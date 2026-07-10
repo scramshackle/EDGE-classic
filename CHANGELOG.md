@@ -42,6 +42,7 @@
 - Fixed attempt to free garbage pointer when deleting images on shutdown
 - Fixed projectiles occasionally damaging a mobj without exploding (regular projectiles, not tunneling/boring ones for which this is expected)
 - Fixed Finale cast drawer not applying palette to recoloured monsters
+- Fixed "Read This!" option erroneously appearing and causing a CTD when neither HELP1 nor HELP images are present (custom standalone games)
 
 
 
