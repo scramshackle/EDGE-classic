@@ -150,5 +150,10 @@ void RandomStateWrite(uint64_t value)
     stateful_rng.Set(value);
 }
 
+uint64_t RandomU64(void)
+{
+    return stateless_rng.Next();
+}
+
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

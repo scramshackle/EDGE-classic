@@ -44,5 +44,8 @@ bool RandomByteTestDeterministic(float chance);
 uint64_t RandomStateRead(void);
 void     RandomStateWrite(uint64_t value);
 
+// Generic PRNG support
+uint64_t RandomU64(void);
+
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab
