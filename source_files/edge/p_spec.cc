@@ -31,7 +31,7 @@
 
 #include <limits.h>
 
-#include "AlmostEquals.h"
+#include "epi_math.h"
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
@@ -898,7 +898,7 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
         //       code, the custom value is either permanent or forgotten.
         if (target->properties.type & kBoomSectorFlagFriction)
         {
-            if (!AlmostEquals(length, 100.0f))
+            if (!epi::AlmostEquals(length, 100.0f))
             {
                 float bigfric               = ((0x1EB8 * length) / 0x80 + 0xD000);
                 target->properties.friction = bigfric / 65536.0f;
@@ -1567,7 +1567,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
         }
     }
 
-    if (!AlmostEquals(special->gravity_, kFloatUnused) && tag > 0)
+    if (!epi::AlmostEquals(special->gravity_, kFloatUnused) && tag > 0)
     {
         for (tsec = FindSectorFromTag(tag); tsec; tsec = tsec->tag_next)
         {
@@ -1576,7 +1576,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
         }
     }
 
-    if (!AlmostEquals(special->friction_, kFloatUnused) && tag > 0)
+    if (!epi::AlmostEquals(special->friction_, kFloatUnused) && tag > 0)
     {
         for (tsec = FindSectorFromTag(tag); tsec; tsec = tsec->tag_next)
         {
@@ -1593,7 +1593,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
         }
     }
 
-    if (!AlmostEquals(special->viscosity_, kFloatUnused) && tag > 0)
+    if (!epi::AlmostEquals(special->viscosity_, kFloatUnused) && tag > 0)
     {
         for (tsec = FindSectorFromTag(tag); tsec; tsec = tsec->tag_next)
         {
@@ -1602,7 +1602,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
         }
     }
 
-    if (!AlmostEquals(special->drag_, kFloatUnused) && tag > 0)
+    if (!epi::AlmostEquals(special->drag_, kFloatUnused) && tag > 0)
     {
         for (tsec = FindSectorFromTag(tag); tsec; tsec = tsec->tag_next)
         {
