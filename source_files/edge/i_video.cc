@@ -360,14 +360,18 @@ bool SetScreenSize(DisplayMode *mode)
     else if (mode->window_mode == kWindowModeBorderless)
     {
         SDL_SetWindowFullscreen(program_window, true);
+        SDL_SyncWindow(program_window);
         SDL_GetWindowSize(program_window, &borderless_mode.width, &borderless_mode.height);
+        SDL_SyncWindow(program_window);
 
         LogPrint("SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height, mode->depth);
     }
     else /* kWindowModeWindowed */
     {
         SDL_SetWindowFullscreen(program_window, 0);
+        SDL_SyncWindow(program_window);
         SDL_SetWindowSize(program_window, mode->width, mode->height);
+        SDL_SyncWindow(program_window);
         SDL_SetWindowPosition(program_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
         LogPrint("SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height, mode->depth);
