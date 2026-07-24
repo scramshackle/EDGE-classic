@@ -16,6 +16,6 @@
 //
 //----------------------------------------------------------------------------
 
-#include "epi_sdl.h"
+#include <SDL3/SDL.h>
 
 extern SDL_Window *program_window;

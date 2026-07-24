@@ -76,6 +76,7 @@
 #include "m_option.h"
 
 #include <math.h>
+#include <SDL3/SDL.h>
 
 #include <set>
 
@@ -88,7 +89,6 @@
 #include "e_input.h"
 #include "epi.h"
 #include "epi_filesystem.h"
-#include "epi_sdl.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "g_game.h"
@@ -508,7 +508,7 @@ static OptionMenuItem analogueoptions[] = {
     {kOptionMenuItemTypeSlider, "Y Sensitivity", nullptr, 0, &mouse_y_sensitivity.f_,
      OptionMenuUpdateConsoleVariableFromFloat, nullptr, &mouse_y_sensitivity, 0.25f, 1.0f, 15.0f, "%0.2f"},
     {kOptionMenuItemTypePlain, "", nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, ""},
-    {kOptionMenuItemTypeSwitch, "Gamepad", "None/1/2/3/4", 5, &joystick_device, OptionMenuChangeGamepad, nullptr,
+    {kOptionMenuItemTypeFunction, "Gamepad", nullptr, 0, nullptr, OptionMenuChangeGamepad, nullptr,
      nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Left Stick X", JoystickAxis, 13, &joystick_axis[0], nullptr, nullptr, nullptr, 0, 0, 0,
      ""},
@@ -1196,31 +1196,7 @@ void OptionMenuDrawer()
         {
         case kOptionMenuItemTypeBoolean:
         case kOptionMenuItemTypeSwitch: {
-            if (current_menu == &analogue_optmenu && current_menu->items[i].switch_variable == &joystick_device)
-            {
-                if (joystick_device == 0)
-                {
-                    HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry, "None");
-                    break;
-                }
-                else
-                {
-                    const char *joyname = SDL_JoystickNameForIndex(joystick_device - 1);
-                    if (joyname)
-                    {
-                        HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry,
-                                     epi::StringFormat("%d - %s", joystick_device, joyname).c_str());
-                        break;
-                    }
-                    else
-                    {
-                        HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry,
-                                     epi::StringFormat("%d - Not Connected", joystick_device).c_str());
-                        break;
-                    }
-                }
-            }
-            else if (current_menu == &main_optmenu && current_menu->items[i].switch_variable == &preferred_game)
+            if (current_menu == &main_optmenu && current_menu->items[i].switch_variable == &preferred_game)
             {
                 HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry,
                              game_checker[preferred_game.d_].display_name);
@@ -1269,6 +1245,14 @@ void OptionMenuDrawer()
             k = *(int *)(current_menu->items[i].switch_variable);
             OptionMenuKeyToString(k, tempstring);
             HUDWriteText(style, fontType, (current_menu->menu_center + 15), curry, tempstring);
+            break;
+        }
+
+        case kOptionMenuItemTypeFunction: {
+            if (current_menu == &analogue_optmenu && current_menu->items[i].routine == OptionMenuChangeGamepad)
+            {
+                HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry, GetJoystickName());
+            }
             break;
         }
 
@@ -2297,9 +2281,8 @@ static void OptionMenuChangeCrosshair(int key_pressed, ConsoleVariable *console_
 //
 static void OptionMenuChangeGamepad(int key_pressed, ConsoleVariable *console_variable)
 {
-    EPI_UNUSED(key_pressed);
     EPI_UNUSED(console_variable);
-    CheckJoystickChanged();
+    SwitchJoystick(key_pressed);
 }
 
 //

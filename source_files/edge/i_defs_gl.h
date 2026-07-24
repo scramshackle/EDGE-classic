@@ -149,13 +149,8 @@ typedef int GLsizei;
 
 #define GL_PERSPECTIVE_CORRECTION_HINT 0x0C50
 #else
-#ifdef __APPLE__
-#include <SDL_opengl.h>
-#include <SDL_video.h>
-#else
-#include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL_video.h>
-#endif
+#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_video.h>
 #endif
 
 //--- editor settings ---

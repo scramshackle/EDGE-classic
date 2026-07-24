@@ -1,0 +1,22 @@
+if (MINGW)
+  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/mingw/include/SDL3")
+else ()
+  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/msvc/include/SDL3")
+endif()
+
+# Support both 32 and 64 bit builds
+if (MINGW)
+  if (${CMAKE_SIZEOF_VOID_P} MATCHES 8)
+    set(SDL3_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/mingw/x64/libSDL3.dll.a")
+  else ()
+    set(SDL3_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/mingw/x86/libSDL3.dll.a")
+  endif ()
+else ()
+  if (${CMAKE_SIZEOF_VOID_P} MATCHES 8)
+    set(SDL3_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/msvc/x64/SDL3.lib")
+  else ()
+    set(SDL3_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/msvc/x86/SDL3.lib")
+  endif ()
+endif ()
+
+string(STRIP "${SDL3_LIBRARIES}" SDL3_LIBRARIES)

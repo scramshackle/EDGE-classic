@@ -18,7 +18,6 @@
 
 #include "e_event.h"
 #include "epi.h"
-#include "epi_sdl.h"
 #include "hu_draw.h"
 #include "i_defs_gl.h"
 #include "i_sound.h"
@@ -293,7 +292,7 @@ void PlayMovie(const std::string &name)
 
     BlackoutWipeTexture();
 
-    last_time = (double)SDL_GetTicks() / 1000.0;
+    last_time = (double)GetMilliseconds() / 1000.0;
     fadein    = 0;
     fadeout   = 0;
 
@@ -386,7 +385,7 @@ void MovieDrawer()
     }
     else
     {
-        double current_time = (double)SDL_GetTicks() / 1000.0;
+        double current_time = (double)GetMilliseconds() / 1000.0;
         fadeout             = current_time - last_time;
 
         StartUnitBatch(false);
@@ -478,7 +477,7 @@ void MovieTicker()
     }
     if (!plm_has_ended(decoder))
     {
-        double current_time = (double)SDL_GetTicks() / 1000.0;
+        double current_time = (double)GetMilliseconds() / 1000.0;
         elapsed_time        = current_time - last_time;
         if (elapsed_time > 1.0 / 30.0)
             elapsed_time = 1.0 / 30.0;

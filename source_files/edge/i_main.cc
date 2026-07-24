@@ -16,10 +16,11 @@
 //
 //----------------------------------------------------------------------------
 
+#include <SDL3/SDL.h>
+
 #include "dm_defs.h"
 #include "e_main.h"
 #include "epi_filesystem.h"
-#include "epi_sdl.h"
 #include "epi_str_util.h"
 #include "i_system.h"
 #include "m_argv.h"
@@ -31,17 +32,15 @@ extern "C"
 {
     int main(int argc, char *argv[])
     {
-        if (SDL_Init(0) < 0)
+        if (!SDL_Init(0))
             FatalError("Couldn't init SDL!!\n%s\n", SDL_GetError());
 
-        char *exec_path = SDL_GetBasePath();
+        const char *exec_path = SDL_GetBasePath();
 
         if (!exec_path)
             FatalError("Couldn't determing program directory!\n");
         else
             executable_path = exec_path;
-
-        SDL_free(exec_path);
 
         EdgeMain(argc, (const char **)argv);
         EdgeShutdown();

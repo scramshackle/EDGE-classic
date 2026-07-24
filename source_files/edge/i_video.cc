@@ -18,6 +18,8 @@
 
 #include "i_video.h"
 
+#include <SDL3/SDL.h>
+
 #include "con_main.h"
 #include "ddf_main.h"
 #include "dm_state.h"
@@ -96,11 +98,13 @@ void GrabCursor(bool enable)
 
     if (grab_state && grab_mouse.d_)
     {
-        SDL_SetRelativeMouseMode(SDL_TRUE);
+        SDL_SetWindowMouseGrab(program_window, true);
+        SDL_SetWindowRelativeMouseMode(program_window, true);
     }
     else
     {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
+        SDL_SetWindowMouseGrab(program_window, false);
+        SDL_SetWindowRelativeMouseMode(program_window, false);
     }
 #endif
 }
@@ -145,26 +149,18 @@ void DeterminePixelAspect()
 
 void StartupGraphics(void)
 {
-    std::string driver = ArgumentValue("videodriver");
+    SDL_Environment *env = SDL_GetEnvironment();
 
-    if (driver.empty())
-    {
-        const char *check = SDL_getenv("SDL_VIDEODRIVER");
-        if (check)
-            driver = check;
-    }
+    if (!env)
+        FatalError("Failed to get SDL Environment variables!\n");
 
-    if (driver.empty())
-        driver = "default";
+    const char *driver = SDL_GetEnvironmentVariable(env, "SDL_VIDEODRIVER");
 
-    if (epi::StringCaseCompareASCII(driver, "default") != 0)
-    {
-        SDL_setenv("SDL_VIDEODRIVER", driver.c_str(), 1);
-    }
+    if (!driver) driver = "default";
 
-    LogPrint("SDL_Video_Driver: %s\n", driver.c_str());
+    LogPrint("SDL_Video_Driver: %s\n", driver);
 
-    if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
         FatalError("Couldn't init SDL VIDEO!\n%s\n", SDL_GetError());
 
     if (FindArgument("nograb") > 0)
@@ -191,11 +187,22 @@ void StartupGraphics(void)
 #endif
 
     // -DS- 2005/06/27 Detect SDL Resolutions
-    SDL_DisplayMode info;
-    SDL_GetDesktopDisplayMode(0, &info);
+    SDL_DisplayID main_display = SDL_GetPrimaryDisplay();
+    
+    if (main_display == 0)
+    {
+        FatalError("Could not fetch display information: %s\n", SDL_GetError());
+    }
 
-    desktop_resolution_width  = info.w;
-    desktop_resolution_height = info.h;
+    const SDL_DisplayMode *info = SDL_GetDesktopDisplayMode(main_display);
+
+    if (!info)
+    {
+        FatalError("Could not fetch desktop display mode: %s\n", SDL_GetError());
+    }
+
+    desktop_resolution_width  = info->w;
+    desktop_resolution_height = info->h;
 
     if (current_screen_width > desktop_resolution_width.d_)
         current_screen_width = desktop_resolution_width.d_;
@@ -204,21 +211,27 @@ void StartupGraphics(void)
 
     LogPrint("Desktop resolution: %dx%d\n", desktop_resolution_width.d_, desktop_resolution_height.d_);
 
-    int num_modes = SDL_GetNumDisplayModes(0);
+    int num_modes = 0;
+    SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(main_display, &num_modes);
 
-    for (int i = 0; i < num_modes; i++)
+    if (!num_modes || !modes)
     {
-        SDL_DisplayMode possible_mode;
-        SDL_GetDisplayMode(0, i, &possible_mode);
+        if (modes) SDL_free(modes);
+        FatalError("Could not fetch possible display modes: %s\n", SDL_GetError());
+    }
 
-        if (possible_mode.w >= desktop_resolution_width.d_ || possible_mode.h >= desktop_resolution_height.d_)
+    for (int i = 0; i < num_modes; ++i)
+    {
+        SDL_DisplayMode *possible_mode = modes[i];
+
+        if (possible_mode->w >= desktop_resolution_width.d_ || possible_mode->h >= desktop_resolution_height.d_)
             continue;
 
         DisplayMode test_mode;
 
-        test_mode.width       = possible_mode.w;
-        test_mode.height      = possible_mode.h;
-        test_mode.depth       = SDL_BITSPERPIXEL(possible_mode.format);
+        test_mode.width       = possible_mode->w;
+        test_mode.height      = possible_mode->h;
+        test_mode.depth       = SDL_BITSPERPIXEL(possible_mode->format);
         test_mode.window_mode = kWindowModeWindowed;
 
         if ((test_mode.width & 15) != 0)
@@ -248,9 +261,11 @@ void StartupGraphics(void)
 
     // Fill in borderless mode scrmode with the native display info
     borderless_mode.window_mode = kWindowModeBorderless;
-    borderless_mode.width       = info.w;
-    borderless_mode.height      = info.h;
-    borderless_mode.depth       = SDL_BITSPERPIXEL(info.format);
+    borderless_mode.width       = info->w;
+    borderless_mode.height      = info->h;
+    borderless_mode.depth       = SDL_BITSPERPIXEL(info->format);
+
+    SDL_free(modes);
 
     LogPrint("StartupGraphics: initialisation OK\n");
 }
@@ -267,16 +282,13 @@ static bool InitializeWindow(DisplayMode *mode)
 #endif
 
     uint32_t window_flags =
-        (mode->window_mode == kWindowModeBorderless ? (SDL_WINDOW_FULLSCREEN_DESKTOP) : (0)) | resizeable;
+        (mode->window_mode == kWindowModeBorderless ? (SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN) : (0)) | resizeable;
 
-#ifndef SOKOL_D3D11
     window_flags |= SDL_WINDOW_OPENGL;
-#endif
 
-    program_window = SDL_CreateWindow(temp_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, mode->width,
-                                      mode->height, window_flags);
+    program_window = SDL_CreateWindow(temp_title.c_str(), mode->width, mode->height, window_flags);
 
-    if (program_window == nullptr)
+    if (!program_window)
     {
         LogPrint("Failed to create window: %s\n", SDL_GetError());
         return false;
@@ -293,42 +305,36 @@ static bool InitializeWindow(DisplayMode *mode)
         toggle_windowed_window_mode = kWindowModeWindowed;
     }
 
-#ifndef SOKOL_D3D11
     program_context = SDL_GL_CreateContext(program_window);
     if (program_context == NULL)
         FatalError("Failed to create OpenGL context.\n");
-#endif
 
     if (vsync.d_ == 2)
     {
-#ifndef SOKOL_D3D11
         // Fallback to normal VSync if Adaptive doesn't work
-        if (SDL_GL_SetSwapInterval(-1) == -1)
+        if (!SDL_GL_SetSwapInterval(-1))
         {
             vsync = 1;
             SDL_GL_SetSwapInterval(vsync.d_);
         }
-#endif
     }
     else
     {
-#ifndef SOKOL_D3D11
         SDL_GL_SetSwapInterval(vsync.d_);
-#endif
     }
 
 #ifndef EDGE_SOKOL
     int major_version = 0;
     int minor_version = 0;
 
-    if (SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major_version) < 0 || SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor_version) < 0)
+    if (!SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major_version) || !SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor_version))
         FatalError("Failed to determine system OpenGL version!\n");
 
     if (major_version < 1 || (major_version == 1 && minor_version < 3))
         FatalError("System only supports GL %d.%d. Minimum GL version 1.3 required!\n", major_version,
                    minor_version);
 
-    if (SDL_GL_ExtensionSupported("GL_ARB_texture_non_power_of_two") != SDL_TRUE)
+    if (!SDL_GL_ExtensionSupported("GL_ARB_texture_non_power_of_two"))
         FatalError("System GL implementation does not support non-power-of-two textures!\n");
 #endif
 
@@ -353,7 +359,7 @@ bool SetScreenSize(DisplayMode *mode)
     }
     else if (mode->window_mode == kWindowModeBorderless)
     {
-        SDL_SetWindowFullscreen(program_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_SetWindowFullscreen(program_window, true);
         SDL_GetWindowSize(program_window, &borderless_mode.width, &borderless_mode.height);
 
         LogPrint("SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height, mode->depth);
@@ -473,7 +479,7 @@ void FinishFrame(void)
         {
 #ifndef SOKOL_D3D11
             // Fallback to normal VSync if Adaptive doesn't work
-            if (SDL_GL_SetSwapInterval(-1) == -1)
+            if (!SDL_GL_SetSwapInterval(-1))
             {
                 vsync = 1;
                 SDL_GL_SetSwapInterval(vsync.d_);
@@ -504,7 +510,7 @@ void ShutdownGraphics(void)
 #ifndef SOKOL_D3D11
     if (program_context != NULL)
     {
-        SDL_GL_DeleteContext(program_context);
+        SDL_GL_DestroyContext(program_context);
         program_context = NULL;
     }
 #endif

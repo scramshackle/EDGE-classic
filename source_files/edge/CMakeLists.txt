@@ -173,9 +173,9 @@ else()
 endif()
 
 if(WIN32 AND (MSVC OR CLANG))
-  target_include_directories(edge-classic PRIVATE ${EDGE_LIBRARY_DIR}/sdl2/msvc/include)
+  target_include_directories(edge-classic PRIVATE ${EDGE_LIBRARY_DIR}/sdl3/msvc/include)
 elseif (MINGW)
-  target_include_directories(edge-classic SYSTEM PRIVATE ${EDGE_LIBRARY_DIR}/sdl2/mingw/include)
+  target_include_directories(edge-classic SYSTEM PRIVATE ${EDGE_LIBRARY_DIR}/sdl3/mingw/include)
 endif()
 
 target_include_directories(edge-classic PRIVATE ./)
@@ -184,7 +184,7 @@ set (EDGE_LINK_LIBRARIES
   ajbsp
   ddf
   epi
-  ${SDL2_LIBRARIES}
+  ${SDL3_LIBRARIES}
   almostequals
   fluidlite
   HandmadeMath
@@ -256,31 +256,31 @@ else()
 
 endif()
 
-# Copy appropriate SDL2.dll to local install directory when built with MSVC/Clang or MSYS2
+# Copy appropriate SDL3.dll to local install directory when built with MSVC/Clang or MSYS2
 if (WIN32)
   if (MSYS)
     if($ENV{MSYSTEM} MATCHES "CLANG64")  
-      list(APPEND COPY_FILES "/clang64/bin/SDL2.dll")
+      list(APPEND COPY_FILES "/clang64/bin/SDL3.dll")
     elseif($ENV{MSYSTEM} MATCHES "UCRT64")
-      list(APPEND COPY_FILES "/ucrt64/bin/SDL2.dll")
+      list(APPEND COPY_FILES "/ucrt64/bin/SDL3.dll")
     else ()
       if (${CMAKE_SIZEOF_VOID_P} MATCHES 8)
-        list(APPEND COPY_FILES "/mingw64/bin/SDL2.dll")
+        list(APPEND COPY_FILES "/mingw64/bin/SDL3.dll")
       else ()
-        list(APPEND COPY_FILES "/mingw32/bin/SDL2.dll")
+        list(APPEND COPY_FILES "/mingw32/bin/SDL3.dll")
       endif ()
     endif()
   elseif(MSVC OR CLANG)
     if (${CMAKE_SIZEOF_VOID_P} MATCHES 8)
-      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl2/msvc/x64/SDL2.dll")
+      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl3/msvc/x64/SDL3.dll")
     else ()
-      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl2/msvc/x86/SDL2.dll")
+      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl3/msvc/x86/SDL3.dll")
     endif ()
   elseif(MINGW)
     if (${CMAKE_SIZEOF_VOID_P} MATCHES 8)
-      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl2/mingw/x64/SDL2.dll")
+      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl3/mingw/x64/SDL3.dll")
     else ()
-      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl2/mingw/x86/SDL2.dll")
+      list(APPEND COPY_FILES "${CMAKE_SOURCE_DIR}/libraries/sdl3/mingw/x86/SDL3.dll")
     endif ()
   endif()
 endif()

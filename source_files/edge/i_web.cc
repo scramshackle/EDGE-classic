@@ -91,11 +91,11 @@ extern "C"
         EPI_UNUSED(userData);
         if (changeEvent->isActive)
         {
-            SDL_ShowCursor(SDL_FALSE);
+            SDL_ShowCursor(false);
         }
         else
         {
-            SDL_ShowCursor(SDL_TRUE);
+            SDL_ShowCursor(true);
         }
 
         return 0;

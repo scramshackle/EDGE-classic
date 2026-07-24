@@ -18,9 +18,10 @@
 
 #include "epi_filesystem.h"
 
+#include <SDL3/SDL.h>
+
 #include "epi.h"
 #include "epi_file.h"
-#include "epi_sdl.h"
 #include "epi_str_compare.h"
 #include "epi_windows.h"
 #ifdef EDGE_WEB
@@ -623,7 +624,7 @@ bool OpenDirectory(const std::string &src)
     // A result of 0 is 'success', but that only means SDL was able to launch
     // some kind of process to attempt to handle the path. -1 is the only result
     // that is guaranteed to be an 'error'
-    if (SDL_OpenURL(StringFormat("file:///%s", src.c_str()).c_str()) == -1)
+    if (!SDL_OpenURL(StringFormat("file:///%s", src.c_str()).c_str()))
     {
         LogWarning("OpenDirectory failed to open requested path %s\nError: %s\n", src.c_str(), SDL_GetError());
         return false;

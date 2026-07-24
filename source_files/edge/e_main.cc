@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <vector>
@@ -50,7 +51,6 @@
 #include "e_input.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
-#include "epi_sdl.h"
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
@@ -1205,14 +1205,13 @@ static void InitializeDirectories(void)
     // Get the App Directory from parameter.
 
     // Note: This might need adjusting for Apple
-    char *path = SDL_GetBasePath();
+    const char *path = SDL_GetBasePath();
 
     if (!path)
         FatalError("Failed to get base path!\n");
 
     std::string s = path;
 
-    SDL_free(path);
     path = NULL;
 
     game_directory = s;
@@ -1267,7 +1266,6 @@ static void InitializeDirectories(void)
         if (!path)
             FatalError("Could not determine home directory!\n");
         home_directory = path;
-        SDL_free(path);
         path = NULL;
     }
 

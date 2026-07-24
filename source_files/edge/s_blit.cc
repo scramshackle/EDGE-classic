@@ -31,7 +31,6 @@
 #include "con_var.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_sdl.h"
 #include "i_sound.h"
 #include "i_system.h"
 #include "m_misc.h"

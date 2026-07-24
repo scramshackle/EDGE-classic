@@ -18,6 +18,8 @@
 
 #include "i_system.h"
 
+#include <SDL3/SDL.h>
+
 #include <chrono>
 #include <thread>
 
@@ -25,7 +27,6 @@
 #include "dm_defs.h"
 #include "e_main.h"
 #include "epi.h"
-#include "epi_sdl.h"
 #include "epi_windows.h"
 #include "g_game.h"
 #include "m_argv.h"

@@ -22,7 +22,6 @@
 
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_sdl.h"
 #include "i_movie.h"
 #include "i_sound.h"
 #include "i_system.h"
