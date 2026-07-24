@@ -131,7 +131,7 @@ In all cases (barring the WebGL build per the previous section), the executable 
 * edge_base
 * edge_fixes
 * overlays
-* soundfont
+* soundbank
 * edge-classic/edge-classic.exe (OS-dependent)
 * edge_defs.epk
 * SDL2.dll (MSVC/MinGW builds)

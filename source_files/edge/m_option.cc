@@ -123,8 +123,7 @@ extern ConsoleVariable m_language;
 extern ConsoleVariable crosshair_image;
 extern ConsoleVariable crosshair_color;
 extern ConsoleVariable crosshair_size;
-extern ConsoleVariable opl_instrument_bank;
-extern ConsoleVariable midi_soundfont;
+extern ConsoleVariable midi_soundbank;
 extern ConsoleVariable video_overlay;
 extern ConsoleVariable erraticism;
 extern ConsoleVariable draw_culling;
@@ -217,7 +216,7 @@ static void OptionMenuBrowseHome(int key_pressed, ConsoleVariable *console_varia
 
 static void OptionMenuLanguageDrawer(int x, int y, int deltay);
 static void OptionMenuChangeLanguage(int key_pressed, ConsoleVariable *console_variable);
-static void OptionMenuChangeSoundfont(int key_pressed, ConsoleVariable *console_variable);
+static void OptionMenuChangeSoundbank(int key_pressed, ConsoleVariable *console_variable);
 static void OptionMenuChangeOverlay(int key_pressed, ConsoleVariable *console_variable);
 static void OptionMenuChangeCrosshair(int key_pressed, ConsoleVariable *console_variable);
 static void OptionMenuChangeGamepad(int key_pressed, ConsoleVariable *console_variable);
@@ -233,7 +232,7 @@ static constexpr char JoystickAxis[] = "Off/Turn/Turn (Reversed)/Look (Inverted)
 // Screen resolution changes
 static DisplayMode new_window_mode;
 
-extern std::set<std::string>               available_soundfonts;
+extern std::set<std::string>               available_soundbanks;
 extern std::map<std::string, unsigned int> available_crosshairs;
 
 //
@@ -556,7 +555,7 @@ static OptionMenuItem soundoptions[] = {
     {kOptionMenuItemTypeSlider, "Movie/Music Volume", nullptr, 0, &music_volume.f_,
      OptionMenuUpdateConsoleVariableFromFloat, nullptr, &music_volume, 0.05f, 0.0f, 1.0f, "%0.2f"},
     {kOptionMenuItemTypePlain, "", nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, ""},
-    {kOptionMenuItemTypeFunction, "MIDI Instrument Set", nullptr, 0, nullptr, OptionMenuChangeSoundfont, nullptr,
+    {kOptionMenuItemTypeFunction, "MIDI Instrument Set", nullptr, 0, nullptr, OptionMenuChangeSoundbank, nullptr,
      nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeBoolean, "PC Speaker Mode", YesNo, 2, &pc_speaker_mode, OptionMenuChangePCSpeakerMode,
      "Music will be Off while this is enabled", nullptr, 0, 0, 0, ""},
@@ -1138,12 +1137,12 @@ void OptionMenuDrawer()
                      (current_menu->menu_center) - (style->fonts_[fontType]->StringWidth(name_entry) * TEXTscale),
                      curry, name_entry);
 
-        // Draw current soundfont
-        if (current_menu == &sound_optmenu && current_menu->items[i].routine == OptionMenuChangeSoundfont)
+        // Draw current soundbank
+        if (current_menu == &sound_optmenu && current_menu->items[i].routine == OptionMenuChangeSoundbank)
         {
             fontType  = StyleDefinition::kTextSectionAlternate;
             TEXTscale = style->definition_->text_[fontType].scale_;
-            HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry, midi_soundfont.s_.c_str());
+            HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry, epi::GetStem(midi_soundbank.s_).c_str());
         }
 
         // Draw current overlay
@@ -2149,45 +2148,45 @@ static void OptionMenuChangeLanguage(int key_pressed, ConsoleVariable *console_v
 }
 
 //
-// OptionMenuChangeSoundfont
+// OptionMenuChangeSoundbank
 //
 //
-static void OptionMenuChangeSoundfont(int key_pressed, ConsoleVariable *console_variable)
+static void OptionMenuChangeSoundbank(int key_pressed, ConsoleVariable *console_variable)
 {
     EPI_UNUSED(console_variable);
 
     std::set<std::string>::iterator sf_pos;
 
-    if (!available_soundfonts.count(midi_soundfont.s_)) // Something is weird
+    if (!available_soundbanks.count(midi_soundbank.s_)) // Something is weird
     {
-        LogWarning("OptionMenuChangeSoundfont: Could not read list of available "
-                   "soundfonts. "
+        LogWarning("OptionMenuChangeSoundbank: Could not read list of available "
+                   "soundbanks. "
                    "Falling back to default!\n");
-        midi_soundfont = "Default";
+        midi_soundbank = "Default.egtb";
         return;
     }
     else
-        sf_pos = available_soundfonts.find(midi_soundfont.s_);
+        sf_pos = available_soundbanks.find(midi_soundbank.s_);
 
     if (key_pressed == kLeftArrow || key_pressed == kGamepadLeft)
     {
-        if (sf_pos != available_soundfonts.begin())
+        if (sf_pos != available_soundbanks.begin())
             sf_pos--;
         else
         {
-            sf_pos = available_soundfonts.end();
+            sf_pos = available_soundbanks.end();
             sf_pos--;
         }
     }
     else if (key_pressed == kRightArrow || key_pressed == kGamepadRight)
     {
         sf_pos++;
-        if (sf_pos == available_soundfonts.end())
-            sf_pos = available_soundfonts.begin();
+        if (sf_pos == available_soundbanks.end())
+            sf_pos = available_soundbanks.begin();
     }
 
     // update console_variable
-    midi_soundfont = *sf_pos;
+    midi_soundbank = *sf_pos;
     RestartMIDI();
 }
 

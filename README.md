@@ -68,7 +68,7 @@ An optional texture pack to enhance the experience can be found [here.](https://
 - Improved compatibility with Boom behavior and rendering (physics, height sectors, etc)
 - UDMF map support
 - Improved sound mixer with floating-point samples and OpenAL spatialization/attenuation models
-- A soundfont-capable MIDI player (SF2/SF3 support)
+- An advanced 6-operator FM MIDI synthesizer
 - OPL emulation with external OP2/AIL/TMB/WOPL instrument support
 - Many more music and sound formats (PC Speaker, IMF, MP3, OGG, FLAC, IT/S3M/XM/MOD/FT, C64 PSID/RSID)
 - UMAPINFO compatibility

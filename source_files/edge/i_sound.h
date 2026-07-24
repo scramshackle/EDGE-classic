@@ -25,7 +25,7 @@
 #include "miniaudio.h"
 #include "miniaudio_freeverb.h"
 
-extern std::set<std::string> available_soundfonts;
+extern std::set<std::string> available_soundbanks;
 
 extern ma_engine        sound_engine;
 extern ma_sound_group   sfx_node;

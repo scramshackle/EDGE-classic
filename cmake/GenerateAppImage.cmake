@@ -114,7 +114,7 @@ file(WRITE "${APPDIR}/edge-classic.desktop"
   "${DESKTOP_CONTENT}\nExec=edge-classic\nIcon=edge-classic\n"
 )
 
-foreach(dir autoload crosshairs docs edge_fixes overlays soundfont)
+foreach(dir autoload crosshairs docs edge_fixes overlays soundbank)
   file(COPY "${SOURCE_DIR}/${dir}"
     DESTINATION "${APPDIR}/usr/share/edge-classic/"
     PATTERN ".gitkeep" EXCLUDE

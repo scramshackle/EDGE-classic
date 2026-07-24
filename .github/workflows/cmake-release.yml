@@ -32,7 +32,7 @@ jobs:
             edge_base/*.epk
             edge_fixes
             overlays
-            soundfont
+            soundbank
             edge-classic.exe
             *.dll
             *.epk
@@ -74,7 +74,7 @@ jobs:
             edge_base/*.epk
             edge_fixes
             overlays
-            soundfont
+            soundbank
             edge-classic.exe
             *.dll
             *.epk

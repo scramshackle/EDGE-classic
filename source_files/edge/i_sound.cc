@@ -43,10 +43,10 @@ bool no_sound = false;
 int  sound_device_frequency;
 bool sector_reverb = false;
 
-std::set<std::string>  available_soundfonts;
+std::set<std::string>  available_soundbanks;
 extern std::string     game_directory;
 extern std::string     home_directory;
-extern ConsoleVariable midi_soundfont;
+extern ConsoleVariable midi_soundbank;
 
 ma_engine      sound_engine;
 ma_sound_group sfx_node;
@@ -140,50 +140,25 @@ void StartupMusic(void)
     if (no_music)
         return;
 
-    // Check for soundfonts and instrument banks
-    std::vector<epi::DirectoryEntry> sfd;
-    std::string                      soundfont_dir = epi::PathAppend(home_directory, "soundfont");
+    // Check for instrument banks
+    std::vector<epi::DirectoryEntry> sbd;
+    std::string                      soundbank_dir = epi::PathAppend(home_directory, "soundbank");
 
-    // Add our built-in options first so they take precedence over a soundfont that might
-    // somehow have the same file stem
-    available_soundfonts.emplace("Default");
-    available_soundfonts.emplace("OPL Emulation");
+    // Create home directory soundbank folder if it doesn't aleady exist
+    if (!epi::IsDirectory(soundbank_dir))
+        epi::MakeDirectory(soundbank_dir);
 
-    // Create home directory soundfont folder if it doesn't aleady exist
-    if (!epi::IsDirectory(soundfont_dir))
-        epi::MakeDirectory(soundfont_dir);
+    sbd.clear();
 
-    sfd.clear();
-
-    if (!ReadDirectory(sfd, soundfont_dir, "*.sf2"))
+    if (ReadDirectory(sbd, soundbank_dir, "*.egtb"))
     {
-        LogWarning("StartupMusic: Failed to read '%s' directory!\n", soundfont_dir.c_str());
-    }
-    else
-    {
-        for (size_t i = 0; i < sfd.size(); i++)
+        for (size_t i = 0; i < sbd.size(); i++)
         {
-            if (!sfd[i].is_dir)
+            if (!sbd[i].is_dir)
             {
-                std::string filename = epi::GetStem(sfd[i].name);
-                if (!available_soundfonts.count(filename))
-                    available_soundfonts.emplace(filename);
-            }
-        }
-    }
-    if (!ReadDirectory(sfd, soundfont_dir, "*.sf3"))
-    {
-        LogWarning("StartupMusic: Failed to read '%s' directory!\n", soundfont_dir.c_str());
-    }
-    else
-    {
-        for (size_t i = 0; i < sfd.size(); i++)
-        {
-            if (!sfd[i].is_dir)
-            {
-                std::string filename = epi::GetStem(sfd[i].name);
-                if (!available_soundfonts.count(filename))
-                    available_soundfonts.emplace(filename);
+                std::string filename = epi::GetFilename(sbd[i].name);
+                if (!available_soundbanks.count(filename))
+                    available_soundbanks.emplace(filename);
             }
         }
     }
@@ -191,38 +166,18 @@ void StartupMusic(void)
     if (home_directory != game_directory)
     {
         // Read the program directory, but only add names we haven't encountered yet
-        sfd.clear();
-        soundfont_dir = epi::PathAppend(game_directory, "soundfont");
+        sbd.clear();
+        soundbank_dir = epi::PathAppend(game_directory, "soundbank");
 
-        if (!ReadDirectory(sfd, soundfont_dir, "*.sf2"))
+        if (ReadDirectory(sbd, soundbank_dir, "*.egtb"))
         {
-            LogWarning("StartupMusic: Failed to read '%s' directory!\n", soundfont_dir.c_str());
-        }
-        else
-        {
-            for (size_t i = 0; i < sfd.size(); i++)
+            for (size_t i = 0; i < sbd.size(); i++)
             {
-                if (!sfd[i].is_dir)
+                if (!sbd[i].is_dir)
                 {
-                    std::string filename = epi::GetStem(sfd[i].name);
-                    if (!available_soundfonts.count(filename))
-                        available_soundfonts.emplace(filename);
-                }
-            }
-        }
-        if (!ReadDirectory(sfd, soundfont_dir, "*.sf3"))
-        {
-            LogWarning("StartupMusic: Failed to read '%s' directory!\n", soundfont_dir.c_str());
-        }
-        else
-        {
-            for (size_t i = 0; i < sfd.size(); i++)
-            {
-                if (!sfd[i].is_dir)
-                {
-                    std::string filename = epi::GetStem(sfd[i].name);
-                    if (!available_soundfonts.count(filename))
-                        available_soundfonts.emplace(filename);
+                    std::string filename = epi::GetFilename(sbd[i].name);
+                    if (!available_soundbanks.count(filename))
+                        available_soundbanks.emplace(filename);
                 }
             }
         }

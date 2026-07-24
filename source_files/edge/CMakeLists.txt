@@ -183,9 +183,9 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ajbsp
   ddf
+  edgetracker
   epi
   ${SDL3_LIBRARIES}
-  fluidlite
   HandmadeMath
   minilua
   miniaudio
@@ -201,7 +201,6 @@ list (APPEND
   dehacked
   libcRSID
   m4p
-  opalmidi
 )
 
 if (EDGE_SOKOL)
@@ -245,7 +244,7 @@ else()
     ${CMAKE_SOURCE_DIR}/edge_base@/edge_base
     ${CMAKE_SOURCE_DIR}/edge_defs@/edge_defs
     ${CMAKE_SOURCE_DIR}/overlays@/overlays
-    ${CMAKE_SOURCE_DIR}/soundfont@/soundfont
+    ${CMAKE_SOURCE_DIR}/soundbank@/soundbank
     --js-output=${DEST_DIR}/edge-classic-data.js
     --use-preload-cache
     --no-node

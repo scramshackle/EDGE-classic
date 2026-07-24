@@ -74,7 +74,7 @@ jobs:
             edge_defs
             edge_fixes
             overlays
-            soundfont
+            soundbank
             edge-classic.exe
             *.dll
           retention-days: ${{env.RETENTION_DAYS}}
@@ -97,7 +97,7 @@ jobs:
             edge_defs
             edge_fixes
             overlays
-            soundfont
+            soundbank
             edge-classic.exe
             *.dll
           retention-days: ${{env.RETENTION_DAYS}}
@@ -131,7 +131,7 @@ jobs:
           ${{github.workspace}}/edge_defs
           ${{github.workspace}}/edge_fixes
           ${{github.workspace}}/overlays
-          ${{github.workspace}}/soundfont
+          ${{github.workspace}}/soundbank
           ${{github.workspace}}/edge-classic
         retention-days: ${{env.RETENTION_DAYS}}
 

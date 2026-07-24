@@ -9,8 +9,6 @@ libcRSID - Copyright (c) 2024-2025 dashodanger
 BSD 3-Clause License
 ===========================================================================================
 
-"16-Bit Game Station" soundfont (select melodic instruments) - Copyright (c) 2009 Beatnik, Inc
-
 AlmostEquals Google Test Framework Component - Copyright (c) 2005 Google, Inc.
 
 Blasphemer (various assets) - Copyright (c) 2021 Contributors to the Blasphemer project
@@ -23,17 +21,11 @@ minivorbis library - Copyright (c) 2020 Eduardo Bart
 Mod4Play library - 	Copyright (c) 2024-2025 dashodanger
 					Copyright (c) 2022 Olav Sørensen
 
-OpalMIDI library - Copyright (c) 2025, dashodanger
-				   Copyright (c) 2021-2024, Devin Acker
-				   Opal Emulation released into Public Domain by Reality Productions
-
 ===========================================================================================
 CC 1.0 Universal License
 ===========================================================================================
 
 HandmadeMath.h - Ben Visness
-
-"ProtoSquare!" soundfont - Yingchun Soul
 
 ===========================================================================================
 CC-BY-3.0 Unported License
@@ -46,12 +38,6 @@ CC-BY-NC-4.0 International License
 ===========================================================================================
 
 REKKR (various assets) - Copyright (c) 2021 Mockingbird Softworks
-
-===========================================================================================
-CC-BY-SA-4.0 International License
-===========================================================================================
-
-"ChipFreak" soundfont - Copyright (c) Jayvee Enaguas
 
 ===========================================================================================
 GPL3 License
@@ -77,11 +63,6 @@ Fluidlite - Copyright (c) 2016 Robin Lobel
 
 SLADE (IMF->WAV conversion and sky drawing routines) - Copyright (c) 2008 - 2023 Simon Judd
 
-XMIDI library (MIDI conversion) - Copyright (c) 2015-2022 Vitaly Novichkov
-								  Copyright (c) 2015-2016 WildMIDI Developers
-								  Copyright (c) 2014 Bret Curtis
-								  Copyright (c) 2001 Ryan Nunn
-
 ===========================================================================================
 HacX License
 ===========================================================================================
@@ -94,11 +75,7 @@ MIT License
 
 3dreamEngine Lua Math Libraries - Copyright (c) 2019 Luke100000 
 
-"16-Bit Game Station" soundfont (percussion and select melodic instruments) - Copyright (c) 2022 Yingchun Soul
-
 base64.lua - Copyright (c) 2018 Ilya Kolbin 
-
-BW_Midi_Sequencer library - Copyright (c) 2015-2022 Vitaly Novichkov
 
 "C++ implementation of a fast Gaussian blur algorithm by Ivan Kutskir - Integer Version"
 	- Copyright (C) 2017 Basile Fraboni
@@ -129,8 +106,6 @@ Fraction.hpp - Bisqwit
 Miniaudio library - David Reid
 
 prns.h - Marc B. Reynolds
-
-"sf_GMbank" soundfont (renamed to Default.sf2) - The Csound Developers
 
 stb_image, stb_rect_pack, stb_sprintf, and stb_truetype libraries - Sean Barrett
 
