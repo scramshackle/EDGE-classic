@@ -23,8 +23,7 @@
 #include "ddf_types.h"
 #include "epi.h"
 #include "epi_str_hash.h"
-#include "miniaudio.h"
-#include "miniaudio_freeverb.h"
+#include "s_effect.h"
 
 extern epi::StringHash DDFCreateStringHash(std::string_view name);
 #ifdef __GNUC__
@@ -43,7 +42,7 @@ class ReverbDefinition final
 
     void                            Default(void);
     void                            CopyDetail(const ReverbDefinition &src);
-    void                            ApplyReverb(ma_freeverb_node *reverb) const;
+    void                            ApplyReverb(ReverbEffect *reverb) const;
     static void                     ReadDDF(const std::string &data);
     static inline ReverbDefinition *Lookup(std::string_view refname)
     {
@@ -75,7 +74,8 @@ class ReverbDefinition final
     static const ReverbDefinition kIndoorWeak;
 
   private:
-    ReverbDefinition(float size, float damp, float wet, float dry, float width, float gain);
+    ReverbDefinition(float decay, float size, float pre_delay, float diffusion, float high_damping,
+                     float low_damping, float wet, float dry, float width);
     // disable copy construct and assignment operator
     explicit ReverbDefinition(ReverbDefinition &rhs)
     {
@@ -94,21 +94,19 @@ class ReverbDefinition final
 
     // Member vars
 
-    float room_size_;
-    float damping_level_;
-    float wet_level_;
-    float dry_level_;
-    float reverb_width_;
-    float reverb_gain_;
+    float parameters_[kTotalReverbParameters];
 
     // Constants and functions for DDF parsing
 
+    EPI_KNOWN_STRINGHASH(kDecayTime, "DECAYTIME")
     EPI_KNOWN_STRINGHASH(kRoomSize, "ROOMSIZE")
-    EPI_KNOWN_STRINGHASH(kDampingLevel, "DAMPINGLEVEL")
+    EPI_KNOWN_STRINGHASH(kPreDelay, "PREDELAY")
+    EPI_KNOWN_STRINGHASH(kDiffusion, "DIFFUSION")
+    EPI_KNOWN_STRINGHASH(kHighFrequencyDamping, "HIGHFREQUENCYDAMPING")
+    EPI_KNOWN_STRINGHASH(kLowFrequencyDamping, "LOWFREQUENCYDAMPING")
     EPI_KNOWN_STRINGHASH(kWetLevel, "WETLEVEL")
     EPI_KNOWN_STRINGHASH(kDryLevel, "DRYLEVEL")
-    EPI_KNOWN_STRINGHASH(kReverbWidth, "REVERBWIDTH")
-    EPI_KNOWN_STRINGHASH(kReverbGain, "REVERBGAIN")
+    EPI_KNOWN_STRINGHASH(kWidthKey, "REVERBWIDTH")
 
     static void StartEntry(const char *name, bool extend);
     static void ParseField(const char *field, const char *contents, int index, bool is_last);

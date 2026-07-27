@@ -25,6 +25,7 @@
 #include "e_main.h"
 #include "epi.h"
 #include "epi_str_util.h"
+#include "i_sound.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
@@ -682,6 +683,10 @@ void ActiveEventProcess(SDL_Event *sdl_ev)
         CheckJoystickChanged();
         break;
 
+    case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED:
+        SoundDeviceFormatChanged();
+        break;
+
     default:
         break; // Don't care
     }
@@ -708,6 +713,10 @@ void InactiveEventProcess(SDL_Event *sdl_ev)
     case SDL_EVENT_GAMEPAD_ADDED:
     case SDL_EVENT_GAMEPAD_REMOVED:
         CheckJoystickChanged();
+        break;
+
+    case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED:
+        SoundDeviceFormatChanged();
         break;
 
     default:

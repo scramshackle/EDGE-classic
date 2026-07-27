@@ -19,6 +19,7 @@
 #include "s_mp3.h"
 
 #include "ddf_playlist.h"
+#include "dr_mp3.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_file.h"
@@ -31,8 +32,6 @@
 #include "snd_gather.h"
 #include "w_wad.h"
 
-static ma_decoder mp3_decoder;
-static ma_sound   mp3_stream;
 class MP3Player : public AbstractMusicPlayer
 {
   public:
@@ -41,24 +40,21 @@ class MP3Player : public AbstractMusicPlayer
 
   private:
     const uint8_t *mp3_data_;
+    drmp3          mp3_decoder_;
+    bool           mp3_opened_;
 
   public:
     bool OpenMemory(const uint8_t *data, int length);
 
     void Close(void) override;
 
-    void Play(bool loop) override;
-    void Stop(void) override;
-
-    void Pause(void) override;
-    void Resume(void) override;
-
-    void Ticker(void) override;
+  protected:
+    int StreamIntoBuffer(void *buffer, int frames) override;
 };
 
 //----------------------------------------------------------------------------
 
-MP3Player::MP3Player() : mp3_data_(nullptr)
+MP3Player::MP3Player() : mp3_data_(nullptr), mp3_opened_(false)
 {
     status_ = kNotLoaded;
 }
@@ -73,26 +69,19 @@ bool MP3Player::OpenMemory(const uint8_t *data, int length)
     if (status_ != kNotLoaded)
         Close();
 
-    ma_decoder_config decode_config = ma_decoder_config_init_default();
-    decode_config.format            = ma_format_f32;
-    decode_config.encodingFormat    = ma_encoding_format_mp3;
-
-    if (ma_decoder_init_memory(data, length, &decode_config, &mp3_decoder) != MA_SUCCESS)
+    if (!drmp3_init_memory(&mp3_decoder_, data, length, NULL))
     {
-        LogWarning("Failed to load MP3 music (corrupt ogg?)\n");
+        LogWarning("Failed to load MP3 music (corrupt mp3?)\n");
         return false;
     }
 
-    if (ma_sound_init_from_data_source(&sound_engine, &mp3_decoder,
-                                       MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_NO_SPATIALIZATION,
-                                       NULL, &mp3_stream) != MA_SUCCESS)
+    mp3_opened_ = true;
+
+    if (!OpenStream(mp3_decoder_.sampleRate, mp3_decoder_.channels, SDL_AUDIO_F32))
     {
-        ma_decoder_uninit(&mp3_decoder);
-        LogWarning("Failed to load OGG music (corrupt ogg?)\n");
+        Close();
         return false;
     }
-
-    ma_node_attach_output_bus(&mp3_stream, 0, &music_node, 0);
 
     mp3_data_ = data;
 
@@ -110,73 +99,45 @@ void MP3Player::Close()
     // Stop playback
     Stop();
 
-    ma_sound_uninit(&mp3_stream);
+    CloseStream();
 
-    ma_decoder_uninit(&mp3_decoder);
+    if (mp3_opened_)
+    {
+        drmp3_uninit(&mp3_decoder_);
+        mp3_opened_ = false;
+    }
 
     delete[] mp3_data_;
+    mp3_data_ = nullptr;
 
     status_ = kNotLoaded;
 }
 
-void MP3Player::Pause()
+int MP3Player::StreamIntoBuffer(void *buffer, int frames)
 {
-    if (status_ != kPlaying)
-        return;
+    float *output      = (float *)buffer;
+    int    frames_left = frames;
 
-    ma_sound_stop(&mp3_stream);
-
-    status_ = kPaused;
-}
-
-void MP3Player::Resume()
-{
-    if (status_ != kPaused)
-        return;
-
-    ma_sound_start(&mp3_stream);
-
-    status_ = kPlaying;
-}
-
-void MP3Player::Play(bool loop)
-{
-    if (status_ != kNotLoaded && status_ != kStopped)
-        return;
-
-    looping_ = loop;
-
-    ma_sound_set_looping(&mp3_stream, looping_ ? MA_TRUE : MA_FALSE);
-
-    // Let 'er rip (maybe)
-    if (playing_movie)
-        status_ = kPaused;
-    else
+    while (frames_left > 0)
     {
-        status_ = kPlaying;
-        ma_sound_start(&mp3_stream);
+        drmp3_uint64 got = drmp3_read_pcm_frames_f32(&mp3_decoder_, frames_left, output);
+
+        if (got == 0)
+        {
+            if (!looping_)
+                break;
+
+            if (!drmp3_seek_to_pcm_frame(&mp3_decoder_, 0))
+                break;
+
+            continue;
+        }
+
+        output += got * mp3_decoder_.channels;
+        frames_left -= (int)got;
     }
-}
 
-void MP3Player::Stop()
-{
-    if (status_ != kPlaying && status_ != kPaused)
-        return;
-
-    ma_sound_stop(&mp3_stream);
-
-    status_ = kStopped;
-}
-
-void MP3Player::Ticker()
-{
-    if (status_ == kPlaying)
-    {
-        if (pc_speaker_mode)
-            Stop();
-        if (ma_sound_at_end(&mp3_stream)) // This should only be true if finished and not set to looping
-            Stop();
-    }
+    return frames - frames_left;
 }
 
 //----------------------------------------------------------------------------
@@ -199,60 +160,48 @@ AbstractMusicPlayer *PlayMP3Music(uint8_t *data, int length, bool looping)
 
 bool LoadMP3Sound(SoundData *buf, const uint8_t *data, int length)
 {
-    ma_decoder_config decode_config = ma_decoder_config_init_default();
-    decode_config.format            = ma_format_f32;
-    decode_config.encodingFormat    = ma_encoding_format_mp3;
+    drmp3 decode;
 
-    ma_decoder decode;
-
-    if (ma_decoder_init_memory(data, length, &decode_config, &decode) != MA_SUCCESS)
+    if (!drmp3_init_memory(&decode, data, length, NULL))
     {
         LogWarning("Failed to load MP3 sound (corrupt mp3?)\n");
         return false;
     }
 
-    if (decode.outputChannels > 2)
+    if (decode.channels > 2)
     {
-        LogWarning("MP3 SFX Loader: too many channels: %d\n", decode.outputChannels);
-        ma_decoder_uninit(&decode);
+        LogWarning("MP3 SFX Loader: too many channels: %d\n", decode.channels);
+        drmp3_uninit(&decode);
         return false;
     }
 
-    ma_uint64 frame_count = 0;
+    drmp3_uint64 frame_count = drmp3_get_pcm_frame_count(&decode);
 
-    if (ma_decoder_get_length_in_pcm_frames(&decode, &frame_count) != MA_SUCCESS)
+    if (frame_count == 0)
     {
         LogWarning("MP3 SFX Loader: no samples!\n");
-        ma_decoder_uninit(&decode);
+        drmp3_uninit(&decode);
         return false;
     }
 
-    LogDebug("MP3 SFX Loader: freq %d Hz, %d channels\n", decode.outputSampleRate, decode.outputChannels);
+    LogDebug("MP3 SFX Loader: freq %d Hz, %d channels\n", decode.sampleRate, decode.channels);
 
-    bool is_stereo = (decode.outputChannels > 1);
+    bool is_stereo = (decode.channels > 1);
 
-    buf->frequency_ = decode.outputSampleRate;
+    buf->frequency_ = decode.sampleRate;
 
     SoundGatherer gather;
 
     float *buffer = gather.MakeChunk(frame_count, is_stereo);
 
-    ma_uint64 frames_read = 0;
-
-    if (ma_decoder_read_pcm_frames(&decode, buffer, frame_count, &frames_read) != MA_SUCCESS)
-    {
-        LogWarning("MP3 SFX Loader: failure loading samples!\n");
-        gather.DiscardChunk();
-        ma_decoder_uninit(&decode);
-        return false;
-    }
+    drmp3_uint64 frames_read = drmp3_read_pcm_frames_f32(&decode, frame_count, buffer);
 
     gather.CommitChunk(frames_read);
 
     if (!gather.Finalise(buf))
         LogWarning("MP3 SFX Loader: no samples!\n");
 
-    ma_decoder_uninit(&decode);
+    drmp3_uninit(&decode);
 
     return true;
 }

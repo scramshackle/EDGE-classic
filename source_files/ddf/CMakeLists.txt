@@ -31,7 +31,7 @@ add_library(
 
 target_link_libraries(ddf PRIVATE epi HandmadeMath stb)
 
-target_include_directories(ddf PRIVATE ../edge ../../libraries/miniaudio)
+target_include_directories(ddf PRIVATE ../edge)
 
 target_include_directories(ddf PUBLIC ./)
 

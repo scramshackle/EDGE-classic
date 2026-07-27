@@ -29,6 +29,11 @@
 
 extern int sound_device_frequency;
 
+static inline float ConvertUnsigned8ToFloat(uint8_t sample)
+{
+    return (float)sample * 0.00784313725490196078f - 1.0f;
+}
+
 bool LoadDoomSound(SoundData *buf, const uint8_t *data, int length)
 {
     buf->frequency_ = data[2] + (data[3] << 8);
@@ -55,7 +60,7 @@ bool LoadDoomSound(SoundData *buf, const uint8_t *data, int length)
 
     for (; src < s_end; src++)
     {
-        ma_pcm_u8_to_f32(&out, src, 1, ma_dither_mode_none);
+        out     = ConvertUnsigned8ToFloat(*src);
         *dest++ = out;
         *dest++ = out;
     }
@@ -117,9 +122,9 @@ bool LoadPCSpeakerSound(SoundData *buf, const uint8_t *data, int length)
         {
             if (tone)
             {
-                value = (128 + sign * kPCVolume);
-                ma_pcm_u8_to_f32(&float_value, &value, 1, ma_dither_mode_none);
-                *dst++ = float_value;
+                value       = (128 + sign * kPCVolume);
+                float_value = ConvertUnsigned8ToFloat(value);
+                *dst++      = float_value;
                 *dst++ = float_value;
                 if (phase_tic++ >= phase_length)
                 {

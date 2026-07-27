@@ -27,8 +27,8 @@
 
 #include "con_var.h"
 #include "ddf_types.h"
-#include "miniaudio.h"
 #include "p_mobj.h"
+#include "s_spatial.h"
 #include "snd_data.h"
 
 // Forward declarations
@@ -40,6 +40,15 @@ enum ChannelState
     kChannelEmpty    = 0,
     kChannelPlaying  = 1,
     kChannelFinished = 2
+};
+
+enum SoundEffectBus
+{
+    kSoundBusDry        = 0,
+    kSoundBusVacuum     = 1,
+    kSoundBusUnderwater = 2,
+    kSoundBusReverb     = 3,
+    kTotalSoundBuses    = 4
 };
 
 // channel info
@@ -56,18 +65,27 @@ class SoundChannel
 
     bool boss_;
 
-    ma_audio_buffer_config ref_config_;
-    ma_audio_buffer        ref_;
-    ma_sound               channel_sound_;
+    int   cursor_;
+    bool  looping_;
+    bool  attenuate_;
+    float volume_;
+    float minimum_distance_;
+    int   bus_;
+
+    SoundSpatializer spatializer_;
 
   public:
     SoundChannel();
     ~SoundChannel();
+
+    void Reset(void);
 };
 
 constexpr uint16_t kMaximumSoundChannels = 128;
 
 extern ConsoleVariable sound_effect_volume;
+
+extern SpatialListener spatial_listener;
 
 extern SoundChannel *mix_channels[];
 extern int           total_channels;
@@ -82,6 +100,8 @@ void FreeSoundChannels(void);
 void KillSoundChannel(int k);
 
 void UpdateSounds(MapObject *listener, BAMAngle angle);
+
+void MixSoundEffects(float *output, int frames);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

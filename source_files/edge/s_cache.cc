@@ -85,6 +85,47 @@ static bool LoadMP3(SoundData *buf, const uint8_t *lump, int length)
     return LoadMP3Sound(buf, lump, length);
 }
 
+static void ResampleToDeviceRate(SoundData *buf)
+{
+    if (buf->length_ <= 0 || buf->frequency_ == sound_device_frequency || sound_device_frequency <= 0)
+        return;
+
+    double step       = (double)buf->frequency_ / (double)sound_device_frequency;
+    int    new_length = (int)((double)buf->length_ / step);
+
+    if (new_length < 1)
+        new_length = 1;
+
+    float *new_data = new float[new_length * 2];
+
+    for (int i = 0; i < new_length; i++)
+    {
+        double source = (double)i * step;
+        int    index  = (int)source;
+        float  frac   = (float)(source - (double)index);
+
+        if (index >= buf->length_)
+            index = buf->length_ - 1;
+
+        int next = index + 1;
+
+        if (next >= buf->length_)
+            next = buf->length_ - 1;
+
+        const float *a = buf->data_ + index * 2;
+        const float *b = buf->data_ + next * 2;
+
+        new_data[i * 2]     = a[0] + (b[0] - a[0]) * frac;
+        new_data[i * 2 + 1] = a[1] + (b[1] - a[1]) * frac;
+    }
+
+    delete[] buf->data_;
+
+    buf->data_      = new_data;
+    buf->length_    = new_length;
+    buf->frequency_ = sound_device_frequency;
+}
+
 //----------------------------------------------------------------------------
 
 void SoundCacheClearAll(void)
@@ -264,6 +305,8 @@ SoundData *SoundCacheLoad(SoundEffectDefinition *def)
         LoadSilence(buf);
     else if (!DoCacheLoad(def, buf))
         LoadSilence(buf);
+
+    ResampleToDeviceRate(buf);
 
     return buf;
 }

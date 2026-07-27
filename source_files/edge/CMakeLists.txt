@@ -78,11 +78,13 @@ set (EDGE_SOURCE_FILES
   r_texgl.cc
   s_blit.cc
   s_cache.cc
+  s_effect.cc
   s_flac.cc
   s_mp3.cc
   s_music.cc
   s_ogg.cc
   s_sound.cc
+  s_spatial.cc
   s_wav.cc
   sv_chunk.cc
   sv_glob.cc
@@ -183,12 +185,12 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ajbsp
   ddf
+  dr_libs
   edgetracker
   epi
   ${SDL3_LIBRARIES}
   HandmadeMath
   minilua
-  miniaudio
   minivorbis
   miniz
   pl_mpeg

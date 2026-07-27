@@ -51,9 +51,176 @@ bool no_music = false;
 // Current music handle
 static AbstractMusicPlayer *music_player;
 
-int         entry_playing = -1;
-static bool entry_looped;
-bool        pc_speaker_mode = false;
+int  entry_playing = -1;
+bool entry_looped;
+bool pc_speaker_mode = false;
+
+SDL_AudioDeviceID music_device = 0;
+
+AbstractMusicPlayer::AbstractMusicPlayer()
+    : status_(kNotLoaded), looping_(false), stream_(nullptr), stream_frame_bytes_(0), stream_paused_(false),
+      stream_ended_(false)
+{
+}
+
+AbstractMusicPlayer::~AbstractMusicPlayer()
+{
+    CloseStream();
+}
+
+void SDLCALL AbstractMusicPlayer::StreamCallback(void *userdata, SDL_AudioStream *stream, int additional_amount,
+                                                 int total_amount)
+{
+    EPI_UNUSED(total_amount);
+
+    AbstractMusicPlayer *player = (AbstractMusicPlayer *)userdata;
+
+    if (additional_amount <= 0 || player->stream_paused_ || player->stream_ended_)
+        return;
+
+    int frames = additional_amount / player->stream_frame_bytes_;
+
+    if (frames <= 0)
+        return;
+
+    if (player->stream_scratch_.size() < (size_t)additional_amount)
+        player->stream_scratch_.resize((size_t)additional_amount);
+
+    int frames_filled = player->StreamIntoBuffer(player->stream_scratch_.data(), frames);
+
+    if (frames_filled > 0)
+        SDL_PutAudioStreamData(stream, player->stream_scratch_.data(), frames_filled * player->stream_frame_bytes_);
+
+    if (frames_filled < frames)
+        player->stream_ended_ = true;
+}
+
+bool AbstractMusicPlayer::OpenStream(int frequency, int channels, SDL_AudioFormat format)
+{
+    CloseStream();
+
+    SDL_AudioSpec spec;
+    spec.format   = format;
+    spec.channels = channels;
+    spec.freq     = frequency;
+
+    stream_ = SDL_CreateAudioStream(&spec, NULL);
+
+    if (!stream_)
+    {
+        LogWarning("Failed to create music stream: %s\n", SDL_GetError());
+        return false;
+    }
+
+    stream_frame_bytes_ = (int)SDL_AUDIO_BYTESIZE(format) * channels;
+    stream_paused_      = true;
+    stream_ended_       = false;
+
+    SDL_SetAudioStreamGetCallback(stream_, StreamCallback, this);
+
+    if (!SDL_BindAudioStream(music_device, stream_))
+    {
+        LogWarning("Failed to bind music stream: %s\n", SDL_GetError());
+        SDL_DestroyAudioStream(stream_);
+        stream_ = nullptr;
+        return false;
+    }
+
+    return true;
+}
+
+void AbstractMusicPlayer::CloseStream(void)
+{
+    if (!stream_)
+        return;
+
+    SDL_DestroyAudioStream(stream_);
+    stream_ = nullptr;
+}
+
+void AbstractMusicPlayer::Play(bool loop)
+{
+    if (status_ != kNotLoaded && status_ != kStopped)
+        return;
+
+    looping_ = loop;
+
+    if (playing_movie)
+    {
+        status_ = kPaused;
+        return;
+    }
+
+    status_ = kPlaying;
+
+    if (stream_)
+    {
+        SDL_LockAudioStream(stream_);
+        stream_paused_ = false;
+        SDL_UnlockAudioStream(stream_);
+    }
+}
+
+void AbstractMusicPlayer::Stop(void)
+{
+    if (status_ != kPlaying && status_ != kPaused)
+        return;
+
+    if (stream_)
+    {
+        SDL_LockAudioStream(stream_);
+        stream_paused_ = true;
+        SDL_UnlockAudioStream(stream_);
+        SDL_ClearAudioStream(stream_);
+    }
+
+    status_ = kStopped;
+}
+
+void AbstractMusicPlayer::Pause(void)
+{
+    if (status_ != kPlaying)
+        return;
+
+    if (stream_)
+    {
+        SDL_LockAudioStream(stream_);
+        stream_paused_ = true;
+        SDL_UnlockAudioStream(stream_);
+    }
+
+    status_ = kPaused;
+}
+
+void AbstractMusicPlayer::Resume(void)
+{
+    if (status_ != kPaused)
+        return;
+
+    if (stream_)
+    {
+        SDL_LockAudioStream(stream_);
+        stream_paused_ = false;
+        SDL_UnlockAudioStream(stream_);
+    }
+
+    status_ = kPlaying;
+}
+
+void AbstractMusicPlayer::Ticker(void)
+{
+    if (status_ != kPlaying)
+        return;
+
+    if (pc_speaker_mode)
+    {
+        Stop();
+        return;
+    }
+
+    if (stream_ended_ && stream_ && SDL_GetAudioStreamQueued(stream_) == 0)
+        Stop();
+}
 
 void ChangeMusic(int entry_number, bool loop)
 {
@@ -237,7 +404,8 @@ void StopMusic(void)
 
 void MusicTicker(void)
 {
-    ma_sound_group_set_volume(&music_node, music_volume.f_);
+    if (music_device != 0)
+        SDL_SetAudioDeviceGain(music_device, music_volume.f_);
 
     if (music_player)
         music_player->Ticker();

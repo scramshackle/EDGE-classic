@@ -18,7 +18,10 @@
 
 #include "i_sound.h"
 
+#include <SDL3/SDL.h>
+
 #include <set>
+#include <vector>
 
 #include "ddf_reverb.h"
 #include "epi.h"
@@ -30,99 +33,240 @@
 #include "m_argv.h"
 #include "m_misc.h"
 #include "m_random.h"
-#include "miniaudio.h"
 #include "s_blit.h"
 #include "s_cache.h"
+#include "s_effect.h"
 #include "s_midi.h"
+#include "s_music.h"
 #include "s_sound.h"
+#include "s_spatial.h"
 #include "w_wad.h"
 
 // If true, sound system is off/not working. Changed to false if sound init ok.
 bool no_sound = false;
 
 int  sound_device_frequency;
-bool sector_reverb = false;
+int  sound_device_channels = 2;
+bool sector_reverb         = false;
+
+SDL_AudioDeviceID sound_device = 0;
+
+static SDL_AudioStream   *sound_device_stream = nullptr;
+static std::vector<float> sound_device_scratch;
+static bool               pending_device_format_change = false;
 
 std::set<std::string>  available_soundbanks;
 extern std::string     game_directory;
 extern std::string     home_directory;
 extern ConsoleVariable midi_soundbank;
 
-ma_engine      sound_engine;
-ma_sound_group sfx_node;
-ma_sound_group music_node;
-// Airless/Vacuum SFX sector sounds
-ma_lpf_node vacuum_node;
-// Underwater sector sounds; these two chain into each other
-static ma_lpf_node underwater_lpf_node;
-ma_delay_node      underwater_node;
-// Dynamic reverb
-ma_freeverb_node reverb_node;
+static LowPassEffect vacuum_filter;
+static LowPassEffect underwater_filter;
+static DelayEffect   underwater_delay;
+
+ReverbEffect reverb_effect;
 
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(dynamic_reverb, "0", kConsoleVariableFlagArchive, 0, 2)
+
+void LockSoundMixer(void)
+{
+    if (sound_device_stream)
+        SDL_LockAudioStream(sound_device_stream);
+}
+
+void UnlockSoundMixer(void)
+{
+    if (sound_device_stream)
+        SDL_UnlockAudioStream(sound_device_stream);
+}
+
+void ProcessVacuumEffect(float *frames, int frame_count)
+{
+    vacuum_filter.Process(frames, frame_count);
+}
+
+void ProcessUnderwaterEffect(float *frames, int frame_count)
+{
+    underwater_delay.Process(frames, frame_count);
+    underwater_filter.Process(frames, frame_count);
+}
+
+void ProcessReverbEffect(float *frames, int frame_count)
+{
+    reverb_effect.Process(frames, frame_count);
+}
+
+static void SDLCALL SoundDeviceCallback(void *userdata, SDL_AudioStream *stream, int additional_amount,
+                                        int total_amount)
+{
+    EPI_UNUSED(userdata);
+    EPI_UNUSED(total_amount);
+
+    if (additional_amount <= 0)
+        return;
+
+    int frame_bytes = (int)sizeof(float) * kSpatialChannels;
+    int frames      = additional_amount / frame_bytes;
+
+    if (frames <= 0)
+        return;
+
+    if (sound_device_scratch.size() < (size_t)(frames * kSpatialChannels))
+        sound_device_scratch.resize((size_t)frames * kSpatialChannels);
+
+    MixSoundEffects(sound_device_scratch.data(), frames);
+
+    SDL_PutAudioStreamData(stream, sound_device_scratch.data(), frames * frame_bytes);
+}
+
+static void BuildEffects(void)
+{
+    SetSpatialGainSmoothTime(sound_device_frequency);
+
+    underwater_delay.Setup(sound_device_frequency, kSpatialChannels, 0.15f, 0.15f);
+    underwater_filter.Setup(sound_device_frequency, kSpatialChannels, 800.0f);
+    vacuum_filter.Setup(sound_device_frequency, kSpatialChannels, 200.0f);
+    reverb_effect.Setup(sound_device_frequency, kSpatialChannels);
+}
+
+static void ShutdownEffects(void)
+{
+    underwater_delay.Shutdown();
+    underwater_filter.Shutdown();
+    vacuum_filter.Shutdown();
+    reverb_effect.Shutdown();
+}
 
 void StartupAudio(void)
 {
     if (no_sound)
         return;
 
-    if (ma_engine_init(NULL, &sound_engine) != MA_SUCCESS)
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
     {
-        LogPrint("StartupSound: Unable to initialize sound engine!\n");
+        LogPrint("StartupSound: Unable to initialize SDL audio subsystem: %s\n", SDL_GetError());
         no_sound = true;
         return;
     }
-    else
+
+    SDL_AudioSpec requested;
+    requested.format   = SDL_AUDIO_F32;
+    requested.channels = kSpatialChannels;
+    requested.freq     = 44100;
+
+    sound_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &requested);
+
+    if (sound_device == 0)
     {
-        sound_device_frequency = ma_engine_get_sample_rate(&sound_engine);
-        ma_uint32 channels     = ma_engine_get_channels(&sound_engine);
-
-        // configure sound groups; this allows us to regulate sound/music
-        // volumes independently
-        if (ma_sound_group_init(&sound_engine, 0, NULL, &sfx_node) != MA_SUCCESS)
-        {
-            ma_engine_uninit(&sound_engine);
-            LogPrint("StartupSound: Unable to initialize sound engine!\n");
-            no_sound = true;
-            return;
-        }
-        else
-            ma_sound_group_set_volume(&sfx_node, sound_effect_volume.f_ * 0.5f);
-        if (ma_sound_group_init(&sound_engine, 0, NULL, &music_node) != MA_SUCCESS)
-        {
-            LogPrint("StartupSound: Unable to initialize music engine!\n");
-            no_music = true;
-        }
-        else
-            ma_sound_group_set_volume(&music_node, music_volume.f_);
-
-        // configure FX nodes
-
-        // Underwater/Submerged
-        ma_delay_node_config delay_node_config = ma_delay_node_config_init(
-            channels, sound_device_frequency, (ma_uint32)(sound_device_frequency * 0.15f), 0.15f);
-        ma_delay_node_init(ma_engine_get_node_graph(&sound_engine), &delay_node_config, NULL, &underwater_node);
-        ma_lpf_node_config lpf_config = ma_lpf_node_config_init(channels, sound_device_frequency, 800.0f, 2);
-        ma_lpf_node_init(ma_engine_get_node_graph(&sound_engine), &lpf_config, NULL, &underwater_lpf_node);
-        ma_node_attach_output_bus(&underwater_lpf_node, 0, &sfx_node, 0);
-        ma_node_attach_output_bus(&underwater_node, 0, &underwater_lpf_node, 0);
-
-        // Vacuum/Airless
-        lpf_config = ma_lpf_node_config_init(channels, sound_device_frequency, 200.0f, 2);
-        ma_lpf_node_init(ma_engine_get_node_graph(&sound_engine), &lpf_config, NULL, &vacuum_node);
-        ma_node_attach_output_bus(&vacuum_node, 0, &sfx_node, 0);
-
-        // Dynamic Reverb
-        ma_freeverb_node_config reverb_node_config = ma_freeverb_node_config_init(2, sound_device_frequency);
-        ma_freeverb_node_init(ma_engine_get_node_graph(&sound_engine), &reverb_node_config, NULL, &reverb_node);
-        ma_node_attach_output_bus(&reverb_node, 0, &sfx_node, 0);
+        LogPrint("StartupSound: Unable to open audio device: %s\n", SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        no_sound = true;
+        return;
     }
 
+    SDL_AudioSpec obtained;
+
+    if (!SDL_GetAudioDeviceFormat(sound_device, &obtained, NULL))
+        obtained = requested;
+
+    sound_device_frequency = obtained.freq;
+    sound_device_channels  = obtained.channels;
+
+    music_device = SDL_OpenAudioDevice(sound_device, &requested);
+
+    if (music_device == 0)
+    {
+        LogPrint("StartupSound: Unable to open music device: %s\n", SDL_GetError());
+        no_music = true;
+    }
+    else
+    {
+        SDL_SetAudioDeviceGain(music_device, music_volume.f_);
+        SDL_ResumeAudioDevice(music_device);
+    }
+
+    BuildEffects();
+
+    SDL_AudioSpec stream_spec;
+    stream_spec.format   = SDL_AUDIO_F32;
+    stream_spec.channels = kSpatialChannels;
+    stream_spec.freq     = sound_device_frequency;
+
+    sound_device_stream = SDL_CreateAudioStream(&stream_spec, NULL);
+
+    if (!sound_device_stream)
+    {
+        LogPrint("StartupSound: Unable to create audio stream: %s\n", SDL_GetError());
+        ShutdownEffects();
+        SDL_CloseAudioDevice(sound_device);
+        sound_device = 0;
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        no_sound = true;
+        return;
+    }
+
+    SDL_SetAudioStreamGetCallback(sound_device_stream, SoundDeviceCallback, NULL);
+    SDL_BindAudioStream(sound_device, sound_device_stream);
+    SDL_ResumeAudioDevice(sound_device);
+
     // display some useful stuff
-    LogPrint("StartupSound: Success @ %d Hz, %d channels\n", sound_device_frequency,
-             ma_engine_get_channels(&sound_engine));
+    LogPrint("StartupSound: Success @ %d Hz, %d channels\n", sound_device_frequency, sound_device_channels);
 
     return;
+}
+
+void SoundDeviceFormatChanged(void)
+{
+    pending_device_format_change = true;
+}
+
+void ApplyPendingSoundDeviceFormatChange(void)
+{
+    if (!pending_device_format_change)
+        return;
+
+    pending_device_format_change = false;
+
+    if (no_sound || sound_device == 0)
+        return;
+
+    SDL_AudioSpec obtained;
+
+    if (!SDL_GetAudioDeviceFormat(sound_device, &obtained, NULL))
+        return;
+
+    if (obtained.freq == sound_device_frequency && obtained.channels == sound_device_channels)
+        return;
+
+    LogPrint("StartupSound: Device format changed to %d Hz, %d channels\n", obtained.freq, obtained.channels);
+
+    int  restart_entry = entry_playing;
+    bool restart_loop  = entry_looped;
+
+    StopMusic();
+    StopAllSoundEffects();
+
+    LockSoundMixer();
+
+    sound_device_frequency = obtained.freq;
+    sound_device_channels  = obtained.channels;
+
+    ShutdownEffects();
+    BuildEffects();
+
+    SDL_AudioSpec stream_spec;
+    stream_spec.format   = SDL_AUDIO_F32;
+    stream_spec.channels = kSpatialChannels;
+    stream_spec.freq     = sound_device_frequency;
+
+    SDL_SetAudioStreamFormat(sound_device_stream, &stream_spec, NULL);
+
+    SoundCacheClearAll();
+
+    UnlockSoundMixer();
+
+    if (restart_entry > 0)
+        ChangeMusic(restart_entry, restart_loop);
 }
 
 void AudioShutdown(void)
@@ -131,6 +275,28 @@ void AudioShutdown(void)
         return;
 
     ShutdownSound();
+
+    if (sound_device_stream)
+    {
+        SDL_DestroyAudioStream(sound_device_stream);
+        sound_device_stream = nullptr;
+    }
+
+    ShutdownEffects();
+
+    if (music_device != 0)
+    {
+        SDL_CloseAudioDevice(music_device);
+        music_device = 0;
+    }
+
+    if (sound_device != 0)
+    {
+        SDL_CloseAudioDevice(sound_device);
+        sound_device = 0;
+    }
+
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
     no_sound = true;
 }

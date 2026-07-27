@@ -33,9 +33,6 @@
 #include "s_music.h"
 #include "snd_gather.h"
 
-static ma_decoder ogg_decoder;
-static ma_sound   ogg_stream;
-
 static size_t ogg_epi_memread(void *ptr, size_t size, size_t nmemb, void *datasource)
 {
     epi::MemFile *d = (epi::MemFile *)datasource;
@@ -78,466 +75,6 @@ static long ogg_epi_memtell(void *datasource)
 
 static constexpr ov_callbacks ogg_epi_callbacks = {ogg_epi_memread, ogg_epi_memseek, ogg_epi_memclose, ogg_epi_memtell};
 
-typedef struct
-{
-    ma_data_source_base     ds;
-    ma_read_proc            onRead;
-    ma_seek_proc            onSeek;
-    ma_tell_proc            onTell;
-    void                   *pReadSeekTellUserData;
-    ma_allocation_callbacks allocationCallbacks;
-    ma_format               format;
-    ma_uint32               channels;
-    ma_uint32               sampleRate;
-    ma_uint64               cursor;
-    epi::MemFile           *memfile;
-    OggVorbis_File          ogg;
-} ma_minivorbis;
-
-static ma_result ma_minivorbis_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tell_proc onTell,
-                                    void *pReadSeekTellUserData, const ma_decoding_backend_config *pConfig,
-                                    const ma_allocation_callbacks *pAllocationCallbacks, ma_minivorbis *pVorbis);
-static ma_result ma_minivorbis_init_memory(const void *pData, size_t dataSize,
-                                           const ma_decoding_backend_config *pConfig,
-                                           const ma_allocation_callbacks *pAllocationCallbacks, ma_minivorbis *pVorbis);
-static void      ma_minivorbis_uninit(ma_minivorbis *pVorbis, const ma_allocation_callbacks *pAllocationCallbacks);
-static ma_result ma_minivorbis_read_pcm_frames(ma_minivorbis *pVorbis, void *pFramesOut, ma_uint64 frameCount,
-                                               ma_uint64 *pFramesRead);
-static ma_result ma_minivorbis_seek_to_pcm_frame(ma_minivorbis *pVorbis, ma_uint64 frameIndex);
-static ma_result ma_minivorbis_get_data_format(const ma_minivorbis *pVorbis, ma_format *pFormat, ma_uint32 *pChannels,
-                                               ma_uint32 *pSampleRate, ma_channel *pChannelMap, size_t channelMapCap);
-static ma_result ma_minivorbis_get_cursor_in_pcm_frames(const ma_minivorbis *pVorbis, ma_uint64 *pCursor);
-static ma_result ma_minivorbis_get_length_in_pcm_frames(ma_minivorbis *pVorbis, ma_uint64 *pLength);
-
-static ma_result ma_minivorbis_ds_read(ma_data_source *pDataSource, void *pFramesOut, ma_uint64 frameCount,
-                                       ma_uint64 *pFramesRead)
-{
-    return ma_minivorbis_read_pcm_frames((ma_minivorbis *)pDataSource, pFramesOut, frameCount, pFramesRead);
-}
-
-static ma_result ma_minivorbis_ds_seek(ma_data_source *pDataSource, ma_uint64 frameIndex)
-{
-    return ma_minivorbis_seek_to_pcm_frame((ma_minivorbis *)pDataSource, frameIndex);
-}
-
-static ma_result ma_minivorbis_ds_get_data_format(ma_data_source *pDataSource, ma_format *pFormat, ma_uint32 *pChannels,
-                                                  ma_uint32 *pSampleRate, ma_channel *pChannelMap, size_t channelMapCap)
-{
-    return ma_minivorbis_get_data_format((ma_minivorbis *)pDataSource, pFormat, pChannels, pSampleRate, pChannelMap,
-                                         channelMapCap);
-}
-
-static ma_result ma_minivorbis_ds_get_cursor(ma_data_source *pDataSource, ma_uint64 *pCursor)
-{
-    return ma_minivorbis_get_cursor_in_pcm_frames((ma_minivorbis *)pDataSource, pCursor);
-}
-
-static ma_result ma_minivorbis_ds_get_length(ma_data_source *pDataSource, ma_uint64 *pLength)
-{
-    return ma_minivorbis_get_length_in_pcm_frames((ma_minivorbis *)pDataSource, pLength);
-}
-
-static ma_data_source_vtable g_ma_minivorbis_ds_vtable = {ma_minivorbis_ds_read,
-                                                          ma_minivorbis_ds_seek,
-                                                          ma_minivorbis_ds_get_data_format,
-                                                          ma_minivorbis_ds_get_cursor,
-                                                          ma_minivorbis_ds_get_length,
-                                                          NULL, /* onSetLooping */
-                                                          0};
-
-static ma_result ma_minivorbis_init_internal(const ma_decoding_backend_config *pConfig, ma_minivorbis *pVorbis)
-{
-    ma_result             result;
-    ma_data_source_config dataSourceConfig;
-
-    EPI_UNUSED(pConfig);
-
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    EPI_CLEAR_MEMORY(pVorbis, ma_minivorbis, 1);
-    pVorbis->format = ma_format_f32; /* Only supporting f32. */
-
-    dataSourceConfig        = ma_data_source_config_init();
-    dataSourceConfig.vtable = &g_ma_minivorbis_ds_vtable;
-
-    result = ma_data_source_init(&dataSourceConfig, &pVorbis->ds);
-    if (result != MA_SUCCESS)
-    {
-        return result; /* Failed to initialize the base data source. */
-    }
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_post_init(ma_minivorbis *pVorbis)
-{
-    EPI_ASSERT(pVorbis != NULL);
-
-    const vorbis_info *info = ov_info(&pVorbis->ogg, -1);
-
-    if (info == NULL)
-    {
-        return MA_INVALID_DATA;
-    }
-
-    pVorbis->channels   = info->channels;
-    pVorbis->sampleRate = info->rate;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tell_proc onTell,
-                                    void *pReadSeekTellUserData, const ma_decoding_backend_config *pConfig,
-                                    const ma_allocation_callbacks *pAllocationCallbacks, ma_minivorbis *pVorbis)
-{
-    EPI_UNUSED(pAllocationCallbacks);
-
-    ma_result result;
-
-    result = ma_minivorbis_init_internal(pConfig, pVorbis);
-    if (result != MA_SUCCESS)
-    {
-        return result;
-    }
-
-    if (onRead == NULL || onSeek == NULL)
-    {
-        return MA_INVALID_ARGS; /* onRead and onSeek are mandatory. */
-    }
-
-    pVorbis->onRead                = onRead;
-    pVorbis->onSeek                = onSeek;
-    pVorbis->onTell                = onTell;
-    pVorbis->pReadSeekTellUserData = pReadSeekTellUserData;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_init_memory(const void *pData, size_t dataSize,
-                                           const ma_decoding_backend_config *pConfig,
-                                           const ma_allocation_callbacks *pAllocationCallbacks, ma_minivorbis *pVorbis)
-{
-    ma_result result;
-
-    result = ma_minivorbis_init_internal(pConfig, pVorbis);
-    if (result != MA_SUCCESS)
-    {
-        return result;
-    }
-
-    EPI_UNUSED(pAllocationCallbacks);
-
-    pVorbis->memfile = new epi::MemFile((const uint8_t *)pData, dataSize);
-
-    if (pVorbis->memfile == NULL)
-    {
-        return MA_INVALID_DATA;
-    }
-
-    if (ov_open_callbacks((void *)pVorbis->memfile, &pVorbis->ogg, NULL, 0, ogg_epi_callbacks) < 0)
-    {
-        delete pVorbis->memfile;
-        return MA_INVALID_DATA;
-    }
-
-    result = ma_minivorbis_post_init(pVorbis);
-    if (result != MA_SUCCESS)
-    {
-        delete pVorbis->memfile;
-        return result;
-    }
-
-    return MA_SUCCESS;
-}
-
-static void ma_minivorbis_uninit(ma_minivorbis *pVorbis, const ma_allocation_callbacks *pAllocationCallbacks)
-{
-    EPI_UNUSED(pAllocationCallbacks);
-
-    if (pVorbis == NULL)
-    {
-        return;
-    }
-
-    ov_clear(&pVorbis->ogg);
-
-    delete (pVorbis->memfile);
-
-    ma_data_source_uninit(&pVorbis->ds);
-}
-
-static ma_result ma_minivorbis_read_pcm_frames(ma_minivorbis *pVorbis, void *pFramesOut, ma_uint64 frameCount,
-                                               ma_uint64 *pFramesRead)
-{
-    if (pFramesRead != NULL)
-    {
-        *pFramesRead = 0;
-    }
-
-    if (frameCount == 0)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    /* We always use floating point format. */
-    ma_result result          = MA_SUCCESS; /* Must be initialized to MA_SUCCESS. */
-    ma_uint64 totalFramesRead = 0;
-    int       section         = 0;
-    ma_format format;
-    ma_uint32 channels;
-    ma_uint64 framesLeft  = frameCount;
-    float    *pFramesOutF = (float *)pFramesOut;
-
-    ma_minivorbis_get_data_format(pVorbis, &format, &channels, NULL, NULL, 0);
-
-    if (format == ma_format_f32)
-    {
-        while (framesLeft > 0)
-        {
-            float **outFrames  = NULL;
-            long    framesRead = ov_read_float(&pVorbis->ogg, &outFrames, framesLeft, &section);
-            if (framesRead <= 0)
-                break;
-
-            for (ma_uint32 j = 0; j < channels; ++j)
-            {
-                for (int i = 0; i < framesRead; ++i)
-                {
-                    pFramesOutF[i * channels + j] = outFrames[j][i];
-                }
-            }
-
-            framesLeft -= framesRead;
-            totalFramesRead += framesRead;
-            pFramesOutF += framesRead * channels;
-        }
-    }
-    else
-    {
-        result = MA_INVALID_ARGS;
-    }
-
-    pVorbis->cursor += totalFramesRead;
-
-    if (totalFramesRead == 0)
-    {
-        result = MA_AT_END;
-    }
-
-    if (pFramesRead != NULL)
-    {
-        *pFramesRead = totalFramesRead;
-    }
-
-    if (result == MA_SUCCESS && totalFramesRead == 0)
-    {
-        result = MA_AT_END;
-    }
-
-    return result;
-}
-
-static ma_result ma_minivorbis_seek_to_pcm_frame(ma_minivorbis *pVorbis, ma_uint64 frameIndex)
-{
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    int vorbisResult = ov_pcm_seek(&pVorbis->ogg, frameIndex);
-
-    if (vorbisResult != 0)
-    {
-        return MA_ERROR; /* See failed. */
-    }
-
-    pVorbis->cursor = frameIndex;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_get_data_format(const ma_minivorbis *pVorbis, ma_format *pFormat, ma_uint32 *pChannels,
-                                               ma_uint32 *pSampleRate, ma_channel *pChannelMap, size_t channelMapCap)
-{
-    /* Defaults for safety. */
-    if (pFormat != NULL)
-    {
-        *pFormat = ma_format_unknown;
-    }
-    if (pChannels != NULL)
-    {
-        *pChannels = 0;
-    }
-    if (pSampleRate != NULL)
-    {
-        *pSampleRate = 0;
-    }
-    if (pChannelMap != NULL)
-    {
-        EPI_CLEAR_MEMORY(pChannelMap, ma_channel, channelMapCap);
-    }
-
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_OPERATION;
-    }
-
-    if (pFormat != NULL)
-    {
-        *pFormat = pVorbis->format;
-    }
-
-    if (pChannels != NULL)
-    {
-        *pChannels = pVorbis->channels;
-    }
-
-    if (pSampleRate != NULL)
-    {
-        *pSampleRate = pVorbis->sampleRate;
-    }
-
-    if (pChannelMap != NULL)
-    {
-        ma_channel_map_init_standard(ma_standard_channel_map_vorbis, pChannelMap, channelMapCap, pVorbis->channels);
-    }
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_get_cursor_in_pcm_frames(const ma_minivorbis *pVorbis, ma_uint64 *pCursor)
-{
-    if (pCursor == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    *pCursor = 0; /* Safety. */
-
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    *pCursor = pVorbis->cursor;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_minivorbis_get_length_in_pcm_frames(ma_minivorbis *pVorbis, ma_uint64 *pLength)
-{
-    if (pLength == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    *pLength = 0; /* Safety. */
-
-    if (pVorbis == NULL)
-    {
-        return MA_INVALID_ARGS;
-    }
-
-    ogg_int64_t res = ov_pcm_total(&pVorbis->ogg, -1);
-
-    if (res <= 0)
-    {
-        return MA_INVALID_DATA;
-    }
-
-    *pLength = (ma_uint64)res;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_decoding_backend_init__minivorbis(void *pUserData, ma_read_proc onRead, ma_seek_proc onSeek,
-                                                      ma_tell_proc onTell, void *pReadSeekTellUserData,
-                                                      const ma_decoding_backend_config *pConfig,
-                                                      const ma_allocation_callbacks    *pAllocationCallbacks,
-                                                      ma_data_source                  **ppBackend)
-{
-    ma_result      result;
-    ma_minivorbis *pVorbis;
-
-    EPI_UNUSED(pUserData); /* For now not using pUserData, but once we start storing the vorbis decoder state within the
-                              ma_decoder structure this will be set to the decoder so we can avoid a malloc. */
-
-    /* For now we're just allocating the decoder backend on the heap. */
-    pVorbis = (ma_minivorbis *)ma_malloc(sizeof(*pVorbis), pAllocationCallbacks);
-    if (pVorbis == NULL)
-    {
-        return MA_OUT_OF_MEMORY;
-    }
-
-    result = ma_minivorbis_init(onRead, onSeek, onTell, pReadSeekTellUserData, pConfig, pAllocationCallbacks, pVorbis);
-    if (result != MA_SUCCESS)
-    {
-        ma_free(pVorbis, pAllocationCallbacks);
-        return result;
-    }
-
-    *ppBackend = pVorbis;
-
-    return MA_SUCCESS;
-}
-
-static ma_result ma_decoding_backend_init_memory__minivorbis(void *pUserData, const void *pData, size_t dataSize,
-                                                             const ma_decoding_backend_config *pConfig,
-                                                             const ma_allocation_callbacks    *pAllocationCallbacks,
-                                                             ma_data_source                  **ppBackend)
-{
-    ma_result      result;
-    ma_minivorbis *pVorbis;
-
-    EPI_UNUSED(pUserData); /* For now not using pUserData, but once we start storing the vorbis decoder state within the
-                              ma_decoder structure this will be set to the decoder so we can avoid a malloc. */
-
-    /* For now we're just allocating the decoder backend on the heap. */
-    pVorbis = (ma_minivorbis *)ma_malloc(sizeof(*pVorbis), pAllocationCallbacks);
-    if (pVorbis == NULL)
-    {
-        return MA_OUT_OF_MEMORY;
-    }
-
-    result = ma_minivorbis_init_memory(pData, dataSize, pConfig, pAllocationCallbacks, pVorbis);
-    if (result != MA_SUCCESS)
-    {
-        ma_free(pVorbis, pAllocationCallbacks);
-        return result;
-    }
-
-    *ppBackend = pVorbis;
-
-    return MA_SUCCESS;
-}
-
-static void ma_decoding_backend_uninit__minivorbis(void *pUserData, ma_data_source *pBackend,
-                                                   const ma_allocation_callbacks *pAllocationCallbacks)
-{
-    ma_minivorbis *pVorbis = (ma_minivorbis *)pBackend;
-
-    EPI_UNUSED(pUserData);
-
-    ma_minivorbis_uninit(pVorbis, pAllocationCallbacks);
-    ma_free(pVorbis, pAllocationCallbacks);
-}
-
-static ma_decoding_backend_vtable g_ma_decoding_backend_vtable_minivorbis = {
-    ma_decoding_backend_init__minivorbis,
-    NULL, // onInitFile()
-    NULL, // onInitFileW()
-    ma_decoding_backend_init_memory__minivorbis, ma_decoding_backend_uninit__minivorbis};
-
-static ma_decoding_backend_vtable *custom_vtable = &g_ma_decoding_backend_vtable_minivorbis;
-
 class OGGPlayer : public AbstractMusicPlayer
 {
   public:
@@ -546,24 +83,23 @@ class OGGPlayer : public AbstractMusicPlayer
 
   private:
     const uint8_t *ogg_data_;
+    epi::MemFile  *ogg_memfile_;
+    OggVorbis_File ogg_file_;
+    bool           ogg_opened_;
+    int            ogg_channels_;
 
   public:
     bool OpenMemory(const uint8_t *data, int length);
 
     void Close(void) override;
 
-    void Play(bool loop) override;
-    void Stop(void) override;
-
-    void Pause(void) override;
-    void Resume(void) override;
-
-    void Ticker(void) override;
+  protected:
+    int StreamIntoBuffer(void *buffer, int frames) override;
 };
 
 //----------------------------------------------------------------------------
 
-OGGPlayer::OGGPlayer() : ogg_data_(nullptr)
+OGGPlayer::OGGPlayer() : ogg_data_(nullptr), ogg_memfile_(nullptr), ogg_opened_(false), ogg_channels_(0)
 {
     status_ = kNotLoaded;
 }
@@ -578,28 +114,34 @@ bool OGGPlayer::OpenMemory(const uint8_t *data, int length)
     if (status_ != kNotLoaded)
         Close();
 
-    ma_decoder_config decode_config      = ma_decoder_config_init_default();
-    decode_config.format                 = ma_format_f32;
-    decode_config.customBackendCount     = 1;
-    decode_config.pCustomBackendUserData = NULL;
-    decode_config.ppCustomBackendVTables = &custom_vtable;
+    ogg_memfile_ = new epi::MemFile(data, length);
 
-    if (ma_decoder_init_memory(data, length, &decode_config, &ogg_decoder) != MA_SUCCESS)
+    if (ov_open_callbacks((void *)ogg_memfile_, &ogg_file_, NULL, 0, ogg_epi_callbacks) < 0)
     {
+        delete ogg_memfile_;
+        ogg_memfile_ = nullptr;
         LogWarning("Failed to load OGG music (corrupt ogg?)\n");
         return false;
     }
 
-    if (ma_sound_init_from_data_source(&sound_engine, &ogg_decoder,
-                                       MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_NO_SPATIALIZATION,
-                                       NULL, &ogg_stream) != MA_SUCCESS)
+    ogg_opened_ = true;
+
+    const vorbis_info *info = ov_info(&ogg_file_, -1);
+
+    if (!info)
     {
-        ma_decoder_uninit(&ogg_decoder);
+        Close();
         LogWarning("Failed to load OGG music (corrupt ogg?)\n");
         return false;
     }
 
-    ma_node_attach_output_bus(&ogg_stream, 0, &music_node, 0);
+    ogg_channels_ = info->channels;
+
+    if (!OpenStream(info->rate, ogg_channels_, SDL_AUDIO_F32))
+    {
+        Close();
+        return false;
+    }
 
     ogg_data_ = data;
 
@@ -617,73 +159,59 @@ void OGGPlayer::Close()
     // Stop playback
     Stop();
 
-    ma_sound_uninit(&ogg_stream);
+    CloseStream();
 
-    ma_decoder_uninit(&ogg_decoder);
+    if (ogg_opened_)
+    {
+        ov_clear(&ogg_file_);
+        ogg_opened_ = false;
+    }
+
+    if (ogg_memfile_)
+    {
+        delete ogg_memfile_;
+        ogg_memfile_ = nullptr;
+    }
 
     delete[] ogg_data_;
+    ogg_data_ = nullptr;
 
     status_ = kNotLoaded;
 }
 
-void OGGPlayer::Pause()
+int OGGPlayer::StreamIntoBuffer(void *buffer, int frames)
 {
-    if (status_ != kPlaying)
-        return;
+    float *output      = (float *)buffer;
+    int    frames_left = frames;
 
-    ma_sound_stop(&ogg_stream);
-
-    status_ = kPaused;
-}
-
-void OGGPlayer::Resume()
-{
-    if (status_ != kPaused)
-        return;
-
-    ma_sound_start(&ogg_stream);
-
-    status_ = kPlaying;
-}
-
-void OGGPlayer::Play(bool loop)
-{
-    if (status_ != kNotLoaded && status_ != kStopped)
-        return;
-
-    looping_ = loop;
-
-    ma_sound_set_looping(&ogg_stream, looping_ ? MA_TRUE : MA_FALSE);
-
-    // Let 'er rip (maybe)
-    if (playing_movie)
-        status_ = kPaused;
-    else
+    while (frames_left > 0)
     {
-        status_ = kPlaying;
-        ma_sound_start(&ogg_stream);
+        float **planes  = nullptr;
+        int     section = 0;
+        long    got     = ov_read_float(&ogg_file_, &planes, frames_left, &section);
+
+        if (got <= 0)
+        {
+            if (!looping_)
+                break;
+
+            if (ov_pcm_seek(&ogg_file_, 0) != 0)
+                break;
+
+            continue;
+        }
+
+        for (int c = 0; c < ogg_channels_; c++)
+        {
+            for (int i = 0; i < got; i++)
+                output[i * ogg_channels_ + c] = planes[c][i];
+        }
+
+        output += got * ogg_channels_;
+        frames_left -= got;
     }
-}
 
-void OGGPlayer::Stop()
-{
-    if (status_ != kPlaying && status_ != kPaused)
-        return;
-
-    ma_sound_stop(&ogg_stream);
-
-    status_ = kStopped;
-}
-
-void OGGPlayer::Ticker()
-{
-    if (status_ == kPlaying)
-    {
-        if (pc_speaker_mode)
-            Stop();
-        if (ma_sound_at_end(&ogg_stream)) // This should only be true if finished and not set to looping
-            Stop();
-    }
+    return frames - frames_left;
 }
 
 //----------------------------------------------------------------------------
@@ -706,53 +234,76 @@ AbstractMusicPlayer *PlayOGGMusic(uint8_t *data, int length, bool looping)
 
 bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
 {
-    ma_decoder_config decode_config      = ma_decoder_config_init_default();
-    decode_config.format                 = ma_format_f32;
-    decode_config.customBackendCount     = 1;
-    decode_config.pCustomBackendUserData = NULL;
-    decode_config.ppCustomBackendVTables = &custom_vtable;
-    ma_decoder decode;
+    epi::MemFile *memfile = new epi::MemFile(data, length);
 
-    if (ma_decoder_init_memory(data, length, &decode_config, &decode) != MA_SUCCESS)
+    OggVorbis_File ogg_file;
+
+    if (ov_open_callbacks((void *)memfile, &ogg_file, NULL, 0, ogg_epi_callbacks) < 0)
     {
+        delete memfile;
         LogWarning("Failed to load OGG sound (corrupt ogg?)\n");
         return false;
     }
 
-    if (decode.outputChannels > 2)
+    const vorbis_info *info = ov_info(&ogg_file, -1);
+
+    if (!info)
     {
-        LogWarning("OGG SFX Loader: too many channels: %d\n", decode.outputChannels);
-        ma_decoder_uninit(&decode);
+        ov_clear(&ogg_file);
+        delete memfile;
+        LogWarning("Failed to load OGG sound (corrupt ogg?)\n");
         return false;
     }
 
-    ma_uint64 frame_count = 0;
+    if (info->channels > 2)
+    {
+        LogWarning("OGG SFX Loader: too many channels: %d\n", info->channels);
+        ov_clear(&ogg_file);
+        delete memfile;
+        return false;
+    }
 
-    if (ma_decoder_get_length_in_pcm_frames(&decode, &frame_count) != MA_SUCCESS)
+    ogg_int64_t frame_count = ov_pcm_total(&ogg_file, -1);
+
+    if (frame_count <= 0)
     {
         LogWarning("OGG SFX Loader: no samples!\n");
-        ma_decoder_uninit(&decode);
+        ov_clear(&ogg_file);
+        delete memfile;
         return false;
     }
 
-    LogDebug("OGG SFX Loader: freq %d Hz, %d channels\n", decode.outputSampleRate, decode.outputChannels);
+    LogDebug("OGG SFX Loader: freq %d Hz, %d channels\n", (int)info->rate, info->channels);
 
-    bool is_stereo = (decode.outputChannels > 1);
+    int  channels  = info->channels;
+    bool is_stereo = (channels > 1);
 
-    buf->frequency_ = decode.outputSampleRate;
+    buf->frequency_ = info->rate;
 
     SoundGatherer gather;
 
     float *buffer = gather.MakeChunk(frame_count, is_stereo);
 
-    ma_uint64 frames_read = 0;
+    ogg_int64_t frames_read = 0;
 
-    if (ma_decoder_read_pcm_frames(&decode, buffer, frame_count, &frames_read) != MA_SUCCESS)
+    while (frames_read < frame_count)
     {
-        LogWarning("OGG SFX Loader: failure loading samples!\n");
-        gather.DiscardChunk();
-        ma_decoder_uninit(&decode);
-        return false;
+        float **planes  = nullptr;
+        int     section = 0;
+        long    got     = ov_read_float(&ogg_file, &planes, (int)(frame_count - frames_read), &section);
+
+        if (got <= 0)
+            break;
+
+        float *output = buffer + frames_read * channels;
+
+        for (int c = 0; c < channels; c++)
+        {
+            for (int i = 0; i < got; i++)
+                output[i * channels + c] = planes[c][i];
+        }
+
+        frames_read += got;
     }
 
     gather.CommitChunk(frames_read);
@@ -760,7 +311,8 @@ bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
     if (!gather.Finalise(buf))
         LogWarning("OGG SFX Loader: no samples!\n");
 
-    ma_decoder_uninit(&decode);
+    ov_clear(&ogg_file);
+    delete memfile;
 
     return true;
 }

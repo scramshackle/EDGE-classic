@@ -43,8 +43,6 @@ extern float listen_x;
 extern float listen_y;
 extern float listen_z;
 
-static constexpr float kMaximumSoundClipDistance = 4000.0f;
-
 static constexpr uint8_t category_limit_table[kTotalCategories] = {
 
     /* 32 channel */
@@ -234,77 +232,7 @@ void ShutdownSound(void)
     FreeSoundChannels();
 
     SoundCacheClearAll();
-
-    if (!no_music)
-        ma_sound_group_uninit(&music_node);
-    ma_sound_group_uninit(&sfx_node);
-    ma_engine_uninit(&sound_engine);
 }
-
-// These are mostly the same as the existing vtable functions for an audio buffer in miniaudio, with the exception
-// of the "onSeek" callback disabling looping once we seek back to the initial frame at the start of a new loop.
-// This is the only way I could find to do the "looping Doom sounds loop once then quit" paradigm in a thread-safe way
-// and without altering miniaudio itself - Dasho
-static ma_result SFXOnRead(ma_data_source *pDataSource, void *pFramesOut, ma_uint64 frameCount, ma_uint64 *pFramesRead)
-{
-    ma_audio_buffer_ref *pAudioBufferRef = (ma_audio_buffer_ref *)pDataSource;
-    ma_uint64 framesRead = ma_audio_buffer_ref_read_pcm_frames(pAudioBufferRef, pFramesOut, frameCount, MA_FALSE);
-
-    if (pFramesRead != NULL)
-    {
-        *pFramesRead = framesRead;
-    }
-
-    if (framesRead < frameCount || framesRead == 0)
-    {
-        return MA_AT_END;
-    }
-
-    return MA_SUCCESS;
-}
-
-static ma_result SFXOnSeek(ma_data_source *pDataSource, ma_uint64 frameIndex)
-{
-    if (frameIndex == 0) // looped
-        ma_data_source_set_looping(pDataSource, MA_FALSE);
-    return ma_audio_buffer_ref_seek_to_pcm_frame((ma_audio_buffer_ref *)pDataSource, frameIndex);
-}
-
-static ma_result SFXOnGetFormat(ma_data_source *pDataSource, ma_format *pFormat, ma_uint32 *pChannels,
-                                ma_uint32 *pSampleRate, ma_channel *pChannelMap, size_t channelMapCap)
-{
-    ma_audio_buffer_ref *pAudioBufferRef = (ma_audio_buffer_ref *)pDataSource;
-
-    *pFormat     = pAudioBufferRef->format;
-    *pChannels   = pAudioBufferRef->channels;
-    *pSampleRate = pAudioBufferRef->sampleRate;
-    ma_channel_map_init_standard(ma_standard_channel_map_default, pChannelMap, channelMapCap,
-                                 pAudioBufferRef->channels);
-
-    return MA_SUCCESS;
-}
-
-static ma_result SFXOnGetCursor(ma_data_source *pDataSource, ma_uint64 *pCursor)
-{
-    ma_audio_buffer_ref *pAudioBufferRef = (ma_audio_buffer_ref *)pDataSource;
-
-    *pCursor = pAudioBufferRef->cursor;
-
-    return MA_SUCCESS;
-}
-
-static ma_result SFXOnGetLength(ma_data_source *pDataSource, ma_uint64 *pLength)
-{
-    ma_audio_buffer_ref *pAudioBufferRef = (ma_audio_buffer_ref *)pDataSource;
-
-    *pLength = pAudioBufferRef->sizeInFrames;
-
-    return MA_SUCCESS;
-}
-
-static const ma_data_source_vtable SFXVTable = {SFXOnRead, SFXOnSeek, SFXOnGetFormat, SFXOnGetCursor, SFXOnGetLength,
-                                                NULL, /* onSetLooping */
-                                                0};
 
 // Not-rejigged-yet stuff..
 SoundEffectDefinition *LookupEffectDef(const SoundEffect *s)
@@ -323,6 +251,26 @@ SoundEffectDefinition *LookupEffectDef(const SoundEffect *s)
     return sfxdefs[num];
 }
 
+static int SelectSoundBus(int category)
+{
+    if (pc_speaker_mode)
+        return kSoundBusDry;
+
+    if (category == kCategoryUi)
+        return kSoundBusDry;
+
+    if (vacuum_sound_effects)
+        return kSoundBusVacuum;
+
+    if (submerged_sound_effects)
+        return kSoundBusUnderwater;
+
+    if (sector_reverb || dynamic_reverb.d_)
+        return kSoundBusReverb;
+
+    return kSoundBusDry;
+}
+
 static void S_PlaySound(int idx, const SoundEffectDefinition *def, int category, const Position *pos, int flags,
                         SoundData *buf)
 {
@@ -337,68 +285,42 @@ static void S_PlaySound(int idx, const SoundEffectDefinition *def, int category,
 
     chan->boss_ = (flags & kSoundEffectBoss) ? true : false;
 
+    chan->cursor_  = 0;
+    chan->looping_ = def->looping_;
+    chan->volume_  = chan->boss_ ? 1.0f : def->volume_;
+
     bool attenuate =
         (!chan->boss_ && pos && category != kCategoryWeapon && category != kCategoryPlayer && category != kCategoryUi);
 
-    chan->ref_config_            = ma_audio_buffer_config_init(ma_format_f32, 2, buf->length_, buf->data_, NULL);
-    chan->ref_config_.sampleRate = buf->frequency_;
-    ma_audio_buffer_init(&chan->ref_config_, &chan->ref_);
-    chan->ref_.ref.ds.vtable = &SFXVTable;
-    ma_sound_init_from_data_source(&sound_engine, &chan->ref_,
-                                   attenuate ? MA_SOUND_FLAG_NO_PITCH
-                                             : (MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION),
-                                   NULL, &chan->channel_sound_);
+    chan->attenuate_ = attenuate;
+
     if (attenuate)
     {
-        ma_sound_set_attenuation_model(&chan->channel_sound_, ma_attenuation_model_exponential);
-        
+        chan->bus_ = SelectSoundBus(category);
+
         // Lobo 2026: possible to get here before we actually have a player mobj so make sure
-        if (players[display_player]->map_object_ && CheckSightToPoint(players[display_player]->map_object_, pos->x, pos->y, pos->z))
-            ma_sound_set_min_distance(&chan->channel_sound_, kMinimumSoundClipDistance);
+        if (players[display_player]->map_object_ &&
+            CheckSightToPoint(players[display_player]->map_object_, pos->x, pos->y, pos->z))
+            chan->minimum_distance_ = kMinimumSoundClipDistance;
         else
-            ma_sound_set_min_distance(&chan->channel_sound_, kMinimumOccludedSoundClipDistance);
-        ma_sound_set_max_distance(&chan->channel_sound_, kMaximumSoundClipDistance);
-        ma_sound_set_position(&chan->channel_sound_, pos->x, pos->z, -pos->y);
-        if (pc_speaker_mode)
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &sfx_node, 0);
-        else if (vacuum_sound_effects)
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &vacuum_node, 0);
-        else if (submerged_sound_effects)
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &underwater_node, 0);
-        else if (sector_reverb || dynamic_reverb.d_)
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &reverb_node, 0);
-        else
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &sfx_node, 0);
+            chan->minimum_distance_ = kMinimumOccludedSoundClipDistance;
+
+        HMM_Vec3 emitter = {{pos->x, pos->z, -pos->y}};
+
+        chan->spatializer_.Update(spatial_listener, emitter, chan->minimum_distance_, kMaximumSoundClipDistance,
+                                  chan->volume_);
     }
     else
     {
-        ma_sound_set_attenuation_model(&chan->channel_sound_, ma_attenuation_model_none);
-        if (pc_speaker_mode)
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &sfx_node, 0);
-        else if (category != kCategoryUi)
-        {
-            if (vacuum_sound_effects)
-                ma_node_attach_output_bus(&chan->channel_sound_, 0, &vacuum_node, 0);
-            else if (submerged_sound_effects)
-                ma_node_attach_output_bus(&chan->channel_sound_, 0, &underwater_node, 0);
-            else if (sector_reverb || dynamic_reverb.d_)
-                ma_node_attach_output_bus(&chan->channel_sound_, 0, &reverb_node, 0);
-            else
-                ma_node_attach_output_bus(&chan->channel_sound_, 0, &sfx_node, 0);
-        }
-        else
-            ma_node_attach_output_bus(&chan->channel_sound_, 0, &sfx_node, 0);
+        chan->bus_ = SelectSoundBus(category);
+        chan->spatializer_.SetUniformGain(chan->volume_);
     }
-    if (chan->boss_)
-        ma_sound_set_volume(&chan->channel_sound_, 1.0f);
-    else
-        ma_sound_set_volume(&chan->channel_sound_, def->volume_);
-    ma_sound_set_looping(&chan->channel_sound_, def->looping_ ? MA_TRUE : MA_FALSE);
-    ma_sound_start(&chan->channel_sound_);
 }
 
 static void DoStartFX(const SoundEffectDefinition *def, int category, const Position *pos, int flags, SoundData *buf)
 {
+    LockSoundMixer();
+
     CountPlayingCats();
 
     int k = FindPlayingFX(def, category, pos);
@@ -409,16 +331,21 @@ static void DoStartFX(const SoundEffectDefinition *def, int category, const Posi
 
         if (def->looping_ && def == chan->definition_)
         {
-            ma_sound_set_looping(&chan->channel_sound_, MA_TRUE);
+            chan->looping_ = true;
+            UnlockSoundMixer();
             return;
         }
         else if (flags & kSoundEffectSingle)
         {
             if (chan->definition_->precious_)
+            {
+                UnlockSoundMixer();
                 return;
+            }
 
             KillSoundChannel(k);
             S_PlaySound(k, def, category, pos, flags, buf);
+            UnlockSoundMixer();
             return;
         }
     }
@@ -452,12 +379,17 @@ static void DoStartFX(const SoundEffectDefinition *def, int category, const Posi
         k = FindChannelToKill(kill_cat, category, new_score);
 
         if (k < 0)
+        {
+            UnlockSoundMixer();
             return;
+        }
 
         KillSoundChannel(k);
     }
 
     S_PlaySound(k, def, category, pos, flags, buf);
+
+    UnlockSoundMixer();
 }
 
 void StartSoundEffect(const SoundEffect *sfx, int category, const Position *pos, int flags)
@@ -506,6 +438,8 @@ void StopSoundEffect(const Position *pos)
     if (no_sound)
         return;
 
+    LockSoundMixer();
+
     for (int i = 0; i < total_channels; i++)
     {
         const SoundChannel *chan = mix_channels[i];
@@ -516,6 +450,8 @@ void StopSoundEffect(const Position *pos)
             KillSoundChannel(i);
         }
     }
+
+    UnlockSoundMixer();
 }
 
 void StopSoundEffect(const SoundEffect *sfx)
@@ -526,6 +462,8 @@ void StopSoundEffect(const SoundEffect *sfx)
     SoundEffectDefinition *def = LookupEffectDef(sfx);
     EPI_ASSERT(def);
 
+    LockSoundMixer();
+
     for (int i = 0; i < total_channels; i++)
     {
         const SoundChannel *chan = mix_channels[i];
@@ -535,12 +473,16 @@ void StopSoundEffect(const SoundEffect *sfx)
             KillSoundChannel(i);
         }
     }
+
+    UnlockSoundMixer();
 }
 
 void StopAllSoundEffects(void)
 {
     if (no_sound)
         return;
+
+    LockSoundMixer();
 
     for (int i = 0; i < total_channels; i++)
     {
@@ -551,11 +493,19 @@ void StopAllSoundEffects(void)
             KillSoundChannel(i);
         }
     }
+
+    UnlockSoundMixer();
 }
 
 void SoundTicker(void)
 {
-    if (no_sound || playing_movie)
+    if (no_sound)
+        return;
+
+    if (!playing_movie)
+        ApplyPendingSoundDeviceFormatChange();
+
+    if (playing_movie)
         return;
 
     if (game_state == kGameStateLevel)

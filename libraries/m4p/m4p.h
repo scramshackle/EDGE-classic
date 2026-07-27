@@ -4061,97 +4061,6 @@ static void mix_UpdateBuffer(int16_t *buffer, int32_t numSamples)
     }  
 }
 
-static void mix_UpdateBufferFloat(float *buffer, int32_t numSamples)
-{
-    if (numSamples <= 0)
-        return;
-
-    if (musicPaused) // silence output
-    {
-        memset(buffer, 0, numSamples * (2 * sizeof(float)));
-        return;
-    }
-
-    memset(CDA_MixBuffer, 0, numSamples * (2 * sizeof(int32_t)));
-
-    int32_t c = 0;
-    int32_t a = numSamples;
-
-    while (a > 0)
-    {
-        if (PMPLeft == 0)
-        {
-            mix_SaveIPVolumes();
-            mainPlayer();
-            mix_UpdateChannelVolPanFrq();
-            PMPLeft = speedVal;
-        }
-
-        int32_t b = a;
-        if (b > PMPLeft)
-            b = PMPLeft;
-
-        CIType *v = CI;
-        for (int32_t i = 0; i < song.antChn * 2; i++, v++)
-            PMPMix32Proc(v, b, c);
-
-        c += b;
-        a -= b;
-        PMPLeft -= b;
-    }
-
-    numSamples *= 2; // 8bb: stereo
-
-                     /* 8bb: Done a bit differently since we don't use a
-                     ** Sound Blaster with its master volume setting.
-                     ** Instead we change the amplitude here.
-                     */
-
-#if defined _MSC_VER || (defined __SIZEOF_FLOAT__ && __SIZEOF_FLOAT__ == 4)
-    if (masterVol == 256) // 8bb: max master volume, no need to change amp
-    {
-        for (int32_t i = 0; i < numSamples; i++)
-        {
-            int32_t out32 = CDA_MixBuffer[i] >> 8;
-            CLAMP16(out32);
-            *(uint32_t *)buffer = 0x43818000 ^ ((uint16_t)out32);
-            *buffer++ -= 259.0f;
-        }
-    }
-    else
-    {
-        for (int32_t i = 0; i < numSamples; i++)
-        {
-            int32_t out32 = CDA_MixBuffer[i] >> 8;
-            CLAMP16(out32);
-            out32               = (out32 * masterVol) >> 8;
-            *(uint32_t *)buffer = 0x43818000 ^ ((uint16_t)out32);
-            *buffer++ -= 259.0f;
-        }
-    }
-#else
-    if (masterVol == 256) // 8bb: max master volume, no need to change amp
-    {
-        for (int32_t i = 0; i < numSamples; i++)
-        {
-            int32_t out32 = CDA_MixBuffer[i] >> 8;
-            CLAMP16(out32);
-            *buffer++ = (float)out32 * 0.000030517578125f;
-        }
-    }
-    else
-    {
-        for (int32_t i = 0; i < numSamples; i++)
-        {
-            int32_t out32 = CDA_MixBuffer[i] >> 8;
-            CLAMP16(out32);
-            out32     = (out32 * masterVol) >> 8;
-            *buffer++ = (float)out32 * 0.000030517578125f;
-        }
-    }
-#endif
-}
-
 /***************************************************************************
  *        ROUTINES FOR SAMPLE HANDLING ETC.                                *
  ***************************************************************************/
@@ -6556,30 +6465,6 @@ static int32_t SB16_PostMix(int16_t *AudioOut16, int32_t SamplesToOutput) // 8bb
     return SamplesTodo;
 }
 
-static int32_t SB16_PostMix_Float(float *AudioOut32, int32_t SamplesToOutput)
-{
-    const uint8_t SampleShiftValue = (Song.Header.Flags & ITF_STEREO) ? 13 : 14;
-
-    int32_t SamplesTodo = (SamplesToOutput == 0) ? BytesToMix : SamplesToOutput;
-    for (int32_t i = 0; i < SamplesTodo * 2; i++)
-    {
-        int32_t Sample = MixBuffer[MixTransferOffset++] >> SampleShiftValue;
-
-        if (Sample < INT16_MIN)
-            Sample = INT16_MIN;
-        else if (Sample > INT16_MAX)
-            Sample = INT16_MAX;
-#if defined _MSC_VER || (defined __SIZEOF_FLOAT__ && __SIZEOF_FLOAT__ == 4)
-        *(uint32_t *)AudioOut32 = 0x43818000 ^ ((uint16_t)Sample);
-        *AudioOut32++ -= 259.0f;
-#else
-        *AudioOut32++ = (float)Sample * 0.000030517578125f;
-#endif
-    }
-
-    return SamplesTodo;
-}
-
 static void SB16_Mix(int32_t numSamples, int16_t *audioOut) // 8bb: added this (original SB16 driver uses IRQ callback)
 {
     int32_t SamplesLeft = numSamples;
@@ -6597,30 +6482,6 @@ static void SB16_Mix(int32_t numSamples, int16_t *audioOut) // 8bb: added this (
             SamplesToTransfer = MixTransferRemaining;
 
         SB16_PostMix(audioOut, SamplesToTransfer);
-        audioOut += SamplesToTransfer * 2;
-
-        MixTransferRemaining -= SamplesToTransfer;
-        SamplesLeft -= SamplesToTransfer;
-    }
-}
-
-static void SB16_Mix_Float(int32_t numSamples, float *audioOut)
-{
-    int32_t SamplesLeft = numSamples;
-    while (SamplesLeft > 0)
-    {
-        if (MixTransferRemaining == 0)
-        {
-            Update();
-            SB16_MixSamples();
-            MixTransferRemaining = BytesToMix;
-        }
-
-        int32_t SamplesToTransfer = SamplesLeft;
-        if (SamplesToTransfer > MixTransferRemaining)
-            SamplesToTransfer = MixTransferRemaining;
-
-        SB16_PostMix_Float(audioOut, SamplesToTransfer);
         audioOut += SamplesToTransfer * 2;
 
         MixTransferRemaining -= SamplesToTransfer;
@@ -10472,17 +10333,6 @@ void Music_FillAudioBuffer(int16_t *buffer, int32_t numSamples)
     SB16_Mix(numSamples, buffer);
 }
 
-void Music_FillAudioBufferFloat(float *buffer, int32_t numSamples)
-{
-    if (!Song.Playing)
-    {
-        memset(buffer, 0, numSamples * 2 * sizeof(float));
-        return;
-    }
-
-    SB16_Mix_Float(numSamples, buffer);
-}
-
 bool Music_Init(int32_t mixingFrequency)
 {
     if (FirstTimeInit)
@@ -12699,14 +12549,6 @@ void m4p_GenerateSamples(int16_t *buffer, int32_t numSamples)
         Music_FillAudioBuffer(buffer, numSamples);
     else
         mix_UpdateBuffer(buffer, numSamples);
-}
-
-void m4p_GenerateFloatSamples(float *buffer, int32_t numSamples)
-{
-    if (m4p_current_format == M4P_FORMAT_IT_S3M)
-        Music_FillAudioBufferFloat(buffer, numSamples);
-    else
-        mix_UpdateBufferFloat(buffer, numSamples);
 }
 
 bool m4p_AtEnd(void)

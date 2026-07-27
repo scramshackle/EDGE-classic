@@ -964,7 +964,7 @@ bool PlayerThink(Player *player)
         else if (player->map_object_->subsector_->sector->sound_reverb)
         {
             sector_reverb = true;
-            player->map_object_->subsector_->sector->sound_reverb->ApplyReverb(&reverb_node);
+            player->map_object_->subsector_->sector->sound_reverb->ApplyReverb(&reverb_effect);
         }
         else if (dynamic_reverb.d_)
         {
@@ -997,33 +997,33 @@ bool PlayerThink(Player *player)
             if (EDGE_IMAGE_IS_SKY(player->map_object_->subsector_->sector->ceiling))
             {
                 if (dynamic_reverb.d_ == 1) // Headphones
-                    ddf::ReverbDefinition::kOutdoorWeak.ApplyReverb(&reverb_node);
+                    ddf::ReverbDefinition::kOutdoorWeak.ApplyReverb(&reverb_effect);
                 else                        // Speakers
-                    ddf::ReverbDefinition::kOutdoorStrong.ApplyReverb(&reverb_node);
+                    ddf::ReverbDefinition::kOutdoorStrong.ApplyReverb(&reverb_effect);
                 if (room_check < 700)
                 {
                     float new_room_size;
                     if (room_check > 350)
-                        new_room_size = 0.3f;
+                        new_room_size = 0.45f;
                     else
-                        new_room_size = 0.2f;
-                    ma_freeverb_update_verb(&reverb_node, &new_room_size, NULL, NULL, NULL, NULL, NULL);
+                        new_room_size = 0.30f;
+                    reverb_effect.SetParameter(kReverbRoomSize, new_room_size);
                 }
             }
             else
             {
                 if (dynamic_reverb.d_ == 1) // Headphones
-                    ddf::ReverbDefinition::kIndoorWeak.ApplyReverb(&reverb_node);
+                    ddf::ReverbDefinition::kIndoorWeak.ApplyReverb(&reverb_effect);
                 else                        // Speakers
-                    ddf::ReverbDefinition::kIndoorStrong.ApplyReverb(&reverb_node);
+                    ddf::ReverbDefinition::kIndoorStrong.ApplyReverb(&reverb_effect);
                 if (room_check < 700)
                 {
                     float new_room_size;
                     if (room_check > 350)
-                        new_room_size = 0.2f;
+                        new_room_size = 0.30f;
                     else
-                        new_room_size = 0.1f;
-                    ma_freeverb_update_verb(&reverb_node, &new_room_size, NULL, NULL, NULL, NULL, NULL);
+                        new_room_size = 0.20f;
+                    reverb_effect.SetParameter(kReverbRoomSize, new_room_size);
                 }
             }
         }

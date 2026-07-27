@@ -55,35 +55,39 @@ static float     tx1          = 0.0f;
 static float     tx2          = 1.0f;
 static float     ty1          = 0.0f;
 static float     ty2          = 1.0f;
-static double    last_time    = 0;
-static ma_pcm_rb movie_ring_buffer;
-static ma_sound  movie_sound_buffer;
-static bool      canvas_can_update;
+static double           last_time = 0;
+static SDL_AudioStream *movie_stream;
+static int              movie_stream_queue_limit;
+static bool             canvas_can_update;
 
 static bool MovieSetupAudioStream(int rate)
 {
-    if (ma_pcm_rb_init(ma_format_f32, 2, PLM_AUDIO_SAMPLES_PER_FRAME * 4, NULL, NULL, &movie_ring_buffer) != MA_SUCCESS)
+    SDL_AudioSpec spec;
+    spec.format   = SDL_AUDIO_F32;
+    spec.channels = 2;
+    spec.freq     = rate;
+
+    movie_stream = SDL_CreateAudioStream(&spec, NULL);
+
+    if (!movie_stream)
     {
-        LogWarning("MovieSetupAudioStream: Failed to initialize the ring buffer.");
+        LogWarning("MovieSetupAudioStream: Failed to create the audio stream.");
         return false;
     }
-    ma_pcm_rb_set_sample_rate(&movie_ring_buffer, rate);
-    if (ma_sound_init_from_data_source(&sound_engine, &movie_ring_buffer,
-                                       MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL,
-                                       &movie_sound_buffer) != MA_SUCCESS)
+
+    if (!SDL_BindAudioStream(music_device, movie_stream))
     {
-        ma_pcm_rb_uninit(&movie_ring_buffer);
-        LogWarning("MovieSetupAudioStream: Failed to initialize the ring buffer.");
+        SDL_DestroyAudioStream(movie_stream);
+        movie_stream = nullptr;
+        LogWarning("MovieSetupAudioStream: Failed to bind the audio stream.");
         return false;
     }
+
+    movie_stream_queue_limit = PLM_AUDIO_SAMPLES_PER_FRAME * 4 * 2 * (int)sizeof(float);
+
     plm_set_audio_lead_time(decoder, (double)1024 / (double)rate);
-    // ring buffer based sounds need to unconditionally "loop" so that even if the buffer
-    // has no data ready to read it will not report being "finished"
-    ma_node_attach_output_bus(&movie_sound_buffer, 0, &music_node, 0);
-    ma_sound_set_looping(&movie_sound_buffer, MA_TRUE);
-    ma_sound_start(&movie_sound_buffer);
     PauseMusic();
-    ma_sound_group_set_volume(&music_node, music_volume.f_);
+    SDL_SetAudioDeviceGain(music_device, music_volume.f_);
     return true;
 }
 
@@ -91,43 +95,14 @@ void MovieAudioCallback(plm_t *mpeg, plm_samples_t *samples, void *user)
 {
     EPI_UNUSED(mpeg);
     EPI_UNUSED(user);
-    if (samples)
-    {
-        ma_result result;
-        ma_uint32 framesWritten;
-        ma_uint32 frameCount = samples->count;
 
-        /* We need to write to the ring buffer. Need to do this in a loop. */
-        framesWritten = 0;
-        while (framesWritten < frameCount)
-        {
-            void     *pMappedBuffer;
-            ma_uint32 framesToWrite = frameCount - framesWritten;
+    if (!samples || !movie_stream || pc_speaker_mode)
+        return;
 
-            result = ma_pcm_rb_acquire_write(&movie_ring_buffer, &framesToWrite, &pMappedBuffer);
-            if (result != MA_SUCCESS)
-            {
-                break;
-            }
+    if (SDL_GetAudioStreamQueued(movie_stream) >= movie_stream_queue_limit)
+        return;
 
-            if (framesToWrite == 0)
-            {
-                break;
-            }
-
-            ma_copy_pcm_frames(pMappedBuffer,
-                               ma_offset_pcm_frames_const_ptr_f32(samples->interleaved, framesWritten, 2),
-                               framesToWrite, ma_format_f32, 2);
-
-            result = ma_pcm_rb_commit_write(&movie_ring_buffer, framesToWrite);
-            if (result != MA_SUCCESS)
-            {
-                break;
-            }
-
-            framesWritten += framesToWrite;
-        }
-    }
+    SDL_PutAudioStreamData(movie_stream, samples->interleaved, (int)(samples->count * 2 * sizeof(float)));
 }
 
 void MovieVideoCallback(plm_t *mpeg, plm_frame_t *frame, void *user)
@@ -316,9 +291,11 @@ static void EndMovie()
         render_state->DeleteTexture(&canvas);
         canvas = 0;
     }
-    ma_sound_stop(&movie_sound_buffer);
-    ma_sound_uninit(&movie_sound_buffer);
-    ma_pcm_rb_uninit(&movie_ring_buffer);
+    if (movie_stream)
+    {
+        SDL_DestroyAudioStream(movie_stream);
+        movie_stream = nullptr;
+    }
     ResumeMusic();
 }
 

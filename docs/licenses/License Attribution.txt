@@ -103,8 +103,6 @@ Public Domain
 
 Fraction.hpp - Bisqwit
 
-Miniaudio library - David Reid
-
 prns.h - Marc B. Reynolds
 
 stb_image, stb_rect_pack, stb_sprintf, and stb_truetype libraries - Sean Barrett

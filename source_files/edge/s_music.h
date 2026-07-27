@@ -25,7 +25,10 @@
 
 #pragma once
 
+#include <SDL3/SDL_audio.h>
 #include <stdint.h>
+
+#include <vector>
 
 #include "con_var.h"
 
@@ -45,28 +48,42 @@ class AbstractMusicPlayer
     bool   looping_;
 
   public:
-    AbstractMusicPlayer()
-    {
-    }
-    virtual ~AbstractMusicPlayer()
-    {
-    }
+    AbstractMusicPlayer();
+    virtual ~AbstractMusicPlayer();
 
     virtual void Close(void) = 0;
 
-    virtual void Play(bool loop) = 0;
-    virtual void Stop(void)      = 0;
+    virtual void Play(bool loop);
+    virtual void Stop(void);
 
-    virtual void Pause(void)  = 0;
-    virtual void Resume(void) = 0;
+    virtual void Pause(void);
+    virtual void Resume(void);
 
-    virtual void Ticker(void) = 0;
+    virtual void Ticker(void);
+
+  protected:
+    bool OpenStream(int frequency, int channels, SDL_AudioFormat format);
+    void CloseStream(void);
+
+    virtual int StreamIntoBuffer(void *buffer, int frames) = 0;
+
+    SDL_AudioStream *stream_;
+    int              stream_frame_bytes_;
+    bool             stream_paused_;
+    bool             stream_ended_;
+
+  private:
+    static void SDLCALL StreamCallback(void *userdata, SDL_AudioStream *stream, int additional_amount,
+                                       int total_amount);
+
+    std::vector<uint8_t> stream_scratch_;
 };
 
 /* VARIABLES */
 
 extern ConsoleVariable music_volume;
 extern int             entry_playing;
+extern bool            entry_looped;
 extern bool            pc_speaker_mode;
 
 /* FUNCTIONS */
@@ -76,6 +93,8 @@ void ResumeMusic(void);
 void PauseMusic(void);
 void StopMusic(void);
 void MusicTicker(void);
+
+extern SDL_AudioDeviceID music_device;
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

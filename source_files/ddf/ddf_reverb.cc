@@ -66,39 +66,56 @@ void ReverbDefinition::ParseField(const char *field, const char *contents, int i
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
-    float *member = nullptr;
+    float *member  = nullptr;
+    bool   is_time = false;
     switch (DDFCreateStringHash(field).Value())
     {
-    case kRoomSize:
-        member = &dynamic_reverb->room_size_;
+    case kDecayTime:
+        member  = &dynamic_reverb->parameters_[kReverbDecayTime];
+        is_time = true;
         break;
-    case kDampingLevel:
-        member = &dynamic_reverb->damping_level_;
+    case kRoomSize:
+        member = &dynamic_reverb->parameters_[kReverbRoomSize];
+        break;
+    case kPreDelay:
+        member  = &dynamic_reverb->parameters_[kReverbPreDelay];
+        is_time = true;
+        break;
+    case kDiffusion:
+        member = &dynamic_reverb->parameters_[kReverbDiffusion];
+        break;
+    case kHighFrequencyDamping:
+        member = &dynamic_reverb->parameters_[kReverbHighFrequencyDamping];
+        break;
+    case kLowFrequencyDamping:
+        member = &dynamic_reverb->parameters_[kReverbLowFrequencyDamping];
         break;
     case kWetLevel:
-        member = &dynamic_reverb->wet_level_;
+        member = &dynamic_reverb->parameters_[kReverbWetLevel];
         break;
     case kDryLevel:
-        member = &dynamic_reverb->dry_level_;
+        member = &dynamic_reverb->parameters_[kReverbDryLevel];
         break;
-    case kReverbWidth:
-        member = &dynamic_reverb->reverb_width_;
-        break;
-    case kReverbGain:
-        member = &dynamic_reverb->reverb_gain_;
+    case kWidthKey:
+        member = &dynamic_reverb->parameters_[kReverbWidth];
         break;
     default:
         DDFError("Unknown reverbs.ddf command: %s\n", field);
     }
     EPI_ASSERT(member);
-    DDFMainGetPercent(contents, member);
+    if (is_time)
+        DDFMainGetFloat(contents, member);
+    else
+        DDFMainGetPercent(contents, member);
 }
 
 void ReverbDefinition::FinishEntry(void)
 {
-    // Map the 0.0-1.0 range presented to the user via DDF
-    // to the range of 0.000-0.100
-    dynamic_reverb->reverb_gain_ *= 0.1f;
+    if (dynamic_reverb->parameters_[kReverbDecayTime] > 20.0f)
+        dynamic_reverb->parameters_[kReverbDecayTime] = 20.0f;
+
+    if (dynamic_reverb->parameters_[kReverbPreDelay] > 0.2f)
+        dynamic_reverb->parameters_[kReverbPreDelay] = 0.2f;
 }
 
 void ReverbDefinition::ClearEntries(void)
@@ -128,8 +145,9 @@ ReverbDefinition::ReverbDefinition()
     Default();
 }
 
-ReverbDefinition::ReverbDefinition(float size, float damp, float wet, float dry, float width, float gain)
-    : room_size_(size), damping_level_(damp), wet_level_(wet), dry_level_(dry), reverb_width_(width), reverb_gain_(gain)
+ReverbDefinition::ReverbDefinition(float decay, float size, float pre_delay, float diffusion, float high_damping,
+                                   float low_damping, float wet, float dry, float width)
+    : parameters_{decay, size, pre_delay, diffusion, high_damping, low_damping, wet, dry, width}
 {
 }
 
@@ -138,34 +156,32 @@ ReverbDefinition::ReverbDefinition(float size, float damp, float wet, float dry,
 //
 void ReverbDefinition::CopyDetail(const ReverbDefinition &src)
 {
-    room_size_     = src.room_size_;
-    damping_level_ = src.damping_level_;
-    wet_level_     = src.wet_level_;
-    dry_level_     = src.dry_level_;
-    reverb_width_  = src.reverb_width_;
-    reverb_gain_   = src.reverb_gain_;
+    for (int i = 0; i < kTotalReverbParameters; i++)
+        parameters_[i] = src.parameters_[i];
 }
 
-void ReverbDefinition::ApplyReverb(ma_freeverb_node *reverb) const
+void ReverbDefinition::ApplyReverb(ReverbEffect *reverb) const
 {
-    ma_freeverb_update_verb(reverb, &room_size_, &damping_level_, &wet_level_, &dry_level_, &reverb_width_,
-                            &reverb_gain_);
+    reverb->SetParameters(parameters_);
 }
 
 void ReverbDefinition::Default()
 {
-    room_size_     = 0.0f;
-    damping_level_ = 0.0f;
-    wet_level_     = 0.0f;
-    dry_level_     = 0.0f;
-    reverb_width_  = 0.0f;
-    reverb_gain_   = 0.0f;
+    parameters_[kReverbDecayTime]            = 0.8f;
+    parameters_[kReverbRoomSize]             = 0.4f;
+    parameters_[kReverbPreDelay]             = 0.0f;
+    parameters_[kReverbDiffusion]            = 0.7f;
+    parameters_[kReverbHighFrequencyDamping] = 0.5f;
+    parameters_[kReverbLowFrequencyDamping]  = 0.0f;
+    parameters_[kReverbWetLevel]             = 0.3f;
+    parameters_[kReverbDryLevel]             = 1.0f;
+    parameters_[kReverbWidth]                = 1.0f;
 }
 
-const ReverbDefinition ReverbDefinition::kOutdoorStrong(0.30f, 0.35f, 0.25f, 0.50f, 0.15f, 0.015f);
-const ReverbDefinition ReverbDefinition::kIndoorStrong(0.40f, 0.35f, 0.35f, 0.50f, 0.65f, 0.015f);
-const ReverbDefinition ReverbDefinition::kOutdoorWeak(0.30f, 0.45f, 0.20f, 0.65f, 0.15f, 0.010f);
-const ReverbDefinition ReverbDefinition::kIndoorWeak(0.40f, 0.50f, 0.20f, 0.70f, 0.50f, 0.010f);
+const ReverbDefinition ReverbDefinition::kOutdoorStrong(2.20f, 0.85f, 0.030f, 0.85f, 0.30f, 0.10f, 0.25f, 1.0f, 0.60f);
+const ReverbDefinition ReverbDefinition::kIndoorStrong(1.30f, 0.55f, 0.012f, 0.75f, 0.55f, 0.05f, 0.35f, 1.0f, 1.00f);
+const ReverbDefinition ReverbDefinition::kOutdoorWeak(1.60f, 0.80f, 0.025f, 0.85f, 0.40f, 0.10f, 0.15f, 1.0f, 0.55f);
+const ReverbDefinition ReverbDefinition::kIndoorWeak(0.90f, 0.50f, 0.010f, 0.75f, 0.60f, 0.05f, 0.20f, 1.0f, 0.90f);
 
 // ---> Container class
 

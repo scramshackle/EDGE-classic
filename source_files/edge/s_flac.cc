@@ -19,6 +19,7 @@
 #include "s_flac.h"
 
 #include "ddf_playlist.h"
+#include "dr_flac.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_file.h"
@@ -31,10 +32,6 @@
 #include "snd_gather.h"
 #include "w_wad.h"
 
-extern int sound_device_frequency;
-
-static ma_decoder flac_decoder;
-static ma_sound   flac_stream;
 class FLACPlayer : public AbstractMusicPlayer
 {
   public:
@@ -43,24 +40,20 @@ class FLACPlayer : public AbstractMusicPlayer
 
   private:
     uint8_t *flac_data_;
+    drflac  *flac_decoder_;
 
   public:
     bool OpenMemory(uint8_t *data, int length);
 
     void Close(void) override;
 
-    void Play(bool loop) override;
-    void Stop(void) override;
-
-    void Pause(void) override;
-    void Resume(void) override;
-
-    void Ticker(void) override;
+  protected:
+    int StreamIntoBuffer(void *buffer, int frames) override;
 };
 
 //----------------------------------------------------------------------------
 
-FLACPlayer::FLACPlayer() : flac_data_(nullptr)
+FLACPlayer::FLACPlayer() : flac_data_(nullptr), flac_decoder_(nullptr)
 {
     status_ = kNotLoaded;
 }
@@ -75,26 +68,19 @@ bool FLACPlayer::OpenMemory(uint8_t *data, int length)
     if (status_ != kNotLoaded)
         Close();
 
-    ma_decoder_config decode_config = ma_decoder_config_init_default();
-    decode_config.format            = ma_format_f32;
-    decode_config.encodingFormat    = ma_encoding_format_flac;
+    flac_decoder_ = drflac_open_memory(data, length, NULL);
 
-    if (ma_decoder_init_memory(data, length, &decode_config, &flac_decoder) != MA_SUCCESS)
+    if (!flac_decoder_)
     {
-        LogWarning("Failed to load MP3 music (corrupt ogg?)\n");
+        LogWarning("Failed to load FLAC music (corrupt flac?)\n");
         return false;
     }
 
-    if (ma_sound_init_from_data_source(&sound_engine, &flac_decoder,
-                                       MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_NO_SPATIALIZATION,
-                                       NULL, &flac_stream) != MA_SUCCESS)
+    if (!OpenStream(flac_decoder_->sampleRate, flac_decoder_->channels, SDL_AUDIO_F32))
     {
-        ma_decoder_uninit(&flac_decoder);
-        LogWarning("Failed to load OGG music (corrupt ogg?)\n");
+        Close();
         return false;
     }
-
-    ma_node_attach_output_bus(&flac_stream, 0, &music_node, 0);
 
     flac_data_ = data;
 
@@ -112,73 +98,45 @@ void FLACPlayer::Close()
     // Stop playback
     Stop();
 
-    ma_sound_uninit(&flac_stream);
+    CloseStream();
 
-    ma_decoder_uninit(&flac_decoder);
+    if (flac_decoder_)
+    {
+        drflac_close(flac_decoder_);
+        flac_decoder_ = nullptr;
+    }
 
     delete[] flac_data_;
+    flac_data_ = nullptr;
 
     status_ = kNotLoaded;
 }
 
-void FLACPlayer::Pause()
+int FLACPlayer::StreamIntoBuffer(void *buffer, int frames)
 {
-    if (status_ != kPlaying)
-        return;
+    float *output      = (float *)buffer;
+    int    frames_left = frames;
 
-    ma_sound_stop(&flac_stream);
-
-    status_ = kPaused;
-}
-
-void FLACPlayer::Resume()
-{
-    if (status_ != kPaused)
-        return;
-
-    ma_sound_start(&flac_stream);
-
-    status_ = kPlaying;
-}
-
-void FLACPlayer::Play(bool loop)
-{
-    if (status_ != kNotLoaded && status_ != kStopped)
-        return;
-
-    looping_ = loop;
-
-    ma_sound_set_looping(&flac_stream, looping_ ? MA_TRUE : MA_FALSE);
-
-    // Let 'er rip (maybe)
-    if (playing_movie)
-        status_ = kPaused;
-    else
+    while (frames_left > 0)
     {
-        status_ = kPlaying;
-        ma_sound_start(&flac_stream);
+        drflac_uint64 got = drflac_read_pcm_frames_f32(flac_decoder_, frames_left, output);
+
+        if (got == 0)
+        {
+            if (!looping_)
+                break;
+
+            if (!drflac_seek_to_pcm_frame(flac_decoder_, 0))
+                break;
+
+            continue;
+        }
+
+        output += got * flac_decoder_->channels;
+        frames_left -= (int)got;
     }
-}
 
-void FLACPlayer::Stop()
-{
-    if (status_ != kPlaying && status_ != kPaused)
-        return;
-
-    ma_sound_stop(&flac_stream);
-
-    status_ = kStopped;
-}
-
-void FLACPlayer::Ticker()
-{
-    if (status_ == kPlaying)
-    {
-        if (pc_speaker_mode)
-            Stop();
-        if (ma_sound_at_end(&flac_stream)) // This should only be true if finished and not set to looping
-            Stop();
-    }
+    return frames - frames_left;
 }
 
 //----------------------------------------------------------------------------

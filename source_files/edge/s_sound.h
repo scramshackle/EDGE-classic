@@ -76,6 +76,7 @@ enum SoundEffectFlag
 
 constexpr float kMinimumSoundClipDistance         = 160.0f;
 constexpr float kMinimumOccludedSoundClipDistance = 80.0f;
+constexpr float kMaximumSoundClipDistance         = 4000.0f;
 
 // Init/Shutdown
 void InitializeSound(void);

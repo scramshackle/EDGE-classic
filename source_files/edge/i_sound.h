@@ -18,20 +18,31 @@
 
 #pragma once
 
+#include <SDL3/SDL_audio.h>
+
 #include <set>
 #include <string>
 
 #include "con_var.h"
-#include "miniaudio.h"
-#include "miniaudio_freeverb.h"
+#include "s_effect.h"
 
 extern std::set<std::string> available_soundbanks;
 
-extern ma_engine        sound_engine;
-extern ma_sound_group   sfx_node;
-extern ma_sound_group   music_node;
-extern ma_freeverb_node reverb_node;
-extern ma_delay_node    underwater_node;
-extern ma_lpf_node      vacuum_node;
-extern bool             sector_reverb; // true if we are in a sector with DDF reverb
-extern ConsoleVariable  dynamic_reverb;
+extern SDL_AudioDeviceID sound_device;
+extern int               sound_device_frequency;
+extern int               sound_device_channels;
+
+extern ReverbEffect reverb_effect;
+
+extern bool            sector_reverb; // true if we are in a sector with DDF reverb
+extern ConsoleVariable dynamic_reverb;
+
+void SoundDeviceFormatChanged(void);
+void ApplyPendingSoundDeviceFormatChange(void);
+
+void LockSoundMixer(void);
+void UnlockSoundMixer(void);
+
+void ProcessVacuumEffect(float *frames, int frame_count);
+void ProcessUnderwaterEffect(float *frames, int frame_count);
+void ProcessReverbEffect(float *frames, int frame_count);
