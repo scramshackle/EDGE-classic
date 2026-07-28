@@ -22,6 +22,9 @@ option(EDGE_SOKOL_GL "Sokol GL" OFF)
 option(EDGE_SOKOL_GLES3 "Sokol GLES3" OFF)
 option(EDGE_LEGACY_GL "Legacy GL Renderer" ON)
 
+# SDL3_GPU Renderer (Vulkan only)
+option(EDGE_SDL_GPU "SDL3_GPU Renderer" OFF)
+
 # Web Player
 option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" OFF)
 option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
@@ -29,7 +32,11 @@ option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
 # If the legacy GL renderer has not been selected and
 # a Sokol backend is not already specified by CMake params, 
 # choose a default based on platform
-if (NOT EDGE_LEGACY_GL)
+if (EDGE_SDL_GPU)
+  set (EDGE_LEGACY_GL OFF)
+endif()
+
+if (NOT EDGE_LEGACY_GL AND NOT EDGE_SDL_GPU)
   if (NOT EDGE_SOKOL_GL AND NOT EDGE_SOKOL_GLES3)
     if (EMSCRIPTEN)
       set (EDGE_SOKOL_GLES3 ON)
@@ -221,6 +228,8 @@ if (EDGE_SOKOL)
   elseif (EDGE_SOKOL_GLES3 AND NOT EMSCRIPTEN)
     find_package(OpenGL COMPONENTS GLES3 REQUIRED)
   endif()
+elseif (EDGE_SDL_GPU)
+  add_definitions(-DEDGE_SDL_GPU)
 else()
   find_package(OpenGL REQUIRED)
 endif()

@@ -134,10 +134,22 @@ set (EDGE_SOKOL_SOURCE_FILES
   render/sokol/sokol_units.cc
 )
 
-if (NOT EDGE_SOKOL)
-  list (APPEND EDGE_SOURCE_FILES ${EDGE_GL_SOURCE_FILES})
-else()
+set (EDGE_SDL_GPU_SOURCE_FILES
+  render/sdlgpu/gpu_backend.cc
+  render/sdlgpu/gpu_device.cc
+  render/sdlgpu/gpu_md2.cc
+  render/sdlgpu/gpu_mdl.cc
+  render/sdlgpu/gpu_sky.cc
+  render/sdlgpu/gpu_state.cc
+  render/sdlgpu/gpu_units.cc
+)
+
+if (EDGE_SOKOL)
   list (APPEND EDGE_SOURCE_FILES ${EDGE_SOKOL_SOURCE_FILES})
+elseif (EDGE_SDL_GPU)
+  list (APPEND EDGE_SOURCE_FILES ${EDGE_SDL_GPU_SOURCE_FILES})
+else()
+  list (APPEND EDGE_SOURCE_FILES ${EDGE_GL_SOURCE_FILES})
 endif()
 
 list (APPEND 
@@ -207,6 +219,10 @@ list (APPEND
 
 if (EDGE_SOKOL)
   list(APPEND EDGE_LINK_LIBRARIES sokol)
+  if (MINGW)
+    list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
+  endif()
+elseif (EDGE_SDL_GPU)
   if (MINGW)
     list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
   endif()

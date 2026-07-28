@@ -213,9 +213,11 @@ class RenderState
     virtual void SetPipeline(uint32_t flags) = 0;
 
     // Needed only for the legacy GL render path when ending unit batches
-#ifndef EDGE_SOKOL
+#if !defined(EDGE_SOKOL) && !defined(EDGE_SDL_GPU)
     virtual void ResetGLState() = 0;
+#endif
 
+#ifndef EDGE_SOKOL
     virtual void SetVertexArrays(const RendererVertex *vertices) = 0;
 
     virtual void DrawVertexArray(GLuint shape, int first, int count) = 0;

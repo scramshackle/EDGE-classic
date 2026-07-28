@@ -17,6 +17,9 @@
 //----------------------------------------------------------------------------
 
 #include "i_video.h"
+#ifdef EDGE_SDL_GPU
+#include "render/sdlgpu/gpu_device.h"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -166,7 +169,7 @@ void StartupGraphics(void)
     if (FindArgument("nograb") > 0)
         grab_mouse = 0;
 
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
     // -AJA- FIXME these are wrong (probably ignored though)
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
@@ -284,7 +287,9 @@ static bool InitializeWindow(DisplayMode *mode)
     uint32_t window_flags =
         (mode->window_mode == kWindowModeBorderless ? (SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN) : (0)) | resizeable;
 
+#ifndef EDGE_SDL_GPU
     window_flags |= SDL_WINDOW_OPENGL;
+#endif
 
     program_window = SDL_CreateWindow(temp_title.c_str(), mode->width, mode->height, window_flags);
 
@@ -305,6 +310,12 @@ static bool InitializeWindow(DisplayMode *mode)
         toggle_windowed_window_mode = kWindowModeWindowed;
     }
 
+#ifdef EDGE_SDL_GPU
+    if (!gpu_device.Init(program_window))
+        FatalError("Failed to create SDL_GPU device.\n");
+
+    gpu_device.SetVerticalSync(vsync.d_);
+#else
     program_context = SDL_GL_CreateContext(program_window);
     if (program_context == NULL)
         FatalError("Failed to create OpenGL context.\n");
@@ -322,8 +333,9 @@ static bool InitializeWindow(DisplayMode *mode)
     {
         SDL_GL_SetSwapInterval(vsync.d_);
     }
+#endif
 
-#ifndef EDGE_SOKOL
+#if !defined(EDGE_SOKOL) && !defined(EDGE_SDL_GPU)
     int major_version = 0;
     int minor_version = 0;
 
@@ -398,7 +410,7 @@ bool SetScreenSize(DisplayMode *mode)
     render_state->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 #endif
 
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
     SDL_GL_SwapWindow(program_window);
 #endif
 
@@ -424,7 +436,7 @@ static void SwapBuffers(void)
 {
     render_backend->SwapBuffers();
 
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
     // move me and other SDL_GL to backend
     SDL_GL_SwapWindow(program_window);
 #endif
@@ -481,7 +493,7 @@ void FinishFrame(void)
     {
         if (vsync.d_ == 2)
         {
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
             // Fallback to normal VSync if Adaptive doesn't work
             if (!SDL_GL_SetSwapInterval(-1))
             {
@@ -492,7 +504,7 @@ void FinishFrame(void)
         }
         else
         {
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
             SDL_GL_SetSwapInterval(vsync.d_);
 #endif
         }
@@ -511,7 +523,7 @@ void ShutdownGraphics(void)
 
     render_backend->Shutdown();
 
-#ifndef SOKOL_D3D11
+#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
     if (program_context != NULL)
     {
         SDL_GL_DestroyContext(program_context);
