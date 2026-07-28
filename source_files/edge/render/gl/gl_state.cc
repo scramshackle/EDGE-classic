@@ -1,14 +1,17 @@
 
 #include "r_state.h"
+#include "r_units.h"
 
-static void(APIENTRY *ec_glActiveTexture)(GLenum)                    = nullptr;
+static void(APIENTRY *ec_glActiveTexture)(GLenum)                     = nullptr;
+static void(APIENTRY *ec_glClientActiveTexture)(GLenum)               = nullptr;
 static void(APIENTRY *ec_glMultiTexCoord2fv)(GLenum, const GLfloat *) = nullptr;
 
 void LoadGL13Procs()
 {
-    ec_glActiveTexture    = (void(APIENTRY *)(GLenum))SDL_GL_GetProcAddress("glActiveTexture");
-    ec_glMultiTexCoord2fv = (void(APIENTRY *)(GLenum, const GLfloat *))SDL_GL_GetProcAddress("glMultiTexCoord2fv");
-    if (!ec_glActiveTexture || !ec_glMultiTexCoord2fv)
+    ec_glActiveTexture       = (void(APIENTRY *)(GLenum))SDL_GL_GetProcAddress("glActiveTexture");
+    ec_glClientActiveTexture = (void(APIENTRY *)(GLenum))SDL_GL_GetProcAddress("glClientActiveTexture");
+    ec_glMultiTexCoord2fv    = (void(APIENTRY *)(GLenum, const GLfloat *))SDL_GL_GetProcAddress("glMultiTexCoord2fv");
+    if (!ec_glActiveTexture || !ec_glClientActiveTexture || !ec_glMultiTexCoord2fv)
         FatalError("OpenGL 1.3 entry points unavailable");
 }
 
@@ -508,9 +511,91 @@ class GLRenderState : public RenderState
     {
     }
 
+    void SetVertexArrays(const RendererVertex *vertices)
+    {
+        if (vertex_array_base_ == vertices)
+        {
+            return;
+        }
+
+        vertex_array_base_   = vertices;
+        vertex_arrays_dirty_ = true;
+    }
+
+    void DrawVertexArray(GLuint shape, int first, int count)
+    {
+        if (!vertex_array_base_ || count <= 0)
+        {
+            return;
+        }
+
+        if (vertex_arrays_dirty_)
+        {
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glVertexPointer(3, GL_FLOAT, sizeof(RendererVertex), &vertex_array_base_->position);
+
+            glEnableClientState(GL_COLOR_ARRAY);
+            glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(RendererVertex), &vertex_array_base_->rgba);
+        }
+
+        for (int t = 0; t < 2; t++)
+        {
+            if (!vertex_arrays_dirty_ && texture_coordinate_array_[t] == enable_texture_2d_[t])
+            {
+                continue;
+            }
+
+            ec_glClientActiveTexture(GL_TEXTURE0 + t);
+
+            if (enable_texture_2d_[t])
+            {
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                glTexCoordPointer(2, GL_FLOAT, sizeof(RendererVertex), &vertex_array_base_->texture_coordinates[t]);
+            }
+            else
+            {
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            }
+
+            texture_coordinate_array_[t] = enable_texture_2d_[t];
+        }
+
+        vertex_arrays_dirty_ = false;
+
+        glDrawArrays(shape, first, count);
+    }
+
+    void DisableVertexArrays()
+    {
+        if (!vertex_array_base_)
+        {
+            return;
+        }
+
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_COLOR_ARRAY);
+
+        for (int t = 1; t >= 0; t--)
+        {
+            if (texture_coordinate_array_[t])
+            {
+                ec_glClientActiveTexture(GL_TEXTURE0 + t);
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+                texture_coordinate_array_[t] = false;
+            }
+        }
+
+        vertex_array_base_   = nullptr;
+        vertex_arrays_dirty_ = false;
+
+        gl_color_ = kRGBANoValue;
+    }
+
     // Might need to add more here since the state's scope has expanded - Dasho
     void ResetGLState()
     {
+        DisableVertexArrays();
+
         Disable(GL_BLEND);
         BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -603,6 +688,10 @@ class GLRenderState : public RenderState
     RGBAColor fog_color_;
 
     RGBAColor gl_color_;
+
+    const RendererVertex *vertex_array_base_           = nullptr;
+    bool                  vertex_arrays_dirty_         = false;
+    bool                  texture_coordinate_array_[2] = {false, false};
 };
 
 static GLRenderState state;

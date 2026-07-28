@@ -1170,7 +1170,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 fogColor = kRGBASilver;
                 break;
             case 2:
-                fogColor = 0x404040FF; // Find a constant to call this
+                fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
                 break;
             case 3:
                 fogColor = kRGBABlack;

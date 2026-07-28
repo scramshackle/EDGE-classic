@@ -107,6 +107,8 @@ struct ECFrameStats
 
 extern ECFrameStats ec_frame_stats;
 
+struct RendererVertex;
+
 enum RenderUsage
 {
     kRenderUsageImmutable = 0,
@@ -213,6 +215,10 @@ class RenderState
     // Needed only for the legacy GL render path when ending unit batches
 #ifndef EDGE_SOKOL
     virtual void ResetGLState() = 0;
+
+    virtual void SetVertexArrays(const RendererVertex *vertices) = 0;
+
+    virtual void DrawVertexArray(GLuint shape, int first, int count) = 0;
 #endif
 };
 

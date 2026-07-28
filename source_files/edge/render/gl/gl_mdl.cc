@@ -208,6 +208,23 @@ static HMM_Vec3  render_position;
 static RGBAColor render_rgba;
 static HMM_Vec2  render_texture_coordinates;
 
+static std::vector<RendererVertex> model_vertices;
+
+static void ReserveModelVertices(int count)
+{
+    if ((int)model_vertices.size() < count)
+        model_vertices.resize(count);
+}
+
+static inline void StoreModelVertex(int index, RGBAColor rgba)
+{
+    RendererVertex *dest = &model_vertices[index];
+
+    dest->rgba                   = rgba;
+    dest->position               = render_position;
+    dest->texture_coordinates[0] = render_texture_coordinates;
+}
+
 /*============== LOADING CODE ====================*/
 
 static const char *CopyFrameName(RawMDLSimpleFrame *frm)
@@ -859,7 +876,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
                 fogColor = kRGBASilver;
                 break;
             case 2:
-                fogColor = 0x404040FF; // Find a constant to call this
+                fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
                 break;
             case 3:
                 fogColor = kRGBABlack;
@@ -981,26 +998,28 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
             render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
         }
 
-        glBegin(GL_TRIANGLES);
+        int total_vertices = md->total_triangles_ * 3;
+
+        ReserveModelVertices(total_vertices);
+
+        int dest_index = 0;
 
         for (int i = 0; i < md->total_triangles_; i++)
         {
             data.triangle_indices_ = &md->triangle_indices_[i];
 
-            for (int v_idx = 0; v_idx < 3; v_idx++)
+            for (int v_idx = 0; v_idx < 3; v_idx++, dest_index++)
             {
                 ModelCoordFunc(&data, v_idx);
 
                 epi::SetRGBAAlpha(render_rgba, trans);
 
-                render_state->GLColor(render_rgba);
-                render_state->MultiTexCoord(GL_TEXTURE0, &render_texture_coordinates);
-                // vertex must be last
-                glVertex3fv((const GLfloat *)(&render_position));
+                StoreModelVertex(dest_index, render_rgba);
             }
         }
 
-        glEnd();
+        render_state->SetVertexArrays(model_vertices.data());
+        render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
         // restore the clamping mode
         if (old_clamp != kDummyClamp)
@@ -1036,18 +1055,19 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
     render_state->Enable(GL_BLEND);
     render_state->Enable(GL_CULL_FACE);
 
-    if (info->flags_ & kMapObjectFlagFuzzy)
-        render_state->GLColor(epi::MakeRGBA(0, 0, 0, 128));
-    else
-        render_state->GLColor(kRGBAWhite);
+    RGBAColor model_rgba = (info->flags_ & kMapObjectFlagFuzzy) ? epi::MakeRGBA(0, 0, 0, 128) : kRGBAWhite;
+
+    int total_vertices = md->total_triangles_ * 3;
+
+    ReserveModelVertices(total_vertices);
+
+    int dest_index = 0;
 
     for (int i = 0; i < md->total_triangles_; i++)
     {
         const int *tri = &md->triangle_indices_[i];
 
-        glBegin(GL_TRIANGLES);
-
-        for (int v_idx = 0; v_idx < 3; v_idx++)
+        for (int v_idx = 0; v_idx < 3; v_idx++, dest_index++)
         {
             const MDLFrame *frame_ptr = &md->frames_[frame];
 
@@ -1056,19 +1076,21 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
 
             const MDLPoint  *point = &md->points_[*tri + v_idx];
             const MDLVertex *vert  = &frame_ptr->vertices[point->vert_idx];
-            const HMM_Vec2   texc  = {{point->skin_s, point->skin_t}};
 
-            render_state->MultiTexCoord(GL_TEXTURE0, &texc);
+            render_texture_coordinates = {{point->skin_s, point->skin_t}};
 
             float dx = vert->x * xscale;
             float dy = vert->y * xscale;
             float dz = (vert->z + info->model_bias_) * yscale;
 
-            glVertex3f(x + dy, y + dz, dx / 256.0f);
-        }
+            render_position = {{x + dy, y + dz, dx / 256.0f}};
 
-        glEnd();
+            StoreModelVertex(dest_index, model_rgba);
+        }
     }
+
+    render_state->SetVertexArrays(model_vertices.data());
+    render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
     render_state->ResetGLState();
 }

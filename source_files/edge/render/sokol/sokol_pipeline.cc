@@ -84,45 +84,57 @@ sgl_pipeline GetPipeline(sgl_context context, uint32_t pipeline_flags, GLenum sr
 
         if (pipeline_flags & kPipelineBlend)
         {
-            sg_blend_factor src_factor = SG_BLENDFACTOR_ZERO;
-            sg_blend_factor dst_factor = SG_BLENDFACTOR_ZERO;
+            sg_blend_factor src_factor       = SG_BLENDFACTOR_ZERO;
+            sg_blend_factor dst_factor       = SG_BLENDFACTOR_ZERO;
+            sg_blend_factor src_factor_alpha = SG_BLENDFACTOR_ZERO;
+            sg_blend_factor dst_factor_alpha = SG_BLENDFACTOR_ZERO;
 
             pipeline_desc.colors[0].blend.enabled = true;
 
             switch (src_blend)
             {
             case GL_SRC_ALPHA:
-                src_factor = SG_BLENDFACTOR_SRC_ALPHA;
+                src_factor       = SG_BLENDFACTOR_SRC_ALPHA;
+                src_factor_alpha = SG_BLENDFACTOR_SRC_ALPHA;
                 break;
             case GL_ONE_MINUS_DST_COLOR:
-                src_factor = SG_BLENDFACTOR_ONE_MINUS_DST_COLOR;
+                src_factor       = SG_BLENDFACTOR_ONE_MINUS_DST_COLOR;
+                src_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_DST_ALPHA;
                 break;
             case GL_DST_COLOR:
-                src_factor = SG_BLENDFACTOR_DST_COLOR;
+                src_factor       = SG_BLENDFACTOR_DST_COLOR;
+                src_factor_alpha = SG_BLENDFACTOR_DST_ALPHA;
                 break;
             case GL_ZERO:
-                src_factor = SG_BLENDFACTOR_ZERO;
+                src_factor       = SG_BLENDFACTOR_ZERO;
+                src_factor_alpha = SG_BLENDFACTOR_ZERO;
                 break;
             }
 
             switch (dst_blend)
             {
             case GL_ONE:
-                dst_factor = SG_BLENDFACTOR_ONE;
+                dst_factor       = SG_BLENDFACTOR_ONE;
+                dst_factor_alpha = SG_BLENDFACTOR_ONE;
                 break;
             case GL_ONE_MINUS_SRC_ALPHA:
-                dst_factor = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                dst_factor       = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
                 break;
             case GL_SRC_COLOR:
-                dst_factor = SG_BLENDFACTOR_SRC_COLOR;
+                dst_factor       = SG_BLENDFACTOR_SRC_COLOR;
+                dst_factor_alpha = SG_BLENDFACTOR_SRC_ALPHA;
                 break;
             case GL_ZERO:
-                dst_factor = SG_BLENDFACTOR_ZERO;
+                dst_factor       = SG_BLENDFACTOR_ZERO;
+                dst_factor_alpha = SG_BLENDFACTOR_ZERO;
                 break;
             }
 
-            pipeline_desc.colors[0].blend.src_factor_rgb = src_factor;
-            pipeline_desc.colors[0].blend.dst_factor_rgb = dst_factor;
+            pipeline_desc.colors[0].blend.src_factor_rgb   = src_factor;
+            pipeline_desc.colors[0].blend.dst_factor_rgb   = dst_factor;
+            pipeline_desc.colors[0].blend.src_factor_alpha = src_factor_alpha;
+            pipeline_desc.colors[0].blend.dst_factor_alpha = dst_factor_alpha;
         }
 
         pipeline_id = sgl_context_make_pipeline(context, &pipeline_desc).id;

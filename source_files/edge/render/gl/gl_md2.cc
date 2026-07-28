@@ -285,6 +285,23 @@ static HMM_Vec3  render_position;
 static RGBAColor render_rgba;
 static HMM_Vec2  render_texture_coordinates;
 
+static std::vector<RendererVertex> model_vertices;
+
+static void ReserveModelVertices(int count)
+{
+    if ((int)model_vertices.size() < count)
+        model_vertices.resize(count);
+}
+
+static inline void StoreModelVertex(int index, RGBAColor rgba)
+{
+    RendererVertex *dest = &model_vertices[index];
+
+    dest->rgba                   = rgba;
+    dest->position               = render_position;
+    dest->texture_coordinates[0] = render_texture_coordinates;
+}
+
 /*============== LOADING CODE ====================*/
 
 static const char *CopyFrameName(RawMD2Frame *frm)
@@ -1186,7 +1203,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 fogColor = kRGBASilver;
                 break;
             case 2:
-                fogColor = 0x404040FF; // Find a constant to call this
+                fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
                 break;
             case 3:
                 fogColor = kRGBABlack;
@@ -1310,48 +1327,62 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
 
         if (md->strips_[0].mode == GL_TRIANGLES) // MD3 models, it's a pile of triangles :/
         {
-            glBegin(GL_TRIANGLES);
+            int total_vertices = md->total_strips_ * 3;
+
+            ReserveModelVertices(total_vertices);
+
+            int dest_index = 0;
 
             for (int i = 0; i < md->total_strips_; i++)
             {
                 data.strip_ = &md->strips_[i];
 
-                for (int v_idx = 0; v_idx < 3; v_idx++)
+                for (int v_idx = 0; v_idx < 3; v_idx++, dest_index++)
                 {
                     ModelCoordFunc(&data, v_idx);
 
                     epi::SetRGBAAlpha(render_rgba, trans);
 
-                    render_state->GLColor(render_rgba);
-                    render_state->MultiTexCoord(GL_TEXTURE0, &render_texture_coordinates);
-                    // vertex must be last
-                    glVertex3fv((const GLfloat *)(&render_position));
+                    StoreModelVertex(dest_index, render_rgba);
                 }
             }
 
-            glEnd();
+            render_state->SetVertexArrays(model_vertices.data());
+            render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
         }
         else
         {
+            int total_vertices = 0;
+
+            for (int i = 0; i < md->total_strips_; i++)
+                total_vertices += md->strips_[i].count;
+
+            ReserveModelVertices(total_vertices);
+
+            int dest_index = 0;
+
             for (int i = 0; i < md->total_strips_; i++)
             {
                 data.strip_ = &md->strips_[i];
 
-                glBegin(data.strip_->mode);
-
-                for (int v_idx = 0; v_idx < md->strips_[i].count; v_idx++)
+                for (int v_idx = 0; v_idx < md->strips_[i].count; v_idx++, dest_index++)
                 {
                     ModelCoordFunc(&data, v_idx);
 
                     epi::SetRGBAAlpha(render_rgba, trans);
 
-                    render_state->GLColor(render_rgba);
-                    render_state->MultiTexCoord(GL_TEXTURE0, &render_texture_coordinates);
-                    // vertex must be last
-                    glVertex3fv((const GLfloat *)(&render_position));
+                    StoreModelVertex(dest_index, render_rgba);
                 }
+            }
 
-                glEnd();
+            render_state->SetVertexArrays(model_vertices.data());
+
+            int first_vertex = 0;
+
+            for (int i = 0; i < md->total_strips_; i++)
+            {
+                render_state->DrawVertexArray(md->strips_[i].mode, first_vertex, md->strips_[i].count);
+                first_vertex += md->strips_[i].count;
             }
         }
 
@@ -1386,71 +1417,61 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
     render_state->Enable(GL_BLEND);
     render_state->Enable(GL_CULL_FACE);
 
-    if (info->flags_ & kMapObjectFlagFuzzy)
-        render_state->GLColor(epi::MakeRGBA(0, 0, 0, 128));
-    else
-        render_state->GLColor(kRGBAWhite);
+    RGBAColor model_rgba = (info->flags_ & kMapObjectFlagFuzzy) ? epi::MakeRGBA(0, 0, 0, 128) : kRGBAWhite;
+
+    int total_vertices = 0;
 
     if (md->strips_[0].mode == GL_TRIANGLES)
-    {
-        glBegin(GL_TRIANGLES);
-
-        for (int i = 0; i < md->total_strips_; i++)
-        {
-            const MD2Strip *strip = &md->strips_[i];
-
-            for (int v_idx = 0; v_idx < 3; v_idx++)
-            {
-                const MD2Frame *frame_ptr = &md->frames_[frame];
-
-                EPI_ASSERT(strip->first + v_idx >= 0);
-                EPI_ASSERT(strip->first + v_idx < md->total_points_);
-
-                const MD2Point  *point = &md->points_[strip->first + v_idx];
-                const MD2Vertex *vert  = &frame_ptr->vertices[point->vert_idx];
-                const HMM_Vec2   texc  = {{point->skin_s, point->skin_t}};
-
-                render_state->MultiTexCoord(GL_TEXTURE0, &texc);
-
-                float dx = vert->x * xscale;
-                float dy = vert->y * xscale;
-                float dz = (vert->z + info->model_bias_) * yscale;
-
-                glVertex3f(x + dy, y + dz, dx / 256.0f);
-            }
-        }
-
-        glEnd();
-    }
+        total_vertices = md->total_strips_ * 3;
     else
     {
         for (int i = 0; i < md->total_strips_; i++)
+            total_vertices += md->strips_[i].count;
+    }
+
+    ReserveModelVertices(total_vertices);
+
+    int dest_index = 0;
+
+    for (int i = 0; i < md->total_strips_; i++)
+    {
+        const MD2Strip *strip = &md->strips_[i];
+        int             count = (md->strips_[0].mode == GL_TRIANGLES) ? 3 : strip->count;
+
+        for (int v_idx = 0; v_idx < count; v_idx++, dest_index++)
         {
-            const MD2Strip *strip = &md->strips_[i];
+            const MD2Frame *frame_ptr = &md->frames_[frame];
 
-            glBegin(strip->mode);
+            EPI_ASSERT(strip->first + v_idx >= 0);
+            EPI_ASSERT(strip->first + v_idx < md->total_points_);
 
-            for (int v_idx = 0; v_idx < md->strips_[i].count; v_idx++)
-            {
-                const MD2Frame *frame_ptr = &md->frames_[frame];
+            const MD2Point  *point = &md->points_[strip->first + v_idx];
+            const MD2Vertex *vert  = &frame_ptr->vertices[point->vert_idx];
 
-                EPI_ASSERT(strip->first + v_idx >= 0);
-                EPI_ASSERT(strip->first + v_idx < md->total_points_);
+            render_texture_coordinates = {{point->skin_s, point->skin_t}};
 
-                const MD2Point  *point = &md->points_[strip->first + v_idx];
-                const MD2Vertex *vert  = &frame_ptr->vertices[point->vert_idx];
-                const HMM_Vec2   texc  = {{point->skin_s, point->skin_t}};
+            float dx = vert->x * xscale;
+            float dy = vert->y * xscale;
+            float dz = (vert->z + info->model_bias_) * yscale;
 
-                render_state->MultiTexCoord(GL_TEXTURE0, &texc);
+            render_position = {{x + dy, y + dz, dx / 256.0f}};
 
-                float dx = vert->x * xscale;
-                float dy = vert->y * xscale;
-                float dz = (vert->z + info->model_bias_) * yscale;
+            StoreModelVertex(dest_index, model_rgba);
+        }
+    }
 
-                glVertex3f(x + dy, y + dz, dx / 256.0f);
-            }
+    render_state->SetVertexArrays(model_vertices.data());
 
-            glEnd();
+    if (md->strips_[0].mode == GL_TRIANGLES)
+        render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
+    else
+    {
+        int first_vertex = 0;
+
+        for (int i = 0; i < md->total_strips_; i++)
+        {
+            render_state->DrawVertexArray(md->strips_[i].mode, first_vertex, md->strips_[i].count);
+            first_vertex += md->strips_[i].count;
         }
     }
 

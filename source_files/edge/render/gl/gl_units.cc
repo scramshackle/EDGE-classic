@@ -286,6 +286,8 @@ void RenderCurrentUnits(void)
     RGBAColor active_fog_rgb     = kRGBANoValue;
     float     active_fog_density = 0;
 
+    state->SetVertexArrays(local_verts);
+
     for (int i = 0; i < current_render_unit; i++)
         local_unit_map[i] = &local_units[i];
 
@@ -307,7 +309,7 @@ void RenderCurrentUnits(void)
             fogColor = kRGBASilver;
             break;
         case 2:
-            fogColor = 0x404040FF; // Find a constant to call this
+            fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
             break;
         case 3:
             fogColor = kRGBABlack;
@@ -540,20 +542,7 @@ void RenderCurrentUnits(void)
             }
         }
 
-        glBegin(unit->shape);
-
-        const RendererVertex *V = local_verts + unit->first;
-
-        for (int v_idx = 0, v_last_idx = unit->count; v_idx < v_last_idx; v_idx++, V++)
-        {
-            state->GLColor(V->rgba);
-            state->MultiTexCoord(GL_TEXTURE0, &V->texture_coordinates[0]);
-            state->MultiTexCoord(GL_TEXTURE1, &V->texture_coordinates[1]);
-            // vertex must be last
-            glVertex3fv((const GLfloat *)(&V->position));
-        }
-
-        glEnd();
+        state->DrawVertexArray(unit->shape, unit->first, unit->count);
 
         // restore the clamping mode
         if (old_clamp_s != kDummyClamp)
