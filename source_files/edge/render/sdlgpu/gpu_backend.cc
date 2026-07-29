@@ -3,6 +3,7 @@
 #include "epi.h"
 #include "g_game.h"
 #include "gpu_device.h"
+#include "gpu_shaders.h"
 #include "i_defs_gl.h"
 #include "r_colormap.h"
 #include "r_draw.h"
@@ -40,6 +41,9 @@ class GpuRenderBackend : public RenderBackend
         max_texture_size_ = 4096;
 
         LogPrint("SDL_GPU: Max Texture Size: %d\n", max_texture_size_);
+
+        if (!CreateWorldShaders(gpu_device.Handle()))
+            FatalError("SDL_GPU: failed to create the world shaders.\n");
 
         RenderBackend::Init();
     }
@@ -89,6 +93,8 @@ class GpuRenderBackend : public RenderBackend
 
     void Shutdown()
     {
+        DestroyWorldShaders(gpu_device.Handle());
+
         gpu_device.Shutdown();
     }
 

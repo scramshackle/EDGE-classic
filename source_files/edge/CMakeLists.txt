@@ -139,6 +139,7 @@ set (EDGE_SDL_GPU_SOURCE_FILES
   render/sdlgpu/gpu_device.cc
   render/sdlgpu/gpu_md2.cc
   render/sdlgpu/gpu_mdl.cc
+  render/sdlgpu/gpu_shaders.cc
   render/sdlgpu/gpu_sky.cc
   render/sdlgpu/gpu_state.cc
   render/sdlgpu/gpu_units.cc

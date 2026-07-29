@@ -1,0 +1,86 @@
+#include "gpu_shaders.h"
+
+#include "epi.h"
+#include "i_system.h"
+#include "shaders/world_spirv.h"
+
+static SDL_GPUShader *world_vertex_shader   = nullptr;
+static SDL_GPUShader *world_fragment_shader = nullptr;
+
+static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage stage, const uint32_t *code,
+                                   size_t code_size, uint32_t num_samplers, uint32_t num_uniform_buffers,
+                                   const char *name)
+{
+    SDL_GPUShaderCreateInfo info;
+    EPI_CLEAR_MEMORY(&info, SDL_GPUShaderCreateInfo, 1);
+
+    info.code                 = (const uint8_t *)code;
+    info.code_size            = code_size;
+    info.entrypoint           = "main";
+    info.format               = SDL_GPU_SHADERFORMAT_SPIRV;
+    info.stage                = stage;
+    info.num_samplers         = num_samplers;
+    info.num_storage_textures = 0;
+    info.num_storage_buffers  = 0;
+    info.num_uniform_buffers  = num_uniform_buffers;
+
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetStringProperty(props, SDL_PROP_GPU_SHADER_CREATE_NAME_STRING, name);
+    info.props = props;
+
+    SDL_GPUShader *shader = SDL_CreateGPUShader(device, &info);
+
+    SDL_DestroyProperties(props);
+
+    if (!shader)
+        LogPrint("GpuShaders: SDL_CreateGPUShader failed for '%s': %s\n", name, SDL_GetError());
+
+    return shader;
+}
+
+bool CreateWorldShaders(SDL_GPUDevice *device)
+{
+    if (world_vertex_shader && world_fragment_shader)
+        return true;
+
+    world_vertex_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kWorldVertexShaderSpirv, sizeof(kWorldVertexShaderSpirv),
+                     kWorldVertexShaderSamplerCount, kWorldVertexShaderUniformBufferCount, "world.vert");
+
+    world_fragment_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kWorldFragmentShaderSpirv, sizeof(kWorldFragmentShaderSpirv),
+                     kWorldFragmentShaderSamplerCount, kWorldFragmentShaderUniformBufferCount, "world.frag");
+
+    if (!world_vertex_shader || !world_fragment_shader)
+    {
+        DestroyWorldShaders(device);
+        return false;
+    }
+
+    return true;
+}
+
+void DestroyWorldShaders(SDL_GPUDevice *device)
+{
+    if (world_vertex_shader)
+    {
+        SDL_ReleaseGPUShader(device, world_vertex_shader);
+        world_vertex_shader = nullptr;
+    }
+
+    if (world_fragment_shader)
+    {
+        SDL_ReleaseGPUShader(device, world_fragment_shader);
+        world_fragment_shader = nullptr;
+    }
+}
+
+SDL_GPUShader *WorldVertexShader()
+{
+    return world_vertex_shader;
+}
+
+SDL_GPUShader *WorldFragmentShader()
+{
+    return world_fragment_shader;
+}
