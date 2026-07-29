@@ -26,6 +26,10 @@ class GpuDevice
 
     void EndPass();
 
+    SDL_GPUCommandBuffer *BeginUpload();
+
+    void EndUpload(SDL_GPUCommandBuffer *upload_buffer);
+
     void SetClearColor(RGBAColor color)
     {
         clear_color_ = color;
@@ -70,29 +74,35 @@ class GpuDevice
 
     int32_t TargetWidth() const
     {
-        return depth_width_;
+        return target_width_;
     }
 
     int32_t TargetHeight() const
     {
-        return depth_height_;
+        return target_height_;
     }
 
+    bool ReadColorTarget(int32_t width, int32_t height, int32_t stride, uint8_t *dest);
+
   private:
-    bool CreateDepthTexture(int32_t width, int32_t height);
+    bool CreateFrameTextures(int32_t width, int32_t height);
 
     SDL_Window           *window_            = nullptr;
     SDL_GPUDevice        *device_            = nullptr;
     SDL_GPUCommandBuffer *command_buffer_    = nullptr;
     SDL_GPURenderPass    *render_pass_       = nullptr;
     SDL_GPUTexture       *swapchain_texture_ = nullptr;
+    SDL_GPUTexture       *color_texture_     = nullptr;
     SDL_GPUTexture       *depth_texture_     = nullptr;
+
+    SDL_GPUTransferBuffer *download_buffer_          = nullptr;
+    uint32_t               download_buffer_capacity_ = 0;
 
     SDL_GPUTextureFormat swapchain_format_ = SDL_GPU_TEXTUREFORMAT_INVALID;
     SDL_GPUTextureFormat depth_format_     = SDL_GPU_TEXTUREFORMAT_INVALID;
 
-    int32_t depth_width_  = 0;
-    int32_t depth_height_ = 0;
+    int32_t target_width_  = 0;
+    int32_t target_height_ = 0;
 
     RGBAColor clear_color_ = kRGBABlack;
 

@@ -1,14 +1,91 @@
+#include <stdlib.h>
+
+#include <vector>
+
 #include "epi.h"
 #include "gpu_device.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
 #include "gpu_pipeline.h"
+#include "i_system.h"
 #include "r_backend.h"
 #include "r_state.h"
 #include "r_units.h"
 
 std::unordered_map<GLuint, GLint> texture_clamp_s;
 std::unordered_map<GLuint, GLint> texture_clamp_t;
+
+static constexpr float kGpuSamplerUnclampedLevelOfDetail = 1000.0f;
+
+struct GpuMipLevel
+{
+    GLsizei width;
+    GLsizei height;
+    void   *pixels;
+};
+
+static SDL_GPUSamplerAddressMode GpuAddressMode(GLint wrap)
+{
+    if (wrap == GL_CLAMP || wrap == GL_CLAMP_TO_EDGE)
+        return SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    return SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+}
+
+static void GpuFillSamplerInfo(SDL_GPUSamplerCreateInfo *info, GLint minification, GLint magnification, GLint wrap_s,
+                               GLint wrap_t)
+{
+    EPI_CLEAR_MEMORY(info, SDL_GPUSamplerCreateInfo, 1);
+
+    info->address_mode_u = GpuAddressMode(wrap_s);
+    info->address_mode_v = GpuAddressMode(wrap_t);
+    info->address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    info->mag_filter = (magnification == GL_LINEAR) ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+
+    bool mipmapped = true;
+
+    switch (minification)
+    {
+    case GL_NEAREST:
+        info->min_filter  = SDL_GPU_FILTER_NEAREST;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+        mipmapped         = false;
+        break;
+
+    case GL_LINEAR:
+        info->min_filter  = SDL_GPU_FILTER_LINEAR;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+        mipmapped         = false;
+        break;
+
+    case GL_NEAREST_MIPMAP_NEAREST:
+        info->min_filter  = SDL_GPU_FILTER_NEAREST;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+        break;
+
+    case GL_LINEAR_MIPMAP_NEAREST:
+        info->min_filter  = SDL_GPU_FILTER_LINEAR;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+        break;
+
+    case GL_NEAREST_MIPMAP_LINEAR:
+        info->min_filter  = SDL_GPU_FILTER_NEAREST;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+        break;
+
+    case GL_LINEAR_MIPMAP_LINEAR:
+        info->min_filter  = SDL_GPU_FILTER_LINEAR;
+        info->mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+        break;
+
+    default:
+        FatalError("GpuRenderState: unknown texture minification filter 0x%04X\n", minification);
+    }
+
+    info->min_lod = 0.0f;
+    info->max_lod = mipmapped ? kGpuSamplerUnclampedLevelOfDetail : 0.0f;
+}
 
 class GpuRenderState : public RenderState
 {
@@ -235,7 +312,7 @@ class GpuRenderState : public RenderState
             texture_clamp_s.erase(*tex_id);
             texture_clamp_t.erase(*tex_id);
 
-            DeleteGpuImage(gpu_device.Handle(), *tex_id);
+            DeleteGpuImage(*tex_id);
         }
     }
 
@@ -260,29 +337,106 @@ class GpuRenderState : public RenderState
 
     void GenTextures(GLsizei n, GLuint *textures)
     {
+        if (generating_texture_)
+            FatalError("GenTextures: called during texture generation");
+
         for (GLsizei i = 0; i < n; i++)
             textures[i] = next_texture_id_++;
+
+        generating_texture_ = true;
+        generating_level_   = 0;
+
+        texture_wrap_s_ = GL_CLAMP;
+        texture_wrap_t_ = GL_CLAMP;
+
+        DiscardMipLevels();
     }
 
     void FinishTextures(GLsizei n, GLuint *textures)
     {
         EPI_UNUSED(n);
-        EPI_UNUSED(textures);
+
+        if (!generating_texture_)
+            FatalError("FinishTextures: called outside of texture generation");
+
+        if (mip_levels_.empty())
+            FatalError("FinishTextures: no mip levels defined");
+
+        SDL_GPUSamplerCreateInfo sampler_info;
+
+        GpuFillSamplerInfo(&sampler_info, texture_min_filter_, texture_mag_filter_, texture_wrap_s_, texture_wrap_t_);
+
+        std::vector<GpuImageLevel> levels;
+
+        levels.resize(mip_levels_.size());
+
+        for (size_t i = 0; i < mip_levels_.size(); i++)
+        {
+            levels[i].width  = mip_levels_[i].width;
+            levels[i].height = mip_levels_[i].height;
+            levels[i].pixels = mip_levels_[i].pixels;
+        }
+
+        if (!CreateGpuImage(gpu_device.Handle(), *textures, levels.data(), (int32_t)levels.size(), &sampler_info))
+            FatalError("FinishTextures: failed to create texture %u", *textures);
+
+        DiscardMipLevels();
+
+        generating_texture_ = false;
+        generating_level_   = 0;
     }
 
     void TexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border,
                     GLenum format, GLenum type, const void *pixels, RenderUsage usage = kRenderUsageImmutable)
     {
         EPI_UNUSED(target);
-        EPI_UNUSED(level);
-        EPI_UNUSED(internalformat);
-        EPI_UNUSED(width);
-        EPI_UNUSED(height);
         EPI_UNUSED(border);
         EPI_UNUSED(format);
         EPI_UNUSED(type);
-        EPI_UNUSED(pixels);
-        EPI_UNUSED(usage);
+
+        if (internalformat == GL_RGB)
+            FatalError("TexImage2D: GL_RGB is only supported by OpenGL, promote to GL_RGBA before calling TexImage2D");
+
+        if (internalformat == GL_ALPHA)
+            FatalError("TexImage2D: GL_ALPHA is only supported by OpenGL, promote to GL_RGBA before calling "
+                       "TexImage2D");
+
+        if (internalformat != GL_RGBA)
+            FatalError("TexImage2D: unknown texture format");
+
+        if (generating_texture_)
+        {
+            if (level < generating_level_)
+                FatalError("TexImage2D: texture levels must be sequential");
+
+            generating_level_ = level;
+
+            GpuMipLevel mip_level;
+
+            mip_level.width  = width;
+            mip_level.height = height;
+            mip_level.pixels = nullptr;
+
+            if (pixels && usage == kRenderUsageImmutable)
+            {
+                size_t bytes = (size_t)width * (size_t)height * 4;
+
+                mip_level.pixels = malloc(bytes);
+
+                memcpy(mip_level.pixels, pixels, bytes);
+            }
+
+            mip_levels_.push_back(mip_level);
+            return;
+        }
+
+        GLuint texture_id = bind_texture_2d_[active_texture_ - GL_TEXTURE0];
+
+        if (!texture_id)
+            FatalError("TexImage2D: no texture bound on update");
+
+        if (!UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+            FatalError("TexImage2D: failed to update texture %u", texture_id);
     }
 
     void PixelStorei(GLenum pname, GLint param)
@@ -453,6 +607,17 @@ class GpuRenderState : public RenderState
     }
 
   private:
+    void DiscardMipLevels()
+    {
+        for (size_t i = 0; i < mip_levels_.size(); i++)
+        {
+            if (mip_levels_[i].pixels)
+                free(mip_levels_[i].pixels);
+        }
+
+        mip_levels_.clear();
+    }
+
     struct GpuClipPlane
     {
         bool     enabled_;
@@ -520,6 +685,11 @@ class GpuRenderState : public RenderState
     float line_width_ = 1.0f;
 
     GLuint next_texture_id_ = 1;
+
+    bool  generating_texture_ = false;
+    GLint generating_level_   = 0;
+
+    std::vector<GpuMipLevel> mip_levels_;
 
     const RendererVertex *vertex_array_base_ = nullptr;
 };

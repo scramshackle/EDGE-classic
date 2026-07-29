@@ -88,7 +88,7 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
      * assigned to it.
      */
 
-#ifdef EDGE_SOKOL
+#if defined(EDGE_SOKOL) || defined(EDGE_SDL_GPU)
     // Only OpenGL supports RGB format for textures, so promote to RGBA
     if (img->depth_ == 3)
     {

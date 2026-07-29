@@ -115,15 +115,15 @@ class GpuRenderBackend : public RenderBackend
 
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
-        EPI_UNUSED(width);
-        EPI_UNUSED(height);
-        EPI_UNUSED(stride);
-        EPI_UNUSED(dest);
+        if (!gpu_device.ReadColorTarget(width, height, stride, dest))
+            memset(dest, 0, (size_t)stride * (size_t)height);
     }
 
     void StartFrame(int32_t width, int32_t height)
     {
         frame_number_++;
+
+        FlushDeletedGpuImages(gpu_device.Handle());
 
         if (vsync.CheckModified())
             gpu_device.SetVerticalSync(vsync.d_);
