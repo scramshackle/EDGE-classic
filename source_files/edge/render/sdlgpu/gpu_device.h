@@ -68,6 +68,16 @@ class GpuDevice
         return command_buffer_ != nullptr && swapchain_texture_ != nullptr;
     }
 
+    int32_t TargetWidth() const
+    {
+        return depth_width_;
+    }
+
+    int32_t TargetHeight() const
+    {
+        return depth_height_;
+    }
+
   private:
     bool CreateDepthTexture(int32_t width, int32_t height);
 
