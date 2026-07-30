@@ -102,20 +102,37 @@ void GpuDevice::SetVerticalSync(int mode)
         return;
 
     SDL_GPUPresentMode present = SDL_GPU_PRESENTMODE_VSYNC;
+    const char        *present_name = "vsync";
 
     if (mode == 0)
     {
         if (SDL_WindowSupportsGPUPresentMode(device_, window_, SDL_GPU_PRESENTMODE_IMMEDIATE))
-            present = SDL_GPU_PRESENTMODE_IMMEDIATE;
+        {
+            present      = SDL_GPU_PRESENTMODE_IMMEDIATE;
+            present_name = "immediate";
+        }
+        else if (SDL_WindowSupportsGPUPresentMode(device_, window_, SDL_GPU_PRESENTMODE_MAILBOX))
+        {
+            present      = SDL_GPU_PRESENTMODE_MAILBOX;
+            present_name = "mailbox";
+        }
     }
     else if (mode == 2)
     {
         if (SDL_WindowSupportsGPUPresentMode(device_, window_, SDL_GPU_PRESENTMODE_MAILBOX))
-            present = SDL_GPU_PRESENTMODE_MAILBOX;
+        {
+            present      = SDL_GPU_PRESENTMODE_MAILBOX;
+            present_name = "mailbox";
+        }
     }
 
     if (!SDL_SetGPUSwapchainParameters(device_, window_, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, present))
+    {
         LogPrint("GpuDevice: SDL_SetGPUSwapchainParameters failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    LogPrint("SDL_GPU: present mode '%s' (vsync %d)\n", present_name, mode);
 }
 
 bool GpuDevice::CreateFrameTextures(int32_t width, int32_t height)

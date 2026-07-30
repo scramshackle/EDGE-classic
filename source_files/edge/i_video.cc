@@ -475,26 +475,24 @@ void FinishFrame(void)
 
     fractional_tic = (float)(GetMilliseconds() * kTicRate % 1000) / 1000;
 
+#ifndef EDGE_SDL_GPU
     if (vsync.CheckModified())
     {
         if (vsync.d_ == 2)
         {
-#ifndef EDGE_SDL_GPU
             // Fallback to normal VSync if Adaptive doesn't work
             if (!SDL_GL_SetSwapInterval(-1))
             {
                 vsync = 1;
                 SDL_GL_SetSwapInterval(vsync.d_);
             }
-#endif
         }
         else
         {
-#ifndef EDGE_SDL_GPU
             SDL_GL_SetSwapInterval(vsync.d_);
-#endif
         }
     }
+#endif
 
     if (monitor_aspect_ratio.CheckModified() || forced_pixel_aspect_ratio.CheckModified())
         DeterminePixelAspect();

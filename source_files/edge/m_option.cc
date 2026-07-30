@@ -468,8 +468,14 @@ static OptionMenuDefinition ui_optmenu = {
 //
 static OptionMenuItem resoptions[] = {
     {kOptionMenuItemTypePlain, "", nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, ""},
+#ifdef EDGE_SDL_GPU
+    {kOptionMenuItemTypeSwitch, "V-Sync", "Off/Standard/Low Latency", 3, &vsync.d_,
+     OptionMenuUpdateConsoleVariableFromInt, "Will fallback to Standard if the mode is not supported", &vsync, 0, 0, 0,
+     ""},
+#else
     {kOptionMenuItemTypeSwitch, "V-Sync", "Off/Standard/Adaptive", 3, &vsync.d_, OptionMenuUpdateConsoleVariableFromInt,
      "Will fallback to Standard if Adaptive is not supported", &vsync, 0, 0, 0, ""},
+#endif
     {kOptionMenuItemTypeSwitch, "Aspect Ratio", "5:4/4:3/3:2/16:10/16:9/21:9", 6, &monitor_size,
      OptionMenuChangeMonitorSize, "Only applies to Fullscreen Modes", nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeFunction, "New Mode", nullptr, 0, nullptr, OptionMenuChangeResFull, nullptr, nullptr, 0, 0, 0,
