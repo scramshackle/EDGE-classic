@@ -332,12 +332,6 @@ void GpuImmediate::BeginFrame()
 
     viewport_set_ = false;
     scissor_set_  = false;
-
-    draw_count_          = 0;
-    pipeline_bind_count_ = 0;
-    binding_count_       = 0;
-    uniform_push_count_  = 0;
-    uploaded_bytes_      = 0;
 }
 
 void GpuImmediate::LoadIdentity()
@@ -929,6 +923,13 @@ void GpuImmediate::ApplyPassState()
 
 void GpuImmediate::Replay()
 {
+    draw_count_          = 0;
+    pipeline_bind_count_ = 0;
+    binding_count_       = 0;
+    uniform_push_count_  = 0;
+    uniform_bytes_       = 0;
+    uploaded_bytes_      = 0;
+
     if (!gpu_device.FrameAcquired())
         return;
 
@@ -1005,6 +1006,7 @@ void GpuImmediate::Replay()
 
             bound_vertex_parameter_index_ = draw->vertex_parameter_index;
             uniform_push_count_++;
+            uniform_bytes_ += sizeof(GpuVertexParameters);
         }
 
         if (bound_fragment_parameter_index_ != draw->fragment_parameter_index)
@@ -1015,6 +1017,7 @@ void GpuImmediate::Replay()
 
             bound_fragment_parameter_index_ = draw->fragment_parameter_index;
             uniform_push_count_++;
+            uniform_bytes_ += sizeof(GpuFragmentParameters);
         }
 
         if (draw->index_source != kGpuIndexSourceNone)

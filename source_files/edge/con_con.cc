@@ -1423,7 +1423,7 @@ void ConsoleStart(void)
     StartupProgressMessage("Starting console...");
 }
 
-#ifdef EDGE_SOKOL
+#ifdef EDGE_SDL_GPU
 static char *GetHumanSize(uint32_t bytes, char *hrbytes)
 {
     const char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
@@ -1455,9 +1455,9 @@ void ConsoleShowFPS(void)
     // -AJA- 2022: reworked for better accuracy, ability to show WORST time
 
     // get difference since last call
-    static uint32_t last_time = 0;
-    uint32_t        time      = GetMicroseconds();
-    uint32_t        diff      = time - last_time;
+    static uint64_t last_time = 0;
+    uint64_t        time      = GetMicroseconds();
+    uint64_t        diff      = time - last_time;
     last_time                 = time;
 
     // last computed value, state to compute average
@@ -1502,9 +1502,6 @@ void ConsoleShowFPS(void)
     if (abs(debug_fps.d_) >= 3)
     {
         y -= (FNSZ * 4);
-#ifdef EDGE_SOKOL
-        y -= (FNSZ * 7);
-#endif
     }
 
     SolidBox(x, y, current_screen_width, current_screen_height, kRGBABlack, 0.5);
@@ -1558,7 +1555,7 @@ void ConsoleShowFPS(void)
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
-#ifdef EDGE_SOKOL
+#ifdef EDGE_SDL_GPU
 
         FrameStats stats;
         render_backend->GetFrameStats(stats);

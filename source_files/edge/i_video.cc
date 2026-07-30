@@ -35,13 +35,12 @@
 #include "n_network.h"
 #include "r_backend.h"
 #include "r_modes.h"
+#include "r_render.h"
 #include "r_state.h"
 #include "version.h"
 
 SDL_Window *program_window = NULL;
-#ifndef SOKOL_D3D11
 SDL_GLContext program_context = NULL;
-#endif
 
 int graphics_shutdown = 0;
 
@@ -169,7 +168,7 @@ void StartupGraphics(void)
     if (FindArgument("nograb") > 0)
         grab_mouse = 0;
 
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
     // -AJA- FIXME these are wrong (probably ignored though)
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
@@ -179,15 +178,6 @@ void StartupGraphics(void)
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 #endif
 
-#ifdef SOKOL_GLCORE
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-#elif SOKOL_GLES3
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-#endif
 
     // -DS- 2005/06/27 Detect SDL Resolutions
     SDL_DisplayID main_display = SDL_GetPrimaryDisplay();
@@ -335,7 +325,7 @@ static bool InitializeWindow(DisplayMode *mode)
     }
 #endif
 
-#if !defined(EDGE_SOKOL) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
     int major_version = 0;
     int minor_version = 0;
 
@@ -406,11 +396,9 @@ bool SetScreenSize(DisplayMode *mode)
 #endif
 
     render_state->ClearColor(kRGBABlack);
-#ifndef EDGE_SOKOL
     render_state->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#endif
 
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
     SDL_GL_SwapWindow(program_window);
 #endif
 
@@ -421,9 +409,7 @@ void StartFrame(void)
 {
     ec_frame_stats.Clear();
     render_state->ClearColor(kRGBABlack);
-#ifndef EDGE_SOKOL
     render_state->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#endif
     if (draw_culling.d_)
         renderer_far_clip.f_ = draw_culling_distance.f_;
     else
@@ -436,7 +422,7 @@ static void SwapBuffers(void)
 {
     render_backend->SwapBuffers();
 
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
     // move me and other SDL_GL to backend
     SDL_GL_SwapWindow(program_window);
 #endif
@@ -493,7 +479,7 @@ void FinishFrame(void)
     {
         if (vsync.d_ == 2)
         {
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
             // Fallback to normal VSync if Adaptive doesn't work
             if (!SDL_GL_SetSwapInterval(-1))
             {
@@ -504,7 +490,7 @@ void FinishFrame(void)
         }
         else
         {
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
             SDL_GL_SetSwapInterval(vsync.d_);
 #endif
         }
@@ -521,9 +507,13 @@ void ShutdownGraphics(void)
 
     graphics_shutdown = 1;
 
+#ifdef EDGE_THREADED_BSP
+    BSPStopThread();
+#endif
+
     render_backend->Shutdown();
 
-#if !defined(SOKOL_D3D11) && !defined(EDGE_SDL_GPU)
+#ifndef EDGE_SDL_GPU
     if (program_context != NULL)
     {
         SDL_GL_DestroyContext(program_context);

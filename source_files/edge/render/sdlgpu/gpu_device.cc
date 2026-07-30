@@ -356,19 +356,27 @@ void GpuDevice::SubmitFrame()
 
 bool GpuDevice::ReadColorTarget(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
 {
+    return ReadColorRegion(0, 0, width, height, stride, dest);
+}
+
+bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t height, int32_t stride, uint8_t *dest)
+{
     if (!device_ || !color_texture_ || !dest)
         return false;
 
-    if (width > target_width_)
-        width = target_width_;
+    if (x < 0 || y < 0)
+        return false;
 
-    if (height > target_height_)
-        height = target_height_;
+    if (x + width > target_width_)
+        width = target_width_ - x;
+
+    if (y + height > target_height_)
+        height = target_height_ - y;
 
     if (width <= 0 || height <= 0)
         return false;
 
-    uint32_t bytes = (uint32_t)target_width_ * (uint32_t)height * 4;
+    uint32_t bytes = (uint32_t)width * (uint32_t)height * 4;
 
     if (download_buffer_ && download_buffer_capacity_ < bytes)
     {
@@ -410,7 +418,9 @@ bool GpuDevice::ReadColorTarget(int32_t width, int32_t height, int32_t stride, u
     EPI_CLEAR_MEMORY(&source, SDL_GPUTextureRegion, 1);
 
     source.texture = color_texture_;
-    source.w       = (uint32_t)target_width_;
+    source.x       = (uint32_t)x;
+    source.y       = (uint32_t)(target_height_ - y - height);
+    source.w       = (uint32_t)width;
     source.h       = (uint32_t)height;
     source.d       = 1;
 
@@ -418,7 +428,7 @@ bool GpuDevice::ReadColorTarget(int32_t width, int32_t height, int32_t stride, u
     EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureTransferInfo, 1);
 
     destination.transfer_buffer = download_buffer_;
-    destination.pixels_per_row  = (uint32_t)target_width_;
+    destination.pixels_per_row  = (uint32_t)width;
     destination.rows_per_layer  = (uint32_t)height;
 
     SDL_DownloadFromGPUTexture(copy_pass, &source, &destination);
@@ -447,19 +457,19 @@ bool GpuDevice::ReadColorTarget(int32_t width, int32_t height, int32_t stride, u
     bool swizzle = (swapchain_format_ == SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM ||
                     swapchain_format_ == SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM_SRGB);
 
-    for (int32_t y = 0; y < height; y++)
+    for (int32_t row = 0; row < height; row++)
     {
-        const uint8_t *source_row = mapped + (size_t)(height - 1 - y) * (size_t)target_width_ * 4;
-        uint8_t       *dest_row   = dest + (size_t)y * (size_t)stride;
+        const uint8_t *source_row = mapped + (size_t)(height - 1 - row) * (size_t)width * 4;
+        uint8_t       *dest_row   = dest + (size_t)row * (size_t)stride;
 
         if (swizzle)
         {
-            for (int32_t x = 0; x < width; x++)
+            for (int32_t column = 0; column < width; column++)
             {
-                dest_row[x * 4 + 0] = source_row[x * 4 + 2];
-                dest_row[x * 4 + 1] = source_row[x * 4 + 1];
-                dest_row[x * 4 + 2] = source_row[x * 4 + 0];
-                dest_row[x * 4 + 3] = source_row[x * 4 + 3];
+                dest_row[column * 4 + 0] = source_row[column * 4 + 2];
+                dest_row[column * 4 + 1] = source_row[column * 4 + 1];
+                dest_row[column * 4 + 2] = source_row[column * 4 + 0];
+                dest_row[column * 4 + 3] = source_row[column * 4 + 3];
             }
         }
         else

@@ -122,18 +122,6 @@ set (EDGE_GL_SOURCE_FILES
   render/gl/gl_units.cc
 )
 
-set (EDGE_SOKOL_SOURCE_FILES
-  render/sokol/sokol_backend.cc
-  render/sokol/sokol_gl.cc  
-  render/sokol/sokol_images.cc
-  render/sokol/sokol_md2.cc
-  render/sokol/sokol_mdl.cc
-  render/sokol/sokol_pipeline.cc
-  render/sokol/sokol_sky.cc
-  render/sokol/sokol_state.cc
-  render/sokol/sokol_units.cc
-)
-
 set (EDGE_SDL_GPU_SOURCE_FILES
   render/sdlgpu/gpu_backend.cc
   render/sdlgpu/gpu_device.cc
@@ -148,9 +136,7 @@ set (EDGE_SDL_GPU_SOURCE_FILES
   render/sdlgpu/gpu_units.cc
 )
 
-if (EDGE_SOKOL)
-  list (APPEND EDGE_SOURCE_FILES ${EDGE_SOKOL_SOURCE_FILES})
-elseif (EDGE_SDL_GPU)
+if (EDGE_SDL_GPU)
   list (APPEND EDGE_SOURCE_FILES ${EDGE_SDL_GPU_SOURCE_FILES})
 else()
   list (APPEND EDGE_SOURCE_FILES ${EDGE_GL_SOURCE_FILES})
@@ -221,12 +207,7 @@ list (APPEND
   m4p
 )
 
-if (EDGE_SOKOL)
-  list(APPEND EDGE_LINK_LIBRARIES sokol)
-  if (MINGW)
-    list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
-  endif()
-elseif (EDGE_SDL_GPU)
+if (EDGE_SDL_GPU)
   if (MINGW)
     list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
   endif()

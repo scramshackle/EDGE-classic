@@ -242,8 +242,8 @@ void PlayMovie(const std::string &name)
         frame_width  = current_screen_width;
     }
 
-#if defined(EDGE_SOKOL) || defined(EDGE_SDL_GPU)
-    // On sokol, this sets up the texture dimenions, for dynamic texture
+#ifdef EDGE_SDL_GPU
+    // On SDL_GPU, this sets up the texture dimenions, for dynamic texture
     render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, movie_width, movie_height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                              nullptr, kRenderUsageDynamic);
     render_state->FinishTextures(1, &canvas);

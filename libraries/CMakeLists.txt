@@ -1,7 +1,4 @@
 add_subdirectory(dr_libs)
-if (EDGE_SOKOL)
-  add_subdirectory(sokol)
-endif()
 add_subdirectory(egtengine)
 add_subdirectory(hmm)
 add_subdirectory(libcRSID)

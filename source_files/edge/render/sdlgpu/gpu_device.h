@@ -84,6 +84,8 @@ class GpuDevice
 
     bool ReadColorTarget(int32_t width, int32_t height, int32_t stride, uint8_t *dest);
 
+    bool ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t height, int32_t stride, uint8_t *dest);
+
   private:
     bool CreateFrameTextures(int32_t width, int32_t height);
 

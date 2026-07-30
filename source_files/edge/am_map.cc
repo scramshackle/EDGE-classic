@@ -180,7 +180,7 @@ bool automap_keydoor_blink = false;
 
 extern Style *automap_style; // FIXME: put in header
 
-// Used for batching GL_LINES (or Sokol equivalent) calls
+// Used for batching GL_LINES (or backend equivalent) calls
 static float map_alpha       = 1.0f;
 static float map_pulse_width = 2.0f;
 static float map_dx          = 0.0f;

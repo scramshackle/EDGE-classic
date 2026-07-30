@@ -80,6 +80,7 @@
 #include "r_image.h"
 #include "r_misc.h"
 #include "r_modes.h"
+#include "r_render.h"
 #include "r_texgl.h"
 #include "r_wipe.h"
 #include "rad_trig.h"
@@ -582,6 +583,10 @@ static void DoSystemStartup(void)
     SetInitialResolution();
 
     render_backend->Init();
+
+#ifdef EDGE_THREADED_BSP
+    BSPStartThread();
+#endif
     SoftInitializeResolution();
 
     LogDebug("- System startup done.\n");

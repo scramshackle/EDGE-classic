@@ -289,7 +289,8 @@ class GpuRenderBackend : public RenderBackend
         stats.num_draw_           = gpu_immediate.DrawCount();
         stats.num_update_buffer_  = gpu_immediate.UploadedBytes() ? 1 : 0;
 
-        stats.size_update_buffer_ = (uint32_t)gpu_immediate.UploadedBytes();
+        stats.size_apply_uniforms_ = (uint32_t)gpu_immediate.UniformBytes();
+        stats.size_update_buffer_  = (uint32_t)gpu_immediate.UploadedBytes();
     }
 
     void OnContextSwitch()

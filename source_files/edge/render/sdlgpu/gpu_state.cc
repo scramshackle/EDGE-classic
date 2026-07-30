@@ -447,12 +447,13 @@ class GpuRenderState : public RenderState
 
     void ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels)
     {
-        EPI_UNUSED(x);
-        EPI_UNUSED(y);
-        EPI_UNUSED(format);
-        EPI_UNUSED(type);
+        if (!pixels || width <= 0 || height <= 0)
+            return;
 
-        if (pixels)
+        if (format != GL_RGBA || type != GL_UNSIGNED_BYTE)
+            FatalError("ReadPixels: unsupported format 0x%04x / type 0x%04x\n", format, type);
+
+        if (!gpu_device.ReadColorRegion(x, y, width, height, width * 4, (uint8_t *)pixels))
             memset(pixels, 0, (size_t)width * (size_t)height * 4);
     }
 

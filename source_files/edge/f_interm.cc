@@ -1802,11 +1802,9 @@ void IntermissionDrawer(void)
     if (background_camera_map_object)
     {
         HUDRenderWorld(0, 0, 320, 200, background_camera_map_object, 0);
-#ifndef EDGE_SOKOL
         // Dasho - Need to setup the 2D matrics for legacy GL else the intermission
         // stats won't be drawn right
         render_backend->SetRenderLayer(kRenderLayerHUD);
-#endif
     }
     else
     {

@@ -397,11 +397,7 @@ static void RenderSkyCylinder(void)
     }
     else if (fc_to_use != kRGBANoValue)
     {
-#ifdef EDGE_SOKOL
         fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.03f : 0.010f);
-#else
-        fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.03f : 0.010f);
-#endif
     }
 
     // Render top cap
@@ -636,12 +632,8 @@ static void RenderSkybox(void)
     }
     else if (fc_to_use != kRGBANoValue)
     {
-#ifdef EDGE_SOKOL
-        fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.009f : 0.045f);
-#else
         fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.015f : 0.045f);
         //fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.015f : 0.005f);
-#endif
     }
 
     RGBAColor unit_col =

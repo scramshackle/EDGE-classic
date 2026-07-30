@@ -106,12 +106,7 @@ static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
 MirrorSet render_mirror_set(kMirrorSetRender);
 
-#ifndef EDGE_SOKOL
 extern std::list<DrawSubsector *> draw_subsector_list;
-#else
-// Sky items from previous frame, delayed a frame so can render the BSP as we traverse it
-static std::list<RenderItem *> deferred_sky_items;
-#endif
 
 static void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int face_dir, float h1, float h2);
 
@@ -1991,9 +1986,6 @@ void           RendererEndFrame()
 
 void RendererShutdownLevel()
 {
-#ifdef EDGE_SOKOL
-    deferred_sky_items.clear();
-#endif
     ShutdownSky();
 }
 
@@ -2049,120 +2041,6 @@ void RenderTrueBSP(void)
             UpdateSectorInterpolation(pmov->sector);
     }
 
-#ifdef EDGE_SOKOL
-
-    render_state->Enable(GL_DEPTH_TEST);
-
-    BeginSky();
-
-    if (!render_world_index)
-    {
-        need_to_draw_sky = deferred_sky_items.size();
-
-        if (need_to_draw_sky)
-        {
-            render_backend->SetRenderLayer(kRenderLayerSkyDeferred, true);
-
-            // Render deferred sky walls and planes from previous frame
-            std::list<RenderItem *>::iterator I;
-            for (I = deferred_sky_items.begin(); I != deferred_sky_items.end(); I++)
-            {
-                RenderItem *item = (*I);
-
-                if (item->type_ == kRenderSkyWall)
-                {
-                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_);
-                }
-                else
-                {
-                    RenderSkyPlane(item->wallPlane_, item->height1_);
-                }
-            }
-
-            FlushSky(); // flush any deferred sky units
-            // Always render a simple sky, when rendering sky walls/planes they are deferred
-            // from previous frame, so fast movement will cause issus on screen edges
-            render_backend->SetRenderLayer(kRenderLayerSky, false);
-            FinishSky(false);
-
-            FinishSky(true);
-        }
-
-        deferred_sky_items.clear();
-    }
-    else
-    {
-        // Always render simple skies for additional world renders
-        need_to_draw_sky = true;
-        render_backend->SetRenderLayer(kRenderLayerSky, true);
-        FinishSky(false);
-    }
-
-    // draw all solid walls and planes
-    solid_mode = true;
-    render_backend->SetRenderLayer(kRenderLayerSolid, false);
-    StartUnitBatch(solid_mode);
-
-    BSPTraverse();
-
-    std::list<RenderItem *> items;
-    while (BSPTraversing())
-    {
-        RenderBatch *batch = BSPReadRenderBatch();
-        if (!batch)
-        {
-            continue;
-        }
-
-        for (int32_t i = 0; i < batch->num_items_; i++)
-        {
-            RenderItem *item = &batch->items_[i];
-
-            switch (item->type_)
-            {
-            case kRenderSubsector:
-                items.push_back(item);
-                RenderSubsector(item->subsector_, false);
-                break;
-            case kRenderSkyWall:
-                // Save off item for next frame
-                if (!render_world_index)
-                    deferred_sky_items.push_back(item);
-                break;
-            case kRenderSkyPlane:
-                // Save off item for next frame
-                if (!render_world_index)
-                    deferred_sky_items.push_back(item);
-                break;
-            }
-        }
-    }
-    FinishUnitBatch();
-
-    // draw all sprites and masked/translucent walls/planes
-    solid_mode = false;
-    render_backend->SetRenderLayer(kRenderLayerTransparent, false);
-
-    StartUnitBatch(solid_mode);
-
-    std::list<RenderItem *>::reverse_iterator RI;
-    for (RI = items.rbegin(); RI != items.rend(); RI++)
-    {
-        RenderItem *item = *RI;
-        if (item->type_ == kRenderSubsector)
-        {
-            if (item->subsector_->solid)
-            {
-                continue;
-            }
-
-            RenderSubsector(item->subsector_, false);
-        }
-    }
-
-    FinishUnitBatch();
-
-#else
 
     draw_subsector_list.clear();
 
@@ -2173,15 +2051,44 @@ void RenderTrueBSP(void)
     // needed for drawing the sky
     BeginSky();
 
+#ifdef EDGE_THREADED_BSP
+    BSPTraverse();
+
+    while (BSPTraversing())
+    {
+        RenderBatch *batch = BSPReadRenderBatch();
+
+        if (!batch)
+            continue;
+
+        for (int32_t i = 0; i < batch->num_items_; i++)
+        {
+            RenderItem *item = &batch->items_[i];
+
+            switch (item->type_)
+            {
+            case kRenderSubsector:
+                draw_subsector_list.push_back(item->subsector_);
+                break;
+            case kRenderSkyWall:
+                RenderSkyWall(item->wallSeg_, item->height1_, item->height2_);
+                break;
+            case kRenderSkyPlane:
+                RenderSkyPlane(item->wallPlane_, item->height1_);
+                break;
+            }
+        }
+    }
+#else
     // walk the bsp tree
     BSPWalkNode(root_node);
+#endif
 
     FlushSky();
     FinishSky(true);
 
     RenderSubList(draw_subsector_list);
 
-#endif
 
     // Add lines seen during render to the automap
     if (!newly_seen_lines.empty())

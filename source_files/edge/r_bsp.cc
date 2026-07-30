@@ -55,18 +55,14 @@
 #include "r_things.h"
 #include "r_units.h"
 
-#if defined(EDGE_SOKOL)
-#if !defined(EDGE_WEB) || defined(EDGE_WEB_MULTITHREADED)
-#define BSP_MULTITHREAD
+#ifdef EDGE_THREADED_BSP
 static void BSPQueueRenderBatch(RenderBatch *batch);
-#endif
-static void         BSPQueueDrawSubsector(DrawSubsector *subsector);
-static void         BSPQueueSkyWall(Seg *seg, float h1, float h2);
-static void         BSPQueueSkyPlane(Subsector *sub, float h);
-static RenderBatch *current_batch = nullptr;
-#endif
+static void BSPQueueDrawSubsector(DrawSubsector *subsector);
+static void BSPQueueSkyWall(Seg *seg, float h1, float h2);
+static void BSPQueueSkyPlane(Subsector *sub, float h);
 
-#ifdef BSP_MULTITHREAD
+static RenderBatch *current_batch = nullptr;
+
 #include <SDL3/SDL_atomic.h>
 #include <SDL3/SDL_mutex.h>
 #include <SDL3/SDL_thread.h>
@@ -191,12 +187,10 @@ struct BSPThread
 };
 
 static struct BSPThread bsp_thread;
-
-#else
+#endif
 
 std::list<DrawSubsector *> draw_subsector_list;
 
-#endif
 
 MirrorSet bsp_mirror_set(kMirrorSetBSP);
 
@@ -513,7 +507,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     {
         if (f_fh < b_fh)
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, f_fh, b_fh);
 #else
             RenderSkyWall(seg, f_fh, b_fh);
@@ -525,7 +519,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     {
         if (f_ch < fsector->sky_height && (!bsector || !EDGE_IMAGE_IS_SKY(*b_ceil) || b_fh >= f_ch))
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, f_ch, fsector->sky_height);
 #else
             RenderSkyWall(seg, f_ch, fsector->sky_height);
@@ -537,10 +531,10 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 
             if (b_ch <= max_f && max_f < fsector->sky_height)
             {
-#ifdef EDGE_SOKOL
-                BSPQueueSkyWall(seg, max_f, fsector->sky_height);
+                #ifdef EDGE_THREADED_BSP
+            BSPQueueSkyWall(seg, max_f, fsector->sky_height);
 #else
-                RenderSkyWall(seg, max_f, fsector->sky_height);
+            RenderSkyWall(seg, max_f, fsector->sky_height);
 #endif
             }
         }
@@ -549,10 +543,10 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     else if (!debug_hall_of_mirrors.d_ && bsector && EDGE_IMAGE_IS_SKY(*b_ceil) && seg->sidedef->top.image == nullptr &&
              b_ch < f_ch)
     {
-#ifdef EDGE_SOKOL
-        BSPQueueSkyWall(seg, b_ch, f_ch);
+        #ifdef EDGE_THREADED_BSP
+            BSPQueueSkyWall(seg, b_ch, f_ch);
 #else
-        RenderSkyWall(seg, b_ch, f_ch);
+            RenderSkyWall(seg, b_ch, f_ch);
 #endif
     }
 }
@@ -772,7 +766,7 @@ static void BSPWalkSubsector(int num)
     {
         if (EDGE_IMAGE_IS_SKY(sub->sector->floor) && view_z > sub->sector->interpolated_floor_height)
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height);
 #else
             RenderSkyPlane(sub, sub->sector->interpolated_floor_height);
@@ -781,7 +775,7 @@ static void BSPWalkSubsector(int num)
 
         if (EDGE_IMAGE_IS_SKY(sub->sector->ceiling) && view_z < sub->sector->sky_height)
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->sky_height);
 #else
             RenderSkyPlane(sub, sub->sector->sky_height);
@@ -823,7 +817,7 @@ static void BSPWalkSubsector(int num)
         }
         if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, floor_h);
 #else
             RenderSkyPlane(sub, floor_h);
@@ -831,7 +825,7 @@ static void BSPWalkSubsector(int num)
         }
         if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sub->sector->sky_height)
         {
-#ifdef EDGE_SOKOL
+            #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->sky_height);
 #else
             RenderSkyPlane(sub, sub->sector->sky_height);
@@ -935,7 +929,7 @@ static void BSPWalkSubsector(int num)
                 bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
             else
             {
-#ifdef EDGE_SOKOL
+                #ifdef EDGE_THREADED_BSP
                 BSPQueueDrawSubsector(K);
 #else
                 draw_subsector_list.push_back(K);
@@ -961,10 +955,10 @@ static void BSPWalkSubsector(int num)
             bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
         else
         {
-#ifdef EDGE_SOKOL
-            BSPQueueDrawSubsector(K);
+            #ifdef EDGE_THREADED_BSP
+                BSPQueueDrawSubsector(K);
 #else
-            draw_subsector_list.push_back(K);
+                draw_subsector_list.push_back(K);
 #endif
         }
     }
@@ -1026,9 +1020,8 @@ void BSPWalkNode(unsigned int bspnum)
         BSPWalkNode(node->children[side ^ 1]);
 }
 
-#ifdef EDGE_SOKOL
+#ifdef EDGE_THREADED_BSP
 
-#ifdef BSP_MULTITHREAD
 
 static int32_t BSPTraverseProc(void *thread_data)
 {
@@ -1053,7 +1046,7 @@ static int32_t BSPTraverseProc(void *thread_data)
                 BSPQueueRenderBatch(current_batch);
             }
 
-            SDL_SetAtomicU32(&bsp_thread.traverse_finished_, 1);
+                    SDL_SetAtomicU32(&bsp_thread.traverse_finished_, 1);
         }
     }
 
@@ -1065,10 +1058,9 @@ static uint32_t    render_batch_counter = 0;
 
 void BSPQueueRenderBatch(RenderBatch *batch)
 {
-    BSPQueueProduce(&bsp_thread.queue_, batch, 100);
+    BSPQueueProduce(&bsp_thread.queue_, batch, -1);
 }
 
-// TODO: This isn't really a ring buffer
 static RenderBatch *GetRenderBatch()
 {
     RenderBatch *batch = &render_batches[render_batch_counter++];
@@ -1076,6 +1068,7 @@ static RenderBatch *GetRenderBatch()
     render_batch_counter %= kMaxRenderBatch;
     return batch;
 }
+
 
 static RenderItem *GetRenderItem()
 {
@@ -1113,7 +1106,6 @@ void BSPQueueSkyPlane(Subsector *sub, float h)
 
 void BSPQueueDrawSubsector(DrawSubsector *subsector)
 {
-    subsector->solid = true;
     RenderItem *item = GetRenderItem();
     item->type_      = kRenderSubsector;
     item->subsector_ = subsector;
@@ -1165,103 +1157,4 @@ void BSPStopThread()
     BSPSignalTerm(&bsp_thread.signal_start_);
 }
 
-#else
-
-constexpr uint32_t  kRenderBatchMax      = 65536 * 2;
-static uint32_t     render_batch_counter = 0;
-static uint32_t     render_batch_travese = 0;
-static RenderBatch *render_batches       = nullptr;
-
-static RenderBatch *GetRenderBatch()
-{
-    if (render_batch_counter >= kRenderBatchMax)
-    {
-        FatalError("GetRenderBatch: Exceeded max render batches");
-    }
-
-    return &render_batches[render_batch_counter++];
-}
-
-static RenderItem *GetRenderItem()
-{
-    if (!current_batch || current_batch->num_items_ == kRenderItemBatchSize)
-    {
-        current_batch = GetRenderBatch();
-    }
-
-    return &current_batch->items_[current_batch->num_items_++];
-}
-
-void BSPQueueSkyWall(Seg *seg, float h1, float h2)
-{
-    RenderItem *item = GetRenderItem();
-
-    item->type_    = kRenderSkyWall;
-    item->height1_ = h1;
-    item->height2_ = h2;
-    item->wallSeg_ = seg;
-}
-
-void BSPQueueSkyPlane(Subsector *sub, float h)
-{
-    RenderItem *item = GetRenderItem();
-
-    item->type_      = kRenderSkyPlane;
-    item->height1_   = h;
-    item->wallPlane_ = sub;
-}
-
-void BSPQueueDrawSubsector(DrawSubsector *subsector)
-{
-    subsector->solid = true;
-    RenderItem *item = GetRenderItem();
-    item->type_      = kRenderSubsector;
-    item->subsector_ = subsector;
-}
-
-void BSPStartThread()
-{
-    if (render_batches)
-    {
-        FatalError("BSPStartThread: Render Batches is not null");
-    }
-
-    render_batches = (RenderBatch *)malloc(sizeof(RenderBatch) * kRenderBatchMax);
-}
-void BSPStopThread()
-{
-    if (render_batches)
-    {
-        free(render_batches);
-        render_batches = nullptr;
-    }
-}
-
-void BSPTraverse()
-{
-    current_batch        = nullptr;
-    render_batch_counter = 0;
-    render_batch_travese = 0;
-    EPI_CLEAR_MEMORY(render_batches, RenderBatch, kRenderBatchMax);
-
-    // walk the bsp tree
-    BSPWalkNode(root_node);
-}
-
-bool BSPTraversing()
-{
-    if (render_batch_counter == render_batch_travese)
-    {
-        return false;
-    }
-
-    return true;
-}
-
-RenderBatch *BSPReadRenderBatch()
-{
-    return &render_batches[render_batch_travese++];
-}
-
-#endif
 #endif

@@ -142,10 +142,10 @@ int PureRandomNumber(void)
     return (P1 ^ P2) & 0x7FFFFFFF;
 }
 
-uint32_t GetMicroseconds(void)
+uint64_t GetMicroseconds(void)
 {
-    return (uint32_t)std::chrono::duration_cast<std::chrono::microseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
+    return (uint64_t)std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
         .count();
 }
 

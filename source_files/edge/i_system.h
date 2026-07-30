@@ -119,7 +119,7 @@ int GetMilliseconds(void);
 // Returns a value that increases by 1000000 every second (i.e. each unit
 // is a single microsecond).  Since this value will wrap-around regularly
 // (roughly every 71 minutes), caller *MUST* check for this situation.
-uint32_t GetMicroseconds(void);
+uint64_t GetMicroseconds(void);
 
 //--------------------------------------------------------
 //  MUSIC functions.

@@ -179,6 +179,11 @@ class GpuImmediate
         return uniform_push_count_;
     }
 
+    size_t UniformBytes() const
+    {
+        return uniform_bytes_;
+    }
+
     size_t UploadedBytes() const
     {
         return uploaded_bytes_;
@@ -265,6 +270,7 @@ class GpuImmediate
     uint32_t pipeline_bind_count_ = 0;
     uint32_t binding_count_       = 0;
     uint32_t uniform_push_count_  = 0;
+    size_t   uniform_bytes_       = 0;
     size_t   uploaded_bytes_      = 0;
 };
 

@@ -673,34 +673,428 @@ static inline void ModelCoordFunc(MDLCoordinateData *data, int v_idx)
     }
 }
 
-
 void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float lerp, float x, float y, float z,
                     MapObject *mo, RegionProperties *props, float scale, float aspect, float bias, int rotation)
 {
-    EPI_UNUSED(md);
-    EPI_UNUSED(is_weapon);
-    EPI_UNUSED(frame1);
-    EPI_UNUSED(frame2);
-    EPI_UNUSED(lerp);
-    EPI_UNUSED(x);
-    EPI_UNUSED(y);
-    EPI_UNUSED(z);
-    EPI_UNUSED(mo);
-    EPI_UNUSED(props);
-    EPI_UNUSED(scale);
-    EPI_UNUSED(aspect);
-    EPI_UNUSED(bias);
-    EPI_UNUSED(rotation);
+    // check if frames are valid
+    if (frame1 < 0 || frame1 >= md->total_frames_)
+    {
+        LogDebug("Render model: bad frame %d\n", frame1);
+        return;
+    }
+    if (frame2 < 0 || frame2 >= md->total_frames_)
+    {
+        LogDebug("Render model: bad frame %d\n", frame1);
+        return;
+    }
+
+    MDLCoordinateData data;
+
+    data.is_fuzzy_ = (mo->flags_ & kMapObjectFlagFuzzy) ? true : false;
+
+    float trans = mo->visibility_;
+
+    if (is_weapon && data.is_fuzzy_ && mo->player_ && mo->player_->powers_[kPowerTypePartInvisTranslucent] > 0)
+    {
+        data.is_fuzzy_ = false;
+        trans *= 0.3f;
+    }
+
+    if (trans <= 0)
+        return;
+
+    BlendingMode blending = kBlendingNone;
+
+    if (mo->hyper_flags_ & kHyperFlagNoZBufferUpdate)
+        blending = (BlendingMode)(blending | kBlendingNoZBuffer);
+
+    if (render_mirror_set.Reflective())
+    {
+        if (fliplevels.d_)
+            blending = (BlendingMode)(blending | kBlendingCullBack);
+        else
+            blending = (BlendingMode)(blending | kBlendingCullFront);
+    }
+    else
+    {
+        if (fliplevels.d_)
+            blending = (BlendingMode)(blending | kBlendingCullFront);
+        else
+            blending = (BlendingMode)(blending | kBlendingCullBack);
+    }
+
+    data.map_object_ = mo;
+    data.model_      = md;
+
+    data.frame1_ = &md->frames_[frame1];
+    data.frame2_ = &md->frames_[frame2];
+
+    data.lerp_ = lerp;
+
+    data.x_ = x;
+    data.y_ = y;
+    data.z_ = z;
+
+    data.is_weapon = is_weapon;
+
+    data.xy_scale_ = scale * aspect * render_mirror_set.XYScale();
+    data.z_scale_  = scale * render_mirror_set.ZScale();
+    data.bias_     = bias;
+
+    bool tilt = is_weapon || (mo->flags_ & kMapObjectFlagMissile) || (mo->hyper_flags_ & kHyperFlagForceModelTilt);
+
+    if (!console_active && !paused && !menu_active && !rts_menu_active &&
+        (is_weapon || (!time_stop_active && !erraticism_active)))
+    {
+        BAMAngle ang;
+        if (is_weapon)
+        {
+            BAMAngleToMatrix(tilt ? ~epi::BAMInterpolate(mo->old_vertical_angle_, mo->vertical_angle_, fractional_tic)
+                                  : 0,
+                             &data.mouselook_x_vector_, &data.mouselook_z_vector_);
+            ang = epi::BAMInterpolate(mo->old_angle_, mo->angle_, fractional_tic) + rotation;
+        }
+        else
+        {
+            BAMAngleToMatrix(tilt ? ~mo->vertical_angle_ : 0, &data.mouselook_x_vector_, &data.mouselook_z_vector_);
+            ang = mo->angle_ + rotation;
+        }
+        render_mirror_set.Angle(ang);
+        BAMAngleToMatrix(~ang, &data.rotation_vector_x_, &data.rotation_vector_y_);
+    }
+    else
+    {
+        BAMAngleToMatrix(tilt ? ~mo->vertical_angle_ : 0, &data.mouselook_x_vector_, &data.mouselook_z_vector_);
+        BAMAngle ang = mo->angle_ + rotation;
+        render_mirror_set.Angle(ang);
+        BAMAngleToMatrix(~ang, &data.rotation_vector_x_, &data.rotation_vector_y_);
+    }
+
+    data.used_normals_ = (lerp < 0.5) ? data.frame1_->used_normals : data.frame2_->used_normals;
+
+    InitializeNormalColors(&data);
+
+    GLuint skin_tex = 0;
+
+    if (data.is_fuzzy_)
+    {
+        skin_tex = ImageCache(fuzz_image, false);
+
+        data.fuzz_multiplier_ = 0.8;
+        data.fuzz_add_        = {{0, 0}};
+
+        if (!data.is_weapon && !view_is_zoomed)
+        {
+            float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
+
+            data.fuzz_multiplier_ = 70.0 / HMM_Clamp(35, dist, 700);
+        }
+
+        FuzzAdjust(&data.fuzz_add_, mo);
+
+        trans = 1.0f;
+
+        blending = (BlendingMode)(blending | (kBlendingAlpha | kBlendingMasked));
+        blending = (BlendingMode)(blending & ~kBlendingLess);
+    }
+    else /* (! data.is_fuzzy) */
+    {
+        int mdlSkin = 0;
+
+        if (is_weapon == true)
+            mdlSkin = mo->player_->weapons_[mo->player_->ready_weapon_].model_skin;
+        else
+            mdlSkin = mo->model_skin_;
+
+        mdlSkin--; // ddf MODEL_SKIN starts at 1 not 0
+
+        if (mdlSkin > -1)
+            skin_tex = md->skin_id_list_[mdlSkin];
+        else
+            skin_tex = md->skin_id_list_[0]; // Just use skin 0?
+
+        if (skin_tex == 0)
+            FatalError("MDL Frame %s missing skins?\n", md->frames_[frame1].name);
+
+        AbstractShader *shader =
+            GetColormapShader(props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->subsector_->sector);
+
+        ShadeNormals(shader, &data, true);
+
+        if (use_dynamic_lights && render_view_extra_light < 250)
+        {
+            float r = mo->radius_;
+
+            DynamicLightIterator(mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r, mo->z + mo->height_,
+                                 MDLDynamicLightCallback, &data);
+
+            SectorGlowIterator(mo->subsector_->sector, mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r,
+                               mo->z + mo->height_, MDLDynamicLightCallback, &data);
+        }
+    }
+
+    /* draw the model */
+
+    int num_pass = data.is_fuzzy_ ? 1 : (detail_level > 0 ? 4 : 3);
+
+    RGBAColor fc_to_use = mo->subsector_->sector->properties.fog_color;
+    float     fd_to_use = mo->subsector_->sector->properties.fog_density;
+    // check for DDFLEVL fog
+    if (fc_to_use == kRGBANoValue)
+    {
+        if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling))
+        {
+            fc_to_use = current_map->outdoor_fog_color_;
+            fd_to_use = 0.01f * current_map->outdoor_fog_density_;
+        }
+        else
+        {
+            fc_to_use = current_map->indoor_fog_color_;
+            fd_to_use = 0.01f * current_map->indoor_fog_density_;
+        }
+    }
+    if (!draw_culling.d_ && fc_to_use != kRGBANoValue && !epi::AlmostEquals(fd_to_use, 0.0f))
+    {
+        render_state->ClearColor(fc_to_use);
+        render_state->FogMode(GL_EXP);
+        render_state->FogColor(fc_to_use);
+        render_state->FogDensity(std::log1p(fd_to_use));
+        render_state->Enable(GL_FOG);
+    }
+    else if (draw_culling.d_)
+    {
+        RGBAColor fogColor;
+        if (need_to_draw_sky)
+        {
+            switch (cull_fog_color.d_)
+            {
+            case 0:
+                fogColor = culling_fog_color;
+                break;
+            case 1:
+                // Not pure white, but 1.0f felt like a little much - Dasho
+                fogColor = kRGBASilver;
+                break;
+            case 2:
+                fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
+                break;
+            case 3:
+                fogColor = kRGBABlack;
+                break;
+            default:
+                fogColor = culling_fog_color;
+                break;
+            }
+        }
+        else
+        {
+            fogColor = kRGBABlack;
+        }
+        render_state->ClearColor(fogColor);
+        render_state->FogMode(GL_LINEAR);
+        render_state->FogColor(fogColor);
+        render_state->FogStart(renderer_far_clip.f_ - 750.0f);
+        render_state->FogEnd(renderer_far_clip.f_ - 250.0f);
+        render_state->Enable(GL_FOG);
+    }
+    else
+        render_state->Disable(GL_FOG);
+
+    for (int pass = 0; pass < num_pass; pass++)
+    {
+        if (pass == 1)
+        {
+            blending = (BlendingMode)(blending & ~kBlendingAlpha);
+            blending = (BlendingMode)(blending | kBlendingAdd);
+            render_state->Disable(GL_FOG);
+        }
+
+        data.is_additive_ = (pass > 0 && pass == num_pass - 1);
+
+        if (pass > 0 && pass < num_pass - 1)
+        {
+            UpdateMulticols(&data);
+            if (MDLMulticolorMaximumRGB(&data, false) <= 0)
+                continue;
+        }
+        else if (data.is_additive_)
+        {
+            if (MDLMulticolorMaximumRGB(&data, true) <= 0)
+                continue;
+        }
+
+        render_state->PolygonOffset(0, -pass);
+
+        if (blending & kBlendingLess)
+        {
+            render_state->Enable(GL_ALPHA_TEST);
+        }
+        else if (blending & kBlendingMasked)
+        {
+            render_state->Enable(GL_ALPHA_TEST);
+            render_state->AlphaFunction(GL_GREATER, 0);
+        }
+        else
+            render_state->Disable(GL_ALPHA_TEST);
+
+        if (blending & kBlendingAdd)
+        {
+            render_state->Enable(GL_BLEND);
+            render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
+        }
+        else if (blending & kBlendingAlpha)
+        {
+            render_state->Enable(GL_BLEND);
+            render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        else
+            render_state->Disable(GL_BLEND);
+
+        if (blending & (kBlendingCullBack | kBlendingCullFront))
+        {
+            render_state->Enable(GL_CULL_FACE);
+            render_state->CullFace((blending & kBlendingCullFront) ? GL_FRONT : GL_BACK);
+        }
+        else
+            render_state->Disable(GL_CULL_FACE);
+
+        render_state->DepthMask((blending & kBlendingNoZBuffer) ? false : true);
+
+        if (blending & kBlendingLess)
+        {
+            // NOTE: assumes alpha is constant over whole model
+            render_state->AlphaFunction(GL_GREATER, trans * 0.66f);
+        }
+
+        render_state->ActiveTexture(GL_TEXTURE1);
+        render_state->Disable(GL_TEXTURE_2D);
+        render_state->ActiveTexture(GL_TEXTURE0);
+        render_state->Enable(GL_TEXTURE_2D);
+        render_state->BindTexture(skin_tex);
+
+        if (data.is_additive_)
+        {
+            render_state->TextureEnvironmentMode(GL_COMBINE);
+            render_state->TextureEnvironmentCombineRGB(GL_REPLACE);
+            render_state->TextureEnvironmentSource0RGB(GL_PREVIOUS);
+        }
+        else
+        {
+            render_state->TextureEnvironmentMode(GL_MODULATE);
+            render_state->TextureEnvironmentCombineRGB(GL_MODULATE);
+            render_state->TextureEnvironmentSource0RGB(GL_TEXTURE);
+        }
+
+        GLint old_clamp = kDummyClamp;
+
+        if (blending & kBlendingClampY)
+        {
+            auto existing = texture_clamp_t.find(skin_tex);
+            if (existing != texture_clamp_t.end())
+            {
+                old_clamp = existing->second;
+            }
+
+            render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
+        }
+
+        int total_vertices = md->total_triangles_ * 3;
+
+        ReserveModelVertices(total_vertices);
+
+        int dest_index = 0;
+
+        for (int i = 0; i < md->total_triangles_; i++)
+        {
+            data.triangle_indices_ = &md->triangle_indices_[i];
+
+            for (int v_idx = 0; v_idx < 3; v_idx++, dest_index++)
+            {
+                ModelCoordFunc(&data, v_idx);
+
+                epi::SetRGBAAlpha(render_rgba, trans);
+
+                StoreModelVertex(dest_index, render_rgba);
+            }
+        }
+
+        render_state->SetPipeline(0);
+
+        render_state->SetVertexArrays(model_vertices.data());
+        render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
+
+        // restore the clamping mode
+        if (old_clamp != kDummyClamp)
+        {
+            render_state->TextureWrapT(old_clamp);
+        }
+    }
 }
 
 void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, float yscale,
                       const MapObjectDefinition *info)
 {
-    EPI_UNUSED(md);
-    EPI_UNUSED(frame);
-    EPI_UNUSED(x);
-    EPI_UNUSED(y);
-    EPI_UNUSED(xscale);
-    EPI_UNUSED(yscale);
-    EPI_UNUSED(info);
+    // check if frame is valid
+    if (frame < 0 || frame >= md->total_frames_)
+        return;
+
+    GLuint skin_tex = md->skin_id_list_[0]; // Just use skin 0?
+
+    if (skin_tex == 0)
+        FatalError("MDL Frame %s missing skins?\n", md->frames_[frame].name);
+
+    xscale = yscale * info->model_scale_ * info->model_aspect_;
+    yscale = yscale * info->model_scale_;
+
+    render_state->ActiveTexture(GL_TEXTURE1);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->ActiveTexture(GL_TEXTURE0);
+    render_state->Enable(GL_TEXTURE_2D);
+    render_state->BindTexture(skin_tex);
+
+    render_state->Enable(GL_BLEND);
+    render_state->Enable(GL_CULL_FACE);
+
+    RGBAColor model_rgba = (info->flags_ & kMapObjectFlagFuzzy) ? epi::MakeRGBA(0, 0, 0, 128) : kRGBAWhite;
+
+    int total_vertices = md->total_triangles_ * 3;
+
+    ReserveModelVertices(total_vertices);
+
+    int dest_index = 0;
+
+    for (int i = 0; i < md->total_triangles_; i++)
+    {
+        const int *tri = &md->triangle_indices_[i];
+
+        for (int v_idx = 0; v_idx < 3; v_idx++, dest_index++)
+        {
+            const MDLFrame *frame_ptr = &md->frames_[frame];
+
+            EPI_ASSERT(*tri + v_idx >= 0);
+            EPI_ASSERT(*tri + v_idx < md->total_points_);
+
+            const MDLPoint  *point = &md->points_[*tri + v_idx];
+            const MDLVertex *vert  = &frame_ptr->vertices[point->vert_idx];
+
+            render_texture_coordinates = {{point->skin_s, point->skin_t}};
+
+            float dx = vert->x * xscale;
+            float dy = vert->y * xscale;
+            float dz = (vert->z + info->model_bias_) * yscale;
+
+            render_position = {{x + dy, y + dz, dx / 256.0f}};
+
+            StoreModelVertex(dest_index, model_rgba);
+        }
+    }
+
+    render_state->SetPipeline(0);
+
+    render_state->SetVertexArrays(model_vertices.data());
+    render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
+
+    render_state->Disable(GL_BLEND);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->Disable(GL_CULL_FACE);
 }

@@ -5,10 +5,10 @@
 
 The following options can be passed to CMake to control certain features:
 
-- EDGE_SOKOL_GL (default OFF): Will force use of the Sokol GL 3.3 render path
-- EDGE_SOKOL_GLES3 (default OFF): Will force use of the Sokol GLES3 render path
-- EDGE_LEGACY_GL (default OFF): Will force use of the original GL 1.3 render path. BSP traversal will not be threaded with this render path.
-  - If none of the renderer options are selected, a default will be chosen based on platform. This means Sokol GLES3 for Emscripten, and Sokol GL 3.3 for all other targets.
+- EDGE_LEGACY_GL (default ON): Will use the original GL 1.3 render path.
+- EDGE_SDL_GPU (default OFF): Will use the SDL3_GPU render path. This backend is Vulkan-only and takes precedence over EDGE_LEGACY_GL when both are set.
+  - If neither renderer option is selected, EDGE_LEGACY_GL is used.
+- EDGE_THREADED_BSP (default ON): Runs the BSP traversal on a worker thread, which queues subsectors and sky surfaces for the main thread to render. Works with either renderer. Set to OFF for a single-threaded traversal.
 - EDGE_SANITIZE (default OFF): Will build with AddressSanitizer support. This option is mutually exclusive with EDGE_SANITIZE_THREADS and EDGE_SANITIZE_UB. Suppressions can be found in ASanSuppress.txt.
 - EDGE_SANITIZE_THREADS (default OFF): Will build with ThreadSanitizer support. Suppressions can be found in TSanSuppress.txt. This option is mutually exclusive with EDGE_SANITIZE and EDGE_SANITIZE_UB and only works with non-MSVC builds.
 - EDGE_SANITIZE_UB (default OFF): Will build with UndefinedBehaviorSanitizer support. This option is mutually exclusive with EDGE_SANITIZE and EDGE_SANITIZE_THREADS and only works with non-MSVC builds.
@@ -17,7 +17,7 @@ The following options can be passed to CMake to control certain features:
 These options are specific to Emscripten builds; although they offer a substantial improvement in performance, they are disabled by default for compatibility with the widest range of web browsers:
 
 - EDGE_WEB_SIMD (default OFF): Enable support for WebAssembly SIMD and SSE2 instruction compatibility.
-- EDGE_WEB_MULTITHREADED (default OFF): Enable support for audio worklets and multithreaded BSP traversal.
+- EDGE_WEB_MULTITHREADED (default OFF): Enable support for audio worklets.
   - The multithreaded web player requires cross-origin isolation; see https://web.dev/articles/coop-coep for more details
 
 ## Windows Compilation using MSVC Build Tools and VSCode

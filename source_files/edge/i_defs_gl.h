@@ -25,8 +25,7 @@
 
 #pragma once
 
-#pragma once
-#ifdef EDGE_SOKOL
+#ifdef EDGE_SDL_GPU
 typedef unsigned char GLboolean;
 typedef int           GLint;
 typedef unsigned int  GLuint;

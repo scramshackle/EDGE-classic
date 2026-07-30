@@ -17,37 +17,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Rendering Options
 
-# Sokol Renderer
-option(EDGE_SOKOL_GL "Sokol GL" OFF)
-option(EDGE_SOKOL_GLES3 "Sokol GLES3" OFF)
-option(EDGE_LEGACY_GL "Legacy GL Renderer" ON)
+option(EDGE_LEGACY_GL "Legacy GL Renderer" OFF)
 
 # SDL3_GPU Renderer (Vulkan only)
-option(EDGE_SDL_GPU "SDL3_GPU Renderer" OFF)
+option(EDGE_SDL_GPU "SDL3_GPU Renderer" ON)
+
+# Run the BSP walk on a worker thread
+option(EDGE_THREADED_BSP "Threaded BSP traversal" ON)
 
 # Web Player
 option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" OFF)
 option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
 
-# If the legacy GL renderer has not been selected and
-# a Sokol backend is not already specified by CMake params, 
-# choose a default based on platform
 if (EDGE_SDL_GPU)
   set (EDGE_LEGACY_GL OFF)
 endif()
 
 if (NOT EDGE_LEGACY_GL AND NOT EDGE_SDL_GPU)
-  if (NOT EDGE_SOKOL_GL AND NOT EDGE_SOKOL_GLES3)
-    if (EMSCRIPTEN)
-      set (EDGE_SOKOL_GLES3 ON)
-    else ()
-      set (EDGE_SOKOL_GL ON)
-    endif()
-  endif()
-endif()
-
-if (EDGE_SOKOL_GL OR EDGE_SOKOL_GLES3)
-  set (EDGE_SOKOL ON)
+  set (EDGE_LEGACY_GL ON)
 endif()
 
 # Development 
@@ -69,7 +56,7 @@ if (EMSCRIPTEN)
 endif()
 
 # Set WIN32_WINNT to Windows 7 if using the new renderer
-if ((WIN32 OR MINGW) AND EDGE_SOKOL)
+if ((WIN32 OR MINGW) AND EDGE_SDL_GPU)
   add_definitions(-D_WIN32_WINNT=0x601)
 endif()
 
@@ -221,17 +208,14 @@ if (APPLE)
   endif()
 endif()
 
-if (EDGE_SOKOL)
-  add_definitions(-DEDGE_SOKOL)
-  if (EDGE_SOKOL_GL)  
-    find_package(OpenGL REQUIRED)
-  elseif (EDGE_SOKOL_GLES3 AND NOT EMSCRIPTEN)
-    find_package(OpenGL COMPONENTS GLES3 REQUIRED)
-  endif()
-elseif (EDGE_SDL_GPU)
+if (EDGE_SDL_GPU)
   add_definitions(-DEDGE_SDL_GPU)
 else()
   find_package(OpenGL REQUIRED)
+endif()
+
+if (EDGE_THREADED_BSP)
+  add_definitions(-DEDGE_THREADED_BSP)
 endif()
 
 if (EDGE_EXTRA_CHECKS)
