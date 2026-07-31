@@ -112,7 +112,6 @@ class GLRenderBackend : public RenderBackend
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         render_state->Flush();
-        render_state->PixelZoom(1.0f, 1.0f);
         render_state->PixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         for (int32_t y = 0; y < height; y++)
@@ -202,20 +201,11 @@ class GLRenderBackend : public RenderBackend
         return kRenderLayerInvalid;
     }
 
-    void Flush(int32_t commands, int32_t vertices)
-    {
-        EPI_UNUSED(commands);
-        EPI_UNUSED(vertices);
-    }
-
     void GetFrameStats(FrameStats &stats)
     {
         EPI_UNUSED(stats);
     }
 
-    void OnContextSwitch()
-    {
-    }
 };
 
 static GLRenderBackend gl_render_backend;

@@ -1,59 +1,36 @@
-if(EDGE_WEB_MULTITHREADED)
-  if(EDGE_WEB_SIMD)
-    set(EDGE_EMSC_COMMON_FLAGS "-sUSE_SDL=3 -sWASM_WORKERS=1 -sSHARED_MEMORY=1 -msimd128 -msse -pthread")
-  else()
-    set(EDGE_EMSC_COMMON_FLAGS "-sUSE_SDL=3 -sWASM_WORKERS=1 -sSHARED_MEMORY=1 -pthread")
-  endif()
-  set(EDGE_EMSC_COMPILER_FLAGS "-DEDGE_WEB=1 -DEDGE_WEB_MULTITHREADED=1")
-  set(EDGE_EMSC_LINKER_FLAGS "-sPTHREAD_POOL_SIZE_STRICT=0 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sENVIRONMENT=web,worker -sAUDIO_WORKLET=1 -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=512Mb -sERROR_ON_UNDEFINED_SYMBOLS=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sGL_MAX_TEMP_BUFFER_SIZE=16777216 -sLZ4=1 -lidbfs.js -sEXPORT_ES6=1 -sMODULARIZE=1 -sEXPORT_NAME=\"createEdgeModule\"")
+set(EDGE_EMSC_COMMON_FLAGS "-sUSE_SDL=3")
+set(EDGE_EMSC_COMPILER_FLAGS "-DEDGE_WEB=1")
+set(EDGE_EMSC_LINKER_FLAGS "-sSTACK_SIZE=262144 -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=128Mb -sMAXIMUM_MEMORY=1Gb -sERROR_ON_UNDEFINED_SYMBOLS=1 -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=1 -sLEGACY_GL_EMULATION=1 -sGL_FFP_ONLY=1 -sGL_UNSAFE_OPTS=1 -sGL_MAX_TEMP_BUFFER_SIZE=16777216 -sLZ4=1 -lidbfs.js -sEXPORT_ES6=1 -sMODULARIZE=1 -sEXPORT_NAME=\"createEdgeModule\"")
 
-  # Enable sourcemap support
-  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -gsource-map --source-map-base=/")
-
-  # force file system, see: https://github.com/emscripten-core/emscripten/blob/main/tools/file_packager.py
-  set(EMPACKAGER "${EMSCRIPTEN_ROOT_PATH}/tools/file_packager.py")
-  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sFORCE_FILESYSTEM=1")
-
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(EDGE_EMSC_COMPILER_FLAGS "${EDGE_EMSC_COMPILER_FLAGS} -O0")
-
-    # Add -sSAFE_HEAP=1 or -sSAFE_HEAP=2 to test heap and alignment, though slows things down a lot
-    set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sASSERTIONS=1")
-  else()
-    set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -flto")
-    set(EDGE_EMSC_COMPILER_FLAGS "${EDGE_EMSC_COMPILER_FLAGS} -O3")
-    set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sASYNCIFY=1")
-  endif()
-
-  add_compile_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_COMPILER_FLAGS}")
-  add_link_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_LINKER_FLAGS}")
-else()
-  if(EDGE_WEB_SIMD)
-    set(EDGE_EMSC_COMMON_FLAGS "-sUSE_SDL=3 -msimd128 -msse")
-  else()
-    set(EDGE_EMSC_COMMON_FLAGS "-sUSE_SDL=3")
-  endif()
-  set(EDGE_EMSC_COMPILER_FLAGS "-DEDGE_WEB=1")
-  set(EDGE_EMSC_LINKER_FLAGS "-sSTACK_SIZE=262144 -sENVIRONMENT=web -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=512Mb -sERROR_ON_UNDEFINED_SYMBOLS=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sGL_MAX_TEMP_BUFFER_SIZE=16777216 -sLZ4=1 -lidbfs.js -sEXPORT_ES6=1 -sMODULARIZE=1 -sEXPORT_NAME=\"createEdgeModule\"")
-
-  # Enable sourcemap support
-  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -gsource-map --source-map-base=/")
-
-  # force file system, see: https://github.com/emscripten-core/emscripten/blob/main/tools/file_packager.py
-  set(EMPACKAGER "${EMSCRIPTEN_ROOT_PATH}/tools/file_packager.py")
-  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sFORCE_FILESYSTEM=1")
-
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(EDGE_EMSC_COMPILER_FLAGS "${EDGE_EMSC_COMPILER_FLAGS} -O0")
-
-    # Add -sSAFE_HEAP=1 or -sSAFE_HEAP=2 to test heap and alignment, though slows things down a lot
-    set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sASSERTIONS=1")
-  else()
-    set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -flto")
-    set(EDGE_EMSC_COMPILER_FLAGS "${EDGE_EMSC_COMPILER_FLAGS} -O3")
-    set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sASYNCIFY=1")
-  endif()
-
-  add_compile_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_COMPILER_FLAGS}")
-  add_link_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_LINKER_FLAGS}")
+if(EDGE_WEB_SIMD)
+  set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -msimd128 -msse")
 endif()
+
+if(EDGE_WEB_MULTITHREADED)
+  set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -pthread")
+  set(EDGE_EMSC_COMPILER_FLAGS "${EDGE_EMSC_COMPILER_FLAGS} -DEDGE_WEB_MULTITHREADED=1")
+  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sPTHREAD_POOL_SIZE_STRICT=0 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sENVIRONMENT=web,worker")
+else()
+  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sENVIRONMENT=web")
+endif()
+
+# force file system, see: https://github.com/emscripten-core/emscripten/blob/main/tools/file_packager.py
+set(EMPACKAGER "${EMSCRIPTEN_ROOT_PATH}/tools/file_packager.py")
+set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sFORCE_FILESYSTEM=1")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(EDGE_EMSC_SOURCE_MAP ON)
+  set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -O0")
+
+  # Enable sourcemap support
+  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -gsource-map --source-map-base=/")
+
+  # Add -sSAFE_HEAP=1 or -sSAFE_HEAP=2 to test heap and alignment, though slows things down a lot
+  set(EDGE_EMSC_LINKER_FLAGS "${EDGE_EMSC_LINKER_FLAGS} -sASSERTIONS=1")
+else()
+  set(EDGE_EMSC_SOURCE_MAP OFF)
+  set(EDGE_EMSC_COMMON_FLAGS "${EDGE_EMSC_COMMON_FLAGS} -flto -O3")
+endif()
+
+add_compile_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_COMPILER_FLAGS}")
+add_link_options("SHELL: ${EDGE_EMSC_COMMON_FLAGS} ${EDGE_EMSC_LINKER_FLAGS}")

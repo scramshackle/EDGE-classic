@@ -2,17 +2,20 @@
 #include "r_state.h"
 #include "r_units.h"
 
-static void(APIENTRY *ec_glActiveTexture)(GLenum)                     = nullptr;
-static void(APIENTRY *ec_glClientActiveTexture)(GLenum)               = nullptr;
-static void(APIENTRY *ec_glMultiTexCoord2fv)(GLenum, const GLfloat *) = nullptr;
+static void(APIENTRY *ec_glActiveTexture)(GLenum)       = nullptr;
+static void(APIENTRY *ec_glClientActiveTexture)(GLenum) = nullptr;
 
 void LoadGL13Procs()
 {
+#ifdef EDGE_WEB
+    ec_glActiveTexture       = (void(APIENTRY *)(GLenum))glActiveTexture;
+    ec_glClientActiveTexture = (void(APIENTRY *)(GLenum))glClientActiveTexture;
+#else
     ec_glActiveTexture       = (void(APIENTRY *)(GLenum))SDL_GL_GetProcAddress("glActiveTexture");
     ec_glClientActiveTexture = (void(APIENTRY *)(GLenum))SDL_GL_GetProcAddress("glClientActiveTexture");
-    ec_glMultiTexCoord2fv    = (void(APIENTRY *)(GLenum, const GLfloat *))SDL_GL_GetProcAddress("glMultiTexCoord2fv");
-    if (!ec_glActiveTexture || !ec_glClientActiveTexture || !ec_glMultiTexCoord2fv)
+    if (!ec_glActiveTexture || !ec_glClientActiveTexture)
         FatalError("OpenGL 1.3 entry points unavailable");
+#endif
 }
 
 class GLRenderState : public RenderState
@@ -282,17 +285,6 @@ class GLRenderState : public RenderState
         glFogf(GL_FOG_DENSITY, fog_density_);
     }
 
-    void GLColor(RGBAColor color)
-    {
-        if (color == gl_color_)
-        {
-            return;
-        }
-
-        gl_color_ = color;
-        glColor4ub(epi::GetRGBARed(color), epi::GetRGBAGreen(color), epi::GetRGBABlue(color), epi::GetRGBAAlpha(color));
-    }
-
     void BlendFunction(GLenum sfactor, GLenum dfactor)
     {
         if (blend_source_factor_ == sfactor && blend_destination_factor_ == dfactor)
@@ -382,18 +374,13 @@ class GLRenderState : public RenderState
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap_t_[index]);
     }
 
-    void MultiTexCoord(GLuint tex, const HMM_Vec2 *coords)
-    {
-        if (enable_texture_2d_[tex - GL_TEXTURE0] == false)
-            return;
-        if (tex == GL_TEXTURE0 && enable_texture_2d_[1] == false)
-            glTexCoord2fv((GLfloat *)coords);
-        else
-            ec_glMultiTexCoord2fv(tex, (GLfloat *)coords);
-    }
-
     void Hint(GLenum target, GLenum mode)
     {
+#ifdef EDGE_WEB
+        if (target == GL_FOG_HINT || target == GL_PERSPECTIVE_CORRECTION_HINT)
+            return;
+#endif
+
         glHint(target, mode);
     }
 
@@ -439,17 +426,6 @@ class GLRenderState : public RenderState
         glFrontFace(wind);
     }
 
-    void ShadeModel(GLenum model)
-    {
-        if (shade_model_ == model)
-        {
-            return;
-        }
-
-        shade_model_ = model;
-        glShadeModel(model);
-    }
-
     void ColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
     {
         glColorMask(red, green, blue, alpha);
@@ -467,6 +443,12 @@ class GLRenderState : public RenderState
         glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
     }
 
+    void TexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
+                       GLenum format, GLenum type, const void *pixels)
+    {
+        glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
+    }
+
     void PixelStorei(GLenum pname, GLint param)
     {
         glPixelStorei(pname, param);
@@ -475,11 +457,6 @@ class GLRenderState : public RenderState
     void ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels)
     {
         glReadPixels(x, y, width, height, format, type, pixels);
-    }
-
-    void PixelZoom(GLfloat xfactor, GLfloat yfactor)
-    {
-        glPixelZoom(xfactor, yfactor);
     }
 
     void Flush()
@@ -501,10 +478,6 @@ class GLRenderState : public RenderState
     void SetPipeline(uint32_t flags)
     {
         EPI_UNUSED(flags);
-    }
-
-    void OnContextSwitch()
-    {
     }
 
     void Reset()
@@ -562,6 +535,13 @@ class GLRenderState : public RenderState
 
         vertex_arrays_dirty_ = false;
 
+#ifdef EDGE_WEB
+        if (shape == GL_POLYGON)
+            shape = GL_TRIANGLE_FAN;
+        else if (shape == GL_QUAD_STRIP)
+            shape = GL_TRIANGLE_STRIP;
+#endif
+
         glDrawArrays(shape, first, count);
     }
 
@@ -587,8 +567,6 @@ class GLRenderState : public RenderState
 
         vertex_array_base_   = nullptr;
         vertex_arrays_dirty_ = false;
-
-        gl_color_ = kRGBANoValue;
     }
 
     // Might need to add more here since the state's scope has expanded - Dasho
@@ -633,8 +611,6 @@ class GLRenderState : public RenderState
     GLenum cull_face_;
 
     GLenum front_face_;
-
-    GLenum shade_model_;
 
     bool enable_scissor_test_;
 
@@ -686,8 +662,6 @@ class GLRenderState : public RenderState
     GLfloat   fog_end_;
     GLfloat   fog_density_;
     RGBAColor fog_color_;
-
-    RGBAColor gl_color_;
 
     const RendererVertex *vertex_array_base_           = nullptr;
     bool                  vertex_arrays_dirty_         = false;

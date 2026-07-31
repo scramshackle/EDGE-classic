@@ -155,7 +155,6 @@ class RenderState
 
     virtual void FogDensity(GLfloat density) = 0;
 
-    virtual void GLColor(RGBAColor color) = 0;
 
     virtual void BlendFunction(GLenum sfactor, GLenum dfactor) = 0;
 
@@ -173,7 +172,6 @@ class RenderState
 
     virtual void TextureWrapT(GLint param) = 0;
 
-    virtual void MultiTexCoord(GLuint tex, const HMM_Vec2 *coords) = 0;
 
     virtual void Hint(GLenum target, GLenum mode) = 0;
 
@@ -185,8 +183,6 @@ class RenderState
 
     virtual void FrontFace(GLenum wind) = 0;
 
-    virtual void ShadeModel(GLenum model) = 0;
-
     virtual void Scissor(GLint x, GLint y, GLsizei width, GLsizei height) = 0;
 
     virtual void GenTextures(GLsizei n, GLuint *textures) = 0;
@@ -197,16 +193,16 @@ class RenderState
                             GLint border, GLenum format, GLenum type, const void *pixels,
                             RenderUsage usage = kRenderUsageImmutable) = 0;
 
+    virtual void TexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
+                               GLsizei height, GLenum format, GLenum type, const void *pixels) = 0;
+
     virtual void PixelStorei(GLenum pname, GLint param) = 0;
 
     virtual void ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type,
                             void *pixels) = 0;
 
-    virtual void PixelZoom(GLfloat xfactor, GLfloat yfactor) = 0;
-
     virtual void Flush() = 0;
 
-    virtual void OnContextSwitch() = 0;
 
     virtual void Reset() = 0;
 

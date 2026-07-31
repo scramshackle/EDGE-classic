@@ -17,12 +17,12 @@
 //----------------------------------------------------------------------------
 
 #include <emscripten/html5.h>
+#include <SDL3/SDL.h>
 
 #include "dm_defs.h"
 #include "e_main.h"
 #include "epi.h"
 #include "epi_filesystem.h"
-#include "epi_sdl.h" // needed for proper SDL main linkage
 #include "epi_str_util.h"
 #include "i_system.h"
 #include "i_video.h"
@@ -91,11 +91,11 @@ extern "C"
         EPI_UNUSED(userData);
         if (changeEvent->isActive)
         {
-            SDL_ShowCursor(false);
+            SDL_HideCursor();
         }
         else
         {
-            SDL_ShowCursor(true);
+            SDL_ShowCursor();
         }
 
         return 0;
@@ -160,7 +160,7 @@ extern "C"
         emscripten_set_pointerlockchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, 0,
                                                   WebHandlePointerLockChange);
 
-        if (SDL_Init(0) < 0)
+        if (!SDL_Init(0))
             FatalError("Couldn't init SDL!!\n%s\n", SDL_GetError());
 
         executable_path = SDL_GetBasePath();

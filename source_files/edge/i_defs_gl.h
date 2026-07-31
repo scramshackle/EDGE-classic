@@ -140,8 +140,7 @@ typedef int GLsizei;
 #define GL_LINEAR_MIPMAP_LINEAR   0x2703
 #define GL_LINEAR_MIPMAP_NEAREST  0x2701
 
-#define GL_SMOOTH 0x1D01
-#define GL_CW     0x0900
+#define GL_CW 0x0900
 
 #define GL_FOG_HINT 0x0C54
 #define GL_NICEST   0x1102

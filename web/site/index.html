@@ -41,6 +41,7 @@
         const args = ["-home", "/edge-classic-webplayer", "-iwad", "/freedoom2.wad"];
 
         createEdgeModule({
+            GL_MAX_TEXTURE_IMAGE_UNITS: 2,
             edgePostInit: () => {
                 Module._WebOpenGameMenu(1);
             },

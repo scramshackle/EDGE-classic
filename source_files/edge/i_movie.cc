@@ -23,6 +23,7 @@
 #include "i_sound.h"
 #include "i_system.h"
 #include "pl_mpeg.h"
+#include "r_backend.h"
 #include "r_gldefs.h"
 #include "r_modes.h"
 #include "r_state.h"
@@ -55,7 +56,8 @@ static float     tx1          = 0.0f;
 static float     tx2          = 1.0f;
 static float     ty1          = 0.0f;
 static float     ty2          = 1.0f;
-static double           last_time = 0;
+static double           last_time        = 0;
+static double           movie_start_time = 0;
 static SDL_AudioStream *movie_stream;
 static int              movie_stream_queue_limit;
 static bool             canvas_can_update;
@@ -114,9 +116,10 @@ void MovieVideoCallback(plm_t *mpeg, plm_frame_t *frame, void *user)
     {
         plm_frame_to_rgba(frame, rgb_data, frame->width * 4);
 
+        render_state->ActiveTexture(GL_TEXTURE0);
         render_state->BindTexture(canvas);
-        render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame->width, frame->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                                 rgb_data);
+        render_state->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame->width, frame->height, GL_RGBA, GL_UNSIGNED_BYTE,
+                                    rgb_data);
 
         canvas_can_update = false;
     }
@@ -193,6 +196,8 @@ void PlayMovie(const std::string &name)
     render_state->BindTexture(canvas);
     render_state->TextureMagFilter(GL_LINEAR);
     render_state->TextureMinFilter(GL_LINEAR);
+    render_state->TextureWrapS(GL_CLAMP_TO_EDGE);
+    render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
 
     if (rgb_data)
     {
@@ -242,12 +247,9 @@ void PlayMovie(const std::string &name)
         frame_width  = current_screen_width;
     }
 
-#ifdef EDGE_SDL_GPU
-    // On SDL_GPU, this sets up the texture dimenions, for dynamic texture
     render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, movie_width, movie_height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                              nullptr, kRenderUsageDynamic);
     render_state->FinishTextures(1, &canvas);
-#endif
 
     vx1 = current_screen_width / 2 - frame_width / 2;
     vx2 = current_screen_width / 2 + frame_width / 2;
@@ -256,20 +258,24 @@ void PlayMovie(const std::string &name)
 
     int num_pixels = movie_width * movie_height * 4;
     rgb_data       = new uint8_t[num_pixels];
-    EPI_CLEAR_MEMORY(rgb_data, uint8_t, num_pixels);
+    memset(rgb_data, 0xFF, num_pixels);
     plm_set_video_decode_callback(decoder, MovieVideoCallback, nullptr);
-    plm_set_audio_decode_callback(decoder, MovieAudioCallback, nullptr);
-    if (!no_sound)
+
+    if (movie_stream)
     {
+        plm_set_audio_decode_callback(decoder, MovieAudioCallback, nullptr);
         plm_set_audio_enabled(decoder, 1);
         plm_set_audio_stream(decoder, 0);
     }
+    else
+        plm_set_audio_enabled(decoder, 0);
 
     BlackoutWipeTexture();
 
-    last_time = (double)GetMilliseconds() / 1000.0;
-    fadein    = 0;
-    fadeout   = 0;
+    last_time        = (double)GetMilliseconds() / 1000.0;
+    movie_start_time = last_time;
+    fadein           = 0;
+    fadeout          = 0;
 
     playing_movie     = true;
     canvas_can_update = true;
@@ -304,6 +310,8 @@ void MovieDrawer()
     if (!playing_movie)
         return;
 
+    render_backend->SetRenderLayer(kRenderLayerHUD);
+
     if (!plm_has_ended(decoder))
     {
         StartUnitBatch(false);
@@ -329,7 +337,7 @@ void MovieDrawer()
         EndRenderUnit(4);
 
         // Fade-in
-        fadein = plm_get_time(decoder);
+        fadein = (double)GetMilliseconds() / 1000.0 - movie_start_time;
         if (fadein <= 0.25f)
         {
             unit_col = epi::MakeRGBAFloat(0.0f, 0.0f, 0.0f, ((0.25f - (float)fadein) / 0.25f));

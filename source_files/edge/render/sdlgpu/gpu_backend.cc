@@ -273,12 +273,6 @@ class GpuRenderBackend : public RenderBackend
         return render_layer_;
     }
 
-    void Flush(int32_t commands, int32_t vertices)
-    {
-        EPI_UNUSED(commands);
-        EPI_UNUSED(vertices);
-    }
-
     void GetFrameStats(FrameStats &stats)
     {
         EPI_CLEAR_MEMORY(&stats, FrameStats, 1);
@@ -291,10 +285,6 @@ class GpuRenderBackend : public RenderBackend
 
         stats.size_apply_uniforms_ = (uint32_t)gpu_immediate.UniformBytes();
         stats.size_update_buffer_  = (uint32_t)gpu_immediate.UploadedBytes();
-    }
-
-    void OnContextSwitch()
-    {
     }
 
   private:

@@ -29,6 +29,14 @@ option(EDGE_THREADED_BSP "Threaded BSP traversal" ON)
 option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" OFF)
 option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
 
+if (EMSCRIPTEN)
+  set (EDGE_SDL_GPU OFF)
+  set (EDGE_LEGACY_GL ON)
+  if (NOT EDGE_WEB_MULTITHREADED)
+    set (EDGE_THREADED_BSP OFF)
+  endif()
+endif()
+
 if (EDGE_SDL_GPU)
   set (EDGE_LEGACY_GL OFF)
 endif()
@@ -210,7 +218,7 @@ endif()
 
 if (EDGE_SDL_GPU)
   add_definitions(-DEDGE_SDL_GPU)
-else()
+elseif (NOT EMSCRIPTEN)
   find_package(OpenGL REQUIRED)
 endif()
 

@@ -33,7 +33,6 @@ void RenderBackend::SoftInit(void)
 
     render_state->Enable(GL_NORMALIZE);
 
-    render_state->ShadeModel(GL_SMOOTH);
     render_state->DepthFunction(GL_LEQUAL);
     render_state->AlphaFunction(GL_GREATER, 0);
 

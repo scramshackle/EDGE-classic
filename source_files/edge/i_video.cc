@@ -23,6 +23,10 @@
 
 #include <SDL3/SDL.h>
 
+#ifdef EDGE_WEB
+#include <emscripten.h>
+#endif
+
 #include "con_main.h"
 #include "ddf_main.h"
 #include "dm_state.h"
@@ -173,6 +177,7 @@ void StartupGraphics(void)
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 5);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
@@ -207,11 +212,16 @@ void StartupGraphics(void)
     int num_modes = 0;
     SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(main_display, &num_modes);
 
+#ifdef EDGE_WEB
+    if (!num_modes || !modes)
+        LogPrint("No fullscreen display modes reported; using desktop resolution only\n");
+#else
     if (!num_modes || !modes)
     {
         if (modes) SDL_free(modes);
         FatalError("Could not fetch possible display modes: %s\n", SDL_GetError());
     }
+#endif
 
     for (int i = 0; i < num_modes; ++i)
     {
@@ -310,6 +320,20 @@ static bool InitializeWindow(DisplayMode *mode)
     if (program_context == NULL)
         FatalError("Failed to create OpenGL context.\n");
 
+#ifdef EDGE_WEB
+    EM_ASM({
+        var real_get_parameter = GLctx.getParameter.bind(GLctx);
+        GLctx.getParameter     = function(pname) {
+            if (pname == GLctx.MAX_TEXTURE_IMAGE_UNITS)
+                return 2;
+            return real_get_parameter(pname);
+        };
+
+        Browser.useWebGL = true;
+        Browser.moduleContextCreatedCallbacks.forEach(function(callback) { callback(); });
+    });
+#endif
+
     if (vsync.d_ == 2)
     {
         // Fallback to normal VSync if Adaptive doesn't work
@@ -325,7 +349,7 @@ static bool InitializeWindow(DisplayMode *mode)
     }
 #endif
 
-#ifndef EDGE_SDL_GPU
+#if !defined(EDGE_SDL_GPU) && !defined(EDGE_WEB)
     int major_version = 0;
     int minor_version = 0;
 
@@ -335,9 +359,6 @@ static bool InitializeWindow(DisplayMode *mode)
     if (major_version < 1 || (major_version == 1 && minor_version < 3))
         FatalError("System only supports GL %d.%d. Minimum GL version 1.3 required!\n", major_version,
                    minor_version);
-
-    if (!SDL_GL_ExtensionSupported("GL_ARB_texture_non_power_of_two"))
-        FatalError("System GL implementation does not support non-power-of-two textures!\n");
 #endif
 
     return true;

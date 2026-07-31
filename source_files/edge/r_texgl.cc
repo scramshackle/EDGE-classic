@@ -105,6 +105,18 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     int total_w = img->width_;
     int total_h = img->height_;
 
+#ifndef EDGE_SDL_GPU
+    int power_of_two_w = 1;
+    while (power_of_two_w < total_w)
+        power_of_two_w <<= 1;
+    total_w = power_of_two_w;
+
+    int power_of_two_h = 1;
+    while (power_of_two_h < total_h)
+        power_of_two_h <<= 1;
+    total_h = power_of_two_h;
+#endif
+
     int new_w, new_h;
 
     // scale down, if necessary, to fix the maximum size
@@ -165,7 +177,14 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     {
         if (img->width_ != new_w || img->height_ != new_h)
         {
-            img->ShrinkMasked(new_w, new_h);
+            int grow_w = HMM_MAX(new_w, (int)img->width_);
+            int grow_h = HMM_MAX(new_h, (int)img->height_);
+
+            if (grow_w != img->width_ || grow_h != img->height_)
+                img->Grow(grow_w, grow_h);
+
+            if (img->width_ != new_w || img->height_ != new_h)
+                img->ShrinkMasked(new_w, new_h);
 
             if (flags & kUploadThresh)
                 img->ThresholdAlpha((mip & 1) ? 96 : 144);

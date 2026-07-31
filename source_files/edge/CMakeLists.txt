@@ -211,7 +211,7 @@ if (EDGE_SDL_GPU)
   if (MINGW)
     list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
   endif()
-else ()
+elseif (NOT EMSCRIPTEN)
 	list(APPEND EDGE_LINK_LIBRARIES OpenGL::GL)
 endif()
 
@@ -231,12 +231,16 @@ if (NOT EMSCRIPTEN)
 
 else()
 
-  set (SOURCE_DIR "${CMAKE_SOURCE_DIR}/build/source_files/edge")
+  set (SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
   set (DEST_DIR "${CMAKE_SOURCE_DIR}/web/site")
 
   target_link_options(edge-classic PRIVATE "--pre-js=${DEST_DIR}/edge-classic-data.js")
 
-  list(APPEND COPY_FILES "${SOURCE_DIR}/edge-classic.js" "${SOURCE_DIR}/edge-classic.wasm" "${SOURCE_DIR}/edge-classic.wasm.map")
+  list(APPEND COPY_FILES "${SOURCE_DIR}/edge-classic.js" "${SOURCE_DIR}/edge-classic.wasm")
+
+  if (EDGE_EMSC_SOURCE_MAP)
+    list(APPEND COPY_FILES "${SOURCE_DIR}/edge-classic.wasm.map")
+  endif()
 
   add_custom_command(
   TARGET edge-classic

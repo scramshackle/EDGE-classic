@@ -635,7 +635,7 @@ void ActiveEventProcess(SDL_Event *sdl_ev)
         // On web, we don't want clicks coming through when changing pointer
         // lock Otherwise, menus will be selected, weapons fired,
         // unexpectedly
-        if (SDL_ShowCursor(SDL_QUERY) == SDL_DISABLE)
+        if (!SDL_CursorVisible())
             HandleMouseButtonEvent(sdl_ev);
 #else
         if (need_mouse_recapture)

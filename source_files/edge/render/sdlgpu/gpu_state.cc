@@ -237,11 +237,6 @@ class GpuRenderState : public RenderState
         fog_density_ = density;
     }
 
-    void GLColor(RGBAColor color)
-    {
-        gl_color_ = color;
-    }
-
     void BlendFunction(GLenum sfactor, GLenum dfactor)
     {
         blend_source_factor_      = sfactor;
@@ -283,12 +278,6 @@ class GpuRenderState : public RenderState
         texture_wrap_t_ = param;
     }
 
-    void MultiTexCoord(GLuint tex, const HMM_Vec2 *coords)
-    {
-        EPI_UNUSED(tex);
-        EPI_UNUSED(coords);
-    }
-
     void Hint(GLenum target, GLenum mode)
     {
         EPI_UNUSED(target);
@@ -319,11 +308,6 @@ class GpuRenderState : public RenderState
     void FrontFace(GLenum wind)
     {
         front_face_ = wind;
-    }
-
-    void ShadeModel(GLenum model)
-    {
-        EPI_UNUSED(model);
     }
 
     void Scissor(GLint x, GLint y, GLsizei width, GLsizei height)
@@ -439,6 +423,25 @@ class GpuRenderState : public RenderState
             FatalError("TexImage2D: failed to update texture %u", texture_id);
     }
 
+    void TexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
+                       GLenum format, GLenum type, const void *pixels)
+    {
+        EPI_UNUSED(target);
+        EPI_UNUSED(format);
+        EPI_UNUSED(type);
+
+        if (level != 0 || xoffset != 0 || yoffset != 0)
+            FatalError("TexSubImage2D: only full-image updates of level 0 are supported");
+
+        GLuint texture_id = bind_texture_2d_[active_texture_ - GL_TEXTURE0];
+
+        if (!texture_id)
+            FatalError("TexSubImage2D: no texture bound on update");
+
+        if (!UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+            FatalError("TexSubImage2D: failed to update texture %u", texture_id);
+    }
+
     void PixelStorei(GLenum pname, GLint param)
     {
         EPI_UNUSED(pname);
@@ -457,17 +460,7 @@ class GpuRenderState : public RenderState
             memset(pixels, 0, (size_t)width * (size_t)height * 4);
     }
 
-    void PixelZoom(GLfloat xfactor, GLfloat yfactor)
-    {
-        EPI_UNUSED(xfactor);
-        EPI_UNUSED(yfactor);
-    }
-
     void Flush()
-    {
-    }
-
-    void OnContextSwitch()
     {
     }
 
@@ -681,7 +674,6 @@ class GpuRenderState : public RenderState
     GLfloat   fog_density_ = 0.0f;
     RGBAColor fog_color_   = kRGBABlack;
     RGBAColor clear_color_ = kRGBABlack;
-    RGBAColor gl_color_    = kRGBAWhite;
 
     float line_width_ = 1.0f;
 
