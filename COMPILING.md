@@ -5,9 +5,10 @@
 
 The following options can be passed to CMake to control certain features:
 
-- EDGE_LEGACY_GL (default ON): Will use the original GL 1.3 render path.
-- EDGE_SDL_GPU (default OFF): Will use the SDL3_GPU render path. This backend is Vulkan-only and takes precedence over EDGE_LEGACY_GL when both are set.
-  - If neither renderer option is selected, EDGE_LEGACY_GL is used.
+- EDGE_GLES2 (default ON): Will use the GLES2 render path. This backend targets OpenGL ES 2.0, WebGL 1 and desktop OpenGL 2.0, and is the renderer used for Emscripten builds.
+- EDGE_SDL_GPU (default OFF): Will use the SDL3_GPU render path. This backend is Vulkan-only and takes precedence over EDGE_GLES2 when both are set.
+  - If neither renderer option is selected, EDGE_GLES2 is used.
+  - Emscripten builds always select EDGE_GLES2.
 - EDGE_THREADED_BSP (default ON): Runs the BSP traversal on a worker thread, which queues subsectors and sky surfaces for the main thread to render. Works with either renderer. Set to OFF for a single-threaded traversal.
 - EDGE_SANITIZE (default OFF): Will build with AddressSanitizer support. This option is mutually exclusive with EDGE_SANITIZE_THREADS and EDGE_SANITIZE_UB. Suppressions can be found in ASanSuppress.txt.
 - EDGE_SANITIZE_THREADS (default OFF): Will build with ThreadSanitizer support. Suppressions can be found in TSanSuppress.txt. This option is mutually exclusive with EDGE_SANITIZE and EDGE_SANITIZE_UB and only works with non-MSVC builds.

@@ -17,10 +17,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Rendering Options
 
-option(EDGE_LEGACY_GL "Legacy GL Renderer" OFF)
+option(EDGE_GLES2 "WebGL1/GLES 2.0/GL 2.0 Renderer" ON)
 
 # SDL3_GPU Renderer (Vulkan only)
-option(EDGE_SDL_GPU "SDL3_GPU Renderer" ON)
+option(EDGE_SDL_GPU "SDL3_GPU Renderer" OFF)
 
 # Run the BSP walk on a worker thread
 option(EDGE_THREADED_BSP "Threaded BSP traversal" ON)
@@ -31,18 +31,18 @@ option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
 
 if (EMSCRIPTEN)
   set (EDGE_SDL_GPU OFF)
-  set (EDGE_LEGACY_GL ON)
+  set (EDGE_GLES2 ON)
   if (NOT EDGE_WEB_MULTITHREADED)
     set (EDGE_THREADED_BSP OFF)
   endif()
 endif()
 
 if (EDGE_SDL_GPU)
-  set (EDGE_LEGACY_GL OFF)
+  set (EDGE_GLES2 OFF)
 endif()
 
-if (NOT EDGE_LEGACY_GL AND NOT EDGE_SDL_GPU)
-  set (EDGE_LEGACY_GL ON)
+if (NOT EDGE_GLES2 AND NOT EDGE_SDL_GPU)
+  set (EDGE_GLES2 ON)
 endif()
 
 # Development 
@@ -208,18 +208,27 @@ endif()
 # set certain definitions (if appropriate)
 
 if (APPLE)
-  include_directories(${SDL3_INCLUDE_DIR})  
-  if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64" AND APPLE)
-    add_compile_definitions(APPLE_SILICON)
-  elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64" AND APPLE)
-    add_compile_definitions(NOT_APPLE_SILICON)
-  endif()
+  include_directories(${SDL3_INCLUDE_DIR})
 endif()
 
 if (EDGE_SDL_GPU)
   add_definitions(-DEDGE_SDL_GPU)
-elseif (NOT EMSCRIPTEN)
-  find_package(OpenGL REQUIRED)
+else()
+  add_definitions(-DEDGE_GLES2)
+
+  if (NOT EMSCRIPTEN)
+    find_path(EDGE_GLES2_INCLUDE_DIR GLES2/gl2.h)
+    find_library(EDGE_GLES2_LIBRARY NAMES GLESv2 libGLESv2)
+
+    if (EDGE_GLES2_INCLUDE_DIR AND EDGE_GLES2_LIBRARY)
+      message(STATUS "EDGE_GLES2: using native OpenGL ES 2.0 (${EDGE_GLES2_LIBRARY})")
+    else()
+      find_package(OpenGL REQUIRED)
+      add_definitions(-DEDGE_GLES2_DESKTOP_GL)
+      set(EDGE_GLES2_LIBRARY OpenGL::GL)
+      message(STATUS "EDGE_GLES2: no OpenGL ES 2.0 driver found, falling back to desktop OpenGL 2.0")
+    endif()
+  endif()
 endif()
 
 if (EDGE_THREADED_BSP)

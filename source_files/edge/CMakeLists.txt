@@ -113,13 +113,16 @@ set (EDGE_SOURCE_FILES
   script/compat/lua_player.cc
   script/compat/lua_hud.cc)
   
-set (EDGE_GL_SOURCE_FILES
-  render/gl/gl_backend.cc
-  render/gl/gl_md2.cc
-  render/gl/gl_mdl.cc
-  render/gl/gl_sky.cc
-  render/gl/gl_state.cc
-  render/gl/gl_units.cc
+set (EDGE_GLES2_SOURCE_FILES
+  render/gles2/gles2_backend.cc
+  render/gles2/gles2_immediate.cc
+  render/gles2/gles2_loader.cc
+  render/gles2/gles2_md2.cc
+  render/gles2/gles2_mdl.cc
+  render/gles2/gles2_program.cc
+  render/gles2/gles2_sky.cc
+  render/gles2/gles2_state.cc
+  render/gles2/gles2_units.cc
 )
 
 set (EDGE_SDL_GPU_SOURCE_FILES
@@ -139,7 +142,7 @@ set (EDGE_SDL_GPU_SOURCE_FILES
 if (EDGE_SDL_GPU)
   list (APPEND EDGE_SOURCE_FILES ${EDGE_SDL_GPU_SOURCE_FILES})
 else()
-  list (APPEND EDGE_SOURCE_FILES ${EDGE_GL_SOURCE_FILES})
+  list (APPEND EDGE_SOURCE_FILES ${EDGE_GLES2_SOURCE_FILES})
 endif()
 
 list (APPEND 
@@ -212,7 +215,7 @@ if (EDGE_SDL_GPU)
     list(APPEND EDGE_LINK_LIBRARIES winmm kernel32)
   endif()
 elseif (NOT EMSCRIPTEN)
-	list(APPEND EDGE_LINK_LIBRARIES OpenGL::GL)
+	list(APPEND EDGE_LINK_LIBRARIES ${EDGE_GLES2_LIBRARY})
 endif()
 
 target_link_libraries(edge-classic PRIVATE ${EDGE_LINK_LIBRARIES})

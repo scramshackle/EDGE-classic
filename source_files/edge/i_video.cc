@@ -173,10 +173,15 @@ void StartupGraphics(void)
         grab_mouse = 0;
 
 #ifndef EDGE_SDL_GPU
-    // -AJA- FIXME these are wrong (probably ignored though)
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 5);
+#ifndef EDGE_GLES2_DESKTOP_GL
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#endif
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -320,20 +325,6 @@ static bool InitializeWindow(DisplayMode *mode)
     if (program_context == NULL)
         FatalError("Failed to create OpenGL context.\n");
 
-#ifdef EDGE_WEB
-    EM_ASM({
-        var real_get_parameter = GLctx.getParameter.bind(GLctx);
-        GLctx.getParameter     = function(pname) {
-            if (pname == GLctx.MAX_TEXTURE_IMAGE_UNITS)
-                return 2;
-            return real_get_parameter(pname);
-        };
-
-        Browser.useWebGL = true;
-        Browser.moduleContextCreatedCallbacks.forEach(function(callback) { callback(); });
-    });
-#endif
-
     if (vsync.d_ == 2)
     {
         // Fallback to normal VSync if Adaptive doesn't work
@@ -354,10 +345,10 @@ static bool InitializeWindow(DisplayMode *mode)
     int minor_version = 0;
 
     if (!SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major_version) || !SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor_version))
-        FatalError("Failed to determine system OpenGL version!\n");
+        FatalError("Failed to determine system OpenGL ES version!\n");
 
-    if (major_version < 1 || (major_version == 1 && minor_version < 3))
-        FatalError("System only supports GL %d.%d. Minimum GL version 1.3 required!\n", major_version,
+    if (major_version < 2)
+        FatalError("System only supports GL ES %d.%d. Minimum GL ES version 2.0 required!\n", major_version,
                    minor_version);
 #endif
 

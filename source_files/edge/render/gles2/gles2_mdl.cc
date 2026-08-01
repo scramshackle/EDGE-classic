@@ -34,6 +34,7 @@
 #include "epi_endian.h"
 #include "epi_str_compare.h"
 #include "g_game.h" //current_map
+#include "gles2_immediate.h"
 #include "i_defs_gl.h"
 #include "im_data.h"
 #include "n_network.h"
@@ -995,7 +996,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
                 old_clamp = existing->second;
             }
 
-            render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
+            render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
         }
 
         int total_vertices = md->total_triangles_ * 3;
@@ -1018,7 +1019,10 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
             }
         }
 
+        render_state->SetPipeline(0);
+
         render_state->SetVertexArrays(model_vertices.data());
+        gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
         render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
         // restore the clamping mode
@@ -1027,8 +1031,6 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
             render_state->TextureWrapT(old_clamp);
         }
     }
-
-    render_state->ResetGLState();
 }
 
 void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, float yscale,
@@ -1089,11 +1091,13 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
         }
     }
 
+    render_state->SetPipeline(0);
+
     render_state->SetVertexArrays(model_vertices.data());
+    gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
     render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
-    render_state->ResetGLState();
+    render_state->Disable(GL_BLEND);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->Disable(GL_CULL_FACE);
 }
-
-//--- editor settings ---
-// vi:ts=4:sw=4:noexpandtab

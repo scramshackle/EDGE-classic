@@ -146,7 +146,7 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     GLint tmode = GL_REPEAT;
 
     if (clamp)
-        tmode = renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE;
+        tmode = GL_CLAMP_TO_EDGE;
 
     render_state->TextureWrapS(tmode);
     render_state->TextureWrapT(tmode);

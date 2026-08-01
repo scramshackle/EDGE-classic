@@ -995,7 +995,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
                 old_clamp = existing->second;
             }
 
-            render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
+            render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
         }
 
         int total_vertices = md->total_triangles_ * 3;

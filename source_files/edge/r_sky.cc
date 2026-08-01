@@ -607,14 +607,6 @@ static void RenderSkybox(void)
     float v0 = 0.0f;
     float v1 = 1.0f;
 
-    if (renderer_dumb_clamp.d_)
-    {
-        float size = fake_box[SK].face_size;
-
-        v0 = 0.5f / size;
-        v1 = 1.0f - v0;
-    }
-
     RGBAColor fc_to_use = current_map->outdoor_fog_color_;
     float     fd_to_use = 0.01f * current_map->outdoor_fog_density_;
     BlendingMode blend     = kBlendingNoZBuffer;
@@ -788,11 +780,6 @@ void FinishSky(bool use_depth_mask)
 
     StartUnitBatch(false);
 
-#ifdef APPLE_SILICON
-    uint8_t old_dumb_clamp = renderer_dumb_clamp.d_;
-    renderer_dumb_clamp    = 1;
-#endif
-
     if (custom_skybox)
         RenderSkybox();
     else
@@ -801,10 +788,6 @@ void FinishSky(bool use_depth_mask)
     FinishUnitBatch();
 
     RendererRevertSkyMatrices();
-
-#ifdef APPLE_SILICON
-    renderer_dumb_clamp = old_dumb_clamp;
-#endif
 
     if (draw_culling.d_)
         render_state->Enable(GL_DEPTH_TEST);

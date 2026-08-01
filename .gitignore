@@ -29,6 +29,9 @@ edge_defs.epk
 /screenshot
 /savegame
 
+source_files/edge/render/gles2/shaders/world_GL.*.glsl
+source_files/edge/render/gles2/shaders/world_GLES.*.glsl
+
 # Other
 source_files/glew/glew.pc
 

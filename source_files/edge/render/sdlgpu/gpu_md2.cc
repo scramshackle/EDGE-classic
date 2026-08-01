@@ -1321,7 +1321,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 old_clamp = existing->second;
             }
 
-            render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
+            render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
         }
 
         render_state->SetPipeline(0);

@@ -1,0 +1,294 @@
+#include "gles2_program.h"
+
+#include <string.h>
+
+#include "epi.h"
+#include "epi_math.h"
+#include "i_system.h"
+#include "shaders/world_glsl.h"
+
+Gles2Program gles2_program;
+
+static GLuint CompileStage(GLenum stage, const char *source, const char *label)
+{
+    GLuint shader = glCreateShader(stage);
+
+    if (!shader)
+    {
+        FatalError("Gles2Program: glCreateShader failed for %s\n", label);
+    }
+
+    const char *strings[2] = {Gles2ShaderPreamble(stage == GL_FRAGMENT_SHADER), source};
+
+    glShaderSource(shader, 2, strings, nullptr);
+    glCompileShader(shader);
+
+    GLint compiled = GL_FALSE;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+
+    if (compiled != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+        {
+            glGetShaderInfoLog(shader, log_length, nullptr, log);
+        }
+
+        FatalError("Gles2Program: %s failed to compile:\n%s\n", label, log);
+    }
+
+    return shader;
+}
+
+bool Gles2Program::Init()
+{
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kWorldVertexSource, "world.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kWorldFragmentSource, "world.frag.glsl");
+
+    program_ = glCreateProgram();
+
+    if (!program_)
+    {
+        FatalError("Gles2Program: glCreateProgram failed\n");
+    }
+
+    glAttachShader(program_, vertex_shader);
+    glAttachShader(program_, fragment_shader);
+
+    glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
+    glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
+    glBindAttribLocation(program_, kGles2AttributeColor, "a_color");
+
+    glLinkProgram(program_);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+
+    if (linked != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+        {
+            glGetProgramInfoLog(program_, log_length, nullptr, log);
+        }
+
+        FatalError("Gles2Program: world program failed to link:\n%s\n", log);
+    }
+
+    glDetachShader(program_, vertex_shader);
+    glDetachShader(program_, fragment_shader);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
+    uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
+    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
+    uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
+    uniform_texture1_              = glGetUniformLocation(program_, "u_texture1");
+    uniform_multi_texture_         = glGetUniformLocation(program_, "u_multi_texture");
+    uniform_line_mode_             = glGetUniformLocation(program_, "u_line_mode");
+    uniform_skip_rgb_              = glGetUniformLocation(program_, "u_skip_rgb");
+    uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
+    uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
+    uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
+    uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
+    uniform_fog_start_             = glGetUniformLocation(program_, "u_fog_start");
+    uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
+
+    glUseProgram(program_);
+
+    glUniform1i(uniform_texture0_, kGles2TextureUnit0);
+    glUniform1i(uniform_texture1_, kGles2TextureUnit1);
+
+    for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
+    {
+        clip_planes_[i].enabled     = false;
+        clip_planes_[i].equation[0] = 0.0f;
+        clip_planes_[i].equation[1] = 0.0f;
+        clip_planes_[i].equation[2] = 0.0f;
+        clip_planes_[i].equation[3] = 1.0f;
+
+        UploadClipPlane(i);
+    }
+
+    return true;
+}
+
+void Gles2Program::Shutdown()
+{
+    if (program_)
+    {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+}
+
+void Gles2Program::Use()
+{
+    glUseProgram(program_);
+}
+
+void Gles2Program::SetFloat(GLint location, float &shadow, float value)
+{
+    if (epi::AlmostEquals(shadow, value))
+    {
+        return;
+    }
+
+    shadow = value;
+
+    glUniform1f(location, value);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetModelViewProjection(const HMM_Mat4 &matrix)
+{
+    if (memcmp(&shadow_model_view_projection_, &matrix, sizeof(HMM_Mat4)) == 0)
+    {
+        return;
+    }
+
+    shadow_model_view_projection_ = matrix;
+
+    glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&matrix);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetModelView(const HMM_Mat4 &matrix)
+{
+    if (memcmp(&shadow_model_view_, &matrix, sizeof(HMM_Mat4)) == 0)
+    {
+        return;
+    }
+
+    shadow_model_view_ = matrix;
+
+    glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&matrix);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::UploadClipPlane(int32_t index)
+{
+    GLfloat values[4];
+
+    if (clip_planes_[index].enabled)
+    {
+        values[0] = clip_planes_[index].equation[0];
+        values[1] = clip_planes_[index].equation[1];
+        values[2] = clip_planes_[index].equation[2];
+        values[3] = clip_planes_[index].equation[3];
+    }
+    else
+    {
+        values[0] = 0.0f;
+        values[1] = 0.0f;
+        values[2] = 0.0f;
+        values[3] = 1.0f;
+    }
+
+    glUniform4fv(uniform_clip_plane_ + index, 1, values);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetClipPlane(int32_t index, const double equation[4])
+{
+    if (index < 0 || index >= kGles2MaximumClipPlanes)
+    {
+        return;
+    }
+
+    bool changed = false;
+
+    for (int32_t i = 0; i < 4; i++)
+    {
+        float value = (float)equation[i];
+
+        if (!epi::AlmostEquals(clip_planes_[index].equation[i], value))
+        {
+            clip_planes_[index].equation[i] = value;
+            changed                         = true;
+        }
+    }
+
+    if (changed && clip_planes_[index].enabled)
+    {
+        UploadClipPlane(index);
+    }
+}
+
+void Gles2Program::SetClipPlaneEnabled(int32_t index, bool enabled)
+{
+    if (index < 0 || index >= kGles2MaximumClipPlanes)
+    {
+        return;
+    }
+
+    if (clip_planes_[index].enabled == enabled)
+    {
+        return;
+    }
+
+    clip_planes_[index].enabled = enabled;
+
+    UploadClipPlane(index);
+}
+
+void Gles2Program::SetMultiTexture(bool enabled)
+{
+    SetFloat(uniform_multi_texture_, shadow_multi_texture_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetLineMode(bool enabled)
+{
+    SetFloat(uniform_line_mode_, shadow_line_mode_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetSkipRGB(bool enabled)
+{
+    SetFloat(uniform_skip_rgb_, shadow_skip_rgb_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetAlphaTest(float reference)
+{
+    SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
+}
+
+void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end)
+{
+    SetFloat(uniform_fog_mode_, shadow_fog_mode_, (float)mode);
+
+    if (mode == kGles2FogModeNone)
+    {
+        return;
+    }
+
+    if (!epi::AlmostEquals(shadow_fog_color_[0], red) || !epi::AlmostEquals(shadow_fog_color_[1], green) ||
+        !epi::AlmostEquals(shadow_fog_color_[2], blue))
+    {
+        shadow_fog_color_[0] = red;
+        shadow_fog_color_[1] = green;
+        shadow_fog_color_[2] = blue;
+        shadow_fog_color_[3] = 1.0f;
+
+        glUniform4f(uniform_fog_color_, red, green, blue, 1.0f);
+
+        uniform_update_count_++;
+    }
+
+    SetFloat(uniform_fog_density_, shadow_fog_density_, density);
+    SetFloat(uniform_fog_start_, shadow_fog_start_, start);
+    SetFloat(uniform_fog_end_, shadow_fog_end_, end);
+}

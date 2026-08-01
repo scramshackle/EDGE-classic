@@ -34,6 +34,7 @@
 #include "epi_endian.h"
 #include "epi_str_compare.h"
 #include "g_game.h" //current_map
+#include "gles2_immediate.h"
 #include "i_defs_gl.h"
 #include "n_network.h"
 #include "p_blockmap.h"
@@ -1000,7 +1001,6 @@ static inline void ModelCoordFunc(MD2CoordinateData *data, int v_idx)
                                            col->add_blue_ * render_view_blue_multiplier);
     }
 }
-
 void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int frame1, int frame2, float lerp, float x,
                     float y, float z, MapObject *mo, RegionProperties *props, float scale, float aspect, float bias,
                     int rotation)
@@ -1322,8 +1322,10 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 old_clamp = existing->second;
             }
 
-            render_state->TextureWrapT(renderer_dumb_clamp.d_ ? GL_CLAMP : GL_CLAMP_TO_EDGE);
+            render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
         }
+
+        render_state->SetPipeline(0);
 
         if (md->strips_[0].mode == GL_TRIANGLES) // MD3 models, it's a pile of triangles :/
         {
@@ -1348,6 +1350,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
             }
 
             render_state->SetVertexArrays(model_vertices.data());
+            gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
             render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
         }
         else
@@ -1376,6 +1379,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
             }
 
             render_state->SetVertexArrays(model_vertices.data());
+            gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
 
             int first_vertex = 0;
 
@@ -1392,8 +1396,6 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
             render_state->TextureWrapT(old_clamp);
         }
     }
-
-    render_state->ResetGLState();
 }
 
 void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, float y, float xscale, float yscale,
@@ -1460,7 +1462,10 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
         }
     }
 
+    render_state->SetPipeline(0);
+
     render_state->SetVertexArrays(model_vertices.data());
+    gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
 
     if (md->strips_[0].mode == GL_TRIANGLES)
         render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
@@ -1475,8 +1480,7 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
         }
     }
 
-    render_state->ResetGLState();
+    render_state->Disable(GL_BLEND);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->Disable(GL_CULL_FACE);
 }
-
-//--- editor settings ---
-// vi:ts=4:sw=4:noexpandtab

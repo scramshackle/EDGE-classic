@@ -6,8 +6,7 @@
 #include "con_var.h"
 #include "epi.h"
 #include "epi_math.h"
-#include "gpu_images.h"
-#include "gpu_immediate.h"
+#include "gles2_immediate.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
 #include "r_gldefs.h"
@@ -165,32 +164,100 @@ struct Compare_Unit_pred
     }
 };
 
+static void ApplyUnitEnvironment(int32_t texture_unit, GLuint environment)
+{
+    render_state->ActiveTexture(GL_TEXTURE0 + texture_unit);
+
+    if (environment == (GLuint)kTextureEnvironmentSkipRGB)
+    {
+        render_state->TextureEnvironmentMode(GL_COMBINE);
+        render_state->TextureEnvironmentCombineRGB(GL_REPLACE);
+        render_state->TextureEnvironmentSource0RGB(GL_PREVIOUS);
+    }
+    else
+    {
+        render_state->TextureEnvironmentMode(GL_MODULATE);
+        render_state->TextureEnvironmentCombineRGB(GL_MODULATE);
+        render_state->TextureEnvironmentSource0RGB(GL_TEXTURE);
+    }
+}
+
 static void BindUnitTextures(const RendererUnit *unit)
 {
-    if (!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable)
+    for (int32_t t = 1; t >= 0; t--)
     {
-        gpu_immediate.DisableTexture();
-        return;
+        bool active = unit->texture[t] != 0 && unit->environment_mode[t] != kTextureEnvironmentDisable;
+
+        render_state->ActiveTexture(GL_TEXTURE0 + t);
+
+        if (active)
+        {
+            render_state->Enable(GL_TEXTURE_2D);
+            render_state->BindTexture(unit->texture[t]);
+        }
+        else
+        {
+            render_state->Disable(GL_TEXTURE_2D);
+            render_state->BindTexture(0);
+        }
+
+        ApplyUnitEnvironment(t, unit->environment_mode[t]);
     }
 
-    const GpuImage *image0 = GetGpuImage(unit->texture[0]);
+    render_state->ActiveTexture(GL_TEXTURE0);
+}
 
-    if (!unit->texture[1] || unit->environment_mode[1] == kTextureEnvironmentDisable)
-    {
-        gpu_immediate.SetTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr);
+static void ApplyUnitClamping(const RendererUnit *unit, GLint &old_clamp_s, GLint &old_clamp_t)
+{
+    old_clamp_s = kDummyClamp;
+    old_clamp_t = kDummyClamp;
+
+    if (unit->texture[0] == 0)
         return;
+
+    render_state->ActiveTexture(GL_TEXTURE0);
+
+    if (unit->blending & kBlendingRepeatX)
+    {
+        auto existing = texture_clamp_s.find(unit->texture[0]);
+
+        if (existing == texture_clamp_s.end())
+        {
+            render_state->TextureWrapS(GL_REPEAT);
+        }
+        else if (existing->second != GL_REPEAT)
+        {
+            old_clamp_s = existing->second;
+            render_state->TextureWrapS(GL_REPEAT);
+        }
     }
 
-    const GpuImage *image1 = GetGpuImage(unit->texture[1]);
+    if (unit->blending & (kBlendingClampY | kBlendingRepeatY))
+    {
+        GLint wanted = (unit->blending & kBlendingClampY) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
 
-    gpu_immediate.SetMultiTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr,
-                                  image1 ? image1->texture : nullptr, image1 ? image1->sampler : nullptr);
+        auto existing = texture_clamp_t.find(unit->texture[0]);
+
+        if (existing == texture_clamp_t.end())
+        {
+            render_state->TextureWrapT(wanted);
+        }
+        else if (existing->second != wanted)
+        {
+            old_clamp_t = existing->second;
+            render_state->TextureWrapT(wanted);
+        }
+    }
 }
 
 static void DrawLineUnit(const RendererUnit *unit)
 {
-    gpu_immediate.DisableTexture();
-    gpu_immediate.SetLineMode(true);
+    render_state->ActiveTexture(GL_TEXTURE1);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->ActiveTexture(GL_TEXTURE0);
+    render_state->Disable(GL_TEXTURE_2D);
+
+    gles2_immediate.SetLineMode(true);
 
     const RendererVertex *source = local_verts + unit->first;
 
@@ -198,11 +265,11 @@ static void DrawLineUnit(const RendererUnit *unit)
 
     if (line_total <= 0)
     {
-        gpu_immediate.SetLineMode(false);
+        gles2_immediate.SetLineMode(false);
         return;
     }
 
-    RendererVertex *destination = gpu_immediate.ReserveVertices(line_total * 4);
+    RendererVertex *destination = gles2_immediate.ReserveVertices(line_total * 4);
 
     HMM_Vec2 aa_radius = {{2.0f, 2.0f}};
 
@@ -241,22 +308,26 @@ static void DrawLineUnit(const RendererUnit *unit)
             out[k].texture_coordinates[1].Y = factor * line_length;
         }
 
-        out[0].position                   = {{a1.X, a1.Y, source_v0->position.Z}};
-        out[0].texture_coordinates[0]     = {{line_width, -factor * line_length}};
+        out[0].position               = {{a1.X, a1.Y, source_v0->position.Z}};
+        out[0].texture_coordinates[0] = {{line_width, -factor * line_length}};
 
-        out[1].position                   = {{a0.X, a0.Y, source_v0->position.Z}};
-        out[1].texture_coordinates[0]     = {{-line_width, -factor * line_length}};
+        out[1].position               = {{a0.X, a0.Y, source_v0->position.Z}};
+        out[1].texture_coordinates[0] = {{-line_width, -factor * line_length}};
 
-        out[2].position                   = {{b0.X, b0.Y, source_v1->position.Z}};
-        out[2].texture_coordinates[0]     = {{-line_width, factor * line_length}};
+        out[2].position               = {{b0.X, b0.Y, source_v1->position.Z}};
+        out[2].texture_coordinates[0] = {{-line_width, factor * line_length}};
 
-        out[3].position                   = {{b1.X, b1.Y, source_v1->position.Z}};
-        out[3].texture_coordinates[0]     = {{line_width, -factor * line_length}};
+        out[3].position               = {{b1.X, b1.Y, source_v1->position.Z}};
+        out[3].texture_coordinates[0] = {{line_width, -factor * line_length}};
     }
 
-    gpu_immediate.RecordDraw(GL_QUADS, line_total * 4);
+    render_state->SetPipeline(0);
 
-    gpu_immediate.SetLineMode(false);
+    Gles2ApplyRenderState();
+
+    gles2_immediate.RecordDraw(GL_QUADS, line_total * 4);
+
+    gles2_immediate.SetLineMode(false);
 }
 
 void RenderCurrentUnits(void)
@@ -316,6 +387,10 @@ void RenderCurrentUnits(void)
     }
     else
         render_state->Disable(GL_FOG);
+
+    render_state->SetVertexArrays(local_verts);
+
+    gles2_immediate.UploadBatch(local_verts, current_render_vert);
 
     for (int j = 0; j < current_render_unit; j++)
     {
@@ -383,7 +458,7 @@ void RenderCurrentUnits(void)
         else if (unit->blending & kBlendingMasked)
         {
             render_state->Enable(GL_ALPHA_TEST);
-            render_state->AlphaFunction(GL_GREATER, 0.01);
+            render_state->AlphaFunction(GL_GREATER, 0.01f);
         }
         else if (unit->blending & kBlendingGEqual)
         {
@@ -412,7 +487,7 @@ void RenderCurrentUnits(void)
             }
         }
 
-        render_state->SetPipeline(0);
+        render_state->PolygonOffset(0, -unit->pass);
 
         if ((!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
             (unit->texture[1] && unit->environment_mode[1] != kTextureEnvironmentDisable))
@@ -430,6 +505,8 @@ void RenderCurrentUnits(void)
                 v->texture_coordinates[0].X = v->texture_coordinates[1].X;
                 v->texture_coordinates[0].Y = v->texture_coordinates[1].Y;
             }
+
+            gles2_immediate.InvalidateBatch();
         }
 
         if (unit->shape == GL_LINES)
@@ -440,8 +517,39 @@ void RenderCurrentUnits(void)
 
         BindUnitTextures(unit);
 
-        gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);
+        GLint old_clamp_s = kDummyClamp;
+        GLint old_clamp_t = kDummyClamp;
+
+        ApplyUnitClamping(unit, old_clamp_s, old_clamp_t);
+
+        render_state->SetPipeline(0);
+
+        render_state->DrawVertexArray(unit->shape, unit->first, unit->count);
+
+        if (old_clamp_s != kDummyClamp)
+        {
+            render_state->ActiveTexture(GL_TEXTURE0);
+            render_state->TextureWrapS(old_clamp_s);
+        }
+
+        if (old_clamp_t != kDummyClamp)
+        {
+            render_state->ActiveTexture(GL_TEXTURE0);
+            render_state->TextureWrapT(old_clamp_t);
+        }
     }
+
+    for (int t = 1; t >= 0; t--)
+    {
+        render_state->ActiveTexture(GL_TEXTURE0 + t);
+        render_state->Disable(GL_TEXTURE_2D);
+
+        ApplyUnitEnvironment(t, GL_MODULATE);
+    }
+
+    render_state->ActiveTexture(GL_TEXTURE0);
+
+    gles2_immediate.InvalidateBatch();
 
     current_render_vert = current_render_unit = 0;
 }

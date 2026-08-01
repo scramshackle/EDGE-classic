@@ -146,6 +146,112 @@ typedef int GLsizei;
 #define GL_NICEST   0x1102
 
 #define GL_PERSPECTIVE_CORRECTION_HINT 0x0C50
+#elif defined(EDGE_GLES2)
+#include <SDL3/SDL_video.h>
+
+#include "render/gles2/gles2_loader.h"
+
+#ifndef EDGE_GLES2_DESKTOP_GL
+typedef double GLdouble;
+#endif
+
+#ifndef GL_QUADS
+#define GL_QUADS 0x0007
+#endif
+#ifndef GL_QUAD_STRIP
+#define GL_QUAD_STRIP 0x0008
+#endif
+#ifndef GL_POLYGON
+#define GL_POLYGON 0x0009
+#endif
+
+#ifndef GL_ALPHA_TEST
+#define GL_ALPHA_TEST 0x0BC0
+#endif
+
+#ifndef GL_FOG
+#define GL_FOG         0x0B60
+#define GL_FOG_DENSITY 0x0B62
+#define GL_FOG_START   0x0B63
+#define GL_FOG_END     0x0B64
+#define GL_FOG_COLOR   0x0B66
+#endif
+#ifndef GL_EXP
+#define GL_EXP 0x0800
+#endif
+
+#ifndef GL_CLIP_PLANE0
+#define GL_CLIP_PLANE0 0x3000
+#define GL_CLIP_PLANE1 0x3001
+#define GL_CLIP_PLANE2 0x3002
+#define GL_CLIP_PLANE3 0x3003
+#define GL_CLIP_PLANE4 0x3004
+#define GL_CLIP_PLANE5 0x3005
+#endif
+
+#ifndef GL_LIGHTING
+#define GL_LIGHTING 0x0B50
+#endif
+#ifndef GL_COLOR_MATERIAL
+#define GL_COLOR_MATERIAL 0x0B57
+#endif
+#ifndef GL_NORMALIZE
+#define GL_NORMALIZE 0x0BA1
+#endif
+#ifndef GL_LINE_SMOOTH
+#define GL_LINE_SMOOTH 0x0B20
+#endif
+#ifndef GL_POLYGON_SMOOTH
+#define GL_POLYGON_SMOOTH 0x0B41
+#endif
+
+#ifndef GL_MODULATE
+#define GL_MODULATE 0x2100
+#endif
+#ifndef GL_COMBINE
+#define GL_COMBINE 0x8570
+#endif
+#ifndef GL_REPLACE
+#define GL_REPLACE 0x1E01
+#endif
+#ifndef GL_PREVIOUS
+#define GL_PREVIOUS 0x8578
+#endif
+#ifndef GL_TEXTURE
+#define GL_TEXTURE 0x1702
+#endif
+
+#ifndef GL_TEXTURE_ENV
+#define GL_TEXTURE_ENV      0x2300
+#define GL_TEXTURE_ENV_MODE 0x2200
+#endif
+#ifndef GL_COMBINE_RGB
+#define GL_COMBINE_RGB 0x8571
+#endif
+#ifndef GL_SOURCE0_RGB
+#define GL_SOURCE0_RGB 0x8580
+#endif
+
+#ifndef GL_CLAMP
+#define GL_CLAMP 0x2900
+#endif
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
+#ifndef GL_PROJECTION
+#define GL_PROJECTION 0x1701
+#endif
+
+#ifndef GL_FOG_HINT
+#define GL_FOG_HINT 0x0C54
+#endif
+#ifndef GL_PERSPECTIVE_CORRECTION_HINT
+#define GL_PERSPECTIVE_CORRECTION_HINT 0x0C50
+#endif
+#ifndef GL_NICEST
+#define GL_NICEST 0x1102
+#endif
 #else
 #include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_video.h>

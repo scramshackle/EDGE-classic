@@ -33,8 +33,6 @@
 #include "ddf_main.h"
 #include "r_defs.h"
 
-extern ConsoleVariable renderer_dumb_clamp;
-
 //
 //  RendererBSP
 //
