@@ -27,7 +27,6 @@ MainSaveGame="Save Game";
 MainReadThis="Read This!";
 MainQuitGame="Quit Game";
 MainEndBotMatch="End Game";
-NoBrowseFromWeb="Cannot open a file browser from the web player!";
 
 MenuOptions="Options";
 MenuVideo="Video Options";
@@ -40,7 +39,6 @@ MenuGameplay="Gameplay Options";
 MenuPerformance="Performance Options";
 MenuAccessibility="Accessibility Options";
 MenuBinding="Key Bindings";
-MenuBrowseHome="Browse Home Directory";
 MenuPreferredGame="Preferred Game";
 
 MenuLanguage="Language";

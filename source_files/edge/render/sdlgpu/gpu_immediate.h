@@ -28,12 +28,14 @@ enum GpuIndexSource
 {
     kGpuIndexSourceNone = 0,
     kGpuIndexSourceQuad,
-    kGpuIndexSourceFan
+    kGpuIndexSourceFan,
+    kGpuIndexSourceDynamic
 };
 
 enum GpuCommandType
 {
     kGpuCommandDraw = 0,
+    kGpuCommandMovie,
     kGpuCommandViewport,
     kGpuCommandScissor,
     kGpuCommandClearDepth
@@ -49,6 +51,7 @@ struct GpuDrawArguments
     int32_t base_vertex;
     int32_t vertex_count;
     int32_t index_count;
+    int32_t index_first;
 
     int32_t vertex_parameter_index;
     int32_t fragment_parameter_index;
@@ -56,6 +59,18 @@ struct GpuDrawArguments
     GpuIndexSource index_source;
 
     bool mergeable;
+};
+
+struct GpuMovieArguments
+{
+    SDL_GPUTexture *texture[3];
+    SDL_GPUSampler *sampler;
+
+    HMM_Mat4 mvp;
+
+    int32_t base_vertex;
+
+    float plane_scales[4];
 };
 
 struct GpuRectangleArguments
@@ -72,6 +87,7 @@ struct GpuCommand
 
     union {
         GpuDrawArguments      draw;
+        GpuMovieArguments     movie;
         GpuRectangleArguments rectangle;
     } arguments;
 };
@@ -157,6 +173,9 @@ class GpuImmediate
 
     void RecordDraw(GLuint shape, int32_t count);
 
+    void RecordMovieDraw(SDL_GPUTexture *luma, SDL_GPUTexture *chroma_blue, SDL_GPUTexture *chroma_red,
+                         SDL_GPUSampler *sampler, const float plane_scales[4]);
+
     void Draw(GLuint shape, const RendererVertex *vertices, int32_t count);
 
     uint32_t DrawCount() const
@@ -194,7 +213,13 @@ class GpuImmediate
 
     bool EnsureVertexCapacity(size_t bytes);
 
+    bool EnsureIndexCapacity(size_t bytes);
+
     void UploadVertices();
+
+    void UploadIndices();
+
+    int32_t AppendDynamicIndices(GLuint shape, int32_t count, int32_t rebase);
 
     void MarkMatrixDirty()
     {
@@ -215,6 +240,12 @@ class GpuImmediate
 
     SDL_GPUBuffer *quad_index_buffer_ = nullptr;
     SDL_GPUBuffer *fan_index_buffer_  = nullptr;
+
+    SDL_GPUBuffer         *dynamic_index_buffer_          = nullptr;
+    SDL_GPUTransferBuffer *dynamic_index_transfer_buffer_ = nullptr;
+    size_t                 dynamic_index_capacity_        = 0;
+
+    std::vector<uint16_t> dynamic_indices_;
 
     SDL_GPUTexture *default_texture_ = nullptr;
     SDL_GPUSampler *default_sampler_ = nullptr;

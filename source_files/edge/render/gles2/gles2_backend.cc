@@ -113,6 +113,9 @@ class Gles2RenderBackend : public RenderBackend
         if (varying_vectors < 3)
             FatalError("OpenGL: the world shader needs 3 varying vectors, the driver offers %d\n", varying_vectors);
 
+        if (!gles2_movie_program.Init())
+            FatalError("Gles2Backend: movie program initialisation failed\n");
+
         if (!gles2_program.Init())
             FatalError("OpenGL: failed to create the world shader program.\n");
 
@@ -183,6 +186,7 @@ class Gles2RenderBackend : public RenderBackend
         gles2_immediate.Shutdown();
 
         gles2_program.Shutdown();
+        gles2_movie_program.Shutdown();
     }
 
     void SetClearColor(RGBAColor color)

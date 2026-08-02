@@ -166,8 +166,16 @@ class dynlight_shader_c : public AbstractShader
 
     float radius;
 
+    bool  normal_is_horizontal_;
+    float normal_x_;
+    float normal_y_;
+    float normal_z_;
+    float radius_xy_divisor_;
+
   public:
-    dynlight_shader_c(MapObject *object, float r) : mo(object), radius(r)
+    dynlight_shader_c(MapObject *object, float r)
+        : mo(object), radius(r), normal_is_horizontal_(false), normal_x_(0.0f), normal_y_(0.0f), normal_z_(1.0f),
+          radius_xy_divisor_(1.0f)
     {
         // Note: this is shared, we must not delete it
         lim = GetLightImage(mo->info_);
@@ -178,7 +186,30 @@ class dynlight_shader_c : public AbstractShader
     }
 
   private:
-    inline float TexCoord(HMM_Vec2 *texc, float r, const HMM_Vec3 *lit_pos, const HMM_Vec3 *normal)
+    inline void PrepareNormal(const HMM_Vec3 *normal)
+    {
+        float nx = normal->X;
+        float ny = normal->Y;
+        float nz = normal->Z;
+
+        if (fabs(nz) > 50 * (fabs(nx) + fabs(ny)))
+        {
+            normal_is_horizontal_ = true;
+            return;
+        }
+
+        normal_is_horizontal_ = false;
+
+        float n_len = sqrt(nx * nx + ny * ny + nz * nz);
+
+        normal_x_ = nx / n_len;
+        normal_y_ = ny / n_len;
+        normal_z_ = nz / n_len;
+
+        radius_xy_divisor_ = sqrt(normal_x_ * normal_x_ + normal_y_ * normal_y_);
+    }
+
+    inline float TexCoord(HMM_Vec2 *texc, float r, const HMM_Vec3 *lit_pos)
     {
         float mx = mo->x;
         float my = mo->y;
@@ -191,13 +222,8 @@ class dynlight_shader_c : public AbstractShader
         float dy = lit_pos->Y - my;
         float dz = lit_pos->Z - mz;
 
-        float nx = normal->X;
-        float ny = normal->Y;
-        float nz = normal->Z;
-
-        if (fabs(nz) > 50 * (fabs(nx) + fabs(ny)))
+        if (normal_is_horizontal_)
         {
-            /* horizontal plane */
             texc->X = (1 + dx / r) / 2.0;
             texc->Y = (1 + dy / r) / 2.0;
 
@@ -205,20 +231,14 @@ class dynlight_shader_c : public AbstractShader
         }
         else
         {
-            float n_len = sqrt(nx * nx + ny * ny + nz * nz);
+            float dxy = normal_x_ * dy - normal_y_ * dx;
 
-            nx /= n_len;
-            ny /= n_len;
-            nz /= n_len;
-
-            float dxy = nx * dy - ny * dx;
-
-            r /= sqrt(nx * nx + ny * ny); // correct ??
+            r /= radius_xy_divisor_;
 
             texc->Y = (1 + dz / r) / 2.0;
             texc->X = (1 + dxy / r) / 2.0;
 
-            return fabs(nx * dx + ny * dy + nz * dz) / r;
+            return fabs(normal_x_ * dx + normal_y_ * dy + normal_z_ * dz) / r;
         }
     }
 
@@ -351,10 +371,14 @@ class dynlight_shader_c : public AbstractShader
             RendererVertex *dest = glvert + v_idx;
 
             HMM_Vec3 lit_pos;
+            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &dest->normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
 
-            float dist = TexCoord(&dest->texture_coordinates[1], WhatRadius(), &lit_pos, &dest->normal);
+            if (v_idx == 0)
+                PrepareNormal(&normal);
+
+            float dist = TexCoord(&dest->texture_coordinates[1], WhatRadius(), &lit_pos);
 
             float ity = exp(-5.44 * dist * dist);
 
@@ -532,10 +556,11 @@ class plane_glow_c : public AbstractShader
             RendererVertex *dest = glvert + v_idx;
 
             HMM_Vec3 lit_pos;
+            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &dest->normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
 
-            TexCoord(&dest->texture_coordinates[1], WhatRadius(), sec, &lit_pos, &dest->normal);
+            TexCoord(&dest->texture_coordinates[1], WhatRadius(), sec, &lit_pos, &normal);
 
             dest->rgba = epi::MakeRGBA((uint8_t)R, (uint8_t)G, (uint8_t)B, (uint8_t)(alpha * 255.0f));
         }
@@ -696,10 +721,11 @@ class wall_glow_c : public AbstractShader
             RendererVertex *dest = glvert + v_idx;
 
             HMM_Vec3 lit_pos;
+            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &dest->normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
 
-            TexCoord(&dest->texture_coordinates[1], WhatRadius(), sec, &lit_pos, &dest->normal);
+            TexCoord(&dest->texture_coordinates[1], WhatRadius(), sec, &lit_pos, &normal);
 
             dest->rgba =
                 epi::MakeRGBA((uint8_t)(R * render_view_red_multiplier), (uint8_t)(G * render_view_green_multiplier),

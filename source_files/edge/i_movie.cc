@@ -20,6 +20,7 @@
 #include "epi.h"
 #include "hu_draw.h"
 #include "i_defs_gl.h"
+#include "r_movie.h"
 #include "i_sound.h"
 #include "i_system.h"
 #include "pl_mpeg.h"
@@ -39,8 +40,10 @@ extern int sound_device_frequency;
 
 bool             playing_movie = false;
 static bool      skip_bar_active;
-static GLuint    canvas            = 0;
-static uint8_t  *rgb_data          = nullptr;
+static float     luma_scale_x      = 1.0f;
+static float     luma_scale_y      = 1.0f;
+static float     chroma_scale_x    = 1.0f;
+static float     chroma_scale_y    = 1.0f;
 static plm_t    *decoder           = nullptr;
 static int       movie_sample_rate = 0;
 static float     skip_time;
@@ -114,12 +117,7 @@ void MovieVideoCallback(plm_t *mpeg, plm_frame_t *frame, void *user)
 
     if (canvas_can_update)
     {
-        plm_frame_to_rgba(frame, rgb_data, frame->width * 4);
-
-        render_state->ActiveTexture(GL_TEXTURE0);
-        render_state->BindTexture(canvas);
-        render_state->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame->width, frame->height, GL_RGBA, GL_UNSIGNED_BYTE,
-                                    rgb_data);
+        MovieUploadPlanes(frame->y.data, frame->cb.data, frame->cr.data);
 
         canvas_can_update = false;
     }
@@ -189,22 +187,6 @@ void PlayMovie(const std::string &name)
         }
     }
 
-    if (canvas)
-        render_state->DeleteTexture(&canvas);
-
-    render_state->GenTextures(1, &canvas);
-    render_state->BindTexture(canvas);
-    render_state->TextureMagFilter(GL_LINEAR);
-    render_state->TextureMinFilter(GL_LINEAR);
-    render_state->TextureWrapS(GL_CLAMP_TO_EDGE);
-    render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
-
-    if (rgb_data)
-    {
-        delete[] rgb_data;
-        rgb_data = nullptr;
-    }
-
     int   movie_width  = plm_get_width(decoder);
     int   movie_height = plm_get_height(decoder);
     float movie_ratio  = (float)movie_width / movie_height;
@@ -247,18 +229,38 @@ void PlayMovie(const std::string &name)
         frame_width  = current_screen_width;
     }
 
-    render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, movie_width, movie_height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                             nullptr, kRenderUsageDynamic);
-    render_state->FinishTextures(1, &canvas);
+    plm_frame_t *first_frame = plm_decode_video(decoder);
+
+    if (!first_frame)
+    {
+        LogWarning("PlayMovie: could not decode a frame from %s!\n", name.c_str());
+        plm_destroy(decoder);
+        decoder = nullptr;
+        delete[] movie_bytes;
+        movie_bytes = nullptr;
+        return;
+    }
+
+    MoviePlaneSizes plane_sizes;
+    plane_sizes.luma_width    = (int)first_frame->y.width;
+    plane_sizes.luma_height   = (int)first_frame->y.height;
+    plane_sizes.chroma_width  = (int)first_frame->cb.width;
+    plane_sizes.chroma_height = (int)first_frame->cb.height;
+
+    MovieSetupPlanes(plane_sizes);
+
+    luma_scale_x   = (float)movie_width / (float)plane_sizes.luma_width;
+    luma_scale_y   = (float)movie_height / (float)plane_sizes.luma_height;
+    chroma_scale_x = (float)(movie_width / 2) / (float)plane_sizes.chroma_width;
+    chroma_scale_y = (float)(movie_height / 2) / (float)plane_sizes.chroma_height;
+
+    MovieUploadPlanes(first_frame->y.data, first_frame->cb.data, first_frame->cr.data);
 
     vx1 = current_screen_width / 2 - frame_width / 2;
     vx2 = current_screen_width / 2 + frame_width / 2;
     vy1 = current_screen_height / 2 + frame_height / 2;
     vy2 = current_screen_height / 2 - frame_height / 2;
 
-    int num_pixels = movie_width * movie_height * 4;
-    rgb_data       = new uint8_t[num_pixels];
-    memset(rgb_data, 0xFF, num_pixels);
     plm_set_video_decode_callback(decoder, MovieVideoCallback, nullptr);
 
     if (movie_stream)
@@ -287,16 +289,7 @@ static void EndMovie()
     decoder = nullptr;
     delete[] movie_bytes;
     movie_bytes = nullptr;
-    if (rgb_data)
-    {
-        delete[] rgb_data;
-        rgb_data = nullptr;
-    }
-    if (canvas)
-    {
-        render_state->DeleteTexture(&canvas);
-        canvas = 0;
-    }
+    MovieReleasePlanes();
     if (movie_stream)
     {
         SDL_DestroyAudioStream(movie_stream);
@@ -314,27 +307,12 @@ void MovieDrawer()
 
     if (!plm_has_ended(decoder))
     {
+        MovieDrawFrame(vx1, vy1, vx2, vy2, luma_scale_x, luma_scale_y, chroma_scale_x, chroma_scale_y);
+
         StartUnitBatch(false);
 
-        RGBAColor unit_col = kRGBAWhite;
-
-        RendererVertex *glvert =
-            BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, canvas, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty2}};
-        glvert++->position             = {{vx1, vy2, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty2}};
-        glvert++->position             = {{vx2, vy2, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty1}};
-        glvert++->position             = {{vx2, vy1, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty1}};
-        glvert->position               = {{vx1, vy1, 0}};
-
-        EndRenderUnit(4);
+        RGBAColor       unit_col = kRGBAWhite;
+        RendererVertex *glvert   = nullptr;
 
         // Fade-in
         fadein = (double)GetMilliseconds() / 1000.0 - movie_start_time;
@@ -373,6 +351,9 @@ void MovieDrawer()
         double current_time = (double)GetMilliseconds() / 1000.0;
         fadeout             = current_time - last_time;
 
+        if (fadeout <= 0.25f)
+            MovieDrawFrame(vx1, vy1, vx2, vy2, luma_scale_x, luma_scale_y, chroma_scale_x, chroma_scale_y);
+
         StartUnitBatch(false);
 
         RGBAColor unit_col;
@@ -380,30 +361,11 @@ void MovieDrawer()
         if (fadeout > 0.25f)
             unit_col = kRGBABlack;
         else
-            unit_col = kRGBAWhite;
+            unit_col = epi::MakeRGBAFloat(0.0f, 0.0f, 0.0f, (float)fadeout / 0.25f);
 
         RendererVertex *glvert =
-            BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, canvas, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty2}};
-        glvert++->position             = {{vx1, vy2, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty2}};
-        glvert++->position             = {{vx2, vy2, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty1}};
-        glvert++->position             = {{vx2, vy1, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty1}};
-        glvert->position               = {{vx1, vy1, 0}};
-
-        EndRenderUnit(4);
-
-        // Fade-out
-        unit_col = epi::MakeRGBAFloat(0.0f, 0.0f, 0.0f, (HMM_MAX(0.0f, 1.0f - ((0.25f - (float)fadeout) / 0.25f))));
-
-        glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
+            BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
+                            fadeout > 0.25f ? kBlendingNone : kBlendingAlpha);
 
         glvert->rgba       = unit_col;
         glvert++->position = {{vx1, vy2, 0}};

@@ -658,8 +658,9 @@ class ColormapShader : public AbstractShader
             epi::SetRGBAAlpha(dest->rgba, alpha);
 
             HMM_Vec3 lit_pos;
+            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &dest->normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
 
             TextureCoordinates(dest, 1, &lit_pos);
         }

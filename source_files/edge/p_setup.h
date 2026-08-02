@@ -29,6 +29,7 @@
 
 extern epi::CRC32 map_sectors_crc;
 extern epi::CRC32 map_lines_crc;
+extern epi::CRC32 map_bsp_crc;
 extern epi::CRC32 map_things_crc;
 
 extern int total_map_things;

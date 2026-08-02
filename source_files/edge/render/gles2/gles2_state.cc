@@ -418,9 +418,12 @@ class Gles2RenderState : public RenderState
         state_dirty_ = true;
     }
 
-    void SetVertexArrays(const RendererVertex *vertices)
+    void SetVertexArrays(const RendererVertex *vertices, int count)
     {
         vertex_array_base_ = vertices;
+
+        if (vertices && count > 0)
+            gles2_immediate.UploadBatch(vertices, count);
     }
 
     void DrawVertexArray(GLuint shape, int first, int count)

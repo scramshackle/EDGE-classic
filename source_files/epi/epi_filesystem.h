@@ -65,7 +65,6 @@ bool IsDirectory(std::string_view dir);
 bool MakeDirectory(std::string_view dir);
 bool ReadDirectory(std::vector<DirectoryEntry> &fsd, const std::string &dir, const char *mask);
 bool WalkDirectory(std::vector<DirectoryEntry> &fsd, const std::string &dir);
-bool OpenDirectory(const std::string &src); // Opens a directory in explorer, finder, etc
 
 // File Functions
 bool  FileExists(std::string_view name);

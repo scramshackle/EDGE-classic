@@ -74,7 +74,6 @@ typedef int GLsizei;
 #define GL_SCISSOR_TEST 0x0C11
 
 #define GL_LINES       0x0001
-#define GL_LINE_SMOOTH 0x0B20
 
 #define GL_PROJECTION 0x1701
 
@@ -197,9 +196,6 @@ typedef double GLdouble;
 #endif
 #ifndef GL_NORMALIZE
 #define GL_NORMALIZE 0x0BA1
-#endif
-#ifndef GL_LINE_SMOOTH
-#define GL_LINE_SMOOTH 0x0B20
 #endif
 #ifndef GL_POLYGON_SMOOTH
 #define GL_POLYGON_SMOOTH 0x0B41

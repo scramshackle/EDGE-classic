@@ -21,12 +21,21 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
+set(SHADER_NAMES world movie)
 set(SHADER_STAGES vert frag)
+
+foreach(SHADER_NAME IN LISTS SHADER_NAMES)
+
+string(SUBSTRING "${SHADER_NAME}" 0 1 NAME_HEAD)
+string(SUBSTRING "${SHADER_NAME}" 1 -1 NAME_TAIL)
+string(TOUPPER "${NAME_HEAD}" NAME_HEAD)
+set(SYMBOL_BASE "${NAME_HEAD}${NAME_TAIL}")
+
 set(GENERATED_BODY "")
 
 foreach(STAGE IN LISTS SHADER_STAGES)
-  set(SOURCE_FILE "${SHADER_DIR}/world.${STAGE}.glsl")
-  set(BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/world.${STAGE}.spv")
+  set(SOURCE_FILE "${SHADER_DIR}/${SHADER_NAME}.${STAGE}.glsl")
+  set(BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.${STAGE}.spv")
 
   execute_process(
     COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 -S ${STAGE} -o "${BINARY_FILE}" "${SOURCE_FILE}"
@@ -35,7 +44,7 @@ foreach(STAGE IN LISTS SHADER_STAGES)
     ERROR_VARIABLE COMPILE_OUTPUT)
 
   if (NOT COMPILE_RESULT EQUAL 0)
-    message(FATAL_ERROR "compile_shaders: glslangValidator failed on world.${STAGE}.glsl\n${COMPILE_OUTPUT}")
+    message(FATAL_ERROR "compile_shaders: glslangValidator failed on ${SHADER_NAME}.${STAGE}.glsl\n${COMPILE_OUTPUT}")
   endif()
 
   if (SPIRV_VAL)
@@ -46,7 +55,7 @@ foreach(STAGE IN LISTS SHADER_STAGES)
       ERROR_VARIABLE VALIDATE_OUTPUT)
 
     if (NOT VALIDATE_RESULT EQUAL 0)
-      message(FATAL_ERROR "compile_shaders: spirv-val rejected world.${STAGE}.spv\n${VALIDATE_OUTPUT}")
+      message(FATAL_ERROR "compile_shaders: spirv-val rejected ${SHADER_NAME}.${STAGE}.spv\n${VALIDATE_OUTPUT}")
     endif()
   endif()
 
@@ -57,17 +66,17 @@ foreach(STAGE IN LISTS SHADER_STAGES)
     ERROR_VARIABLE DISASSEMBLE_ERROR)
 
   if (NOT DISASSEMBLE_RESULT EQUAL 0)
-    message(FATAL_ERROR "compile_shaders: spirv-dis failed on world.${STAGE}.spv\n${DISASSEMBLE_ERROR}")
+    message(FATAL_ERROR "compile_shaders: spirv-dis failed on ${SHADER_NAME}.${STAGE}.spv\n${DISASSEMBLE_ERROR}")
   endif()
 
   if (STAGE STREQUAL "vert")
     set(SAMPLER_SET 0)
     set(UNIFORM_SET 1)
-    set(STAGE_PREFIX "kWorldVertexShader")
+    set(STAGE_PREFIX "k${SYMBOL_BASE}VertexShader")
   else()
     set(SAMPLER_SET 2)
     set(UNIFORM_SET 3)
-    set(STAGE_PREFIX "kWorldFragmentShader")
+    set(STAGE_PREFIX "k${SYMBOL_BASE}FragmentShader")
   endif()
 
   count_descriptor_set("${DISASSEMBLY}" ${SAMPLER_SET} SAMPLER_COUNT)
@@ -78,7 +87,7 @@ foreach(STAGE IN LISTS SHADER_STAGES)
       count_descriptor_set("${DISASSEMBLY}" ${STRAY_SET} STRAY_COUNT)
       if (NOT STRAY_COUNT EQUAL 0)
         message(FATAL_ERROR
-          "compile_shaders: world.${STAGE}.glsl declares ${STRAY_COUNT} resource(s) in set ${STRAY_SET}, "
+          "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl declares ${STRAY_COUNT} resource(s) in set ${STRAY_SET}, "
           "which SDL_GPU reserves for the other shader stage.")
       endif()
     endif()
@@ -126,12 +135,14 @@ foreach(STAGE IN LISTS SHADER_STAGES)
 
   string(APPEND GENERATED_BODY "\n};\n\n")
 
-  message(STATUS "compile_shaders: world.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) in set "
+  message(STATUS "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) in set "
                  "${SAMPLER_SET}, ${UNIFORM_BUFFER_COUNT} uniform buffer(s) in set ${UNIFORM_SET}")
 endforeach()
 
 set(GENERATED_HEADER "#pragma once\n\n#include <stdint.h>\n\n${GENERATED_BODY}")
 
-file(WRITE "${SHADER_DIR}/world_spirv.h" "${GENERATED_HEADER}")
+file(WRITE "${SHADER_DIR}/${SHADER_NAME}_spirv.h" "${GENERATED_HEADER}")
 
-message(STATUS "compile_shaders: wrote ${SHADER_DIR}/world_spirv.h")
+message(STATUS "compile_shaders: wrote ${SHADER_DIR}/${SHADER_NAME}_spirv.h")
+
+endforeach()

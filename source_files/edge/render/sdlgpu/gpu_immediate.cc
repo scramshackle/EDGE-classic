@@ -276,6 +276,20 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
         fan_index_buffer_ = nullptr;
     }
 
+    if (dynamic_index_buffer_)
+    {
+        SDL_ReleaseGPUBuffer(device, dynamic_index_buffer_);
+        dynamic_index_buffer_ = nullptr;
+    }
+
+    if (dynamic_index_transfer_buffer_)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, dynamic_index_transfer_buffer_);
+        dynamic_index_transfer_buffer_ = nullptr;
+    }
+
+    dynamic_index_capacity_ = 0;
+
     if (default_texture_)
     {
         SDL_ReleaseGPUTexture(device, default_texture_);
@@ -295,6 +309,7 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 void GpuImmediate::BeginFrame()
 {
     vertex_count_ = 0;
+    dynamic_indices_.clear();
     commands_.clear();
     vertex_parameters_.clear();
     fragment_parameters_.clear();
@@ -658,33 +673,23 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
         count -= count % 4;
         if (count < 4)
             return;
-        index_source = kGpuIndexSourceQuad;
-        index_count  = (count / 4) * 6;
+        index_source = kGpuIndexSourceDynamic;
         break;
 
     case GL_TRIANGLES:
         count -= count % 3;
         if (count < 3)
             return;
+        index_source = kGpuIndexSourceDynamic;
         break;
 
     case GL_POLYGON:
     case GL_TRIANGLE_FAN:
-        if (count < 3)
-            return;
-        if (count > kGpuMaximumFanVertices)
-            FatalError("GpuImmediate: fan of %d vertices exceeds the index buffer\n", count);
-        index_source = kGpuIndexSourceFan;
-        index_count  = (count - 2) * 3;
-        mergeable    = false;
-        break;
-
     case GL_QUAD_STRIP:
     case GL_TRIANGLE_STRIP:
         if (count < 3)
             return;
-        primitive = kGpuPrimitiveTriangleStrip;
-        mergeable = false;
+        index_source = kGpuIndexSourceDynamic;
         break;
 
     case GL_LINES:
@@ -692,14 +697,12 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
         if (count < 2)
             return;
         primitive = kGpuPrimitiveLineList;
+        mergeable = false;
         break;
 
     default:
         FatalError("GpuImmediate: unsupported shape 0x%04X\n", shape);
     }
-
-    if (index_count > kGpuQuadIndexTotal)
-        FatalError("GpuImmediate: draw of %d indices exceeds the index buffer\n", index_count);
 
     int32_t vertex_parameters   = CurrentVertexParameters();
     int32_t fragment_parameters = CurrentFragmentParameters();
@@ -720,14 +723,16 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
             GpuDrawArguments *draw = &previous->arguments.draw;
 
             if (draw->mergeable && draw->pipeline == pipeline && draw->index_source == index_source &&
-                draw->texture[0] == texture0 && draw->sampler[0] == sampler0 && draw->texture[1] == texture1 &&
-                draw->sampler[1] == sampler1 && draw->vertex_parameter_index == vertex_parameters &&
+                index_source == kGpuIndexSourceDynamic && draw->texture[0] == texture0 &&
+                draw->sampler[0] == sampler0 && draw->texture[1] == texture1 && draw->sampler[1] == sampler1 &&
+                draw->vertex_parameter_index == vertex_parameters &&
                 draw->fragment_parameter_index == fragment_parameters &&
                 draw->base_vertex + draw->vertex_count == pending_base_ &&
-                draw->index_count + index_count <= kGpuQuadIndexTotal)
+                draw->index_first + draw->index_count == (int32_t)dynamic_indices_.size() &&
+                draw->vertex_count + count <= 65536)
             {
+                draw->index_count += AppendDynamicIndices(shape, count, draw->vertex_count);
                 draw->vertex_count += count;
-                draw->index_count += index_count;
                 return;
             }
         }
@@ -744,13 +749,45 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->sampler[0]               = sampler0;
     draw->texture[1]               = texture1;
     draw->sampler[1]               = sampler1;
-    draw->base_vertex              = pending_base_;
+    draw->base_vertex = pending_base_;
+    draw->index_first = (int32_t)dynamic_indices_.size();
+
+    if (index_source == kGpuIndexSourceDynamic)
+        index_count = AppendDynamicIndices(shape, count, 0);
+
     draw->vertex_count             = count;
     draw->index_count              = index_count;
     draw->vertex_parameter_index   = vertex_parameters;
     draw->fragment_parameter_index = fragment_parameters;
     draw->index_source             = index_source;
     draw->mergeable                = mergeable;
+
+    commands_.push_back(command);
+}
+
+void GpuImmediate::RecordMovieDraw(SDL_GPUTexture *luma, SDL_GPUTexture *chroma_blue, SDL_GPUTexture *chroma_red,
+                                   SDL_GPUSampler *sampler, const float plane_scales[4])
+{
+    if (!luma || !chroma_blue || !chroma_red || !sampler)
+        return;
+
+    GpuCommand command;
+
+    command.type = kGpuCommandMovie;
+
+    GpuMovieArguments *movie = &command.arguments.movie;
+
+    movie->texture[0] = luma;
+    movie->texture[1] = chroma_blue;
+    movie->texture[2] = chroma_red;
+    movie->sampler     = sampler;
+    movie->base_vertex = pending_base_;
+
+    movie->mvp = HMM_MulM4(matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]],
+                           matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]]);
+
+    for (int32_t i = 0; i < 4; i++)
+        movie->plane_scales[i] = plane_scales[i];
 
     commands_.push_back(command);
 }
@@ -820,6 +857,151 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
     vertex_buffer_capacity_ = capacity;
 
     return true;
+}
+
+int32_t GpuImmediate::AppendDynamicIndices(GLuint shape, int32_t count, int32_t rebase)
+{
+    size_t start = dynamic_indices_.size();
+
+    switch (shape)
+    {
+    case GL_QUADS:
+        for (int32_t q = 0; q + 4 <= count; q += 4)
+        {
+            uint16_t b = (uint16_t)(rebase + q);
+
+            dynamic_indices_.push_back(b);
+            dynamic_indices_.push_back((uint16_t)(b + 1));
+            dynamic_indices_.push_back((uint16_t)(b + 2));
+            dynamic_indices_.push_back(b);
+            dynamic_indices_.push_back((uint16_t)(b + 2));
+            dynamic_indices_.push_back((uint16_t)(b + 3));
+        }
+        break;
+
+    case GL_TRIANGLES:
+        for (int32_t t = 0, total = (count / 3) * 3; t < total; t++)
+            dynamic_indices_.push_back((uint16_t)(rebase + t));
+        break;
+
+    case GL_POLYGON:
+    case GL_TRIANGLE_FAN:
+        for (int32_t t = 0; t + 2 < count; t++)
+        {
+            dynamic_indices_.push_back((uint16_t)rebase);
+            dynamic_indices_.push_back((uint16_t)(rebase + t + 1));
+            dynamic_indices_.push_back((uint16_t)(rebase + t + 2));
+        }
+        break;
+
+    case GL_QUAD_STRIP:
+    case GL_TRIANGLE_STRIP:
+        for (int32_t t = 0; t + 2 < count; t++)
+        {
+            if (t & 1)
+            {
+                dynamic_indices_.push_back((uint16_t)(rebase + t + 1));
+                dynamic_indices_.push_back((uint16_t)(rebase + t));
+                dynamic_indices_.push_back((uint16_t)(rebase + t + 2));
+            }
+            else
+            {
+                dynamic_indices_.push_back((uint16_t)(rebase + t));
+                dynamic_indices_.push_back((uint16_t)(rebase + t + 1));
+                dynamic_indices_.push_back((uint16_t)(rebase + t + 2));
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return (int32_t)(dynamic_indices_.size() - start);
+}
+
+bool GpuImmediate::EnsureIndexCapacity(size_t bytes)
+{
+    if (bytes <= dynamic_index_capacity_ && dynamic_index_buffer_)
+        return true;
+
+    size_t capacity = dynamic_index_capacity_ ? dynamic_index_capacity_ : 65536;
+
+    while (capacity < bytes)
+        capacity *= 2;
+
+    if (dynamic_index_buffer_)
+        SDL_ReleaseGPUBuffer(device_, dynamic_index_buffer_);
+
+    if (dynamic_index_transfer_buffer_)
+        SDL_ReleaseGPUTransferBuffer(device_, dynamic_index_transfer_buffer_);
+
+    SDL_GPUBufferCreateInfo buffer_info;
+    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+
+    buffer_info.usage = SDL_GPU_BUFFERUSAGE_INDEX;
+    buffer_info.size  = (uint32_t)capacity;
+
+    dynamic_index_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
+
+    SDL_GPUTransferBufferCreateInfo transfer_info;
+    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+    transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_info.size  = (uint32_t)capacity;
+
+    dynamic_index_transfer_buffer_ = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
+
+    if (!dynamic_index_buffer_ || !dynamic_index_transfer_buffer_)
+    {
+        LogPrint("GpuImmediate: dynamic index buffer allocation failed: %s\n", SDL_GetError());
+        dynamic_index_capacity_ = 0;
+        return false;
+    }
+
+    dynamic_index_capacity_ = capacity;
+
+    return true;
+}
+
+void GpuImmediate::UploadIndices()
+{
+    if (dynamic_indices_.empty())
+        return;
+
+    size_t bytes = dynamic_indices_.size() * sizeof(uint16_t);
+
+    if (!EnsureIndexCapacity(bytes))
+        return;
+
+    void *mapped = SDL_MapGPUTransferBuffer(device_, dynamic_index_transfer_buffer_, true);
+
+    if (!mapped)
+    {
+        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (dynamic index) failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    memcpy(mapped, dynamic_indices_.data(), bytes);
+
+    SDL_UnmapGPUTransferBuffer(device_, dynamic_index_transfer_buffer_);
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(gpu_device.CommandBuffer());
+
+    SDL_GPUTransferBufferLocation source;
+    source.transfer_buffer = dynamic_index_transfer_buffer_;
+    source.offset          = 0;
+
+    SDL_GPUBufferRegion destination;
+    destination.buffer = dynamic_index_buffer_;
+    destination.offset = 0;
+    destination.size   = (uint32_t)bytes;
+
+    SDL_UploadToGPUBuffer(copy_pass, &source, &destination, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    uploaded_bytes_ += bytes;
 }
 
 void GpuImmediate::UploadVertices()
@@ -934,6 +1116,7 @@ void GpuImmediate::Replay()
         return;
 
     UploadVertices();
+    UploadIndices();
 
     gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear);
 
@@ -942,6 +1125,78 @@ void GpuImmediate::Replay()
     for (size_t i = 0; i < commands_.size(); i++)
     {
         const GpuCommand *command = &commands_[i];
+
+        if (command->type == kGpuCommandMovie)
+        {
+            const GpuMovieArguments *movie = &command->arguments.movie;
+
+            SDL_GPURenderPass *pass = gpu_device.RenderPass();
+
+            if (!pass)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear);
+                ApplyPassState();
+                pass = gpu_device.RenderPass();
+            }
+
+            if (!pass)
+                continue;
+
+            SDL_GPUGraphicsPipeline *movie_pipeline = GetMoviePipeline();
+
+            SDL_BindGPUGraphicsPipeline(pass, movie_pipeline);
+            bound_pipeline_ = movie_pipeline;
+            pipeline_bind_count_++;
+
+            SDL_GPUTextureSamplerBinding movie_bindings[3];
+            for (int32_t i = 0; i < 3; i++)
+            {
+                movie_bindings[i].texture = movie->texture[i];
+                movie_bindings[i].sampler = movie->sampler;
+            }
+
+            SDL_BindGPUFragmentSamplers(pass, 0, movie_bindings, 3);
+            binding_count_++;
+
+            bound_texture_[0] = nullptr;
+            bound_texture_[1] = nullptr;
+            bound_sampler_[0] = nullptr;
+            bound_sampler_[1] = nullptr;
+
+            GpuMovieVertexParameters movie_vertex;
+            movie_vertex.mvp = movie->mvp;
+
+            GpuMovieFragmentParameters movie_fragment;
+            for (int32_t i = 0; i < 4; i++)
+                movie_fragment.plane_scales[i] = movie->plane_scales[i];
+
+            SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuVertexUniformSlot, &movie_vertex,
+                                         (uint32_t)sizeof(movie_vertex));
+            SDL_PushGPUFragmentUniformData(gpu_device.CommandBuffer(), kGpuFragmentUniformSlot, &movie_fragment,
+                                           (uint32_t)sizeof(movie_fragment));
+            uniform_push_count_ += 2;
+
+            bound_vertex_parameter_index_   = -1;
+            bound_fragment_parameter_index_ = -1;
+
+            if (bound_index_buffer_ != quad_index_buffer_)
+            {
+                SDL_GPUBufferBinding movie_index_binding;
+                movie_index_binding.buffer = quad_index_buffer_;
+                movie_index_binding.offset = 0;
+
+                SDL_BindGPUIndexBuffer(pass, &movie_index_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+                bound_index_buffer_ = quad_index_buffer_;
+                binding_count_++;
+            }
+
+            SDL_DrawGPUIndexedPrimitives(pass, 6, 1, 0, movie->base_vertex, 0);
+
+            draw_count_++;
+
+            continue;
+        }
 
         if (command->type != kGpuCommandDraw)
         {
@@ -1022,8 +1277,12 @@ void GpuImmediate::Replay()
 
         if (draw->index_source != kGpuIndexSourceNone)
         {
-            SDL_GPUBuffer *index_buffer =
-                (draw->index_source == kGpuIndexSourceQuad) ? quad_index_buffer_ : fan_index_buffer_;
+            SDL_GPUBuffer *index_buffer = dynamic_index_buffer_;
+
+            if (draw->index_source == kGpuIndexSourceQuad)
+                index_buffer = quad_index_buffer_;
+            else if (draw->index_source == kGpuIndexSourceFan)
+                index_buffer = fan_index_buffer_;
 
             if (bound_index_buffer_ != index_buffer)
             {
@@ -1037,7 +1296,8 @@ void GpuImmediate::Replay()
                 binding_count_++;
             }
 
-            SDL_DrawGPUIndexedPrimitives(pass, (uint32_t)draw->index_count, 1, 0, draw->base_vertex, 0);
+            SDL_DrawGPUIndexedPrimitives(pass, (uint32_t)draw->index_count, 1, (uint32_t)draw->index_first,
+                                         draw->base_vertex, 0);
         }
         else
         {

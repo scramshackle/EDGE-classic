@@ -42,6 +42,7 @@
 #include <vector>
 
 #include "am_map.h"
+#include "bsp.h"
 #include "con_gui.h"
 #include "con_main.h"
 #include "con_var.h"
@@ -1337,7 +1338,9 @@ static void PurgeCache(void)
             {
                 std::string ext = epi::GetExtension(fsd[i].name);
                 epi::StringLowerASCII(ext);
-                if (ext == ".gwa" || ext == ".hwa")
+                if (ext == ".gwa" || ext == ".hwa" || ext == ".xwa")
+                    epi::FileDelete(fsd[i].name);
+                else if (ext == ".ecn" && !ajbsp::IsNodeCacheCurrent(fsd[i].name))
                     epi::FileDelete(fsd[i].name);
             }
         }

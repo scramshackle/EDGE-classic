@@ -564,7 +564,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
         GLuint fuzz_tex = is_fuzzy ? ImageCache(fuzz_image, false) : 0;
 
         RendererVertex *glvert =
-            BeginRenderUnit(GL_POLYGON, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
+            BeginRenderUnit(GL_QUADS, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
                             is_fuzzy ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable, fuzz_tex, pass, blending,
                             pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use);
 
@@ -574,8 +574,6 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
             dest->position               = data.vertices[v_idx];
             dest->texture_coordinates[0] = data.texture_coordinates[v_idx];
-
-            dest->normal = {{0, 0, 1}};
 
             if (is_fuzzy)
             {
@@ -643,7 +641,7 @@ static void DrawStdCrossHair(void)
     StartUnitBatch(false);
 
     RendererVertex *glvert =
-        BeginRenderUnit(GL_POLYGON, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAdd);
+        BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAdd);
 
     glvert->rgba                     = unit_col;
     glvert->position                 = {{x - w, y - w, 0.0f}};
@@ -1501,7 +1499,7 @@ static bool RenderThing(DrawThing *dthing, bool solid)
         GLuint fuzz_tex = is_fuzzy ? ImageCache(fuzz_image, false) : 0;
 
         RendererVertex *glvert =
-            BeginRenderUnit(GL_POLYGON, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
+            BeginRenderUnit(GL_QUADS, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
                             is_fuzzy ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable, fuzz_tex, pass, blending,
                             pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use);
 
@@ -1511,7 +1509,6 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
             dest->position               = data.vertices[v_idx];
             dest->texture_coordinates[0] = data.texture_coordinates[v_idx];
-            dest->normal                 = data.normal;
 
             if (is_fuzzy)
             {

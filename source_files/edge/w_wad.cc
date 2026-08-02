@@ -1208,55 +1208,6 @@ void ProcessWad(DataFile *df, size_t file_index)
     ProcessLuaInWad(df);
 }
 
-std::string BuildXGLNodesForWAD(DataFile *df)
-{
-    if (df->wad_->level_markers_.empty())
-        return "";
-
-    // determine XWA filename in the cache
-    std::string cache_name = epi::GetStem(df->name_);
-    cache_name += "-";
-    cache_name += df->wad_->md5_string_;
-    cache_name += ".xwa";
-
-    std::string xwa_filename = epi::PathAppend(cache_directory, cache_name);
-
-    LogDebug("XWA filename: %s\n", xwa_filename.c_str());
-
-    // check whether an XWA file for this map exists in the cache
-    bool exists = epi::TestFileAccess(xwa_filename);
-
-    if (!exists)
-    {
-        LogPrint("Building XGL nodes for: %s\n", df->name_.c_str());
-
-        LogDebug("# source: '%s'\n", df->name_.c_str());
-        LogDebug("#   dest: '%s'\n", xwa_filename.c_str());
-
-        ajbsp::ResetInfo();
-
-        if ((df->kind_ == kFileKindPackWAD || df->kind_ == kFileKindIPackWAD))
-        {
-            ajbsp::OpenMem(df->name_, df->file_);
-        }
-        else
-            ajbsp::OpenWad(df->name_);
-
-        ajbsp::CreateXWA(xwa_filename);
-
-        for (int i = 0; i < ajbsp::LevelsInWad(); i++)
-            ajbsp::BuildLevel(i);
-
-        ajbsp::FinishXWA();
-        ajbsp::CloseWad();
-
-        LogDebug("AJ_BuildNodes: FINISHED\n");
-
-        epi::SyncFilesystem();
-    }
-
-    return xwa_filename;
-}
 
 void ReadUMAPINFOLumps(void)
 {

@@ -106,3 +106,30 @@ class Gles2Program
 };
 
 extern Gles2Program gles2_program;
+
+class Gles2MovieProgram
+{
+  public:
+    bool Init();
+
+    void Shutdown();
+
+    void Use();
+
+    void SetMatrices(const HMM_Mat4 &model_view, const HMM_Mat4 &projection);
+
+    void SetPlaneScales(float luma_x, float luma_y, float chroma_x, float chroma_y);
+
+  private:
+    GLuint program_ = 0;
+
+    GLint uniform_model_view_   = -1;
+    GLint uniform_projection_   = -1;
+    GLint uniform_texture_y_    = -1;
+    GLint uniform_texture_cb_   = -1;
+    GLint uniform_texture_cr_   = -1;
+    GLint uniform_luma_scale_   = -1;
+    GLint uniform_chroma_scale_ = -1;
+};
+
+extern Gles2MovieProgram gles2_movie_program;

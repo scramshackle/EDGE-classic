@@ -43,7 +43,7 @@ static void DrawMirrorPolygon(DrawMirror *mir)
     render_mirror_set.Coordinate(x1, y1);
     render_mirror_set.Coordinate(x2, y2);
 
-    RendererVertex *glvert = BeginRenderUnit(GL_POLYGON, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
+    RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
                                              alpha < 0.99f ? kBlendingAlpha : kBlendingNone);
 
     glvert->rgba       = unit_col;
@@ -108,7 +108,7 @@ static void DrawPortalPolygon(DrawMirror *mir)
     ty1 = ty1 * surf->y_matrix.Y / total_h;
     ty2 = ty2 * surf->y_matrix.Y / total_h;
 
-    RendererVertex *glvert = BeginRenderUnit(GL_POLYGON, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0,
+    RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0,
                                              0, alpha < 0.99f ? kBlendingAlpha : kBlendingNone);
 
     glvert->rgba                     = unit_col;

@@ -2,10 +2,13 @@
 
 #include "epi.h"
 #include "i_system.h"
+#include "shaders/movie_spirv.h"
 #include "shaders/world_spirv.h"
 
 static SDL_GPUShader *world_vertex_shader   = nullptr;
 static SDL_GPUShader *world_fragment_shader = nullptr;
+static SDL_GPUShader *movie_vertex_shader    = nullptr;
+static SDL_GPUShader *movie_fragment_shader  = nullptr;
 
 static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage stage, const uint32_t *code,
                                    size_t code_size, uint32_t num_samplers, uint32_t num_uniform_buffers,
@@ -83,4 +86,51 @@ SDL_GPUShader *WorldVertexShader()
 SDL_GPUShader *WorldFragmentShader()
 {
     return world_fragment_shader;
+}
+
+bool CreateMovieShaders(SDL_GPUDevice *device)
+{
+    if (movie_vertex_shader && movie_fragment_shader)
+        return true;
+
+    movie_vertex_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kMovieVertexShaderSpirv, sizeof(kMovieVertexShaderSpirv),
+                     kMovieVertexShaderSamplerCount, kMovieVertexShaderUniformBufferCount, "movie.vert");
+
+    movie_fragment_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kMovieFragmentShaderSpirv, sizeof(kMovieFragmentShaderSpirv),
+                     kMovieFragmentShaderSamplerCount, kMovieFragmentShaderUniformBufferCount, "movie.frag");
+
+    if (!movie_vertex_shader || !movie_fragment_shader)
+    {
+        DestroyMovieShaders(device);
+        return false;
+    }
+
+    return true;
+}
+
+void DestroyMovieShaders(SDL_GPUDevice *device)
+{
+    if (movie_vertex_shader)
+    {
+        SDL_ReleaseGPUShader(device, movie_vertex_shader);
+        movie_vertex_shader = nullptr;
+    }
+
+    if (movie_fragment_shader)
+    {
+        SDL_ReleaseGPUShader(device, movie_fragment_shader);
+        movie_fragment_shader = nullptr;
+    }
+}
+
+SDL_GPUShader *MovieVertexShader(void)
+{
+    return movie_vertex_shader;
+}
+
+SDL_GPUShader *MovieFragmentShader(void)
+{
+    return movie_fragment_shader;
 }

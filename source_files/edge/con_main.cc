@@ -579,18 +579,6 @@ int ConsoleCommandShowFiles(char **argv, int argc)
     return 0;
 }
 
-int ConsoleCommandBrowse(char **argv, int argc)
-{
-    EPI_UNUSED(argv);
-    EPI_UNUSED(argc);
-#ifdef EDGE_WEB
-    ConsoleMessage(kConsoleOnly, "%s\n", language["NoBrowseFromWeb"]);
-    return 1;
-#else
-    epi::OpenDirectory(working_directory);
-    return 0;
-#endif
-}
 
 int ConsoleCommandShowVars(char **argv, int argc)
 {
@@ -810,8 +798,7 @@ const ConsoleCommand builtin_commands[] = {{"cat", ConsoleCommandType},
                                            {"warp", ConsoleCommandMap}, // compatibility
                                            {"playsound", ConsoleCommandPlaySound},
                                            {"readme", ConsoleCommandReadme},
-                                           {"browse", ConsoleCommandBrowse},
-                                           {"pwd", ConsoleCommandPrintWorkingDir},
+                                                                                      {"pwd", ConsoleCommandPrintWorkingDir},
                                            {"resetvars", ConsoleCommandResetVars},
                                            {"showfiles", ConsoleCommandShowFiles},
                                            {"showgamepads", ConsoleCommandShowGamepads},

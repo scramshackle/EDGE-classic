@@ -33,11 +33,18 @@ struct RendererUnit
 
     int first, count;
 
+    float line_width;
+
+    int32_t index_first, index_count;
+
     RGBAColor fog_color   = kRGBANoValue;
     float     fog_density = 0;
 };
 
+static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
+
 static RendererVertex local_verts[kMaximumLocalVertices];
+static uint16_t       merged_indices[kMaximumMergedIndices];
 static RendererUnit   local_units[kMaximumLocalUnits];
 
 static std::vector<RendererUnit *> local_unit_map;
@@ -106,9 +113,10 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->texture[0]          = tex1;
     unit->texture[1]          = tex2;
 
-    unit->pass     = pass;
-    unit->blending = blending;
-    unit->first    = current_render_vert;
+    unit->pass       = pass;
+    unit->blending   = blending;
+    unit->first      = current_render_vert;
+    unit->line_width = (shape == GL_LINES) ? render_state->GetLineWidth() : 1.0f;
 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
@@ -163,6 +171,132 @@ struct Compare_Unit_pred
         return A->blending < B->blending;
     }
 };
+
+static int32_t UnitIndexCount(GLuint shape, int count)
+{
+    switch (shape)
+    {
+    case GL_QUADS:
+        return (count / 4) * 6;
+
+    case GL_TRIANGLES:
+        return (count / 3) * 3;
+
+    case GL_POLYGON:
+    case GL_TRIANGLE_FAN:
+        return count < 3 ? 0 : (count - 2) * 3;
+
+    case GL_QUAD_STRIP:
+    case GL_TRIANGLE_STRIP:
+        return count < 3 ? 0 : (count - 2) * 3;
+
+    default:
+        return 0;
+    }
+}
+
+static int32_t ExpandUnitIndices(GLuint shape, int first, int count, uint16_t *out)
+{
+    int32_t  written = 0;
+    uint16_t base    = (uint16_t)first;
+
+    switch (shape)
+    {
+    case GL_QUADS:
+        for (int q = 0; q + 4 <= count; q += 4)
+        {
+            uint16_t b = (uint16_t)(base + q);
+
+            out[written++] = b;
+            out[written++] = (uint16_t)(b + 1);
+            out[written++] = (uint16_t)(b + 2);
+            out[written++] = b;
+            out[written++] = (uint16_t)(b + 2);
+            out[written++] = (uint16_t)(b + 3);
+        }
+        break;
+
+    case GL_TRIANGLES:
+        for (int t = 0, total = (count / 3) * 3; t < total; t++)
+            out[written++] = (uint16_t)(base + t);
+        break;
+
+    case GL_POLYGON:
+    case GL_TRIANGLE_FAN:
+        for (int t = 0; t + 2 < count; t++)
+        {
+            out[written++] = base;
+            out[written++] = (uint16_t)(base + t + 1);
+            out[written++] = (uint16_t)(base + t + 2);
+        }
+        break;
+
+    case GL_QUAD_STRIP:
+    case GL_TRIANGLE_STRIP:
+        for (int t = 0; t + 2 < count; t++)
+        {
+            if (t & 1)
+            {
+                out[written++] = (uint16_t)(base + t + 1);
+                out[written++] = (uint16_t)(base + t);
+                out[written++] = (uint16_t)(base + t + 2);
+            }
+            else
+            {
+                out[written++] = (uint16_t)(base + t);
+                out[written++] = (uint16_t)(base + t + 1);
+                out[written++] = (uint16_t)(base + t + 2);
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return written;
+}
+
+static void PromoteSecondTexture(RendererUnit *unit, RendererVertex *verts)
+{
+    if ((unit->texture[0] && unit->environment_mode[0] != kTextureEnvironmentDisable) || !unit->texture[1] ||
+        unit->environment_mode[1] == kTextureEnvironmentDisable)
+        return;
+
+    unit->texture[0]          = unit->texture[1];
+    unit->environment_mode[0] = unit->environment_mode[1];
+
+    unit->texture[1]          = 0;
+    unit->environment_mode[1] = kTextureEnvironmentDisable;
+
+    RendererVertex *v = verts + unit->first;
+
+    for (int k = 0; k < unit->count; k++, v++)
+    {
+        v->texture_coordinates[0].X = v->texture_coordinates[1].X;
+        v->texture_coordinates[0].Y = v->texture_coordinates[1].Y;
+    }
+}
+
+static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const RendererVertex *verts)
+{
+    if (a->shape == GL_LINES || b->shape == GL_LINES)
+        return false;
+
+    if (a->pass != b->pass || a->texture[0] != b->texture[0] || a->texture[1] != b->texture[1] ||
+        a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
+        a->blending != b->blending || a->fog_color != b->fog_color ||
+        !epi::AlmostEquals(a->fog_density, b->fog_density))
+        return false;
+
+    if (a->blending & (kBlendingLess | kBlendingGEqual))
+    {
+        if (epi::GetRGBAAlpha(verts[a->first].rgba) != epi::GetRGBAAlpha(verts[b->first].rgba))
+            return false;
+    }
+
+    return true;
+}
 
 static void ApplyUnitEnvironment(int32_t texture_unit, GLuint environment)
 {
@@ -273,7 +407,7 @@ static void DrawLineUnit(const RendererUnit *unit)
 
     HMM_Vec2 aa_radius = {{2.0f, 2.0f}};
 
-    float line_width       = HMM_MAX(1.0f, render_state->GetLineWidth()) + aa_radius.X;
+    float line_width       = HMM_MAX(1.0f, unit->line_width) + aa_radius.X;
     float extension_length = aa_radius.Y;
 
     for (int32_t i = 0; i < line_total; i++)
@@ -318,7 +452,7 @@ static void DrawLineUnit(const RendererUnit *unit)
         out[2].texture_coordinates[0] = {{-line_width, factor * line_length}};
 
         out[3].position               = {{b1.X, b1.Y, source_v1->position.Z}};
-        out[3].texture_coordinates[0] = {{line_width, -factor * line_length}};
+        out[3].texture_coordinates[0] = {{line_width, factor * line_length}};
     }
 
     render_state->SetPipeline(0);
@@ -347,6 +481,26 @@ void RenderCurrentUnits(void)
     {
         std::sort(local_unit_map.begin(), local_unit_map.begin() + current_render_unit, Compare_Unit_pred());
     }
+
+    for (int j = 0; j < current_render_unit; j++)
+        PromoteSecondTexture(local_unit_map[j], local_verts);
+
+    int32_t merged_index_total = 0;
+
+    for (int j = 0; j < current_render_unit; j++)
+    {
+        RendererUnit *unit = local_unit_map[j];
+
+        EPI_ASSERT(merged_index_total + UnitIndexCount(unit->shape, unit->count) <= kMaximumMergedIndices);
+
+        unit->index_first = merged_index_total;
+        unit->index_count = ExpandUnitIndices(unit->shape, unit->first, unit->count, merged_indices + merged_index_total);
+
+        merged_index_total += unit->index_count;
+    }
+
+    if (merged_index_total > 0)
+        gles2_immediate.UploadMergedIndices(merged_indices, merged_index_total);
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
 
@@ -388,15 +542,25 @@ void RenderCurrentUnits(void)
     else
         render_state->Disable(GL_FOG);
 
-    render_state->SetVertexArrays(local_verts);
+    render_state->SetVertexArrays(local_verts, current_render_vert);
 
-    gles2_immediate.UploadBatch(local_verts, current_render_vert);
+    int j = 0;
 
-    for (int j = 0; j < current_render_unit; j++)
+    while (j < current_render_unit)
     {
         RendererUnit *unit = local_unit_map[j];
 
         EPI_ASSERT(unit->count > 0);
+
+        int     run_end         = j + 1;
+        int32_t run_index_count = unit->index_count;
+
+        while (run_end < current_render_unit &&
+               UnitsCanMerge(local_unit_map[run_end - 1], local_unit_map[run_end], local_verts))
+        {
+            run_index_count += local_unit_map[run_end]->index_count;
+            run_end++;
+        }
 
         if (!culling && unit->fog_color != kRGBANoValue && !(unit->blending & kBlendingNoFog) && !no_fog)
         {
@@ -489,29 +653,10 @@ void RenderCurrentUnits(void)
 
         render_state->PolygonOffset(0, -unit->pass);
 
-        if ((!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
-            (unit->texture[1] && unit->environment_mode[1] != kTextureEnvironmentDisable))
-        {
-            unit->texture[0]          = unit->texture[1];
-            unit->environment_mode[0] = unit->environment_mode[1];
-
-            unit->texture[1]          = 0;
-            unit->environment_mode[1] = kTextureEnvironmentDisable;
-
-            RendererVertex *v = local_verts + unit->first;
-
-            for (int k = 0; k < unit->count; k++, v++)
-            {
-                v->texture_coordinates[0].X = v->texture_coordinates[1].X;
-                v->texture_coordinates[0].Y = v->texture_coordinates[1].Y;
-            }
-
-            gles2_immediate.InvalidateBatch();
-        }
-
         if (unit->shape == GL_LINES)
         {
             DrawLineUnit(unit);
+            j = run_end;
             continue;
         }
 
@@ -524,7 +669,9 @@ void RenderCurrentUnits(void)
 
         render_state->SetPipeline(0);
 
-        render_state->DrawVertexArray(unit->shape, unit->first, unit->count);
+        Gles2ApplyRenderState();
+
+        gles2_immediate.DrawMerged(unit->index_first, run_index_count);
 
         if (old_clamp_s != kDummyClamp)
         {
@@ -537,6 +684,8 @@ void RenderCurrentUnits(void)
             render_state->ActiveTexture(GL_TEXTURE0);
             render_state->TextureWrapT(old_clamp_t);
         }
+
+        j = run_end;
     }
 
     for (int t = 1; t >= 0; t--)

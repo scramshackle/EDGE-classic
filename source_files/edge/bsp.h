@@ -1,9 +1,10 @@
 //------------------------------------------------------------------------
-//  UTILITIES
-//------------------------------------------------------------------------
 //
-//  Copyright (C) 2001-2023 Andrew Apted
-//  Copyright (C) 1997-2003 André Majorel et al
+//  AJ-BSP  Copyright (C) 2000-2023  Andrew Apted, et al
+//          Copyright (C) 1994-1998  Colin Reed
+//          Copyright (C) 1997-1998  Lee Killough
+//
+//  Originally based on the program 'BSP', version 2.3.
 //
 //  This program is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU General Public License
@@ -19,16 +20,18 @@
 
 #pragma once
 
+#include <string>
+
 namespace ajbsp
 {
 
-// memory allocation, guaranteed to not return nullptr.
-void *UtilCalloc(int size);
-void *UtilRealloc(void *old, int size);
-void  UtilFree(void *data);
+void BuildNodesForCurrentLevel();
 
-// math stuff
-double ComputeAngle(double dx, double dy);
+bool LoadNodeCache(const std::string &path);
+
+bool SaveNodeCache(const std::string &path);
+
+bool IsNodeCacheCurrent(const std::string &path);
 
 } // namespace ajbsp
 

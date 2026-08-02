@@ -80,6 +80,17 @@ class Gles2Immediate
 
     void Draw(GLuint shape, const RendererVertex *vertices, int32_t base, int32_t count);
 
+    void UploadMergedIndices(const uint16_t *indices, int32_t count);
+
+    void DrawMerged(int32_t index_offset, int32_t index_count);
+
+    void DrawMovieQuad(const RendererVertex *vertices);
+
+    const HMM_Mat4 &ProjectionMatrix() const
+    {
+        return matrix_stack_[kGles2MatrixModeProjection][matrix_top_[kGles2MatrixModeProjection]];
+    }
+
     RendererVertex *ReserveVertices(int32_t count);
 
     void RecordDraw(GLuint shape, int32_t count);
@@ -127,9 +138,10 @@ class Gles2Immediate
 
     bool CreateDefaultTexture();
 
-    GLuint vertex_buffer_     = 0;
-    GLuint quad_index_buffer_ = 0;
-    GLuint default_texture_   = 0;
+    GLuint vertex_buffer_       = 0;
+    GLuint quad_index_buffer_   = 0;
+    GLuint merged_index_buffer_ = 0;
+    GLuint default_texture_     = 0;
 
     size_t vertex_buffer_offset_ = 0;
 

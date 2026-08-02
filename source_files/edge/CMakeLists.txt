@@ -9,6 +9,7 @@ set (EDGE_SOURCE_FILES
   i_sound.cc
   am_map.cc
   bot_nav.cc
+  bsp.cc
   bot_think.cc
   con_con.cc
   con_main.cc
@@ -24,6 +25,7 @@ set (EDGE_SOURCE_FILES
   hu_stuff.cc
   hu_style.cc
   i_system.cc
+  i_thread.cc
   im_filter.cc
   im_data.cc
   im_funcs.cc
@@ -64,6 +66,8 @@ set (EDGE_SOURCE_FILES
   r_render.cc
   r_effects.cc
   r_backend.cc
+  r_md2.cc
+  r_mdl.cc
   r_mirror.cc
   r_occlude.cc
   r_things.cc
@@ -117,8 +121,7 @@ set (EDGE_GLES2_SOURCE_FILES
   render/gles2/gles2_backend.cc
   render/gles2/gles2_immediate.cc
   render/gles2/gles2_loader.cc
-  render/gles2/gles2_md2.cc
-  render/gles2/gles2_mdl.cc
+  render/gles2/gles2_movie.cc
   render/gles2/gles2_program.cc
   render/gles2/gles2_sky.cc
   render/gles2/gles2_state.cc
@@ -130,8 +133,7 @@ set (EDGE_SDL_GPU_SOURCE_FILES
   render/sdlgpu/gpu_device.cc
   render/sdlgpu/gpu_images.cc
   render/sdlgpu/gpu_immediate.cc
-  render/sdlgpu/gpu_md2.cc
-  render/sdlgpu/gpu_mdl.cc
+  render/sdlgpu/gpu_movie.cc
   render/sdlgpu/gpu_pipeline.cc
   render/sdlgpu/gpu_shaders.cc
   render/sdlgpu/gpu_sky.cc
@@ -188,7 +190,6 @@ endif()
 target_include_directories(edge-classic PRIVATE ./)
 
 set (EDGE_LINK_LIBRARIES
-  ajbsp
   ddf
   dr_libs
   edgetracker

@@ -217,11 +217,12 @@ static void DrawAllLines()
 {
     size_t          current_vert_count = 0;
     RendererVertex *current_glvert     = nullptr;
+    StartUnitBatch(false);
+
     for (int i = 3; i >= 0; i--)
     {
         if (!map_line_pointers[i].empty())
         {
-            StartUnitBatch(false);
             if (i == 3)
                 render_state->LineWidth(map_pulse_width);
             else if (i == 2)
@@ -239,11 +240,9 @@ static void DrawAllLines()
                 if (current_vert_count > kMaximumLineVerts - 2)
                 {
                     EndRenderUnit(current_vert_count);
-                    FinishUnitBatch();
                     current_vert_count = 0;
-                    StartUnitBatch(false);
-                    current_glvert = BeginRenderUnit(GL_LINES, kMaximumLineVerts, GL_MODULATE, 0,
-                                                     (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
+                    current_glvert     = BeginRenderUnit(GL_LINES, kMaximumLineVerts, GL_MODULATE, 0,
+                                                         (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
                 }
                 current_glvert->position = {{points->X, points->Y, 0}};
                 current_glvert++->rgba   = col;
@@ -252,10 +251,12 @@ static void DrawAllLines()
                 current_vert_count += 2;
             }
             EndRenderUnit(current_vert_count);
-            FinishUnitBatch();
             current_vert_count = 0;
         }
     }
+
+    FinishUnitBatch();
+
     render_state->LineWidth(1.0f);
     automap_line_position = 0;
     map_line_pointers[0].clear();

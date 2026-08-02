@@ -18,6 +18,20 @@ constexpr uint32_t kGpuFragmentUniformSlot = 0;
 constexpr uint32_t kGpuSamplerSlotTexture0 = 0;
 constexpr uint32_t kGpuSamplerSlotTexture1 = 1;
 
+constexpr uint32_t kGpuSamplerSlotMovieLuma       = 0;
+constexpr uint32_t kGpuSamplerSlotMovieChromaBlue = 1;
+constexpr uint32_t kGpuSamplerSlotMovieChromaRed  = 2;
+
+struct GpuMovieVertexParameters
+{
+    HMM_Mat4 mvp;
+};
+
+struct GpuMovieFragmentParameters
+{
+    float plane_scales[4];
+};
+
 enum GpuFragmentFlag
 {
     kGpuFragmentFlagMultiTexture = (1 << 0),
@@ -70,6 +84,14 @@ static_assert(offsetof(GpuFragmentParameters, fog_scale) == 44, "GpuFragmentPara
 static_assert(sizeof(GpuFragmentParameters) == 48, "GpuFragmentParameters size");
 
 bool CreateWorldShaders(SDL_GPUDevice *device);
+
+bool CreateMovieShaders(SDL_GPUDevice *device);
+
+void DestroyMovieShaders(SDL_GPUDevice *device);
+
+SDL_GPUShader *MovieVertexShader(void);
+
+SDL_GPUShader *MovieFragmentShader(void);
 
 void DestroyWorldShaders(SDL_GPUDevice *device);
 

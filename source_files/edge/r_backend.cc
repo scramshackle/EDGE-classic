@@ -27,7 +27,6 @@ void RenderBackend::SoftInit(void)
     render_state->Disable(GL_SCISSOR_TEST);
     render_state->Disable(GL_STENCIL_TEST);
 
-    render_state->Disable(GL_LINE_SMOOTH);
 
     render_state->Disable(GL_POLYGON_SMOOTH);
 

@@ -40,7 +40,6 @@ struct RendererVertex
     RGBAColor rgba;
     HMM_Vec3  position;
     HMM_Vec2  texture_coordinates[2];
-    HMM_Vec3  normal;
 };
 
 extern RGBAColor culling_fog_color;

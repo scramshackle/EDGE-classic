@@ -8,7 +8,7 @@
 
 Gles2Immediate gles2_immediate;
 
-static_assert(sizeof(RendererVertex) == 44, "RendererVertex size");
+static_assert(sizeof(RendererVertex) == 32, "RendererVertex size");
 static_assert(offsetof(RendererVertex, rgba) == 0, "RendererVertex::rgba offset");
 static_assert(offsetof(RendererVertex, position) == 4, "RendererVertex::position offset");
 static_assert(offsetof(RendererVertex, texture_coordinates) == 16, "RendererVertex::texture_coordinates offset");
@@ -151,6 +151,12 @@ void Gles2Immediate::Shutdown()
     {
         glDeleteBuffers(1, &quad_index_buffer_);
         quad_index_buffer_ = 0;
+    }
+
+    if (merged_index_buffer_)
+    {
+        glDeleteBuffers(1, &merged_index_buffer_);
+        merged_index_buffer_ = 0;
     }
 
     if (default_texture_)
@@ -349,6 +355,59 @@ void Gles2Immediate::BindVertexAttributes(size_t byte_offset)
 
     glVertexAttribPointer(kGles2AttributeColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(RendererVertex),
                           (const void *)(byte_offset + offsetof(RendererVertex, rgba)));
+}
+
+void Gles2Immediate::UploadMergedIndices(const uint16_t *indices, int32_t count)
+{
+    if (!indices || count <= 0)
+        return;
+
+    if (!merged_index_buffer_)
+    {
+        glGenBuffers(1, &merged_index_buffer_);
+
+        if (!merged_index_buffer_)
+            return;
+    }
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, merged_index_buffer_);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(uint16_t)), indices, GL_STREAM_DRAW);
+
+    uploaded_bytes_ += (size_t)count * sizeof(uint16_t);
+    upload_count_++;
+}
+
+void Gles2Immediate::DrawMerged(int32_t index_offset, int32_t index_count)
+{
+    if (index_count <= 0 || !merged_index_buffer_)
+        return;
+
+    ApplyMatrices();
+
+    BindVertexAttributes(batch_offset_);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, merged_index_buffer_);
+    glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_SHORT,
+                   (const void *)((size_t)index_offset * sizeof(uint16_t)));
+
+    draw_count_++;
+}
+
+void Gles2Immediate::DrawMovieQuad(const RendererVertex *vertices)
+{
+    if (!vertices)
+        return;
+
+    size_t offset = StreamVertices(vertices, 4);
+
+    BindVertexAttributes(offset);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_index_buffer_);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *)0);
+
+    InvalidateBatch();
+
+    draw_count_++;
 }
 
 void Gles2Immediate::DrawRange(GLuint shape, size_t byte_offset, int32_t count)

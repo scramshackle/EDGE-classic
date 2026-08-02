@@ -1348,7 +1348,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 }
             }
 
-            render_state->SetVertexArrays(model_vertices.data());
+            render_state->SetVertexArrays(model_vertices.data(), total_vertices);
             render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
         }
         else
@@ -1376,7 +1376,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
                 }
             }
 
-            render_state->SetVertexArrays(model_vertices.data());
+            render_state->SetVertexArrays(model_vertices.data(), total_vertices);
 
             int first_vertex = 0;
 
@@ -1461,7 +1461,7 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
 
     render_state->SetPipeline(0);
 
-    render_state->SetVertexArrays(model_vertices.data());
+    render_state->SetVertexArrays(model_vertices.data(), total_vertices);
 
     if (md->strips_[0].mode == GL_TRIANGLES)
         render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);

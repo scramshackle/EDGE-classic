@@ -566,8 +566,10 @@ class GpuRenderState : public RenderState
         }
     }
 
-    void SetVertexArrays(const RendererVertex *vertices)
+    void SetVertexArrays(const RendererVertex *vertices, int count)
     {
+        EPI_UNUSED(count);
+
         vertex_array_base_ = vertices;
     }
 

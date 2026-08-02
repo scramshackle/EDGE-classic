@@ -34,7 +34,6 @@
 #include "epi_endian.h"
 #include "epi_str_compare.h"
 #include "g_game.h" //current_map
-#include "gles2_immediate.h"
 #include "i_defs_gl.h"
 #include "im_data.h"
 #include "n_network.h"
@@ -1021,8 +1020,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
         render_state->SetPipeline(0);
 
-        render_state->SetVertexArrays(model_vertices.data());
-        gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
+        render_state->SetVertexArrays(model_vertices.data(), total_vertices);
         render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
         // restore the clamping mode
@@ -1093,8 +1091,7 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
 
     render_state->SetPipeline(0);
 
-    render_state->SetVertexArrays(model_vertices.data());
-    gles2_immediate.UploadBatch(model_vertices.data(), total_vertices);
+    render_state->SetVertexArrays(model_vertices.data(), total_vertices);
     render_state->DrawVertexArray(GL_TRIANGLES, 0, total_vertices);
 
     render_state->Disable(GL_BLEND);

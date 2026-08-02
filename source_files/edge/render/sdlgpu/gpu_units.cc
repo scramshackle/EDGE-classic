@@ -34,6 +34,8 @@ struct RendererUnit
 
     int first, count;
 
+    float line_width;
+
     RGBAColor fog_color   = kRGBANoValue;
     float     fog_density = 0;
 };
@@ -107,9 +109,10 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->texture[0]          = tex1;
     unit->texture[1]          = tex2;
 
-    unit->pass     = pass;
-    unit->blending = blending;
-    unit->first    = current_render_vert;
+    unit->pass       = pass;
+    unit->blending   = blending;
+    unit->first      = current_render_vert;
+    unit->line_width = (shape == GL_LINES) ? render_state->GetLineWidth() : 1.0f;
 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
@@ -206,7 +209,7 @@ static void DrawLineUnit(const RendererUnit *unit)
 
     HMM_Vec2 aa_radius = {{2.0f, 2.0f}};
 
-    float line_width       = HMM_MAX(1.0f, render_state->GetLineWidth()) + aa_radius.X;
+    float line_width       = HMM_MAX(1.0f, unit->line_width) + aa_radius.X;
     float extension_length = aa_radius.Y;
 
     for (int32_t i = 0; i < line_total; i++)
@@ -251,7 +254,7 @@ static void DrawLineUnit(const RendererUnit *unit)
         out[2].texture_coordinates[0]     = {{-line_width, factor * line_length}};
 
         out[3].position                   = {{b1.X, b1.Y, source_v1->position.Z}};
-        out[3].texture_coordinates[0]     = {{line_width, -factor * line_length}};
+        out[3].texture_coordinates[0]     = {{line_width, factor * line_length}};
     }
 
     gpu_immediate.RecordDraw(GL_QUADS, line_total * 4);

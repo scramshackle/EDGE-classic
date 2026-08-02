@@ -5,9 +5,11 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
+#include "shaders/movie_glsl.h"
 #include "shaders/world_glsl.h"
 
-Gles2Program gles2_program;
+Gles2Program      gles2_program;
+Gles2MovieProgram gles2_movie_program;
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
 {
@@ -291,4 +293,87 @@ void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue,
     SetFloat(uniform_fog_density_, shadow_fog_density_, density);
     SetFloat(uniform_fog_start_, shadow_fog_start_, start);
     SetFloat(uniform_fog_end_, shadow_fog_end_, end);
+}
+
+bool Gles2MovieProgram::Init()
+{
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kMovieVertexSource, "movie.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kMovieFragmentSource, "movie.frag.glsl");
+
+    program_ = glCreateProgram();
+
+    if (!program_)
+        FatalError("Gles2MovieProgram: glCreateProgram failed\n");
+
+    glAttachShader(program_, vertex_shader);
+    glAttachShader(program_, fragment_shader);
+
+    glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
+    glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
+
+    glLinkProgram(program_);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+
+    if (linked != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+            glGetProgramInfoLog(program_, log_length, nullptr, log);
+
+        FatalError("Gles2MovieProgram: movie program failed to link:\n%s\n", log);
+    }
+
+    glDetachShader(program_, vertex_shader);
+    glDetachShader(program_, fragment_shader);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    uniform_model_view_   = glGetUniformLocation(program_, "u_model_view");
+    uniform_projection_   = glGetUniformLocation(program_, "u_projection");
+    uniform_texture_y_    = glGetUniformLocation(program_, "u_texture_y");
+    uniform_texture_cb_   = glGetUniformLocation(program_, "u_texture_cb");
+    uniform_texture_cr_   = glGetUniformLocation(program_, "u_texture_cr");
+    uniform_luma_scale_   = glGetUniformLocation(program_, "u_luma_scale");
+    uniform_chroma_scale_ = glGetUniformLocation(program_, "u_chroma_scale");
+
+    glUseProgram(program_);
+
+    glUniform1i(uniform_texture_y_, 0);
+    glUniform1i(uniform_texture_cb_, 1);
+    glUniform1i(uniform_texture_cr_, 2);
+
+    return true;
+}
+
+void Gles2MovieProgram::Shutdown()
+{
+    if (program_)
+    {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+}
+
+void Gles2MovieProgram::Use()
+{
+    glUseProgram(program_);
+}
+
+void Gles2MovieProgram::SetMatrices(const HMM_Mat4 &model_view, const HMM_Mat4 &projection)
+{
+    glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&model_view);
+    glUniformMatrix4fv(uniform_projection_, 1, GL_FALSE, (const GLfloat *)&projection);
+}
+
+void Gles2MovieProgram::SetPlaneScales(float luma_x, float luma_y, float chroma_x, float chroma_y)
+{
+    glUniform2f(uniform_luma_scale_, luma_x, luma_y);
+    glUniform2f(uniform_chroma_scale_, chroma_x, chroma_y);
 }

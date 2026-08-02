@@ -955,8 +955,6 @@ void HUDSolidLine(float x1, float y1, float x2, float y2, RGBAColor col)
     x2 = HUDToRealCoordinatesX(x2);
     y2 = HUDToRealCoordinatesY(y2);
 
-    render_state->Enable(GL_LINE_SMOOTH);
-
     StartUnitBatch(false);
 
     RGBAColor unit_col = col;
@@ -977,7 +975,6 @@ void HUDSolidLine(float x1, float y1, float x2, float y2, RGBAColor col)
     EndRenderUnit(2);
 
     FinishUnitBatch();
-    render_state->Disable(GL_LINE_SMOOTH);
 }
 
 void HUDThinBox(float x1, float y1, float x2, float y2, RGBAColor col, float thickness, BlendingMode special_blend)

@@ -44,6 +44,11 @@
 extern int     total_level_vertexes;
 extern Vertex *level_vertexes;
 
+extern Vertex *level_gl_vertexes;
+
+extern int  total_level_segs;
+extern Seg *level_segs;
+
 extern int     total_level_sectors;
 extern Sector *level_sectors;
 
@@ -97,12 +102,12 @@ struct ECFrameStats
 	int draw_things;
 
 	void Clear()
-	{		
+	{
 		draw_render_units = 0;
 		draw_wall_parts = 0;
 		draw_planes = 0;
 		draw_things = 0;
-	}	
+	}
 };
 
 extern ECFrameStats ec_frame_stats;
@@ -208,7 +213,7 @@ class RenderState
 
     virtual void SetPipeline(uint32_t flags) = 0;
 
-    virtual void SetVertexArrays(const RendererVertex *vertices) = 0;
+    virtual void SetVertexArrays(const RendererVertex *vertices, int count) = 0;
 
     virtual void DrawVertexArray(GLuint shape, int first, int count) = 0;
 };

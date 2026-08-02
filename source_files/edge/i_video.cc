@@ -471,15 +471,17 @@ void FinishFrame(void)
 
                 if (elapsed_time >= target_time)
                 {
-                    start_time = current_time;
+                    start_time += target_time;
+                    if (current_time - start_time >= target_time)
+                        start_time = current_time;
                     break;
                 }
 
                 remaining_time = target_time - elapsed_time;
 
-                if (remaining_time > 1000)
+                if (remaining_time > 2000)
                 {
-                    SleepForMilliseconds((remaining_time - 1000) / 1000);
+                    SleepForMilliseconds((remaining_time - 2000) / 1000);
                 }
             }
         }
