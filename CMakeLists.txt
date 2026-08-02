@@ -17,10 +17,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Rendering Options
 
-option(EDGE_GLES2 "WebGL1/GLES 2.0/GL 2.0 Renderer" ON)
+option(EDGE_GLES2 "WebGL1/GLES 2.0/GL 2.0 Renderer" OFF)
 
 # SDL3_GPU Renderer (Vulkan only)
-option(EDGE_SDL_GPU "SDL3_GPU Renderer" OFF)
+option(EDGE_SDL_GPU "SDL3_GPU Renderer" ON)
 
 # Run the BSP walk on a worker thread
 option(EDGE_THREADED_BSP "Threaded BSP traversal" ON)

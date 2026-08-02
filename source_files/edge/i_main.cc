@@ -17,6 +17,7 @@
 //----------------------------------------------------------------------------
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #include "dm_defs.h"
 #include "e_main.h"

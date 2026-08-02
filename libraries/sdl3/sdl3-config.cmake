@@ -1,7 +1,7 @@
 if (MINGW)
-  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/mingw/include/SDL3")
+  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/mingw/include")
 else ()
-  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/msvc/include/SDL3")
+  set(SDL3_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/msvc/include")
 endif()
 
 # Support both 32 and 64 bit builds

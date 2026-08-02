@@ -31,6 +31,7 @@
     X(PFNGLSHADERSOURCEPROC, glShaderSource)                                                                            \
     X(PFNGLUNIFORM1FPROC, glUniform1f)                                                                                  \
     X(PFNGLUNIFORM1IPROC, glUniform1i)                                                                                  \
+    X(PFNGLUNIFORM2FPROC, glUniform2f)                                                                                  \
     X(PFNGLUNIFORM4FPROC, glUniform4f)                                                                                  \
     X(PFNGLUNIFORM4FVPROC, glUniform4fv)                                                                                \
     X(PFNGLUNIFORMMATRIX4FVPROC, glUniformMatrix4fv)                                                                    \
@@ -65,6 +66,7 @@ EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glShaderSource             ec_glShaderSource
 #define glUniform1f                ec_glUniform1f
 #define glUniform1i                ec_glUniform1i
+#define glUniform2f                ec_glUniform2f
 #define glUniform4f                ec_glUniform4f
 #define glUniform4fv               ec_glUniform4fv
 #define glUniformMatrix4fv         ec_glUniformMatrix4fv
