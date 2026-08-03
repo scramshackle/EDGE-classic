@@ -527,6 +527,21 @@ void GpuImmediate::SetLineMode(bool enabled)
     fragment_parameters_dirty_ = true;
 }
 
+void GpuImmediate::SetSkipRGB(bool enabled)
+{
+    bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagSkipRGB) != 0;
+
+    if (current == enabled)
+        return;
+
+    if (enabled)
+        current_fragment_parameters_.flags |= kGpuFragmentFlagSkipRGB;
+    else
+        current_fragment_parameters_.flags &= ~kGpuFragmentFlagSkipRGB;
+
+    fragment_parameters_dirty_ = true;
+}
+
 void GpuImmediate::SetClipPlane(int32_t index, const double equation[4])
 {
     EPI_ASSERT(index >= 0 && index < kGpuMaximumClipPlanes);

@@ -435,6 +435,8 @@ void RenderCurrentUnits(void)
             }
         }
 
+        gpu_immediate.SetSkipRGB(unit->environment_mode[0] == (GLuint)kTextureEnvironmentSkipRGB);
+
         if (unit->shape == GL_LINES)
         {
             DrawLineUnit(unit);
@@ -445,6 +447,8 @@ void RenderCurrentUnits(void)
 
         gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);
     }
+
+    gpu_immediate.SetSkipRGB(false);
 
     current_render_vert = current_render_unit = 0;
 }

@@ -35,7 +35,8 @@ struct GpuMovieFragmentParameters
 enum GpuFragmentFlag
 {
     kGpuFragmentFlagMultiTexture = (1 << 0),
-    kGpuFragmentFlagLine         = (1 << 1)
+    kGpuFragmentFlagLine         = (1 << 1),
+    kGpuFragmentFlagSkipRGB      = (1 << 2)
 };
 
 enum GpuFogMode

@@ -88,6 +88,11 @@ void main()
         discard;
     }
 
+    if ((flags & 4) == 4)
+    {
+        c0.rgb = vec3(1.0);
+    }
+
     vec4 fcolor = color;
 
     float fogf = 0.0;

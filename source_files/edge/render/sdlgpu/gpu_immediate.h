@@ -159,6 +159,8 @@ class GpuImmediate
 
     void SetLineMode(bool enabled);
 
+    void SetSkipRGB(bool enabled);
+
     void SetClipPlane(int32_t index, const double equation[4]);
 
     void SetClipPlaneEnabled(int32_t index, bool enabled);
