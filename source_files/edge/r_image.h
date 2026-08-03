@@ -93,6 +93,8 @@ class Image
 
     bool grayscale_ = false;
 
+    bool is_sky_ = false;
+
     int hsv_rotation_   = 0;
     int hsv_saturation_ = -1;
     int hsv_value_      = 0;
@@ -258,6 +260,7 @@ void CreateFallbackFlat(void);
 void CreateFallbackTexture(void);
 
 GLuint ImageCache(const Image *image, bool anim = true, const Colormap *trans = nullptr, bool do_whiten = false);
+void   MarkImageAsSky(const Image *image);
 void   ImagePrecache(const Image *image);
 
 // this only needed during initialisation -- r_things.cpp

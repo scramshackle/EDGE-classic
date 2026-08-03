@@ -169,9 +169,6 @@ void ComputeSkyHeights(void)
         if (ring1->group == 0 || ring2->group == 0)
             continue;
 
-        if (sec1->sky_image != sec2->sky_image)
-            continue;
-
         // already in the same group ?
         if (ring1->group == ring2->group)
             continue;
@@ -887,6 +884,9 @@ void UpdateSkyboxTextures(void)
 
         for (int i = kSkyboxEast; i < 6; i++)
             info->face[i] = ImageLookup(UserSkyFaceName(sky_image->name_.c_str(), i), kImageNamespaceTexture);
+
+        for (int k = 0; k < 6; k++)
+            MarkImageAsSky(info->face[k]);
 
         for (int k = 0; k < 6; k++)
             info->texture[k] = ImageCache(info->face[k], true, render_view_effect_colormap);

@@ -817,6 +817,7 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
             for (Sector *tsec = FindSectorFromTag(target->tag); tsec != nullptr; tsec = tsec->tag_next)
             {
                 tsec->sky_image = transfer_sky;
+                MarkImageAsSky(transfer_sky);
                 tsec->sky_ref   = transfer_ref;
             }
 

@@ -162,6 +162,7 @@ void LoadLevel_Bits(void)
     // -ACB- 1998/08/09 Reference current map for sky name.
 
     sky_image = ImageLookup(current_map->sky_.c_str(), kImageNamespaceTexture);
+    MarkImageAsSky(sky_image);
 
     game_state = kGameStateNothing; // FIXME: needed ???
 
@@ -855,7 +856,10 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
     }
 
     if (globs->sky_image) // backwards compat (sky_image added 2003/12/19)
+    {
         sky_image = globs->sky_image;
+        MarkImageAsSky(sky_image);
+    }
 
     // clear line/sector lookup caches
     DDFBoomClearGeneralizedTypes();

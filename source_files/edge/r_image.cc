@@ -1162,8 +1162,7 @@ static bool IM_ShouldClamp(const Image *rim)
 
 static bool IM_ShouldMipmap(const Image *rim)
 {
-    // the "SKY" check here is a hack...
-    if (epi::StringPrefixCaseCompareASCII(rim->name_, "SKY") == 0)
+    if (rim->is_sky_)
         return false;
 
     if (image_mipmapping == 0)
@@ -1263,7 +1262,7 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
             clamp = true;
 
         if (rim->source_user_.def->special_ & kImageSpecialMip)
-            mip = true;
+            mip = !rim->is_sky_;
         else if (rim->source_user_.def->special_ & kImageSpecialNoMip)
             mip = false;
 
@@ -1896,6 +1895,30 @@ GLuint ImageCache(const Image *image, bool anim, const Colormap *trans, bool do_
     EPI_ASSERT(rc->parent);
 
     return rc->texture_id;
+}
+
+void MarkImageAsSky(const Image *image)
+{
+    Image *start = (Image *)image;
+
+    for (Image *rim = start; rim && !rim->is_sky_; rim = rim->animation_.next)
+    {
+        rim->is_sky_ = true;
+
+        for (std::vector<CachedImage *>::iterator it = rim->cache_.begin(); it != rim->cache_.end(); ++it)
+        {
+            CachedImage *rc = *it;
+
+            if (rc && rc->texture_id != 0)
+            {
+                render_state->DeleteTexture(&rc->texture_id);
+                rc->texture_id = 0;
+            }
+        }
+
+        if (rim->animation_.next == start)
+            break;
+    }
 }
 
 void ImagePrecache(const Image *image)
