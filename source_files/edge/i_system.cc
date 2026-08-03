@@ -27,6 +27,7 @@
 #include "dm_defs.h"
 #include "e_main.h"
 #include "epi.h"
+#include "epi_simd.h"
 #include "epi_windows.h"
 #include "g_game.h"
 #include "m_argv.h"
@@ -50,6 +51,8 @@ static char              message_buffer[kMessageBufferSize];
 
 void SystemStartup(void)
 {
+    epi::EnableFastFloats();
+
     StartupGraphics(); // SDL requires this to be called first
     StartupControl();
     StartupAudio();

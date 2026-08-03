@@ -38,7 +38,8 @@ enum GpuCommandType
     kGpuCommandMovie,
     kGpuCommandViewport,
     kGpuCommandScissor,
-    kGpuCommandClearDepth
+    kGpuCommandClearDepth,
+    kGpuCommandClearStencil
 };
 
 struct GpuDrawArguments
@@ -57,6 +58,8 @@ struct GpuDrawArguments
     int32_t fragment_parameter_index;
 
     GpuIndexSource index_source;
+
+    uint8_t stencil_reference;
 
     bool mergeable;
 };
@@ -143,7 +146,14 @@ class GpuImmediate
         return matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]];
     }
 
+    const HMM_Mat4 &ProjectionMatrix() const
+    {
+        return matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]];
+    }
+
     void SetPipelineState(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
+
+    void SetStencilReference(uint8_t reference);
 
     void SetTexture(SDL_GPUTexture *texture, SDL_GPUSampler *sampler);
 
@@ -161,6 +171,8 @@ class GpuImmediate
 
     void SetSkipRGB(bool enabled);
 
+    void SetSkyPass(const SkyPassInfo *sky_pass);
+
     void SetClipPlane(int32_t index, const double equation[4]);
 
     void SetClipPlaneEnabled(int32_t index, bool enabled);
@@ -170,6 +182,8 @@ class GpuImmediate
     void ScissorRect(int32_t x, int32_t y, int32_t width, int32_t height);
 
     void ClearDepth();
+
+    void ClearStencil();
 
     RendererVertex *ReserveVertices(int32_t count);
 
@@ -274,6 +288,7 @@ class GpuImmediate
     int32_t fragment_parameter_index_ = -1;
 
     uint32_t pipeline_flags_    = 0;
+    uint8_t  stencil_reference_ = 0;
     GLenum   source_blend_      = GL_SRC_ALPHA;
     GLenum   destination_blend_ = GL_ONE_MINUS_SRC_ALPHA;
 
@@ -281,6 +296,9 @@ class GpuImmediate
     SDL_GPUSampler *current_sampler_[2] = {nullptr, nullptr};
 
     bool texturing_enabled_ = false;
+
+    bool        sky_pass_enabled_ = false;
+    SkyPassInfo sky_pass_info_;
 
     int32_t pending_base_  = 0;
     int32_t pending_count_ = 0;
@@ -290,6 +308,7 @@ class GpuImmediate
     SDL_GPUSampler          *bound_sampler_[2]  = {nullptr, nullptr};
     SDL_GPUBuffer           *bound_index_buffer_ = nullptr;
 
+    int32_t bound_stencil_reference_        = -1;
     int32_t bound_vertex_parameter_index_   = -1;
     int32_t bound_fragment_parameter_index_ = -1;
 

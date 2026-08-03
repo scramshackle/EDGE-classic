@@ -811,8 +811,16 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
     {
         if (source->side[0]->top.image)
         {
-            sky_image = ImageLookup(source->side[0]->top.image->name_.c_str(), kImageNamespaceTexture);
-            sky_ref   = &source->side[0]->top;
+            const Image *transfer_sky = ImageLookup(source->side[0]->top.image->name_.c_str(), kImageNamespaceTexture);
+            MapSurface  *transfer_ref = &source->side[0]->top;
+
+            for (Sector *tsec = FindSectorFromTag(target->tag); tsec != nullptr; tsec = tsec->tag_next)
+            {
+                tsec->sky_image = transfer_sky;
+                tsec->sky_ref   = transfer_ref;
+            }
+
+            ComputeSkyHeights();
         }
     }
 

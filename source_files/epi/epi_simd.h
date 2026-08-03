@@ -516,6 +516,25 @@ inline SimdF32x4 RsqrtF32x4(SimdF32x4 v)
 #endif
 }
 
+inline void EnableFastFloats()
+{
+#if defined(EPI_SIMD_SSE2)
+    _mm_setcsr(_mm_getcsr() | 0x8040);
+#elif defined(EPI_SIMD_NEON)
+#if defined(__aarch64__)
+    uint64_t fpcr;
+    __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr |= (1ULL << 24);
+    __asm__ volatile("msr fpcr, %0" ::"r"(fpcr));
+#elif defined(__arm__)
+    uint32_t fpscr;
+    __asm__ volatile("vmrs %0, fpscr" : "=r"(fpscr));
+    fpscr |= (1U << 24);
+    __asm__ volatile("vmsr fpscr, %0" ::"r"(fpscr));
+#endif
+#endif
+}
+
 inline void StoreLo64(uint8_t *p, SimdI32x4 v)
 {
 #if defined(EPI_SIMD_SSE2)

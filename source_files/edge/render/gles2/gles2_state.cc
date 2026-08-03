@@ -11,6 +11,17 @@
 std::unordered_map<GLuint, GLint> texture_clamp_s;
 std::unordered_map<GLuint, GLint> texture_clamp_t;
 
+static bool gles2_stencil_available = false;
+
+void Gles2DetectStencilBuffer()
+{
+    GLint stencil_bits = 0;
+
+    glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+
+    gles2_stencil_available = (stencil_bits > 0);
+}
+
 static GLint Gles2WrapMode(GLint wrap)
 {
     if (wrap == GL_CLAMP || wrap == GL_CLAMP_TO_EDGE)
@@ -56,6 +67,16 @@ class Gles2RenderState : public RenderState
             enable_depth_test_ = enabled;
             state_dirty_       = true;
             break;
+        case GL_STENCIL_TEST:
+            if (enabled)
+            {
+                glEnable(GL_STENCIL_TEST);
+            }
+            else
+            {
+                glDisable(GL_STENCIL_TEST);
+            }
+            break;
         case GL_CLIP_PLANE0:
         case GL_CLIP_PLANE1:
         case GL_CLIP_PLANE2:
@@ -90,6 +111,28 @@ class Gles2RenderState : public RenderState
     void ColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
     {
         glColorMask(red, green, blue, alpha);
+    }
+
+    void StencilFunction(GLenum func, GLint ref, GLuint mask)
+    {
+        glStencilFunc(func, ref, mask);
+    }
+
+    void StencilOperation(GLenum stencil_fail, GLenum depth_fail, GLenum depth_pass)
+    {
+        glStencilOp(stencil_fail, depth_fail, depth_pass);
+    }
+
+    void StencilWriteMask(GLuint mask)
+    {
+        stencil_write_mask_ = mask;
+
+        glStencilMask(mask);
+    }
+
+    bool HasStencilBuffer()
+    {
+        return gles2_stencil_available;
     }
 
     void CullFace(GLenum mode)
@@ -155,6 +198,12 @@ class Gles2RenderState : public RenderState
             glDepthMask(GL_TRUE);
             depth_mask_  = true;
             state_dirty_ = true;
+        }
+
+        if ((mask & GL_STENCIL_BUFFER_BIT) && stencil_write_mask_ != 0xFF)
+        {
+            glStencilMask(0xFF);
+            stencil_write_mask_ = 0xFF;
         }
 
         glClear(mask);
@@ -382,6 +431,13 @@ class Gles2RenderState : public RenderState
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_POLYGON_OFFSET_FILL);
+
+        glDisable(GL_STENCIL_TEST);
+        glStencilMask(0xFF);
+        glStencilFunc(GL_ALWAYS, 0, 0xFF);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+        stencil_write_mask_ = 0xFF;
 
         glDepthMask(GL_TRUE);
         glDepthFunc(GL_LEQUAL);
@@ -654,6 +710,8 @@ class Gles2RenderState : public RenderState
     GLenum applied_cull_mode_         = GL_BACK;
     GLenum applied_blend_source_      = GL_ONE;
     GLenum applied_blend_destination_ = GL_ZERO;
+
+    GLuint stencil_write_mask_ = 0xFF;
 
     bool state_dirty_ = true;
 

@@ -20,7 +20,9 @@ enum GpuPipelineFlag
     kGpuPipelineBlendDestinationSourceColor         = 1 << 10,
     kGpuPipelineBlendDestinationZero                = 1 << 11,
     kGpuPipelineCullFront                           = 1 << 12,
-    kGpuPipelineCullBack                            = 1 << 13
+    kGpuPipelineCullBack                            = 1 << 13,
+    kGpuPipelineStencilWrite                        = 1 << 14,
+    kGpuPipelineStencilTest                         = 1 << 15
 };
 
 enum GpuPrimitiveType

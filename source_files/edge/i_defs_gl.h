@@ -51,10 +51,12 @@ typedef int GLsizei;
 
 #define GL_ALPHA 0x1906
 
-#define GL_COLOR_BUFFER_BIT 0x00004000
-#define GL_DEPTH_BUFFER_BIT 0x00000100
-#define GL_DEPTH_TEST       0x0B71
-#define GL_STENCIL_TEST     0x0B90
+#define GL_COLOR_BUFFER_BIT   0x00004000
+#define GL_DEPTH_BUFFER_BIT   0x00000100
+#define GL_STENCIL_BUFFER_BIT 0x00000400
+#define GL_DEPTH_TEST         0x0B71
+#define GL_STENCIL_TEST       0x0B90
+#define GL_STENCIL_BITS       0x0D57
 
 #define GL_UNSIGNED_BYTE 0x1401
 
@@ -89,6 +91,9 @@ typedef int GLsizei;
 
 #define GL_GREATER 0x0204
 #define GL_LEQUAL  0x0203
+#define GL_ALWAYS  0x0207
+#define GL_EQUAL   0x0202
+#define GL_KEEP    0x1E00
 
 #define GL_TEXTURE0 0x84C0
 

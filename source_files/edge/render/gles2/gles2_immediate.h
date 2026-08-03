@@ -166,3 +166,5 @@ class Gles2Immediate
 extern Gles2Immediate gles2_immediate;
 
 void Gles2ApplyRenderState();
+
+void Gles2DetectStencilBuffer();

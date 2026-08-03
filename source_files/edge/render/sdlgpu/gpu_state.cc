@@ -124,6 +124,9 @@ class GpuRenderState : public RenderState
         case GL_DEPTH_TEST:
             enable_depth_test_ = enabled;
             break;
+        case GL_STENCIL_TEST:
+            enable_stencil_test_ = enabled;
+            break;
         case GL_CLIP_PLANE0:
         case GL_CLIP_PLANE1:
         case GL_CLIP_PLANE2:
@@ -162,6 +165,32 @@ class GpuRenderState : public RenderState
         EPI_UNUSED(green);
         EPI_UNUSED(blue);
         EPI_UNUSED(alpha);
+    }
+
+    void StencilFunction(GLenum func, GLint ref, GLuint mask)
+    {
+        EPI_UNUSED(mask);
+
+        stencil_function_  = func;
+        stencil_reference_ = (uint8_t)ref;
+    }
+
+    void StencilOperation(GLenum stencil_fail, GLenum depth_fail, GLenum depth_pass)
+    {
+        EPI_UNUSED(stencil_fail);
+        EPI_UNUSED(depth_fail);
+
+        stencil_pass_operation_ = depth_pass;
+    }
+
+    void StencilWriteMask(GLuint mask)
+    {
+        stencil_write_mask_ = mask;
+    }
+
+    bool HasStencilBuffer()
+    {
+        return gpu_device.HasStencil();
     }
 
     void CullFace(GLenum mode)
@@ -205,6 +234,9 @@ class GpuRenderState : public RenderState
     {
         if (mask & GL_DEPTH_BUFFER_BIT)
             gpu_immediate.ClearDepth();
+
+        if ((mask & GL_STENCIL_BUFFER_BIT) && gpu_device.HasStencil())
+            gpu_immediate.ClearStencil();
     }
 
     void ClearColor(RGBAColor color)
@@ -471,9 +503,15 @@ class GpuRenderState : public RenderState
         enable_depth_test_   = false;
         enable_alpha_test_   = false;
         enable_fog_          = false;
+        enable_stencil_test_ = false;
 
         depth_mask_     = true;
         depth_function_ = GL_LEQUAL;
+
+        stencil_function_       = GL_ALWAYS;
+        stencil_pass_operation_ = GL_KEEP;
+        stencil_reference_      = 0;
+        stencil_write_mask_     = 0xFF;
 
         line_width_ = 1.0f;
 
@@ -519,7 +557,17 @@ class GpuRenderState : public RenderState
                 pipeline_flags |= kGpuPipelineCullFront;
         }
 
+        if (enable_stencil_test_ && gpu_device.HasStencil())
+        {
+            if (stencil_write_mask_ != 0 && stencil_pass_operation_ == GL_REPLACE)
+                pipeline_flags |= kGpuPipelineStencilWrite;
+            else if (stencil_function_ == GL_EQUAL)
+                pipeline_flags |= kGpuPipelineStencilTest;
+        }
+
         pipeline_flags |= flags;
+
+        gpu_immediate.SetStencilReference(stencil_reference_);
 
         gpu_immediate.SetPipelineState(pipeline_flags, blend_source_factor_, blend_destination_factor_);
 
@@ -639,7 +687,13 @@ class GpuRenderState : public RenderState
     GLenum cull_face_        = GL_BACK;
     GLenum front_face_       = GL_CW;
 
-    bool enable_depth_test_ = false;
+    bool enable_depth_test_   = false;
+    bool enable_stencil_test_ = false;
+
+    GLenum  stencil_function_       = GL_ALWAYS;
+    GLenum  stencil_pass_operation_ = GL_KEEP;
+    uint8_t stencil_reference_      = 0;
+    GLuint  stencil_write_mask_     = 0xFF;
     bool depth_mask_        = true;
 
     GLenum depth_function_ = GL_LEQUAL;

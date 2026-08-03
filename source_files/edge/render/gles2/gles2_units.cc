@@ -39,6 +39,9 @@ struct RendererUnit
 
     RGBAColor fog_color   = kRGBANoValue;
     float     fog_density = 0;
+
+    bool        sky_pass_enabled = false;
+    SkyPassInfo sky_pass;
 };
 
 static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
@@ -81,7 +84,8 @@ void FinishUnitBatch(void)
 }
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
-                                int pass, BlendingMode blending, RGBAColor fog_color, float fog_density)
+                                int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
+                                const SkyPassInfo *sky_pass)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -120,6 +124,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
+
+    unit->sky_pass_enabled = (sky_pass != nullptr);
+
+    if (sky_pass)
+        unit->sky_pass = *sky_pass;
 
     return local_verts + current_render_vert;
 }
@@ -285,7 +294,7 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
 
     if (a->pass != b->pass || a->texture[0] != b->texture[0] || a->texture[1] != b->texture[1] ||
         a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
-        a->blending != b->blending || a->fog_color != b->fog_color ||
+        a->blending != b->blending || a->fog_color != b->fog_color || a->sky_pass_enabled || b->sky_pass_enabled ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
         return false;
 
@@ -668,6 +677,8 @@ void RenderCurrentUnits(void)
         ApplyUnitClamping(unit, old_clamp_s, old_clamp_t);
 
         render_state->SetPipeline(0);
+
+        gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
 
         Gles2ApplyRenderState();
 

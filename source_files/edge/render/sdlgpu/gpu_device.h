@@ -22,7 +22,7 @@ class GpuDevice
 
     void SubmitFrame();
 
-    void BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load);
+    void BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load);
 
     void EndPass();
 
@@ -67,6 +67,11 @@ class GpuDevice
         return depth_format_;
     }
 
+    bool HasStencil() const
+    {
+        return has_stencil_;
+    }
+
     bool FrameAcquired() const
     {
         return command_buffer_ != nullptr && swapchain_texture_ != nullptr;
@@ -109,6 +114,7 @@ class GpuDevice
     RGBAColor clear_color_ = kRGBABlack;
 
     bool color_written_ = false;
+    bool has_stencil_   = false;
 };
 
 extern GpuDevice gpu_device;

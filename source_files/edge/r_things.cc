@@ -23,6 +23,7 @@
 //
 //----------------------------------------------------------------------------
 
+#include "edge_profiling.h"
 #include <math.h>
 
 #include <map>
@@ -950,6 +951,8 @@ static void RendererClipSpriteVertically(DrawSubsector *dsub, DrawThing *dthing)
 
 void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
 {
+    EDGE_ZoneScoped;
+
     /* Visit a single thing that exists in the current subsector */
 
     EPI_ASSERT(mo->state_);
@@ -1184,6 +1187,8 @@ static void DLIT_Thing(MapObject *mo, void *dataptr)
 
 static bool RenderThing(DrawThing *dthing, bool solid)
 {
+    EDGE_ZoneScoped;
+
     ec_frame_stats.draw_things++;
 
     if (dthing->is_model)
@@ -1548,6 +1553,8 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
 bool RenderThings(DrawFloor *dfloor, bool solid)
 {
+    EDGE_ZoneScoped;
+
     //
     // As part my move to strip out Z_Zone usage and replace
     // it with array classes and more standard new and delete

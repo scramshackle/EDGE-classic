@@ -432,6 +432,20 @@ void GpuImmediate::SetPipelineState(uint32_t pipeline_flags, GLenum source_blend
     destination_blend_ = destination_blend;
 }
 
+void GpuImmediate::SetStencilReference(uint8_t reference)
+{
+    stencil_reference_ = reference;
+}
+
+void GpuImmediate::ClearStencil()
+{
+    GpuCommand command;
+
+    command.type = kGpuCommandClearStencil;
+
+    commands_.push_back(command);
+}
+
 void GpuImmediate::SetTexture(SDL_GPUTexture *texture, SDL_GPUSampler *sampler)
 {
     current_texture_[0] = texture ? texture : default_texture_;
@@ -525,6 +539,45 @@ void GpuImmediate::SetLineMode(bool enabled)
         current_fragment_parameters_.flags &= ~kGpuFragmentFlagLine;
 
     fragment_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
+{
+    bool enabled = (sky_pass != nullptr);
+
+    if (!enabled && !sky_pass_enabled_)
+        return;
+
+    sky_pass_enabled_ = enabled;
+
+    if (enabled)
+    {
+        sky_pass_info_ = *sky_pass;
+
+        current_fragment_parameters_.flags |= kGpuFragmentFlagSkyPass;
+
+        current_fragment_parameters_.sky_inverse_projection = sky_pass->inverse_projection;
+        current_fragment_parameters_.sky_inverse_view       = sky_pass->inverse_view;
+
+        current_fragment_parameters_.sky_viewport[0] = sky_pass->viewport_origin.X;
+        current_fragment_parameters_.sky_viewport[1] = (float)gpu_device.TargetHeight() - sky_pass->viewport_origin.Y;
+        current_fragment_parameters_.sky_viewport[2] = sky_pass->viewport_size.X;
+        current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.Y;
+
+        current_fragment_parameters_.sky_stretch_mode       = (float)sky_pass->stretch_mode;
+        current_fragment_parameters_.sky_h_ratio            = sky_pass->h_ratio;
+        current_fragment_parameters_.sky_u_scale            = sky_pass->u_scale;
+        current_fragment_parameters_.sky_ty                 = sky_pass->ty;
+        current_fragment_parameters_.sky_u_offset           = sky_pass->u_offset;
+        current_fragment_parameters_.sky_v_offset           = sky_pass->v_offset;
+        current_fragment_parameters_.sky_vertical_fov_slope = sky_pass->vertical_fov_slope;
+        current_fragment_parameters_.sky_horizon_shift      = sky_pass->horizon_shift;
+    }
+    else
+        current_fragment_parameters_.flags &= ~kGpuFragmentFlagSkyPass;
+
+    fragment_parameters_dirty_ = true;
+    vertex_parameters_dirty_   = true;
 }
 
 void GpuImmediate::SetSkipRGB(bool enabled)
@@ -624,6 +677,11 @@ int32_t GpuImmediate::CurrentVertexParameters()
     parameters.tm  = matrix_stack_[kGpuMatrixModeTexture][matrix_top_[kGpuMatrixModeTexture]];
 
     memcpy(parameters.clipplane, clip_plane_, sizeof(clip_plane_));
+
+    parameters.sky_pass         = sky_pass_enabled_ ? 1.0f : 0.0f;
+    parameters.sky_fog_depth    = sky_pass_info_.fog_depth;
+    parameters.vertex_padding[0] = 0.0f;
+    parameters.vertex_padding[1] = 0.0f;
 
     vertex_parameters_.push_back(parameters);
 
@@ -742,6 +800,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
                 draw->sampler[0] == sampler0 && draw->texture[1] == texture1 && draw->sampler[1] == sampler1 &&
                 draw->vertex_parameter_index == vertex_parameters &&
                 draw->fragment_parameter_index == fragment_parameters &&
+                draw->stencil_reference == stencil_reference_ &&
                 draw->base_vertex + draw->vertex_count == pending_base_ &&
                 draw->index_first + draw->index_count == (int32_t)dynamic_indices_.size() &&
                 draw->vertex_count + count <= 65536)
@@ -775,6 +834,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->vertex_parameter_index   = vertex_parameters;
     draw->fragment_parameter_index = fragment_parameters;
     draw->index_source             = index_source;
+    draw->stencil_reference        = stencil_reference_;
     draw->mergeable                = mergeable;
 
     commands_.push_back(command);
@@ -1071,6 +1131,7 @@ void GpuImmediate::ApplyPassState()
     bound_index_buffer_             = nullptr;
     bound_vertex_parameter_index_   = -1;
     bound_fragment_parameter_index_ = -1;
+    bound_stencil_reference_        = -1;
 
     if (!pass)
         return;
@@ -1133,7 +1194,7 @@ void GpuImmediate::Replay()
     UploadVertices();
     UploadIndices();
 
-    gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear);
+    gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear);
 
     ApplyPassState();
 
@@ -1149,7 +1210,7 @@ void GpuImmediate::Replay()
 
             if (!pass)
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear);
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad);
                 ApplyPassState();
                 pass = gpu_device.RenderPass();
             }
@@ -1225,9 +1286,13 @@ void GpuImmediate::Replay()
                 current_scissor_ = command->arguments.rectangle;
                 scissor_set_     = true;
             }
+            else if (command->type == kGpuCommandClearStencil)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear);
+            }
             else
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear);
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad);
             }
 
             ApplyPassState();
@@ -1246,6 +1311,12 @@ void GpuImmediate::Replay()
             SDL_BindGPUGraphicsPipeline(pass, draw->pipeline);
             bound_pipeline_ = draw->pipeline;
             pipeline_bind_count_++;
+        }
+
+        if (bound_stencil_reference_ != draw->stencil_reference)
+        {
+            SDL_SetGPUStencilReference(pass, draw->stencil_reference);
+            bound_stencil_reference_ = draw->stencil_reference;
         }
 
         if (bound_texture_[0] != draw->texture[0] || bound_sampler_[0] != draw->sampler[0] ||

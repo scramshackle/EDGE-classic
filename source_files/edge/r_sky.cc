@@ -22,6 +22,7 @@
 
 #include "dm_state.h"
 #include "epi.h"
+#include "edge_profiling.h"
 #include "g_game.h" // current_map
 #include "i_defs_gl.h"
 #include "im_data.h"
@@ -53,14 +54,6 @@ extern ImageData *ReadAsEpiBlock(Image *rim);
 
 extern ConsoleVariable draw_culling;
 
-static RGBAColor sky_cap_color;
-
-static uint32_t total_sky_verts = 0;
-
-static RendererVertex *sky_glvert = nullptr;
-
-static bool sky_unit_started = false;
-
 static HMM_Vec2 ddf_sky_scroll     = {{0, 0}};
 static HMM_Vec2 ddf_old_sky_scroll = {{0, 0}};
 static int      ddf_scroll_tic     = -1;
@@ -69,7 +62,9 @@ SkyStretch current_sky_stretch = kSkyStretchUnset;
 
 static constexpr uint8_t kMBFSkyYShift = 28;
 
-EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 3);
+static constexpr int kMaximumSkyGroups = 8;
+
+EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 2);
 
 struct SectorSkyRing
 {
@@ -83,6 +78,34 @@ struct SectorSkyRing
     // maximal sky height of group
     float maximum_height;
 };
+
+static std::unordered_map<const Image *, int> sky_image_group_lookup;
+
+static int overflowed_sky_group_count = 0;
+
+static int SkyGroupForImage(const Image *image)
+{
+    if (!render_state->HasStencilBuffer())
+        return 0;
+
+    std::unordered_map<const Image *, int>::iterator it = sky_image_group_lookup.find(image);
+
+    if (it != sky_image_group_lookup.end())
+        return it->second;
+
+    if ((int)sky_image_group_lookup.size() >= kMaximumSkyGroups)
+    {
+        overflowed_sky_group_count++;
+        sky_image_group_lookup.emplace(image, kMaximumSkyGroups - 1);
+        return kMaximumSkyGroups - 1;
+    }
+
+    int group = (int)sky_image_group_lookup.size();
+
+    sky_image_group_lookup.emplace(image, group);
+
+    return group;
+}
 
 //
 // ComputeSkyHeights
@@ -146,6 +169,9 @@ void ComputeSkyHeights(void)
         if (ring1->group == 0 || ring2->group == 0)
             continue;
 
+        if (sec1->sky_image != sec2->sky_image)
+            continue;
+
         // already in the same group ?
         if (ring1->group == ring2->group)
             continue;
@@ -184,11 +210,25 @@ void ComputeSkyHeights(void)
 
     // --- now store the results, and free up ---
 
+    sky_image_group_lookup.clear();
+    overflowed_sky_group_count = 0;
+
     for (i = 0, sec = level_sectors; i < total_level_sectors; i++, sec++)
     {
         if (rings[i].group > 0)
+        {
             sec->sky_height = rings[i].maximum_height;
+            sec->sky_group  = SkyGroupForImage(sec->sky_image);
+        }
+        else if (EDGE_IMAGE_IS_SKY(sec->floor))
+            sec->sky_group = SkyGroupForImage(sec->sky_image);
+        else
+            sec->sky_group = -1;
     }
+
+    if (overflowed_sky_group_count > 0)
+        LogWarning("Level uses more than %d distinct skies; %d had to share a sky group.\n", kMaximumSkyGroups,
+                   overflowed_sky_group_count);
 
     delete[] rings;
 }
@@ -199,157 +239,103 @@ bool need_to_draw_sky = false;
 
 struct FakeSkybox
 {
-    const Image *base_sky;
+    const Image *base_sky = nullptr;
 
-    const Colormap *effect_colormap;
+    const Colormap *effect_colormap = nullptr;
 
-    int face_size;
+    int face_size = 1;
 
-    GLuint texture[6];
+    GLuint texture[6] = {0, 0, 0, 0, 0, 0};
 
     // face images are only present for custom skyboxes.
     // pseudo skyboxes are generated outside of the image system.
-    const Image *face[6];
+    const Image *face[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 };
 
-static FakeSkybox fake_box[2] = {
-    {nullptr, nullptr, 1, {0, 0, 0, 0, 0, 0}, {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}},
-    {nullptr, nullptr, 1, {0, 0, 0, 0, 0, 0}, {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}}};
+static std::unordered_map<uint64_t, FakeSkybox> fake_box_cache;
 
-static void DeleteSkyTexGroup(int SK)
+static FakeSkybox *current_fake_box = nullptr;
+
+static uint64_t MakeSkyboxCacheKey(const Image *base_sky, const Colormap *effect_colormap)
+{
+    return (uint64_t)(uintptr_t)base_sky ^ ((uint64_t)(uintptr_t)effect_colormap * 0x9E3779B97F4A7C15ull);
+}
+
+static void DeleteSkyTexGroup(FakeSkybox &box)
 {
     for (int i = 0; i < 6; i++)
     {
-        if (fake_box[SK].texture[i] != 0)
+        if (box.texture[i] != 0)
         {
-            render_state->DeleteTexture(&fake_box[SK].texture[i]);
-            fake_box[SK].texture[i] = 0;
+            render_state->DeleteTexture(&box.texture[i]);
+            box.texture[i] = 0;
         }
     }
 }
 
 void DeleteSkyTextures(void)
 {
-    for (int SK = 0; SK < 2; SK++)
-    {
-        fake_box[SK].base_sky        = nullptr;
-        fake_box[SK].effect_colormap = nullptr;
+    for (std::unordered_map<uint64_t, FakeSkybox>::iterator it = fake_box_cache.begin(); it != fake_box_cache.end();
+         ++it)
+        DeleteSkyTexGroup(it->second);
 
-        DeleteSkyTexGroup(SK);
-    }
+    fake_box_cache.clear();
+
+    current_fake_box = nullptr;
 }
 
-static void BeginSkyUnit(void)
+struct SkyGroupAccumulator
 {
-    total_sky_verts = 0;
-    StartUnitBatch(false);
-    sky_glvert       = BeginRenderUnit(GL_TRIANGLES, kMaximumLocalVertices, GL_MODULATE, 0,
-                                       (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-    sky_unit_started = true;
+    std::vector<RendererVertex> vertices;
+
+    const Image *image = nullptr;
+    MapSurface  *ref   = nullptr;
+
+    bool used = false;
+};
+
+static SkyGroupAccumulator sky_group_accumulator[kMaximumSkyGroups];
+
+static void PushSkyVertex(int group, const HMM_Vec3 &position)
+{
+    RendererVertex vertex;
+
+    vertex.rgba     = kRGBAWhite;
+    vertex.position = position;
+
+    sky_group_accumulator[group].vertices.push_back(vertex);
+}
+
+static int MarkSkyGroup(Sector *sky_owner)
+{
+    int group = (sky_owner && sky_owner->sky_group >= 0) ? sky_owner->sky_group : 0;
+
+    if (group >= kMaximumSkyGroups)
+        group = kMaximumSkyGroups - 1;
+
+    SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
+
+    accumulator.image = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
+    accumulator.ref   = sky_owner ? sky_owner->sky_ref : nullptr;
+    accumulator.used  = true;
+
+    return group;
 }
 
 void BeginSky(void)
 {
     need_to_draw_sky = false;
 
+    for (int group = 0; group < kMaximumSkyGroups; group++)
+    {
+        sky_group_accumulator[group].vertices.clear();
+        sky_group_accumulator[group].used = false;
+    }
+
     render_state->ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 }
 
-// The following cylindrical sky-drawing routines are adapted from SLADE's 3D
-// Renderer
-// (https://github.com/sirjuddington/SLADE/blob/master/src/MapEditor/Renderer/MapRenderer3D.cpp)
-// with additional modes and other tweaks
-
-static HMM_Vec2 sky_circle[32];
-
-static void BuildSkyCircle()
-{
-    float rot = 0;
-    for (auto &pos : sky_circle)
-    {
-        pos = {{HMM_SINF(rot), -HMM_COSF(rot)}};
-        rot -= (HMM_PI32 * 2) / 32.0;
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Renders a cylindrical 'slice' of the sky between [top] and [bottom] on the z
-// axis
-// -----------------------------------------------------------------------------
-static void RenderSkySlice(float top, float bottom, float atop, float abottom, float dist, float tx, float ty,
-                           float offx, float offy, GLuint sky_tex_id, BlendingMode blend, RGBAColor fc_to_use,
-                           float fd_to_use)
-{
-    float tc_x  = offx;
-    float tc_y1 = (top + 1.0f) * (ty * 0.5f);
-    float tc_y2 = (bottom + 1.0f) * (ty * 0.5f);
-
-    if (current_sky_stretch == kSkyStretchMirror && bottom < -0.5f)
-    {
-        tc_y1 += offy;
-        tc_y2 += offy;
-    }
-    else
-    {
-        tc_y1 -= offy;
-        tc_y2 -= offy;
-    }
-
-    if (current_sky_stretch == kSkyStretchMirror && bottom < -0.5f)
-    {
-        tc_y1 = -tc_y1;
-        tc_y2 = -tc_y2;
-    }
-
-    RGBAColor topcol    = epi::MakeRGBA(255, 255, 255, (uint8_t)(atop * 255.0f));
-    RGBAColor bottomcol = epi::MakeRGBA(255, 255, 255, (uint8_t)(abottom * 255.0f));
-
-    RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 128, GL_MODULATE, sky_tex_id, (GLuint)kTextureEnvironmentDisable,
-                                             0, 0, blend, fc_to_use, fd_to_use);
-
-    // Go through circular points
-    for (unsigned a = 0; a < 31; a++)
-    {
-        // Top
-        glvert->rgba                   = topcol;
-        glvert->texture_coordinates[0] = {{tc_x + tx, tc_y1}};
-        glvert++->position             = {{(sky_circle[a + 1].X * dist), -(sky_circle[a + 1].Y * dist), (top * dist)}};
-        glvert->rgba                   = topcol;
-        glvert->texture_coordinates[0] = {{tc_x, tc_y1}};
-        glvert++->position             = {{(sky_circle[a].X * dist), -(sky_circle[a].Y * dist), (top * dist)}};
-
-        // Bottom
-        glvert->rgba                   = bottomcol;
-        glvert->texture_coordinates[0] = {{tc_x, tc_y2}};
-        glvert++->position             = {{(sky_circle[a].X * dist), -(sky_circle[a].Y * dist), (bottom * dist)}};
-        glvert->rgba                   = bottomcol;
-        glvert->texture_coordinates[0] = {{tc_x + tx, tc_y2}};
-        glvert++->position = {{(sky_circle[a + 1].X * dist), -(sky_circle[a + 1].Y * dist), (bottom * dist)}};
-
-        tc_x += tx;
-    }
-
-    // Link last point -> first
-    // Top
-    glvert->rgba                   = topcol;
-    glvert->texture_coordinates[0] = {{tc_x + tx, tc_y1}};
-    glvert++->position             = {{(sky_circle[0].X * dist), -(sky_circle[0].Y * dist), (top * dist)}};
-    glvert->rgba                   = topcol;
-    glvert->texture_coordinates[0] = {{tc_x, tc_y1}};
-    glvert++->position             = {{(sky_circle[31].X * dist), -(sky_circle[31].Y * dist), (top * dist)}};
-
-    // Bottom
-    glvert->rgba                   = bottomcol;
-    glvert->texture_coordinates[0] = {{tc_x, tc_y2}};
-    glvert++->position             = {{(sky_circle[31].X * dist), -(sky_circle[31].Y * dist), (bottom * dist)}};
-    glvert->rgba                   = bottomcol;
-    glvert->texture_coordinates[0] = {{tc_x + tx, tc_y2}};
-    glvert->position               = {{(sky_circle[0].X * dist), -(sky_circle[0].Y * dist), (bottom * dist)}};
-
-    EndRenderUnit(128);
-}
-
-static void RenderSkyCylinder(void)
+static void RenderSkyEquirect(void)
 {
     GLuint sky_tex_id = ImageCache(sky_image, true, render_view_effect_colormap);
 
@@ -360,30 +346,39 @@ static void RenderSkyCylinder(void)
     else
         current_sky_stretch = (SkyStretch)sky_stretch_mode.d_;
 
-    // Center skybox a bit below the camera view
     SetupSkyMatrices();
 
-    float dist     = renderer_far_clip.f_ * 2.0f;
-    float cap_dist = dist * 2.0f; // Ensure the caps extend beyond the cylindrical
-                                  // projection Calculate some stuff based on sky height
     float sky_h_ratio;
     float solid_sky_h;
+
     if (sky_image->ScaledHeight() > 128 && current_sky_stretch != kSkyStretchStretch)
         sky_h_ratio = (float)sky_image->ScaledHeight() / 256;
     else if (current_sky_stretch == kSkyStretchVanilla)
         sky_h_ratio = 0.5f;
     else
         sky_h_ratio = 1.0f;
+
     if (current_sky_stretch == kSkyStretchVanilla)
         solid_sky_h = sky_h_ratio * 0.98f;
     else
         solid_sky_h = sky_h_ratio * 0.75f;
-    float cap_z = dist * sky_h_ratio;
+
+    float ty = 2.0f;
+
+    if (current_sky_stretch == kSkyStretchStretch)
+    {
+        if (sky_image->ScaledHeight() > 128)
+            ty = (float)sky_image->ScaledHeight() / 256.0f;
+        else
+            ty = 1.0f;
+    }
+    else if (current_sky_stretch == kSkyStretchVanilla && sky_image->ScaledHeight() > 128)
+        ty = 1.0f;
 
     RGBAColor    fc_to_use = current_map->outdoor_fog_color_;
     float        fd_to_use = 0.01f * current_map->outdoor_fog_density_;
     BlendingMode blend     = kBlendingNoZBuffer;
-    // check for sector fog
+
     if (fc_to_use == kRGBANoValue)
     {
         fc_to_use = view_properties->fog_color;
@@ -400,73 +395,18 @@ static void RenderSkyCylinder(void)
         fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.03f : 0.010f);
     }
 
-    // Render top cap
-    RendererVertex *glvert   = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
-                                               blend, fc_to_use, fd_to_use);
-    RGBAColor       unit_col = sky_cap_color;
+    float offx = 0.0f;
+    float offy = 0.0f;
 
-    glvert->rgba       = unit_col;
-    glvert++->position = {{-cap_dist, -cap_dist, cap_z}};
-    glvert->rgba       = unit_col;
-    glvert++->position = {{-cap_dist, cap_dist, cap_z}};
-    glvert->rgba       = unit_col;
-    glvert++->position = {{cap_dist, cap_dist, cap_z}};
-    glvert->rgba       = unit_col;
-    glvert->position   = {{cap_dist, -cap_dist, cap_z}};
-
-    EndRenderUnit(4);
-
-    // Render bottom cap
-    if (current_sky_stretch > kSkyStretchMirror)
-        unit_col = culling_fog_color;
-    if (current_sky_stretch == kSkyStretchVanilla)
-        cap_z = 0;
-
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use,
-                             fd_to_use);
-
-    glvert->rgba       = unit_col;
-    glvert++->position = {{-cap_dist, -cap_dist, -cap_z}};
-    glvert->rgba       = unit_col;
-    glvert++->position = {{-cap_dist, cap_dist, -cap_z}};
-    glvert->rgba       = unit_col;
-    glvert++->position = {{cap_dist, cap_dist, -cap_z}};
-    glvert->rgba       = unit_col;
-    glvert->position   = {{cap_dist, -cap_dist, -cap_z}};
-
-    EndRenderUnit(4);
-
-    // Render skybox sides
-
-    blend = (BlendingMode)(blend | kBlendingAlpha);
-
-    // Check for odd sky sizes
-    float tx   = 0.125f;
-    float ty   = 2.0f;
-    float offx = 0;
-    float offy = 0;
-    if (sky_image->ScaledWidth() > 256)
-        tx = 0.125f / ((float)sky_image->ScaledWidth() / 256.0f);
-
-    // Set scrolling...I guess MBF transfers should take precedence since part of their purpose is to
-    // override the normal sky - Dasho
     if (sky_ref)
     {
-        // Dasho - Dividing by the image height seems to work for scrolling skies, but not skies with static
-        // offsets. I've tested with a few WADs (Eviternity, PD2, Toilet Doom) and things seem to be right.
-        // The entire sky code needs to be rewritten anyway.
-        if (!epi::AlmostEquals(sky_ref->old_offset.Y, sky_ref->offset.Y))
-        {
-            if (!console_active && !paused && !menu_active && !time_stop_active && !erraticism_active)
-            {
-                offy = (HMM_Lerp(sky_ref->old_offset.Y, fractional_tic, sky_ref->offset.Y) - kMBFSkyYShift) /
-                       sky_image->ScaledHeight();
-            }
-            else
-                offy = (sky_ref->offset.Y - kMBFSkyYShift) / sky_image->ScaledHeight();
-        }
+        if (!epi::AlmostEquals(sky_ref->old_offset.Y, sky_ref->offset.Y) && !console_active && !paused &&
+            !menu_active && !time_stop_active && !erraticism_active)
+            offy = HMM_Lerp(sky_ref->old_offset.Y, fractional_tic, sky_ref->offset.Y) - kMBFSkyYShift;
         else
             offy = sky_ref->offset.Y - kMBFSkyYShift;
+
+        offy /= sky_image->ScaledHeight();
     }
     else
     {
@@ -491,116 +431,63 @@ static void RenderSkyCylinder(void)
             else
                 offy = ddf_sky_scroll.Y;
         }
+
     }
 
-    if (current_sky_stretch == kSkyStretchMirror)
+    float tx = 0.125f;
+
+    if (sky_image->ScaledWidth() > 256)
+        tx = 0.125f / ((float)sky_image->ScaledWidth() / 256.0f);
+
+    float horizon_shift = -0.15f;
+
+    if (current_sky_stretch == kSkyStretchStretch)
+        horizon_shift = 0.15f;
+    else if (current_sky_stretch == kSkyStretchVanilla)
     {
-        if (sky_image->ScaledHeight() > 128)
-        {
-            RenderSkySlice(sky_h_ratio, solid_sky_h, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(solid_sky_h, 0.0f, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Solid
-            RenderSkySlice(0.0f, -solid_sky_h, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Solid
-            RenderSkySlice(-solid_sky_h, -sky_h_ratio, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
-        else
-        {
-            RenderSkySlice(1.0f, 0.75f, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(0.75f, 0.0f, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Solid
-            RenderSkySlice(0.0f, -0.75f, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Solid
-            RenderSkySlice(-0.75f, -1.0f, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
+        float band_fraction = (sky_image->ScaledHeight() > 128) ? (0.30f / sky_h_ratio) : 0.18f;
+
+        horizon_shift = (1.0f - 2.0f * band_fraction) * view_y_slope;
     }
-    else if (current_sky_stretch == kSkyStretchRepeat)
+
+    SkyPassInfo sky_pass_info;
+
+    GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
+
+    sky_pass_info.viewport_origin    = {{(float)view_window_x, (float)view_window_y}};
+    sky_pass_info.viewport_size      = {{(float)view_window_width, (float)view_window_height}};
+    sky_pass_info.stretch_mode       = (int)current_sky_stretch;
+    sky_pass_info.h_ratio            = sky_h_ratio;
+    sky_pass_info.solid_sky_h        = solid_sky_h;
+    sky_pass_info.ty                 = ty;
+    sky_pass_info.u_scale            = tx * 32.0f;
+    sky_pass_info.u_offset           = offx;
+    sky_pass_info.v_offset           = offy;
+    sky_pass_info.fog_depth          = renderer_far_clip.f_ * 2.0f;
+    sky_pass_info.vertical_fov_slope = view_y_slope;
+    sky_pass_info.horizon_shift      = horizon_shift;
+
+    RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, 6, GL_MODULATE, sky_tex_id,
+                                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use,
+                                             &sky_pass_info);
+
+    static const HMM_Vec2 kFullscreenQuad[6] = {
+        {{-1.0f, -1.0f}}, {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{-1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{-1.0f, 1.0f}}};
+
+    for (int i = 0; i < 6; i++)
     {
-        if (sky_image->ScaledHeight() > 128)
-        {
-            RenderSkySlice(sky_h_ratio, solid_sky_h, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(solid_sky_h, -solid_sky_h, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use); // Middle Solid
-            RenderSkySlice(-solid_sky_h, -sky_h_ratio, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
-        else
-        {
-            RenderSkySlice(1.0f, 0.75f, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(0.75f, -0.75f, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Middle Solid
-            RenderSkySlice(-0.75f, -1.0f, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
+        glvert->rgba       = kRGBAWhite;
+        glvert++->position = {{kFullscreenQuad[i].X, kFullscreenQuad[i].Y, 0.0f}};
     }
-    else if (current_sky_stretch == kSkyStretchStretch)
-    {
-        if (sky_image->ScaledHeight() > 128)
-        {
-            ty = ((float)sky_image->ScaledHeight() / 256.0f);
-            RenderSkySlice(sky_h_ratio, solid_sky_h, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(solid_sky_h, -solid_sky_h, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use); // Middle Solid
-            RenderSkySlice(-solid_sky_h, -sky_h_ratio, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
-        else
-        {
-            ty = 1.0f;
-            RenderSkySlice(1.0f, 0.75f, 0.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(0.75f, -0.75f, 1.0f, 1.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Middle Solid
-            RenderSkySlice(-0.75f, -1.0f, 1.0f, 0.0f, dist, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
-    }
-    else                               // Vanilla (or sane value if somehow this gets set out of expected
-                                       // range)
-    {
-        if (sky_image->ScaledHeight() > 128)
-        {
-            RenderSkySlice(sky_h_ratio, solid_sky_h, 0.0f, 1.0f, dist / 2, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use);                   // Top Fade
-            RenderSkySlice(solid_sky_h, sky_h_ratio - solid_sky_h, 1.0f, 1.0f, dist / 2, tx, ty, offx, offy, sky_tex_id,
-                           blend, fc_to_use, fd_to_use); // Middle Solid
-            RenderSkySlice(sky_h_ratio - solid_sky_h, 0.0f, 1.0f, 0.0f, dist / 2, tx, ty, offx, offy, sky_tex_id, blend,
-                           fc_to_use,
-                           fd_to_use);                   // Bottom Fade
-        }
-        else
-        {
-            ty *= 1.5f;
-            RenderSkySlice(1.0f, 0.98f, 0.0f, 1.0f, dist / 3, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Top Fade
-            RenderSkySlice(0.98f, 0.35f, 1.0f, 1.0f, dist / 3, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Middle Solid
-            RenderSkySlice(0.35f, 0.33f, 1.0f, 0.0f, dist / 3, tx, ty, offx, offy, sky_tex_id, blend, fc_to_use,
-                           fd_to_use); // Bottom Fade
-        }
-    }
+
+    EndRenderUnit(6);
 }
 
 static void RenderSkybox(void)
 {
     float dist = renderer_far_clip.f_ / 2.0f;
 
-    int SK = UpdateSkyboxTextures();
-
-    EPI_ASSERT(SK >= 0);
+    EPI_ASSERT(current_fake_box);
 
     SetupSkyMatrices();
 
@@ -633,7 +520,7 @@ static void RenderSkybox(void)
                       (uint8_t)(render_view_blue_multiplier * 255.0f));
     // top
     RendererVertex *glvert =
-        BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxTop], (GLuint)kTextureEnvironmentDisable,
+        BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxTop], (GLuint)kTextureEnvironmentDisable,
                         0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -652,7 +539,7 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 
     // bottom
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxBottom],
+    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxBottom],
                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -671,7 +558,7 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 
     // north
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxNorth],
+    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxNorth],
                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -690,7 +577,7 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 
     // east
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxEast],
+    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxEast],
                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -709,7 +596,7 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 
     // south
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxSouth],
+    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxSouth],
                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -728,7 +615,7 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 
     // west
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, fake_box[SK].texture[kSkyboxWest],
+    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxWest],
                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
 
     glvert->rgba                   = unit_col;
@@ -747,23 +634,58 @@ static void RenderSkybox(void)
     EndRenderUnit(4);
 }
 
-static void FinishSkyUnit(void)
+static void FlushSkyGroupPunch(int group)
 {
-    EndRenderUnit(total_sky_verts);
-    FinishUnitBatch();
-    sky_glvert       = nullptr;
-    total_sky_verts  = 0;
-    sky_unit_started = false;
+    EDGE_ZoneScoped;
+
+    SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
+
+    if (accumulator.vertices.empty())
+        return;
+
+    if (render_state->HasStencilBuffer())
+    {
+        render_state->Enable(GL_STENCIL_TEST);
+        render_state->StencilFunction(GL_ALWAYS, group + 1, 0xFF);
+        render_state->StencilOperation(GL_KEEP, GL_KEEP, GL_REPLACE);
+        render_state->StencilWriteMask(0xFF);
+    }
+
+    size_t offset = 0;
+
+    while (offset < accumulator.vertices.size())
+    {
+        size_t chunk = accumulator.vertices.size() - offset;
+
+        if (chunk > kMaximumLocalVertices)
+            chunk = kMaximumLocalVertices;
+
+        StartUnitBatch(false);
+
+        RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, (int)chunk, GL_MODULATE, 0,
+                                                 (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
+
+        for (size_t i = 0; i < chunk; i++)
+            glvert[i] = accumulator.vertices[offset + i];
+
+        EndRenderUnit((int)chunk);
+        FinishUnitBatch();
+
+        offset += chunk;
+    }
 }
 
 void FlushSky(void)
 {
-    if (sky_unit_started)
-        FinishSkyUnit();
+    EDGE_ZoneScoped;
+
+    for (int group = 0; group < kMaximumSkyGroups; group++)
+        FlushSkyGroupPunch(group);
 }
 
 void FinishSky(bool use_depth_mask)
 {
+    EDGE_ZoneScoped;
 
     render_state->ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
@@ -778,16 +700,50 @@ void FinishSky(bool use_depth_mask)
     else
         render_state->DepthMask(false);
 
-    StartUnitBatch(false);
+    if (render_state->HasStencilBuffer())
+    {
+        render_state->StencilOperation(GL_KEEP, GL_KEEP, GL_KEEP);
+        render_state->StencilWriteMask(0x00);
+    }
 
-    if (custom_skybox)
-        RenderSkybox();
-    else
-        RenderSkyCylinder();
+    const Image *saved_sky_image = sky_image;
+    MapSurface  *saved_sky_ref   = sky_ref;
 
-    FinishUnitBatch();
+    for (int group = 0; group < kMaximumSkyGroups; group++)
+    {
+        SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
 
-    RendererRevertSkyMatrices();
+        if (!accumulator.used)
+            continue;
+
+        if (render_state->HasStencilBuffer())
+            render_state->StencilFunction(GL_EQUAL, group + 1, 0xFF);
+
+        sky_image = accumulator.image ? accumulator.image : saved_sky_image;
+        sky_ref   = accumulator.ref;
+
+        StartUnitBatch(false);
+
+        UpdateSkyboxTextures();
+
+        if (custom_skybox)
+            RenderSkybox();
+        else
+            RenderSkyEquirect();
+
+        FinishUnitBatch();
+
+        RendererRevertSkyMatrices();
+    }
+
+    sky_image = saved_sky_image;
+    sky_ref   = saved_sky_ref;
+
+    if (render_state->HasStencilBuffer())
+    {
+        render_state->Disable(GL_STENCIL_TEST);
+        render_state->StencilWriteMask(0xFF);
+    }
 
     if (draw_culling.d_)
         render_state->Enable(GL_DEPTH_TEST);
@@ -798,7 +754,7 @@ void FinishSky(bool use_depth_mask)
         render_state->DepthMask(true);
 }
 
-void RenderSkyPlane(Subsector *sub, float h)
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner)
 {
     need_to_draw_sky = true;
 
@@ -820,11 +776,9 @@ void RenderSkyPlane(Subsector *sub, float h)
     if (!seg)
         return;
 
-    if (!sky_unit_started)
-        BeginSkyUnit();
+    int group = MarkSkyGroup(sky_owner);
 
     render_mirror_set.Height(h);
-    RGBAColor unit_col = kRGBAWhite;
 
     while (seg)
     {
@@ -832,38 +786,21 @@ void RenderSkyPlane(Subsector *sub, float h)
         float y2 = seg->vertex_1->Y;
         render_mirror_set.Coordinate(x2, y2);
 
-        sky_glvert->rgba       = unit_col;
-        sky_glvert++->position = {{x0, y0, h}};
-        sky_glvert->rgba       = unit_col;
-        sky_glvert++->position = {{x1, y1, h}};
-        sky_glvert->rgba       = unit_col;
-        sky_glvert++->position = {{x2, y2, h}};
-
-        total_sky_verts += 3;
+        PushSkyVertex(group, {{x0, y0, h}});
+        PushSkyVertex(group, {{x1, y1, h}});
+        PushSkyVertex(group, {{x2, y2, h}});
 
         x1  = x2;
         y1  = y2;
         seg = seg->subsector_next;
     }
-
-    // Break up large batches
-    if (total_sky_verts > kMaximumLocalVertices / 4)
-    {
-        EndRenderUnit(total_sky_verts);
-        FinishUnitBatch();
-        StartUnitBatch(false);
-        sky_glvert      = BeginRenderUnit(GL_TRIANGLES, kMaximumLocalVertices, GL_MODULATE, 0,
-                                          (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-        total_sky_verts = 0;
-    }
 }
 
-void RenderSkyWall(Seg *seg, float h1, float h2)
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
 {
     need_to_draw_sky = true;
 
-    if (!sky_unit_started)
-        BeginSkyUnit();
+    int group = MarkSkyGroup(sky_owner);
 
     float x1 = seg->vertex_1->X;
     float y1 = seg->vertex_1->Y;
@@ -876,33 +813,12 @@ void RenderSkyWall(Seg *seg, float h1, float h2)
     render_mirror_set.Height(h1);
     render_mirror_set.Height(h2);
 
-    RGBAColor unit_col = kRGBAWhite;
-
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x1, y1, h1}};
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x1, y1, h2}};
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x2, y2, h2}};
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x2, y2, h1}};
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x2, y2, h2}};
-    sky_glvert->rgba       = unit_col;
-    sky_glvert++->position = {{x1, y1, h1}};
-
-    total_sky_verts += 6;
-
-    // Break up large batches
-    if (total_sky_verts > kMaximumLocalVertices / 4)
-    {
-        EndRenderUnit(total_sky_verts);
-        FinishUnitBatch();
-        StartUnitBatch(false);
-        sky_glvert      = BeginRenderUnit(GL_TRIANGLES, kMaximumLocalVertices, GL_MODULATE, 0,
-                                          (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-        total_sky_verts = 0;
-    }
+    PushSkyVertex(group, {{x1, y1, h1}});
+    PushSkyVertex(group, {{x1, y1, h2}});
+    PushSkyVertex(group, {{x2, y2, h2}});
+    PushSkyVertex(group, {{x2, y2, h1}});
+    PushSkyVertex(group, {{x2, y2, h2}});
+    PushSkyVertex(group, {{x1, y1, h1}});
 }
 
 //----------------------------------------------------------------------------
@@ -916,15 +832,16 @@ static const char *UserSkyFaceName(const char *base, int face)
     return buffer;
 }
 
-int UpdateSkyboxTextures(void)
+void UpdateSkyboxTextures(void)
 {
-    int SK = render_view_effect_colormap ? 1 : 0;
+    FakeSkybox *info = &fake_box_cache[MakeSkyboxCacheKey(sky_image, render_view_effect_colormap)];
 
-    FakeSkybox *info = &fake_box[SK];
+    current_fake_box = info;
 
     if (info->base_sky == sky_image && info->effect_colormap == render_view_effect_colormap)
     {
-        return SK;
+        custom_skybox = (info->face[kSkyboxNorth] != nullptr);
+        return;
     }
 
     info->base_sky        = sky_image;
@@ -957,7 +874,6 @@ int UpdateSkyboxTextures(void)
         tmp_img_data = rgb_img_data;
     }
     culling_fog_color = tmp_img_data->AverageColor(0, sky_image->width_, 0, sky_image->height_ / 2);
-    sky_cap_color = tmp_img_data->AverageColor(0, sky_image->width_, sky_image->height_ * 3 / 4, sky_image->height_);
     delete tmp_img_data;
 
     if (what_palette)
@@ -974,20 +890,12 @@ int UpdateSkyboxTextures(void)
 
         for (int k = 0; k < 6; k++)
             info->texture[k] = ImageCache(info->face[k], true, render_view_effect_colormap);
-
-        return SK;
     }
     else
     {
         info->face_size = 256;
         custom_skybox   = false;
-        return -1;
     }
-}
-
-void PrecacheSky(void)
-{
-    BuildSkyCircle();
 }
 
 void ShutdownSky(void)

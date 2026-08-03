@@ -134,6 +134,14 @@ class RenderState
 
     virtual void ColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) = 0;
 
+    virtual void StencilFunction(GLenum func, GLint ref, GLuint mask) = 0;
+
+    virtual void StencilOperation(GLenum stencil_fail, GLenum depth_fail, GLenum depth_pass) = 0;
+
+    virtual void StencilWriteMask(GLuint mask) = 0;
+
+    virtual bool HasStencilBuffer() = 0;
+
     virtual void CullFace(GLenum mode) = 0;
 
     virtual void AlphaFunction(GLenum func, GLfloat ref) = 0;

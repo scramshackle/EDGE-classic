@@ -17,12 +17,105 @@ uniform float u_fog_density;
 uniform float u_fog_start;
 uniform float u_fog_end;
 
+uniform float u_sky_pass;
+uniform mat4  u_sky_inverse_projection;
+uniform mat4  u_sky_inverse_view;
+uniform vec4  u_sky_viewport;
+uniform float u_sky_stretch_mode;
+uniform float u_sky_h_ratio;
+uniform float u_sky_u_scale;
+uniform float u_sky_ty;
+uniform float u_sky_u_offset;
+uniform float u_sky_v_offset;
+uniform float u_sky_vertical_fov_slope;
+uniform float u_sky_horizon_shift;
+
 varying vec4 v_texture_coordinates;
 varying vec4 v_color;
 varying vec3 v_eye_position;
 
+const float kSkyStretchMirror  = 0.0;
+const float kSkyStretchRepeat  = 1.0;
+const float kSkyStretchStretch = 2.0;
+const float kSkyStretchVanilla = 3.0;
+
+float FogFactor()
+{
+    if (u_fog_mode <= 0.5)
+    {
+        return 0.0;
+    }
+
+    float fog_distance = length(v_eye_position);
+
+    if (u_fog_mode < kFogLinear + 0.5)
+    {
+        return clamp(smoothstep(u_fog_start, u_fog_end, fog_distance), 0.0, 1.0);
+    }
+
+    return 1.0 - clamp(exp2(-u_fog_density * u_fog_density * fog_distance * fog_distance * kLog2), 0.0, 1.0);
+}
+
+vec4 SampleEquirectSky()
+{
+    vec2 ndc  = ((gl_FragCoord.xy - u_sky_viewport.xy) / u_sky_viewport.zw) * 2.0 - 1.0;
+    vec4 clip = vec4(ndc, 1.0, 1.0);
+    vec4 eye  = u_sky_inverse_projection * clip;
+    eye       = vec4(eye.xy, -1.0, 0.0);
+    vec3 dir  = normalize((u_sky_inverse_view * eye).xyz);
+
+    const float kTwoPi = 6.28318530718;
+
+    float horiz_len = max(length(dir.xy), 0.0001);
+    float sky_tan   = dir.z / horiz_len - u_sky_horizon_shift;
+    float p         = sky_tan / sqrt(1.0 + sky_tan * sky_tan);
+    float u = fract((atan(dir.y, dir.x) / kTwoPi + 0.5) * u_sky_u_scale + u_sky_u_offset);
+
+    bool mode_is_vanilla = abs(u_sky_stretch_mode - kSkyStretchVanilla) < 0.5;
+    bool mode_is_mirror  = abs(u_sky_stretch_mode - kSkyStretchMirror) < 0.5;
+    bool lower_hemisphere = p < 0.0;
+
+    float v_raw;
+
+    if (mode_is_vanilla)
+    {
+        float pc = clamp(sky_tan / u_sky_vertical_fov_slope, -1.0, 1.0);
+        v_raw           = (pc + 1.0) * 0.5 * u_sky_h_ratio * u_sky_ty - u_sky_v_offset;
+    }
+    else if (mode_is_mirror)
+    {
+        float base = (p + 1.0) * 0.5 * u_sky_ty;
+        v_raw      = lower_hemisphere ? -(base + u_sky_v_offset) : (base - u_sky_v_offset);
+    }
+    else
+    {
+        v_raw = (p + 1.0) * 0.5 * u_sky_ty - u_sky_v_offset;
+    }
+
+    float v = fract(v_raw);
+
+    vec4 sampled = texture2D(u_texture0, vec2(u, v));
+
+    vec3 rgb = sampled.rgb * v_color.rgb;
+
+    float fog_factor = FogFactor();
+
+    if (fog_factor > 0.0)
+    {
+        rgb = mix(rgb, u_fog_color.rgb, fog_factor);
+    }
+
+    return vec4(rgb, sampled.a * v_color.a);
+}
+
 void main()
 {
+    if (u_sky_pass > 0.5)
+    {
+        gl_FragColor = SampleEquirectSky();
+        return;
+    }
+
     vec4 eye_position = vec4(v_eye_position, 1.0);
 
     float clip_distance = 0.0;
@@ -63,22 +156,7 @@ void main()
 
     vec4 fragment_color = v_color;
 
-    float fog_factor = 0.0;
-
-    if (u_fog_mode > 0.5)
-    {
-        float fog_distance = length(v_eye_position);
-
-        if (u_fog_mode < kFogLinear + 0.5)
-        {
-            fog_factor = clamp(smoothstep(u_fog_start, u_fog_end, fog_distance), 0.0, 1.0);
-        }
-        else
-        {
-            fog_factor =
-                1.0 - clamp(exp2(-u_fog_density * u_fog_density * fog_distance * fog_distance * kLog2), 0.0, 1.0);
-        }
-    }
+    float fog_factor = FogFactor();
 
     if (u_multi_texture > 0.5)
     {

@@ -34,6 +34,7 @@
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "edge_profiling.h"
 #include "epi_doomdefs.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
@@ -972,6 +973,8 @@ static inline float SafeImageHeight(const Image *image)
 static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_min, float c_max,
                              bool mirror_sub = false)
 {
+    EDGE_ZoneScoped;
+
     Line       *ld = seg->linedef;
     Side       *sd = ld->side[sidenum];
     Sector     *sec, *other;
@@ -1425,6 +1428,8 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
 
 static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
 {
+    EDGE_ZoneScoped;
+
     //
     // Analyses floor/ceiling heights, and add corresponding walls/floors
     // to the drawfloor.  Returns true if the whole region was "solid".
@@ -1526,6 +1531,8 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
 
 static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_dir)
 {
+    EDGE_ZoneScoped;
+
     float orig_h = h;
 
     render_mirror_set.Height(h);
@@ -1745,6 +1752,8 @@ static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub = false);
 
 void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 {
+    EDGE_ZoneScoped;
+
     // draw all solid walls and planes
     solid_mode = true;
     // if (!for_mirror)
@@ -1774,6 +1783,8 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 
 static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub)
 {
+    EDGE_ZoneScoped;
+
     Subsector *sub = dsub->subsector;
 
 #if (DEBUG >= 1)
@@ -2022,6 +2033,8 @@ void UpdateSectorInterpolation(Sector *sector)
 //
 void RenderTrueBSP(void)
 {
+    EDGE_ZoneScoped;
+
     FuzzUpdate();
 
     ClearBSP();
@@ -2045,7 +2058,7 @@ void RenderTrueBSP(void)
     draw_subsector_list.clear();
 
     render_backend->SetRenderLayer(kRenderLayerSolid, false);
-    render_state->Clear(GL_DEPTH_BUFFER_BIT);
+    render_state->Clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     render_state->Enable(GL_DEPTH_TEST);
 
     // needed for drawing the sky
@@ -2071,10 +2084,10 @@ void RenderTrueBSP(void)
                 draw_subsector_list.push_back(item->subsector_);
                 break;
             case kRenderSkyWall:
-                RenderSkyWall(item->wallSeg_, item->height1_, item->height2_);
+                RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_);
                 break;
             case kRenderSkyPlane:
-                RenderSkyPlane(item->wallPlane_, item->height1_);
+                RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_);
                 break;
             }
         }

@@ -201,6 +201,36 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
     info.depth_stencil_state.enable_depth_write = (pipeline_flags & kGpuPipelineDepthWrite) ? true : false;
 
+    if (pipeline_flags & (kGpuPipelineStencilWrite | kGpuPipelineStencilTest))
+    {
+        SDL_GPUStencilOpState stencil_state;
+        EPI_CLEAR_MEMORY(&stencil_state, SDL_GPUStencilOpState, 1);
+
+        if (pipeline_flags & kGpuPipelineStencilWrite)
+        {
+            stencil_state.compare_op   = SDL_GPU_COMPAREOP_ALWAYS;
+            stencil_state.fail_op      = SDL_GPU_STENCILOP_KEEP;
+            stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+            stencil_state.pass_op      = SDL_GPU_STENCILOP_REPLACE;
+
+            info.depth_stencil_state.write_mask = 0xFF;
+        }
+        else
+        {
+            stencil_state.compare_op   = SDL_GPU_COMPAREOP_EQUAL;
+            stencil_state.fail_op      = SDL_GPU_STENCILOP_KEEP;
+            stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+            stencil_state.pass_op      = SDL_GPU_STENCILOP_KEEP;
+
+            info.depth_stencil_state.write_mask = 0x00;
+        }
+
+        info.depth_stencil_state.enable_stencil_test = true;
+        info.depth_stencil_state.compare_mask        = 0xFF;
+        info.depth_stencil_state.front_stencil_state = stencil_state;
+        info.depth_stencil_state.back_stencil_state  = stencil_state;
+    }
+
     info.target_info.color_target_descriptions = &color_target;
     info.target_info.num_color_targets         = 1;
     info.target_info.depth_stencil_format      = pipeline_depth_format;

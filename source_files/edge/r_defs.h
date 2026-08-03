@@ -315,6 +315,10 @@ struct Sector
     // sky height for GL renderer
     float sky_height;
 
+    const Image *sky_image;
+    MapSurface  *sky_ref;
+    int          sky_group;
+
     // keep track of vertical sight gaps within the sector.  This is
     // just a much more convenient form of the info in the extrafloor
     // list.

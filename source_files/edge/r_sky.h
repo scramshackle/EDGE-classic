@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "HandmadeMath.h"
 #include "r_image.h"
 
 extern const Image *sky_image;
@@ -51,14 +52,14 @@ void BeginSky(void);
 void FlushSky(void);
 void FinishSky(bool use_depth_mask);
 
-void RenderSkyPlane(Subsector *sub, float h);
-void RenderSkyWall(Seg *seg, float h1, float h2);
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner);
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner);
 
-int  UpdateSkyboxTextures(void);
-void PrecacheSky(void);
+void UpdateSkyboxTextures(void);
 
 void SetupSkyMatrices(void);
 void RendererRevertSkyMatrices(void);
+void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view);
 
 void ShutdownSky(void);
 

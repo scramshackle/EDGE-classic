@@ -4,6 +4,7 @@
 
 #include "HandmadeMath.h"
 #include "i_defs_gl.h"
+#include "r_units.h"
 
 constexpr int32_t kGles2MaximumClipPlanes = 6;
 
@@ -48,6 +49,8 @@ class Gles2Program
 
     void SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end);
 
+    void SetSkyPass(const SkyPassInfo *sky_pass);
+
     uint32_t UniformUpdateCount() const
     {
         return uniform_update_count_;
@@ -86,6 +89,20 @@ class Gles2Program
     GLint uniform_fog_start_             = -1;
     GLint uniform_fog_end_               = -1;
 
+    GLint uniform_sky_pass_               = -1;
+    GLint uniform_sky_fog_depth_          = -1;
+    GLint uniform_sky_inverse_projection_ = -1;
+    GLint uniform_sky_inverse_view_       = -1;
+    GLint uniform_sky_viewport_           = -1;
+    GLint uniform_sky_stretch_mode_       = -1;
+    GLint uniform_sky_h_ratio_            = -1;
+    GLint uniform_sky_u_scale_            = -1;
+    GLint uniform_sky_ty_                 = -1;
+    GLint uniform_sky_u_offset_           = -1;
+    GLint uniform_sky_v_offset_           = -1;
+    GLint uniform_sky_vertical_fov_slope_ = -1;
+    GLint uniform_sky_horizon_shift_      = -1;
+
     HMM_Mat4 shadow_model_view_projection_ = {};
     HMM_Mat4 shadow_model_view_            = {};
 
@@ -101,6 +118,8 @@ class Gles2Program
     float shadow_fog_end_       = -1.0f;
 
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+
+    float shadow_sky_pass_ = -1.0f;
 
     uint32_t uniform_update_count_ = 0;
 };

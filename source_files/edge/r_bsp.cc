@@ -32,7 +32,9 @@
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "edge_profiling.h"
 #include "epi_doomdefs.h"
+#include "epi_simd.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
 #include "m_bbox.h"
@@ -58,8 +60,8 @@
 #ifdef EDGE_THREADED_BSP
 static void BSPQueueRenderBatch(RenderBatch *batch);
 static void BSPQueueDrawSubsector(DrawSubsector *subsector);
-static void BSPQueueSkyWall(Seg *seg, float h1, float h2);
-static void BSPQueueSkyPlane(Subsector *sub, float h);
+static void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner);
+static void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner);
 
 static RenderBatch *current_batch = nullptr;
 
@@ -268,6 +270,8 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
 //
 static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 {
+    EDGE_ZoneScoped;
+
     // ignore segs sitting on current mirror
     if (bsp_mirror_set.SegOnPortal(seg))
         return;
@@ -506,9 +510,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         if (f_fh < b_fh)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_fh, b_fh);
+            BSPQueueSkyWall(seg, f_fh, b_fh, fsector);
 #else
-            RenderSkyWall(seg, f_fh, b_fh);
+            RenderSkyWall(seg, f_fh, b_fh, fsector);
 #endif
         }
     }
@@ -518,9 +522,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         if (f_ch < fsector->sky_height && (!bsector || !EDGE_IMAGE_IS_SKY(*b_ceil) || b_fh >= f_ch))
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_ch, fsector->sky_height);
+            BSPQueueSkyWall(seg, f_ch, fsector->sky_height, fsector);
 #else
-            RenderSkyWall(seg, f_ch, fsector->sky_height);
+            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector);
 #endif
         }
         else if (bsector && EDGE_IMAGE_IS_SKY(*b_ceil))
@@ -530,9 +534,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
             if (b_ch <= max_f && max_f < fsector->sky_height)
             {
                 #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, max_f, fsector->sky_height);
+            BSPQueueSkyWall(seg, max_f, fsector->sky_height, fsector);
 #else
-            RenderSkyWall(seg, max_f, fsector->sky_height);
+            RenderSkyWall(seg, max_f, fsector->sky_height, fsector);
 #endif
             }
         }
@@ -542,9 +546,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
              b_ch < f_ch)
     {
         #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, b_ch, f_ch);
+            BSPQueueSkyWall(seg, b_ch, f_ch, bsector);
 #else
-            RenderSkyWall(seg, b_ch, f_ch);
+            RenderSkyWall(seg, b_ch, f_ch, bsector);
 #endif
     }
 }
@@ -738,6 +742,8 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
 //
 static void BSPWalkSubsector(int num)
 {
+    EDGE_ZoneScoped;
+
     Subsector *sub    = &level_subsectors[num];
     Sector    *sector = sub->sector;
 
@@ -765,18 +771,18 @@ static void BSPWalkSubsector(int num)
         if (EDGE_IMAGE_IS_SKY(sub->sector->floor) && view_z > sub->sector->interpolated_floor_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height);
+            BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector);
 #else
-            RenderSkyPlane(sub, sub->sector->interpolated_floor_height);
+            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector);
 #endif
         }
 
         if (EDGE_IMAGE_IS_SKY(sub->sector->ceiling) && view_z < sub->sector->sky_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height);
+            BSPQueueSkyPlane(sub, sub->sector->sky_height, sub->sector);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height);
+            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector);
 #endif
         }
     }
@@ -816,17 +822,17 @@ static void BSPWalkSubsector(int num)
         if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, floor_h);
+            BSPQueueSkyPlane(sub, floor_h, sector->height_sector);
 #else
-            RenderSkyPlane(sub, floor_h);
+            RenderSkyPlane(sub, floor_h, sector->height_sector);
 #endif
         }
         if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sub->sector->sky_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height);
+            BSPQueueSkyPlane(sub, sub->sector->sky_height, sector->height_sector);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height);
+            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector);
 #endif
         }
     }
@@ -970,6 +976,8 @@ static void BSPWalkSubsector(int num)
 //
 void BSPWalkNode(unsigned int bspnum)
 {
+    EDGE_ZoneScoped;
+
     BSPNode *node;
     int      side;
 
@@ -1024,6 +1032,8 @@ void BSPWalkNode(unsigned int bspnum)
 static int32_t BSPTraverseProc(void *thread_data)
 {
     EPI_UNUSED(thread_data);
+
+    epi::EnableFastFloats();
 
     while (GetAtomicU32(&bsp_thread.exit_flag_) == 0)
     {
@@ -1083,23 +1093,25 @@ static RenderItem *GetRenderItem()
     return &current_batch->items_[current_batch->num_items_++];
 }
 
-void BSPQueueSkyWall(Seg *seg, float h1, float h2)
+void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
 {
     RenderItem *item = GetRenderItem();
 
-    item->type_    = kRenderSkyWall;
-    item->height1_ = h1;
-    item->height2_ = h2;
-    item->wallSeg_ = seg;
+    item->type_     = kRenderSkyWall;
+    item->height1_  = h1;
+    item->height2_  = h2;
+    item->wallSeg_  = seg;
+    item->skyOwner_ = sky_owner;
 }
 
-void BSPQueueSkyPlane(Subsector *sub, float h)
+void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner)
 {
     RenderItem *item = GetRenderItem();
 
     item->type_      = kRenderSkyPlane;
     item->height1_   = h;
     item->wallPlane_ = sub;
+    item->skyOwner_  = sky_owner;
 }
 
 void BSPQueueDrawSubsector(DrawSubsector *subsector)

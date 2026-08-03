@@ -88,9 +88,27 @@ enum CustomTextureEnvironment
     // normally, i.e. passed on to next texture unit.
 };
 
+struct SkyPassInfo
+{
+    HMM_Mat4 inverse_projection = HMM_M4D(1.0f);
+    HMM_Mat4 inverse_view       = HMM_M4D(1.0f);
+    HMM_Vec2 viewport_origin    = {{0.0f, 0.0f}};
+    HMM_Vec2 viewport_size      = {{1.0f, 1.0f}};
+    int      stretch_mode       = 0;
+    float    h_ratio            = 1.0f;
+    float    solid_sky_h        = 1.0f;
+    float    ty                 = 2.0f;
+    float    u_scale            = 1.0f;
+    float    u_offset           = 0.0f;
+    float    v_offset           = 0.0f;
+    float    fog_depth          = 0.0f;
+    float    vertical_fov_slope = 1.0f;
+    float    horizon_shift      = 0.0f;
+};
+
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
-                                float fog_density = 0);
+                                float fog_density = 0, const SkyPassInfo *sky_pass = nullptr);
 void            EndRenderUnit(int actual_vert);
 
 //--- editor settings ---

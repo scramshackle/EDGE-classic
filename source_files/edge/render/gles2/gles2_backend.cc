@@ -1,3 +1,4 @@
+#include "edge_profiling.h"
 #include "../../r_backend.h"
 
 #include "epi.h"
@@ -108,6 +109,10 @@ class Gles2RenderBackend : public RenderBackend
 
         LogPrint("OpenGL: Max Texture Size: %d\n", max_texture_size_);
 
+        Gles2DetectStencilBuffer();
+
+        LogPrint("OpenGL: Stencil Buffer: %s\n", render_state->HasStencilBuffer() ? "yes" : "no");
+
         int32_t varying_vectors = Gles2MaxVaryingVectors();
 
         if (varying_vectors < 3)
@@ -173,6 +178,8 @@ class Gles2RenderBackend : public RenderBackend
         }
 
         on_frame_finished_.clear();
+
+        EDGE_FrameMark;
     }
 
     void Resize(int32_t width, int32_t height)

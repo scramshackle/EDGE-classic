@@ -38,6 +38,9 @@ struct RendererUnit
 
     RGBAColor fog_color   = kRGBANoValue;
     float     fog_density = 0;
+
+    bool        sky_pass_enabled = false;
+    SkyPassInfo sky_pass;
 };
 
 static RendererVertex local_verts[kMaximumLocalVertices];
@@ -77,7 +80,8 @@ void FinishUnitBatch(void)
 }
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
-                                int pass, BlendingMode blending, RGBAColor fog_color, float fog_density)
+                                int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
+                                const SkyPassInfo *sky_pass)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -113,6 +117,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->blending   = blending;
     unit->first      = current_render_vert;
     unit->line_width = (shape == GL_LINES) ? render_state->GetLineWidth() : 1.0f;
+
+    unit->sky_pass_enabled = (sky_pass != nullptr);
+
+    if (sky_pass)
+        unit->sky_pass = *sky_pass;
 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
@@ -437,6 +446,8 @@ void RenderCurrentUnits(void)
 
         gpu_immediate.SetSkipRGB(unit->environment_mode[0] == (GLuint)kTextureEnvironmentSkipRGB);
 
+        gpu_immediate.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
+
         if (unit->shape == GL_LINES)
         {
             DrawLineUnit(unit);
@@ -449,6 +460,7 @@ void RenderCurrentUnits(void)
     }
 
     gpu_immediate.SetSkipRGB(false);
+    gpu_immediate.SetSkyPass(nullptr);
 
     current_render_vert = current_render_unit = 0;
 }

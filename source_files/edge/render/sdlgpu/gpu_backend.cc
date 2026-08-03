@@ -1,3 +1,4 @@
+#include "edge_profiling.h"
 #include "../../r_backend.h"
 
 #include "epi.h"
@@ -159,6 +160,8 @@ class GpuRenderBackend : public RenderBackend
         }
 
         on_frame_finished_.clear();
+
+        EDGE_FrameMark;
     }
 
     void Resize(int32_t width, int32_t height)

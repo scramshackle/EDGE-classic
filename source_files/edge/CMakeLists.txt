@@ -192,6 +192,7 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ddf
   dr_libs
+  edge_tracy
   edgetracker
   epi
   ${SDL3_LIBRARIES}
@@ -217,6 +218,10 @@ if (EDGE_SDL_GPU)
   endif()
 elseif (NOT EMSCRIPTEN)
 	list(APPEND EDGE_LINK_LIBRARIES ${EDGE_GLES2_LIBRARY})
+endif()
+
+if (EDGE_PROFILING)
+  list (APPEND EDGE_LINK_LIBRARIES TracyClient)
 endif()
 
 target_link_libraries(edge-classic PRIVATE ${EDGE_LINK_LIBRARIES})

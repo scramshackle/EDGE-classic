@@ -6,6 +6,10 @@ layout(set = 1, binding = 0) uniform VertexParameters
     mat4 tm;
     mat4 mv;
     vec4 clipplane[6];
+    float sky_pass;
+    float sky_fog_depth;
+    float vertex_padding0;
+    float vertex_padding1;
 };
 
 layout(location = 0) in vec3 position;
@@ -27,10 +31,19 @@ void main()
     vec4 model_position = vec4(position, 1.0);
     vec4 vertex         = mv * model_position;
 
-    gl_Position = mvp * model_position;
-
     uv    = texcoords;
     color = color0;
+
+    if (sky_pass > 0.5)
+    {
+        vertex = vec4(0.0, 0.0, -sky_fog_depth, 1.0);
+
+        gl_Position = vec4(position.xy, 1.0, 1.0);
+    }
+    else
+    {
+        gl_Position = mvp * model_position;
+    }
 
     clipvertex0 = dot(vertex, clipplane[0]);
     clipvertex1 = dot(vertex, clipplane[1]);

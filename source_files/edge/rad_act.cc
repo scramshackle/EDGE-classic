@@ -781,7 +781,44 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
     {
         if (image)
         {
-            sky_image = image;
+            if (ctex->tag == 0)
+            {
+                for (int i = 0; i < total_level_sectors; i++)
+                {
+                    level_sectors[i].sky_image = image;
+                    level_sectors[i].sky_ref   = nullptr;
+                }
+
+                sky_image = image;
+                sky_ref   = nullptr;
+            }
+            else
+            {
+                for (Sector *tsec = FindSectorFromTag(ctex->tag); tsec != nullptr; tsec = tsec->tag_next)
+                {
+                    if (ctex->subtag)
+                    {
+                        bool valid = false;
+
+                        for (int i = 0; i < tsec->line_count; i++)
+                        {
+                            if (tsec->lines[i]->tag == ctex->subtag)
+                            {
+                                valid = true;
+                                break;
+                            }
+                        }
+
+                        if (!valid)
+                            continue;
+                    }
+
+                    tsec->sky_image = image;
+                    tsec->sky_ref   = nullptr;
+                }
+            }
+
+            ComputeSkyHeights();
             UpdateSkyboxTextures();
         }
         return;

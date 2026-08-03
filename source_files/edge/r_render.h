@@ -31,6 +31,7 @@ struct RenderItem
 
     Seg       *wallSeg_;
     Subsector *wallPlane_;
+    Sector    *skyOwner_;
 
     float height1_;
     float height2_;

@@ -106,3 +106,9 @@ void RendererRevertSkyMatrices(void)
     gpu_immediate.MatrixModeModelView();
     gpu_immediate.PopMatrix();
 }
+
+void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view)
+{
+    inverse_projection = HMM_InvGeneralM4(gpu_immediate.ProjectionMatrix());
+    inverse_view       = HMM_InvGeneralM4(gpu_immediate.ModelViewMatrix());
+}

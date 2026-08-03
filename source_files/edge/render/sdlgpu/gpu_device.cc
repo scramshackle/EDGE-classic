@@ -54,6 +54,9 @@ bool GpuDevice::Init(SDL_Window *window)
     else
         depth_format_ = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
+    has_stencil_ = (depth_format_ == SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT ||
+                    depth_format_ == SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT);
+
     SDL_PropertiesID device_props = SDL_GetGPUDeviceProperties(device_);
 
     LogPrint("SDL_GPU: driver '%s'\n", SDL_GetGPUDeviceDriver(device_));
@@ -239,7 +242,7 @@ bool GpuDevice::AcquireFrame(int32_t width, int32_t height)
     return true;
 }
 
-void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load)
+void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load)
 {
     if (!FrameAcquired())
         return;
@@ -291,11 +294,34 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
         break;
     }
 
-    depth_target.store_op         = SDL_GPU_STOREOP_STORE;
-    depth_target.stencil_load_op  = SDL_GPU_LOADOP_DONT_CARE;
-    depth_target.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
-    depth_target.clear_depth      = 1.0f;
-    depth_target.cycle            = false;
+    depth_target.store_op = SDL_GPU_STOREOP_STORE;
+
+    if (!has_stencil_)
+    {
+        depth_target.stencil_load_op  = SDL_GPU_LOADOP_DONT_CARE;
+        depth_target.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    }
+    else
+    {
+        switch (stencil_load)
+        {
+        case kGpuLoadOperationClear:
+            depth_target.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+            break;
+        case kGpuLoadOperationDontCare:
+            depth_target.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+            break;
+        default:
+            depth_target.stencil_load_op = SDL_GPU_LOADOP_LOAD;
+            break;
+        }
+
+        depth_target.stencil_store_op = SDL_GPU_STOREOP_STORE;
+    }
+
+    depth_target.clear_depth   = 1.0f;
+    depth_target.clear_stencil = 0;
+    depth_target.cycle         = false;
 
     render_pass_ = SDL_BeginGPURenderPass(command_buffer_, &color_target, 1, &depth_target);
 
