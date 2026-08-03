@@ -73,6 +73,8 @@ class DataFile
     // for kFileKindEPK
     PackFile *pack_;
 
+    std::string node_cache_;
+
   public:
     DataFile(std::string_view name, FileKind kind);
     ~DataFile();

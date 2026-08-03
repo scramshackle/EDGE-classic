@@ -84,6 +84,8 @@ void StartupControl(void);
 // the PostEvent() function.
 void ControlGetEvents(void);
 
+void ControlPumpEvents(void);
+
 // Used when hotplugging controllers
 void CheckJoystickChanged(void);
 

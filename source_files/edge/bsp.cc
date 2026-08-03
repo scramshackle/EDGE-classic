@@ -33,6 +33,8 @@
 #include "epi_file.h"
 #include "epi_filesystem.h"
 #include "epi_simd.h"
+#include "epi_str_compare.h"
+#include "epi_str_util.h"
 #include "miniz.h"
 #include "r_defs.h"
 #include "r_misc.h"
@@ -2168,42 +2170,37 @@ void ClockwiseBSPTree()
 // LEVEL TRANSFER
 //------------------------------------------------------------------------
 
-static void LoadLevelFromEngineData()
+static void LoadLevelFromInput(const InputLevel &input)
 {
     num_new_vert   = 0;
     num_real_lines = 0;
 
-    for (int i = 0; i < ::total_level_vertexes; i++)
+    for (size_t i = 0; i < input.vertexes.size(); i++)
     {
         Vertex *v = NewVertex();
-        v->x_     = (double)::level_vertexes[i].X;
-        v->y_     = (double)::level_vertexes[i].Y;
+        v->x_     = (double)input.vertexes[i].x;
+        v->y_     = (double)input.vertexes[i].y;
     }
 
     num_old_vert = (int)level_vertices.size();
 
-    for (int i = 0; i < ::total_level_sectors; i++)
+    for (int i = 0; i < input.sector_count; i++)
         NewSector();
 
-    for (int i = 0; i < ::total_level_sides; i++)
+    for (size_t i = 0; i < input.sidedef_sectors.size(); i++)
     {
         Sidedef *side = NewSidedef();
-        if (::level_sides[i].sector != nullptr)
-        {
-            int sec_idx  = (int)(::level_sides[i].sector - ::level_sectors);
-            side->sector = level_sectors[sec_idx];
-        }
+        int32_t  sec  = input.sidedef_sectors[i];
+        if (sec >= 0 && sec < input.sector_count)
+            side->sector = level_sectors[sec];
     }
 
-    for (int i = 0; i < ::total_level_lines; i++)
+    for (size_t i = 0; i < input.linedefs.size(); i++)
     {
-        const ::Line &eline = ::level_lines[i];
+        const InputLinedef &iline = input.linedefs[i];
 
-        int v1_idx = (int)(eline.vertex_1 - ::level_vertexes);
-        int v2_idx = (int)(eline.vertex_2 - ::level_vertexes);
-
-        Vertex *start = level_vertices[v1_idx];
-        Vertex *end   = level_vertices[v2_idx];
+        Vertex *start = level_vertices[iline.vertex_1];
+        Vertex *end   = level_vertices[iline.vertex_2];
 
         start->is_used_ = true;
         end->is_used_   = true;
@@ -2215,19 +2212,14 @@ static void LoadLevelFromEngineData()
         line->zero_length = (fabs(start->x_ - end->x_) < kEpsilon) && (fabs(start->y_ - end->y_) < kEpsilon);
 
         line->type        = 0;
-        line->two_sided   = (eline.side[1] != nullptr);
-        line->is_precious = (eline.tag >= 900 && eline.tag < 1000);
+        line->two_sided   = (iline.left_side >= 0);
+        line->is_precious = (iline.tag >= 900 && iline.tag < 1000);
 
-        if (eline.side[0] != nullptr)
-        {
-            int sd_idx  = (int)(eline.side[0] - ::level_sides);
-            line->right = level_sidedefs[sd_idx];
-        }
-        if (eline.side[1] != nullptr)
-        {
-            int sd_idx = (int)(eline.side[1] - ::level_sides);
-            line->left = level_sidedefs[sd_idx];
-        }
+        if (iline.right_side >= 0)
+            line->right = level_sidedefs[iline.right_side];
+
+        if (iline.left_side >= 0)
+            line->left = level_sidedefs[iline.left_side];
 
         if (line->right || line->left)
             num_real_lines++;
@@ -2490,8 +2482,23 @@ static void ExpandCachedNodes(void)
 
 
 
-static constexpr uint32_t kNodeCacheVersion = 1;
-static constexpr int      kNodeCacheCompression = MZ_BEST_SPEED;
+static constexpr char     kNodeCacheMagic[4]      = {'E', 'C', 'N', '1'};
+static constexpr uint32_t kNodeCacheVersion       = 1;
+static constexpr int      kNodeCacheCompression   = MZ_BEST_SPEED;
+static constexpr uint32_t kNodeCacheHeaderSize    = 12;
+static constexpr uint32_t kNodeCacheDirectorySize = 32;
+static constexpr size_t   kNodeCacheNameSize      = 12;
+
+struct NodeCacheEntry
+{
+    char                 name[kNodeCacheNameSize];
+    uint32_t             geometry_crc;
+    uint32_t             raw_size;
+    uint32_t             checksum;
+    std::vector<uint8_t> deflated;
+};
+
+static std::vector<NodeCacheEntry> node_cache_entries;
 
 static void AppendBytes(std::vector<uint8_t> &out, const void *data, size_t bytes)
 {
@@ -2527,8 +2534,22 @@ template <typename T> static bool ReadArray(const uint8_t *&pos, const uint8_t *
     return true;
 }
 
-bool SaveNodeCache(const std::string &path)
+void BeginNodeCache(void)
 {
+    node_cache_entries.clear();
+}
+
+void ClearNodeCache(void)
+{
+    node_cache_entries.clear();
+    node_cache_entries.shrink_to_fit();
+}
+
+bool AddNodeCacheLevel(const char *name, uint32_t geometry_crc)
+{
+    if (name == nullptr || name[0] == 0 || strlen(name) >= kNodeCacheNameSize)
+        return false;
+
     std::vector<uint8_t> payload;
 
     AppendArray(payload, cached_vertexes);
@@ -2545,21 +2566,67 @@ bool SaveNodeCache(const std::string &path)
                      kNodeCacheCompression) != MZ_OK)
         return false;
 
-    uint32_t version  = kNodeCacheVersion;
-    uint32_t raw_size = (uint32_t)payload.size();
-    uint32_t checksum = (uint32_t)mz_adler32(MZ_ADLER32_INIT, payload.data(), payload.size());
+    deflated.resize(deflated_size);
+
+    node_cache_entries.emplace_back();
+    NodeCacheEntry &entry = node_cache_entries.back();
+
+    EPI_CLEAR_MEMORY(entry.name, char, kNodeCacheNameSize);
+    epi::CStringCopyMax(entry.name, name, kNodeCacheNameSize - 1);
+
+    entry.geometry_crc = geometry_crc;
+    entry.raw_size     = (uint32_t)payload.size();
+    entry.checksum     = (uint32_t)mz_adler32(MZ_ADLER32_INIT, payload.data(), payload.size());
+    entry.deflated.swap(deflated);
+
+    return true;
+}
+
+bool WriteNodeCache(const std::string &path)
+{
+    uint32_t level_count = (uint32_t)node_cache_entries.size();
 
     epi::File *file = epi::FileOpen(path, epi::kFileAccessWrite | epi::kFileAccessBinary);
 
     if (!file)
+    {
+        epi::FileDelete(path);
         return false;
+    }
+
+    uint32_t version = kNodeCacheVersion;
 
     bool ok = true;
-    ok = ok && file->Write("ECN1", 4) == 4;
-    ok = ok && file->Write(&version, sizeof(version)) == sizeof(version);
-    ok = ok && file->Write(&raw_size, sizeof(raw_size)) == sizeof(raw_size);
-    ok = ok && file->Write(&checksum, sizeof(checksum)) == sizeof(checksum);
-    ok = ok && file->Write(deflated.data(), (unsigned int)deflated_size) == (unsigned int)deflated_size;
+    ok      = ok && file->Write(kNodeCacheMagic, 4) == 4;
+    ok      = ok && file->Write(&version, sizeof(version)) == sizeof(version);
+    ok      = ok && file->Write(&level_count, sizeof(level_count)) == sizeof(level_count);
+
+    uint32_t offset = kNodeCacheHeaderSize + level_count * kNodeCacheDirectorySize;
+
+    for (uint32_t i = 0; ok && i < level_count; i++)
+    {
+        const NodeCacheEntry &entry = node_cache_entries[i];
+
+        uint32_t compressed_size = (uint32_t)entry.deflated.size();
+
+        ok = ok && file->Write(entry.name, kNodeCacheNameSize) == kNodeCacheNameSize;
+        ok = ok && file->Write(&entry.geometry_crc, sizeof(uint32_t)) == sizeof(uint32_t);
+        ok = ok && file->Write(&offset, sizeof(uint32_t)) == sizeof(uint32_t);
+        ok = ok && file->Write(&compressed_size, sizeof(uint32_t)) == sizeof(uint32_t);
+        ok = ok && file->Write(&entry.raw_size, sizeof(uint32_t)) == sizeof(uint32_t);
+        ok = ok && file->Write(&entry.checksum, sizeof(uint32_t)) == sizeof(uint32_t);
+
+        offset += compressed_size;
+    }
+
+    for (uint32_t i = 0; ok && i < level_count; i++)
+    {
+        const NodeCacheEntry &entry = node_cache_entries[i];
+
+        unsigned int compressed_size = (unsigned int)entry.deflated.size();
+
+        ok = ok && file->Write(entry.deflated.data(), compressed_size) == compressed_size;
+    }
 
     delete file;
 
@@ -2576,12 +2643,12 @@ bool IsNodeCacheCurrent(const std::string &path)
     if (!file)
         return false;
 
-    uint8_t header[8];
-    bool    ok = file->Read(header, sizeof(header)) == sizeof(header);
+    uint8_t header[kNodeCacheHeaderSize];
+    bool    ok = file->Read(header, kNodeCacheHeaderSize) == kNodeCacheHeaderSize;
 
     delete file;
 
-    if (!ok || memcmp(header, "ECN1", 4) != 0)
+    if (!ok || memcmp(header, kNodeCacheMagic, 4) != 0)
         return false;
 
     uint32_t version;
@@ -2590,79 +2657,132 @@ bool IsNodeCacheCurrent(const std::string &path)
     return version == kNodeCacheVersion;
 }
 
-bool LoadNodeCache(const std::string &path)
+NodeCacheResult LoadNodeCacheLevel(const std::string &path, const char *name, uint32_t geometry_crc)
 {
-    if (!epi::TestFileAccess(path))
-        return false;
+    if (name == nullptr || name[0] == 0)
+        return kNodeCacheLevelMissing;
 
     epi::File *file = epi::FileOpen(path, epi::kFileAccessRead | epi::kFileAccessBinary);
 
     if (!file)
-        return false;
+        return kNodeCacheCorrupt;
 
-    int      raw_size_total = file->GetLength();
-    uint8_t *raw            = file->LoadIntoMemory();
+    uint8_t header[kNodeCacheHeaderSize];
+
+    if (file->Read(header, kNodeCacheHeaderSize) != kNodeCacheHeaderSize ||
+        memcmp(header, kNodeCacheMagic, 4) != 0)
+    {
+        delete file;
+        return kNodeCacheCorrupt;
+    }
+
+    uint32_t version, level_count;
+    memcpy(&version, header + 4, sizeof(version));
+    memcpy(&level_count, header + 8, sizeof(level_count));
+
+    if (version != kNodeCacheVersion || level_count == 0)
+    {
+        delete file;
+        return kNodeCacheCorrupt;
+    }
+
+    std::vector<uint8_t> directory(level_count * kNodeCacheDirectorySize);
+
+    if (file->Read(directory.data(), (unsigned int)directory.size()) != (unsigned int)directory.size())
+    {
+        delete file;
+        return kNodeCacheCorrupt;
+    }
+
+    uint32_t offset = 0, compressed_size = 0, raw_size = 0, checksum = 0;
+    bool     name_found  = false;
+    bool     entry_valid = false;
+
+    for (uint32_t i = 0; i < level_count; i++)
+    {
+        const uint8_t *dir_entry = directory.data() + i * kNodeCacheDirectorySize;
+
+        char entry_name[kNodeCacheNameSize + 1];
+        memcpy(entry_name, dir_entry, kNodeCacheNameSize);
+        entry_name[kNodeCacheNameSize] = 0;
+
+        if (epi::StringCaseCompareASCII(entry_name, name) != 0)
+            continue;
+
+        name_found = true;
+
+        uint32_t entry_crc;
+        memcpy(&entry_crc, dir_entry + kNodeCacheNameSize, sizeof(uint32_t));
+
+        if (entry_crc != geometry_crc)
+            break;
+
+        memcpy(&offset, dir_entry + kNodeCacheNameSize + 4, sizeof(uint32_t));
+        memcpy(&compressed_size, dir_entry + kNodeCacheNameSize + 8, sizeof(uint32_t));
+        memcpy(&raw_size, dir_entry + kNodeCacheNameSize + 12, sizeof(uint32_t));
+        memcpy(&checksum, dir_entry + kNodeCacheNameSize + 16, sizeof(uint32_t));
+
+        entry_valid = true;
+        break;
+    }
+
+    if (!name_found)
+    {
+        delete file;
+        return kNodeCacheLevelMissing;
+    }
+
+    if (!entry_valid || compressed_size == 0 || raw_size == 0 ||
+        (int)(offset + compressed_size) > file->GetLength() || !file->Seek((int)offset, epi::File::kSeekpointStart))
+    {
+        delete file;
+        return kNodeCacheCorrupt;
+    }
+
+    std::vector<uint8_t> deflated(compressed_size);
+
+    bool read_ok = file->Read(deflated.data(), compressed_size) == compressed_size;
+
     delete file;
 
-    if (!raw)
-        return false;
-
-    if (raw_size_total < 16 || memcmp(raw, "ECN1", 4) != 0)
-    {
-        delete[] raw;
-        return false;
-    }
-
-    uint32_t version, raw_size, checksum;
-    memcpy(&version, raw + 4, sizeof(version));
-    memcpy(&raw_size, raw + 8, sizeof(raw_size));
-    memcpy(&checksum, raw + 12, sizeof(checksum));
-
-    if (version != kNodeCacheVersion)
-    {
-        delete[] raw;
-        return false;
-    }
+    if (!read_ok)
+        return kNodeCacheCorrupt;
 
     std::vector<uint8_t> payload(raw_size);
     mz_ulong             out_size = raw_size;
 
-    int decompress_result = mz_uncompress(payload.data(), &out_size, raw + 16, (mz_ulong)(raw_size_total - 16));
-
-    delete[] raw;
-
-    if (decompress_result != MZ_OK)
-        return false;
+    if (mz_uncompress(payload.data(), &out_size, deflated.data(), (mz_ulong)compressed_size) != MZ_OK)
+        return kNodeCacheCorrupt;
 
     if (out_size != raw_size)
-        return false;
+        return kNodeCacheCorrupt;
 
     if ((uint32_t)mz_adler32(MZ_ADLER32_INIT, payload.data(), payload.size()) != checksum)
-        return false;
+        return kNodeCacheCorrupt;
 
     const uint8_t *pos = payload.data();
     const uint8_t *end = payload.data() + payload.size();
 
     if (!ReadArray(pos, end, cached_vertexes) || !ReadArray(pos, end, cached_segs) ||
         !ReadArray(pos, end, cached_subsectors) || !ReadArray(pos, end, cached_nodes))
-        return false;
+        return kNodeCacheCorrupt;
 
     if (cached_subsectors.empty() || cached_segs.empty())
-        return false;
+        return kNodeCacheCorrupt;
 
     ExpandCachedNodes();
 
-    return true;
+    return kNodeCacheOK;
 }
 
-void BuildNodesForCurrentLevel()
+void BuildNodes(const InputLevel &input)
 {
     alloc_mutex = CreateSystemMutex();
 
     Node      *root_node = nullptr;
     Subsector *root_sub  = nullptr;
 
-    LoadLevelFromEngineData();
+    LoadLevelFromInput(input);
 
     if (num_real_lines == 0)
         FatalError("AJBSP: Level has no valid linedefs.\n");
@@ -2687,7 +2807,6 @@ void BuildNodesForCurrentLevel()
     ClockwiseBSPTree();
     RepairPartnerLinks();
     BuildCachedFromNodes(root_node);
-    ExpandCachedNodes();
 
     FreeLevel();
 

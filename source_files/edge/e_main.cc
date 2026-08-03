@@ -344,6 +344,7 @@ void StartupProgressMessage(const char *message)
 {
     startup_progress.AddMessage(message);
     startup_progress.DrawIt();
+    ControlPumpEvents();
 }
 
 //
@@ -2200,7 +2201,7 @@ static void EdgeStartup(void)
     ConsoleStart();
     CreateQuitScreen();
     SpecialWadVerify();
-    BuildXGLNodes();
+    BuildLevelNodes();
     ShowNotice();
 
     InitializeSaveSystem();

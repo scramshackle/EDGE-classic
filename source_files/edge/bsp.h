@@ -20,16 +20,55 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #include <string>
+#include <vector>
 
 namespace ajbsp
 {
 
-void BuildNodesForCurrentLevel();
+struct InputVertex
+{
+    float x;
+    float y;
+};
 
-bool LoadNodeCache(const std::string &path);
+struct InputLinedef
+{
+    int32_t vertex_1;
+    int32_t vertex_2;
+    int32_t right_side;
+    int32_t left_side;
+    int32_t tag;
+};
 
-bool SaveNodeCache(const std::string &path);
+enum NodeCacheResult
+{
+    kNodeCacheOK = 0,
+    kNodeCacheLevelMissing,
+    kNodeCacheCorrupt
+};
+
+struct InputLevel
+{
+    std::vector<InputVertex>  vertexes;
+    std::vector<int32_t>      sidedef_sectors;
+    std::vector<InputLinedef> linedefs;
+    int32_t                   sector_count;
+};
+
+void BuildNodes(const InputLevel &input);
+
+void BeginNodeCache(void);
+
+bool AddNodeCacheLevel(const char *name, uint32_t geometry_crc);
+
+bool WriteNodeCache(const std::string &path);
+
+void ClearNodeCache(void);
+
+NodeCacheResult LoadNodeCacheLevel(const std::string &path, const char *name, uint32_t geometry_crc);
 
 bool IsNodeCacheCurrent(const std::string &path);
 

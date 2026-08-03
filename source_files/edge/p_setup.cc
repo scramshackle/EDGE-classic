@@ -114,7 +114,6 @@ static float dummy_bounding_box[4];
 epi::CRC32 map_sectors_crc;
 epi::CRC32 map_lines_crc;
 epi::CRC32 map_things_crc;
-epi::CRC32 map_bsp_crc;
 
 int total_map_things;
 
@@ -319,7 +318,6 @@ static void LoadVertexes(int lump)
     // Load data into cache.
     data = LoadLumpIntoMemory(lump);
 
-    map_bsp_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
 
     ml = (const RawVertex *)data;
     li = level_vertexes;
@@ -378,7 +376,6 @@ static void LoadSectors(int lump)
 
     data = LoadLumpIntoMemory(lump);
     map_sectors_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
-    map_bsp_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
     CheckDoom2Map05Bug((uint8_t *)data, GetLumpLength(lump)); // Lobo: 2023
     ms = (const RawSector *)data;
     ss = level_sectors;
@@ -875,7 +872,6 @@ static void LoadLineDefs(int lump)
 
     const uint8_t *data = LoadLumpIntoMemory(lump);
     map_lines_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
-    map_bsp_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
 
     std::unordered_map<int, std::vector<int>> sector_tag_map;
     for (int t = 0; t < total_level_sectors; t++)
@@ -2362,7 +2358,6 @@ static void LoadSideDefs(int lump)
 
     data = LoadLumpIntoMemory(lump);
 
-    map_bsp_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
 
     msd  = (const RawSidedef *)data;
 
@@ -3156,6 +3151,417 @@ void ShutdownLevel(void)
     RemoveAllMapObjects(false);
 }
 
+struct LevelGeometryLumps
+{
+    bool udmf;
+    int  textmap;
+    int  vertexes;
+    int  sectors;
+    int  sidedefs;
+    int  linedefs;
+};
+
+static const char *known_level_lumps[] = {"THINGS",  "LINEDEFS", "SIDEDEFS", "VERTEXES", "SEGS",    "SSECTORS",
+                                          "NODES",   "SECTORS",  "REJECT",   "BLOCKMAP", "BEHAVIOR"};
+
+static int FindLevelSubLump(int marker_lump, const char *name)
+{
+    for (int i = 1; i <= (int)(sizeof(known_level_lumps) / sizeof(known_level_lumps[0])); i++)
+    {
+        int lump = marker_lump + i;
+
+        if (!IsLumpIndexValid(lump))
+            break;
+
+        if (VerifyLump(lump, name))
+            return lump;
+
+        bool known = false;
+
+        for (size_t k = 0; k < sizeof(known_level_lumps) / sizeof(known_level_lumps[0]); k++)
+        {
+            if (VerifyLump(lump, known_level_lumps[k]))
+            {
+                known = true;
+                break;
+            }
+        }
+
+        if (!known)
+            break;
+    }
+
+    return -1;
+}
+
+static bool FindLevelGeometryLumps(int marker_lump, LevelGeometryLumps &lumps)
+{
+    lumps.udmf     = false;
+    lumps.textmap  = -1;
+    lumps.vertexes = -1;
+    lumps.sectors  = -1;
+    lumps.sidedefs = -1;
+    lumps.linedefs = -1;
+
+    if (!IsLumpIndexValid(marker_lump))
+        return false;
+
+    if (IsLumpIndexValid(marker_lump + 1) && VerifyLump(marker_lump + 1, "TEXTMAP"))
+    {
+        lumps.udmf    = true;
+        lumps.textmap = marker_lump + 1;
+        return GetLumpLength(lumps.textmap) > 0;
+    }
+
+    if (FindLevelSubLump(marker_lump, "BEHAVIOR") >= 0)
+        return false;
+
+    lumps.vertexes = FindLevelSubLump(marker_lump, "VERTEXES");
+    lumps.sectors  = FindLevelSubLump(marker_lump, "SECTORS");
+    lumps.sidedefs = FindLevelSubLump(marker_lump, "SIDEDEFS");
+    lumps.linedefs = FindLevelSubLump(marker_lump, "LINEDEFS");
+
+    if (lumps.vertexes < 0 || lumps.sectors < 0 || lumps.sidedefs < 0 || lumps.linedefs < 0)
+        return false;
+
+    if (GetLumpLength(lumps.vertexes) < (int)sizeof(RawVertex) ||
+        GetLumpLength(lumps.sectors) < (int)sizeof(RawSector) ||
+        GetLumpLength(lumps.sidedefs) < (int)sizeof(RawSidedef) ||
+        GetLumpLength(lumps.linedefs) < (int)sizeof(RawLinedef))
+        return false;
+
+    return true;
+}
+
+static uint32_t HashLevelGeometryLumps(const LevelGeometryLumps &lumps)
+{
+    epi::CRC32 crc;
+    crc.Reset();
+
+    const int hashed[4] = {lumps.udmf ? lumps.textmap : lumps.vertexes, lumps.udmf ? -1 : lumps.sectors,
+                           lumps.udmf ? -1 : lumps.sidedefs, lumps.udmf ? -1 : lumps.linedefs};
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (hashed[i] < 0)
+            continue;
+
+        int            length = GetLumpLength(hashed[i]);
+        const uint8_t *data   = LoadLumpIntoMemory(hashed[i]);
+
+        crc.AddBlock(data, length);
+
+        delete[] data;
+    }
+
+    return crc.GetCRC();
+}
+
+static bool ReadBinaryLevelGeometry(const LevelGeometryLumps &lumps, ajbsp::InputLevel &input)
+{
+    int vertex_count  = GetLumpLength(lumps.vertexes) / (int)sizeof(RawVertex);
+    int sector_count  = GetLumpLength(lumps.sectors) / (int)sizeof(RawSector);
+    int sidedef_count = GetLumpLength(lumps.sidedefs) / (int)sizeof(RawSidedef);
+    int linedef_count = GetLumpLength(lumps.linedefs) / (int)sizeof(RawLinedef);
+
+    if (vertex_count <= 0 || sector_count <= 0 || sidedef_count <= 0 || linedef_count <= 0)
+        return false;
+
+    input.sector_count = sector_count;
+
+    input.vertexes.resize(vertex_count);
+    {
+        const uint8_t   *data = LoadLumpIntoMemory(lumps.vertexes);
+        const RawVertex *rv   = (const RawVertex *)data;
+
+        for (int i = 0; i < vertex_count; i++, rv++)
+        {
+            input.vertexes[i].x = (float)AlignedLittleEndianS16(rv->x);
+            input.vertexes[i].y = (float)AlignedLittleEndianS16(rv->y);
+        }
+
+        delete[] data;
+    }
+
+    input.sidedef_sectors.resize(sidedef_count);
+    {
+        const uint8_t    *data = LoadLumpIntoMemory(lumps.sidedefs);
+        const RawSidedef *rs   = (const RawSidedef *)data;
+
+        for (int i = 0; i < sidedef_count; i++, rs++)
+        {
+            int sector = AlignedLittleEndianU16(rs->sector);
+
+            input.sidedef_sectors[i] = (sector < sector_count) ? sector : -1;
+        }
+
+        delete[] data;
+    }
+
+    input.linedefs.resize(linedef_count);
+    {
+        const uint8_t    *data = LoadLumpIntoMemory(lumps.linedefs);
+        const RawLinedef *rl   = (const RawLinedef *)data;
+
+        for (int i = 0; i < linedef_count; i++, rl++)
+        {
+            ajbsp::InputLinedef &line = input.linedefs[i];
+
+            line.vertex_1 = AlignedLittleEndianU16(rl->start);
+            line.vertex_2 = AlignedLittleEndianU16(rl->end);
+            line.tag      = HMM_MAX(0, AlignedLittleEndianS16(rl->tag));
+
+            int side0 = AlignedLittleEndianU16(rl->right);
+            int side1 = AlignedLittleEndianU16(rl->left);
+
+            line.right_side = (side0 == 0xFFFF || side0 >= sidedef_count) ? -1 : side0;
+            line.left_side  = (side1 == 0xFFFF || side1 >= sidedef_count) ? -1 : side1;
+        }
+
+        delete[] data;
+    }
+
+    return true;
+}
+
+static bool ReadUDMFLevelGeometry(const LevelGeometryLumps &lumps, ajbsp::InputLevel &input)
+{
+    int            textmap_length = GetLumpLength(lumps.textmap);
+    const uint8_t *textmap_data   = LoadLumpIntoMemory(lumps.textmap);
+
+    std::string textmap;
+    textmap.assign((const char *)textmap_data, (size_t)textmap_length);
+
+    delete[] textmap_data;
+
+    epi::Scanner lex(textmap);
+
+    input.sector_count = 0;
+
+    while (lex.TokensLeft())
+    {
+        if (!lex.GetNextToken())
+            break;
+
+        if (lex.state_.token != epi::Scanner::kIdentifier)
+            return false;
+
+        std::string section = lex.state_.string;
+
+        if (lex.CheckToken('='))
+        {
+            lex.GetNextToken();
+
+            if (!lex.CheckToken(';'))
+                return false;
+
+            continue;
+        }
+
+        if (!lex.CheckToken('{'))
+            return false;
+
+        epi::StringHash section_hash(section);
+
+        float x = 0.0f, y = 0.0f;
+        int   sector = -1;
+        int   v1 = 0, v2 = 0, side0 = -1, side1 = -1, tag = -1;
+
+        for (;;)
+        {
+            if (lex.CheckToken('}'))
+                break;
+
+            if (!lex.GetNextToken())
+                return false;
+
+            if (lex.state_.token != epi::Scanner::kIdentifier)
+                return false;
+
+            epi::StringHash key_hash(lex.state_.string);
+
+            if (!lex.CheckToken('='))
+                return false;
+
+            if (!lex.GetNextToken() || lex.state_.token == '}')
+                return false;
+
+            switch (key_hash.Value())
+            {
+            case udmf::kX:
+                x = lex.state_.decimal;
+                break;
+            case udmf::kY:
+                y = lex.state_.decimal;
+                break;
+            case udmf::kSector:
+                sector = lex.state_.number;
+                break;
+            case udmf::kV1:
+                v1 = lex.state_.number;
+                break;
+            case udmf::kV2:
+                v2 = lex.state_.number;
+                break;
+            case udmf::kSideFront:
+                side0 = lex.state_.number;
+                break;
+            case udmf::kSideBack:
+                side1 = lex.state_.number;
+                break;
+            case udmf::kID:
+                tag = lex.state_.number;
+                break;
+            default:
+                break;
+            }
+
+            if (!lex.CheckToken(';'))
+                return false;
+        }
+
+        switch (section_hash.Value())
+        {
+        case udmf::kVertex: {
+            ajbsp::InputVertex vertex;
+            vertex.x = x;
+            vertex.y = y;
+            input.vertexes.push_back(vertex);
+            break;
+        }
+        case udmf::kSector:
+            input.sector_count++;
+            break;
+        case udmf::kSidedef:
+            input.sidedef_sectors.push_back(sector);
+            break;
+        case udmf::kLinedef: {
+            ajbsp::InputLinedef line;
+            line.vertex_1   = v1;
+            line.vertex_2   = v2;
+            line.right_side = side0;
+            line.left_side  = side1;
+            line.tag        = HMM_MAX(0, tag);
+            input.linedefs.push_back(line);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    if (input.vertexes.empty() || input.linedefs.empty() || input.sidedef_sectors.empty() || input.sector_count <= 0)
+        return false;
+
+    for (size_t i = 0; i < input.sidedef_sectors.size(); i++)
+    {
+        if (input.sidedef_sectors[i] >= input.sector_count)
+            input.sidedef_sectors[i] = -1;
+    }
+
+    for (size_t i = 0; i < input.linedefs.size(); i++)
+    {
+        ajbsp::InputLinedef &line = input.linedefs[i];
+
+        if (line.right_side >= (int32_t)input.sidedef_sectors.size())
+            line.right_side = -1;
+        if (line.left_side >= (int32_t)input.sidedef_sectors.size())
+            line.left_side = -1;
+    }
+
+    return true;
+}
+
+static bool ComputeLevelGeometryCRC(int marker_lump, uint32_t *geometry_crc)
+{
+    LevelGeometryLumps lumps;
+
+    if (!FindLevelGeometryLumps(marker_lump, lumps))
+        return false;
+
+    *geometry_crc = HashLevelGeometryLumps(lumps);
+
+    return true;
+}
+
+bool ReadLevelGeometry(int marker_lump, ajbsp::InputLevel &input, uint32_t *geometry_crc)
+{
+    LevelGeometryLumps lumps;
+
+    if (!FindLevelGeometryLumps(marker_lump, lumps))
+        return false;
+
+    if (geometry_crc != nullptr)
+        *geometry_crc = HashLevelGeometryLumps(lumps);
+
+    input.vertexes.clear();
+    input.sidedef_sectors.clear();
+    input.linedefs.clear();
+    input.sector_count = 0;
+
+    if (lumps.udmf)
+    {
+        if (!ReadUDMFLevelGeometry(lumps, input))
+            return false;
+    }
+    else
+    {
+        if (!ReadBinaryLevelGeometry(lumps, input))
+            return false;
+    }
+
+    int real_lines = 0;
+
+    for (size_t i = 0; i < input.linedefs.size(); i++)
+    {
+        ajbsp::InputLinedef &line = input.linedefs[i];
+
+        if (line.vertex_1 < 0 || line.vertex_1 >= (int32_t)input.vertexes.size() || line.vertex_2 < 0 ||
+            line.vertex_2 >= (int32_t)input.vertexes.size())
+            return false;
+
+        if (line.right_side < 0 && line.left_side >= 0)
+            line.right_side = 0;
+
+        if (line.right_side >= 0 || line.left_side >= 0)
+            real_lines++;
+    }
+
+    if (real_lines == 0)
+        return false;
+
+    return true;
+}
+
+static void LoadLevelNodes(int marker_lump)
+{
+    const char *level_name = GetLumpNameFromIndex(marker_lump);
+
+    uint32_t geometry_crc = 0;
+
+    if (!ComputeLevelGeometryCRC(marker_lump, &geometry_crc))
+        FatalError("Bad WAD: level %s has invalid or unsupported geometry.\n", level_name);
+
+    const std::string &cache_path = GetNodeCachePathForLump(marker_lump);
+
+    if (cache_path.empty())
+        FatalError("Internal error: no node cache for level %s.\n", level_name);
+
+    ajbsp::NodeCacheResult result = ajbsp::LoadNodeCacheLevel(cache_path, level_name, geometry_crc);
+
+    if (result == ajbsp::kNodeCacheOK)
+        return;
+
+    if (result == ajbsp::kNodeCacheLevelMissing)
+        FatalError("Level %s has no cached nodes.\n", level_name);
+
+    if (epi::FileDelete(cache_path))
+        FatalError("Stale or corrupt nodes for level %s.\nThe node cache has been removed; restart to rebuild it.\n",
+                   level_name);
+
+    FatalError("Stale or corrupt nodes for level %s.\nDelete '%s' and restart.\n", level_name, cache_path.c_str());
+}
+
 void LevelSetup(void)
 {
     // Sets up the current level using the skill passed and the
@@ -3186,7 +3592,6 @@ void LevelSetup(void)
         udmf_lump.clear();
         udmf_lump.resize(raw_length);
         memcpy(udmf_lump.data(), raw_udmf, raw_length);
-        map_bsp_crc.AddBlock((const uint8_t *)udmf_lump.data(), (int)udmf_lump.size());
         if (udmf_lump.empty())
             FatalError("Internal error: can't load UDMF lump.\n");
         delete[] raw_udmf;
@@ -3201,7 +3606,6 @@ void LevelSetup(void)
     map_sectors_crc.Reset();
     map_lines_crc.Reset();
     map_things_crc.Reset();
-    map_bsp_crc.Reset();
 
     // note: most of this ordering is important
     // 23-6-98 KM, eg, Sectors must be loaded before sidedefs,
@@ -3243,17 +3647,7 @@ void LevelSetup(void)
 
     delete[] temp_line_sides;
 
-    std::string node_cache_name =
-        epi::StringFormat("%s-%08x.ecn", current_map->lump_.c_str(), map_bsp_crc.GetCRC());
-    std::string node_cache_path = epi::PathAppend(cache_directory, node_cache_name);
-
-    if (!ajbsp::LoadNodeCache(node_cache_path))
-    {
-        ajbsp::BuildNodesForCurrentLevel();
-
-        if (!ajbsp::SaveNodeCache(node_cache_path))
-            LogDebug("Could not write node cache: %s\n", node_cache_path.c_str());
-    }
+    LoadLevelNodes(lumpnum);
 
     AssignSubsectorsToSectors();
     SetupRootNode();

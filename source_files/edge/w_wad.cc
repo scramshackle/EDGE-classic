@@ -62,6 +62,7 @@
 #include "i_system.h"
 #include "l_deh.h"
 #include "m_misc.h"
+#include "p_setup.h"
 #include "p_umapinfo.h" //Lobo 2022
 #include "r_image.h"
 #include "rad_trig.h"
@@ -1208,6 +1209,75 @@ void ProcessWad(DataFile *df, size_t file_index)
     ProcessLuaInWad(df);
 }
 
+std::string BuildNodesForWAD(DataFile *df)
+{
+    if (df->wad_ == nullptr || df->wad_->level_markers_.empty())
+        return "";
+
+    std::string cache_name = epi::GetStem(df->name_);
+    cache_name += "-";
+    cache_name += df->wad_->md5_string_;
+    cache_name += ".ecn";
+
+    std::string cache_path = epi::PathAppend(cache_directory, cache_name);
+
+    LogDebug("Node cache filename: %s\n", cache_path.c_str());
+
+    if (ajbsp::IsNodeCacheCurrent(cache_path))
+        return cache_path;
+
+    LogPrint("Building nodes for: %s\n", df->name_.c_str());
+
+    ajbsp::BeginNodeCache();
+
+    for (size_t i = 0; i < df->wad_->level_markers_.size(); i++)
+    {
+        int         marker     = df->wad_->level_markers_[i];
+        const char *level_name = lump_info[marker].name;
+
+        ajbsp::InputLevel input;
+        uint32_t          geometry_crc = 0;
+
+        if (!ReadLevelGeometry(marker, input, &geometry_crc))
+        {
+            LogDebug("Skipping nodes for %s: unsupported or invalid geometry\n", level_name);
+            continue;
+        }
+
+        StartupProgressMessage(epi::StringFormat("Building nodes for %s\n", level_name).c_str());
+
+        ajbsp::BuildNodes(input);
+
+        if (!ajbsp::AddNodeCacheLevel(level_name, geometry_crc))
+            LogDebug("Could not cache nodes for %s\n", level_name);
+    }
+
+    bool ok = ajbsp::WriteNodeCache(cache_path);
+
+    ajbsp::ClearNodeCache();
+
+    if (!ok)
+        FatalError("Could not write node cache: %s\n", cache_path.c_str());
+
+    epi::SyncFilesystem();
+
+    return cache_path;
+}
+
+const std::string &GetNodeCachePathForLump(int lump)
+{
+    static const std::string no_cache;
+
+    if (lump < 0 || lump >= (int)lump_info.size())
+        return no_cache;
+
+    int file = lump_info[lump].file;
+
+    if (file < 0 || file >= (int)data_files.size())
+        return no_cache;
+
+    return data_files[file]->node_cache_;
+}
 
 void ReadUMAPINFOLumps(void)
 {

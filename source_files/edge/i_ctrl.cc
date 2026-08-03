@@ -823,6 +823,11 @@ void ControlGetEvents(void)
     }
 }
 
+void ControlPumpEvents(void)
+{
+    SDL_PumpEvents();
+}
+
 void ShutdownControl(void)
 {
     if (SDL_WasInit(SDL_INIT_GAMEPAD))
