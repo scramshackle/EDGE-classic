@@ -21,7 +21,6 @@ layout(set = 3, binding = 0) uniform FragmentParameters
     mat4  sky_inverse_view;
     vec4  sky_viewport;
     float sky_stretch_mode;
-    float sky_h_ratio;
     float sky_u_scale;
     float sky_ty;
     float sky_u_offset;
@@ -89,7 +88,7 @@ vec4 SampleEquirectSky()
     if (mode_is_vanilla)
     {
         float pc = clamp(sky_tan / sky_vertical_fov_slope, -1.0, 1.0);
-        v_raw           = (pc + 1.0) * 0.5 * sky_h_ratio * sky_ty - sky_v_offset;
+        v_raw           = (pc + 1.0) * 0.5 * sky_ty - sky_v_offset;
     }
     else if (mode_is_mirror)
     {

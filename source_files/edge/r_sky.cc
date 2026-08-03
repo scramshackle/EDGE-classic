@@ -345,31 +345,9 @@ static void RenderSkyEquirect(void)
 
     SetupSkyMatrices();
 
-    float sky_h_ratio;
-    float solid_sky_h;
-
-    if (sky_image->ScaledHeight() > 128 && current_sky_stretch != kSkyStretchStretch)
-        sky_h_ratio = (float)sky_image->ScaledHeight() / 256;
-    else if (current_sky_stretch == kSkyStretchVanilla)
-        sky_h_ratio = 0.5f;
-    else
-        sky_h_ratio = 1.0f;
-
-    if (current_sky_stretch == kSkyStretchVanilla)
-        solid_sky_h = sky_h_ratio * 0.98f;
-    else
-        solid_sky_h = sky_h_ratio * 0.75f;
-
     float ty = 2.0f;
 
-    if (current_sky_stretch == kSkyStretchStretch)
-    {
-        if (sky_image->ScaledHeight() > 128)
-            ty = (float)sky_image->ScaledHeight() / 256.0f;
-        else
-            ty = 1.0f;
-    }
-    else if (current_sky_stretch == kSkyStretchVanilla && sky_image->ScaledHeight() > 128)
+    if (current_sky_stretch == kSkyStretchStretch || current_sky_stretch == kSkyStretchVanilla)
         ty = 1.0f;
 
     RGBAColor    fc_to_use = current_map->outdoor_fog_color_;
@@ -431,10 +409,10 @@ static void RenderSkyEquirect(void)
 
     }
 
-    float tx = 0.125f;
+    float sky_horizontal_tilings = 4.0f;
 
     if (sky_image->ScaledWidth() > 256)
-        tx = 0.125f / ((float)sky_image->ScaledWidth() / 256.0f);
+        sky_horizontal_tilings = HMM_MAX(1024.0f / (float)sky_image->ScaledWidth(), 1.0f);
 
     float horizon_shift = -0.15f;
 
@@ -442,7 +420,7 @@ static void RenderSkyEquirect(void)
         horizon_shift = 0.15f;
     else if (current_sky_stretch == kSkyStretchVanilla)
     {
-        float band_fraction = (sky_image->ScaledHeight() > 128) ? (0.30f / sky_h_ratio) : 0.18f;
+        float band_fraction = (sky_image->ScaledHeight() > 128) ? 0.30f : 0.18f;
 
         horizon_shift = (1.0f - 2.0f * band_fraction) * view_y_slope;
     }
@@ -454,10 +432,8 @@ static void RenderSkyEquirect(void)
     sky_pass_info.viewport_origin    = {{(float)view_window_x, (float)view_window_y}};
     sky_pass_info.viewport_size      = {{(float)view_window_width, (float)view_window_height}};
     sky_pass_info.stretch_mode       = (int)current_sky_stretch;
-    sky_pass_info.h_ratio            = sky_h_ratio;
-    sky_pass_info.solid_sky_h        = solid_sky_h;
     sky_pass_info.ty                 = ty;
-    sky_pass_info.u_scale            = tx * 32.0f;
+    sky_pass_info.u_scale            = sky_horizontal_tilings;
     sky_pass_info.u_offset           = offx;
     sky_pass_info.v_offset           = offy;
     sky_pass_info.fog_depth          = renderer_far_clip.f_ * 2.0f;

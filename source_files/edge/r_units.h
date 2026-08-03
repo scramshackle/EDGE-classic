@@ -95,8 +95,6 @@ struct SkyPassInfo
     HMM_Vec2 viewport_origin    = {{0.0f, 0.0f}};
     HMM_Vec2 viewport_size      = {{1.0f, 1.0f}};
     int      stretch_mode       = 0;
-    float    h_ratio            = 1.0f;
-    float    solid_sky_h        = 1.0f;
     float    ty                 = 2.0f;
     float    u_scale            = 1.0f;
     float    u_offset           = 0.0f;

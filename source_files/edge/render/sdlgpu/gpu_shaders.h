@@ -74,13 +74,13 @@ struct GpuFragmentParameters
     HMM_Mat4 sky_inverse_view;
     float    sky_viewport[4];
     float    sky_stretch_mode;
-    float    sky_h_ratio;
     float    sky_u_scale;
     float    sky_ty;
     float    sky_u_offset;
     float    sky_v_offset;
     float    sky_vertical_fov_slope;
     float    sky_horizon_shift;
+    float    sky_padding;
 };
 
 static_assert(offsetof(GpuVertexParameters, mvp) == 0, "GpuVertexParameters::mvp offset");
@@ -107,6 +107,8 @@ static_assert(offsetof(GpuFragmentParameters, sky_inverse_view) == 112,
 static_assert(offsetof(GpuFragmentParameters, sky_viewport) == 176, "GpuFragmentParameters::sky_viewport offset");
 static_assert(offsetof(GpuFragmentParameters, sky_stretch_mode) == 192,
               "GpuFragmentParameters::sky_stretch_mode offset");
+static_assert(offsetof(GpuFragmentParameters, sky_horizon_shift) == 216,
+              "GpuFragmentParameters::sky_horizon_shift offset");
 static_assert(sizeof(GpuFragmentParameters) == 224, "GpuFragmentParameters size");
 
 bool CreateWorldShaders(SDL_GPUDevice *device);

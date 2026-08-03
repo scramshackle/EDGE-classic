@@ -95,7 +95,6 @@ class Gles2Program
     GLint uniform_sky_inverse_view_       = -1;
     GLint uniform_sky_viewport_           = -1;
     GLint uniform_sky_stretch_mode_       = -1;
-    GLint uniform_sky_h_ratio_            = -1;
     GLint uniform_sky_u_scale_            = -1;
     GLint uniform_sky_ty_                 = -1;
     GLint uniform_sky_u_offset_           = -1;

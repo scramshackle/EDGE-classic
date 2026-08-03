@@ -565,7 +565,6 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
         current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.Y;
 
         current_fragment_parameters_.sky_stretch_mode       = (float)sky_pass->stretch_mode;
-        current_fragment_parameters_.sky_h_ratio            = sky_pass->h_ratio;
         current_fragment_parameters_.sky_u_scale            = sky_pass->u_scale;
         current_fragment_parameters_.sky_ty                 = sky_pass->ty;
         current_fragment_parameters_.sky_u_offset           = sky_pass->u_offset;

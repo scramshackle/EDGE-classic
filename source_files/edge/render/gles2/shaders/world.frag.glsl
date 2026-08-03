@@ -22,7 +22,6 @@ uniform mat4  u_sky_inverse_projection;
 uniform mat4  u_sky_inverse_view;
 uniform vec4  u_sky_viewport;
 uniform float u_sky_stretch_mode;
-uniform float u_sky_h_ratio;
 uniform float u_sky_u_scale;
 uniform float u_sky_ty;
 uniform float u_sky_u_offset;
@@ -80,7 +79,7 @@ vec4 SampleEquirectSky()
     if (mode_is_vanilla)
     {
         float pc = clamp(sky_tan / u_sky_vertical_fov_slope, -1.0, 1.0);
-        v_raw           = (pc + 1.0) * 0.5 * u_sky_h_ratio * u_sky_ty - u_sky_v_offset;
+        v_raw           = (pc + 1.0) * 0.5 * u_sky_ty - u_sky_v_offset;
     }
     else if (mode_is_mirror)
     {

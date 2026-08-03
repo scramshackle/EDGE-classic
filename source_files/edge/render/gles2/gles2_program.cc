@@ -112,7 +112,6 @@ bool Gles2Program::Init()
     uniform_sky_inverse_view_       = glGetUniformLocation(program_, "u_sky_inverse_view");
     uniform_sky_viewport_           = glGetUniformLocation(program_, "u_sky_viewport");
     uniform_sky_stretch_mode_       = glGetUniformLocation(program_, "u_sky_stretch_mode");
-    uniform_sky_h_ratio_            = glGetUniformLocation(program_, "u_sky_h_ratio");
     uniform_sky_u_scale_            = glGetUniformLocation(program_, "u_sky_u_scale");
     uniform_sky_ty_                 = glGetUniformLocation(program_, "u_sky_ty");
     uniform_sky_u_offset_           = glGetUniformLocation(program_, "u_sky_u_offset");
@@ -299,7 +298,6 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
                 sky_pass->viewport_size.X, sky_pass->viewport_size.Y);
 
     glUniform1f(uniform_sky_stretch_mode_, (float)sky_pass->stretch_mode);
-    glUniform1f(uniform_sky_h_ratio_, sky_pass->h_ratio);
     glUniform1f(uniform_sky_u_scale_, sky_pass->u_scale);
     glUniform1f(uniform_sky_ty_, sky_pass->ty);
     glUniform1f(uniform_sky_u_offset_, sky_pass->u_offset);
@@ -308,7 +306,7 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
     glUniform1f(uniform_sky_horizon_shift_, sky_pass->horizon_shift);
     glUniform1f(uniform_sky_fog_depth_, sky_pass->fog_depth);
 
-    uniform_update_count_ += 12;
+    uniform_update_count_ += 11;
 }
 
 void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end)
