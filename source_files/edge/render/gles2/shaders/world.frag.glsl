@@ -38,6 +38,11 @@ const float kSkyStretchRepeat  = 1.0;
 const float kSkyStretchStretch = 2.0;
 const float kSkyStretchVanilla = 3.0;
 
+const int   kSkyPinchTaps      = 64;
+const float kSkyPinchTapWeight = 0.015625;
+const float kSkyPinchFadeStart = 0.9397;
+const float kSkyPinchFadeEnd   = 0.9848;
+
 float FogFactor()
 {
     if (u_fog_mode <= 0.5)
@@ -94,6 +99,24 @@ vec4 SampleEquirectSky()
     float v = fract(v_raw);
 
     vec4 sampled = texture2D(u_texture0, vec2(u, v));
+
+    float pinch_mix = smoothstep(kSkyPinchFadeStart, kSkyPinchFadeEnd, abs(dir.z));
+
+    if (pinch_mix > 0.0)
+    {
+        vec4 averaged = vec4(0.0);
+
+        float average_span = min(u_sky_u_scale, 1.0);
+
+        for (int i = 0; i < kSkyPinchTaps; i++)
+        {
+            float tap = (float(i) + 0.5) * kSkyPinchTapWeight - 0.5;
+
+            averaged += texture2D(u_texture0, vec2(fract(u + tap * average_span), v));
+        }
+
+        sampled = mix(sampled, averaged * kSkyPinchTapWeight, pinch_mix);
+    }
 
     vec3 rgb = sampled.rgb * v_color.rgb;
 

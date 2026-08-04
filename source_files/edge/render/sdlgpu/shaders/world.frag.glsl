@@ -34,6 +34,11 @@ layout(set = 3, binding = 0) uniform FragmentParameters
 #define SKY_STRETCH_STRETCH 2.0
 #define SKY_STRETCH_VANILLA 3.0
 
+#define SKY_PINCH_TAPS 64
+#define SKY_PINCH_TAP_WEIGHT 0.015625
+#define SKY_PINCH_FADE_START 0.9397
+#define SKY_PINCH_FADE_END 0.9848
+
 layout(set = 2, binding = 0) uniform sampler2D tex0;
 layout(set = 2, binding = 1) uniform sampler2D tex1;
 
@@ -103,6 +108,24 @@ vec4 SampleEquirectSky()
     float v = fract(v_raw);
 
     vec4 sampled = texture(tex0, vec2(u, v));
+
+    float pinch_mix = smoothstep(SKY_PINCH_FADE_START, SKY_PINCH_FADE_END, abs(dir.z));
+
+    if (pinch_mix > 0.0)
+    {
+        vec4 averaged = vec4(0.0);
+
+        float average_span = min(sky_u_scale, 1.0);
+
+        for (int i = 0; i < SKY_PINCH_TAPS; i++)
+        {
+            float tap = (float(i) + 0.5) * SKY_PINCH_TAP_WEIGHT - 0.5;
+
+            averaged += texture(tex0, vec2(fract(u + tap * average_span), v));
+        }
+
+        sampled = mix(sampled, averaged * SKY_PINCH_TAP_WEIGHT, pinch_mix);
+    }
 
     vec3 rgb = sampled.rgb * color.rgb;
 
