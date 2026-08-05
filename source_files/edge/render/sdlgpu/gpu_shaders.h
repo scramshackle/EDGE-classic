@@ -12,6 +12,16 @@ constexpr uint32_t kGpuAttributePosition        = 0;
 constexpr uint32_t kGpuAttributeTextureCoords   = 1;
 constexpr uint32_t kGpuAttributeColor           = 2;
 
+constexpr uint32_t kGpuAttributeModelPositionFrame1     = 0;
+constexpr uint32_t kGpuAttributeModelPositionFrame2     = 1;
+constexpr uint32_t kGpuAttributeModelTextureCoordinates = 2;
+constexpr uint32_t kGpuAttributeModelColor              = 3;
+
+constexpr uint32_t kGpuModelBufferSlotPositionFrame1     = 0;
+constexpr uint32_t kGpuModelBufferSlotPositionFrame2     = 1;
+constexpr uint32_t kGpuModelBufferSlotTextureCoordinates = 2;
+constexpr uint32_t kGpuModelBufferSlotColor              = 3;
+
 constexpr uint32_t kGpuVertexUniformSlot   = 0;
 constexpr uint32_t kGpuFragmentUniformSlot = 0;
 
@@ -83,6 +93,59 @@ struct GpuFragmentParameters
     float    sky_padding;
 };
 
+struct GpuModelVertexParameters
+{
+    HMM_Mat4 mvp;
+    HMM_Mat4 mv;
+    HMM_Mat4 model_transform;
+    float    clipplane[kGpuMaximumClipPlanes][4];
+    float    lerp;
+    float    vertex_padding0;
+    float    texture_scale[2];
+    float    texture_offset[2];
+    float    vertex_padding1[2];
+};
+
+struct GpuModelFragmentParameters
+{
+    int32_t clipplanes;
+    float   alpha;
+    float   alpha_test;
+    float   additive_pass;
+
+    int32_t fog_mode;
+    float   fog_density;
+    float   fog_start;
+    float   fog_end;
+
+    float fog_color[4];
+};
+
+static_assert(offsetof(GpuModelVertexParameters, mvp) == 0, "GpuModelVertexParameters::mvp offset");
+static_assert(offsetof(GpuModelVertexParameters, mv) == 64, "GpuModelVertexParameters::mv offset");
+static_assert(offsetof(GpuModelVertexParameters, model_transform) == 128,
+              "GpuModelVertexParameters::model_transform offset");
+static_assert(offsetof(GpuModelVertexParameters, clipplane) == 192, "GpuModelVertexParameters::clipplane offset");
+static_assert(offsetof(GpuModelVertexParameters, lerp) == 288, "GpuModelVertexParameters::lerp offset");
+static_assert(offsetof(GpuModelVertexParameters, texture_scale) == 296,
+              "GpuModelVertexParameters::texture_scale offset");
+static_assert(offsetof(GpuModelVertexParameters, texture_offset) == 304,
+              "GpuModelVertexParameters::texture_offset offset");
+static_assert(sizeof(GpuModelVertexParameters) == 320, "GpuModelVertexParameters size");
+
+static_assert(offsetof(GpuModelFragmentParameters, clipplanes) == 0, "GpuModelFragmentParameters::clipplanes offset");
+static_assert(offsetof(GpuModelFragmentParameters, alpha) == 4, "GpuModelFragmentParameters::alpha offset");
+static_assert(offsetof(GpuModelFragmentParameters, alpha_test) == 8, "GpuModelFragmentParameters::alpha_test offset");
+static_assert(offsetof(GpuModelFragmentParameters, additive_pass) == 12,
+              "GpuModelFragmentParameters::additive_pass offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_mode) == 16, "GpuModelFragmentParameters::fog_mode offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_density) == 20,
+              "GpuModelFragmentParameters::fog_density offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_start) == 24, "GpuModelFragmentParameters::fog_start offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_end) == 28, "GpuModelFragmentParameters::fog_end offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_color) == 32, "GpuModelFragmentParameters::fog_color offset");
+static_assert(sizeof(GpuModelFragmentParameters) == 48, "GpuModelFragmentParameters size");
+
 static_assert(offsetof(GpuVertexParameters, mvp) == 0, "GpuVertexParameters::mvp offset");
 static_assert(offsetof(GpuVertexParameters, tm) == 64, "GpuVertexParameters::tm offset");
 static_assert(offsetof(GpuVertexParameters, mv) == 128, "GpuVertexParameters::mv offset");
@@ -110,6 +173,14 @@ static_assert(offsetof(GpuFragmentParameters, sky_stretch_mode) == 192,
 static_assert(offsetof(GpuFragmentParameters, sky_horizon_shift) == 216,
               "GpuFragmentParameters::sky_horizon_shift offset");
 static_assert(sizeof(GpuFragmentParameters) == 224, "GpuFragmentParameters size");
+
+bool CreateModelShaders(SDL_GPUDevice *device);
+
+void DestroyModelShaders(SDL_GPUDevice *device);
+
+SDL_GPUShader *ModelVertexShader();
+
+SDL_GPUShader *ModelFragmentShader();
 
 bool CreateWorldShaders(SDL_GPUDevice *device);
 

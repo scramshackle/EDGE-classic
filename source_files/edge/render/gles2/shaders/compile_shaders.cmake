@@ -8,7 +8,7 @@ if (NOT GLSLANG_VALIDATOR)
   message(FATAL_ERROR "compile_shaders: glslangValidator not found. Install the Vulkan SDK or a glslang package.")
 endif()
 
-set(SHADER_NAMES world movie)
+set(SHADER_NAMES world movie model)
 
 set(SHADER_STAGES vert frag)
 set(STAGE_SYMBOLS Vertex Fragment)

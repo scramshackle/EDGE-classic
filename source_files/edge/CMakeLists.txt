@@ -68,6 +68,7 @@ set (EDGE_SOURCE_FILES
   r_backend.cc
   r_md2.cc
   r_mdl.cc
+  r_mdmesh.cc
   r_mirror.cc
   r_occlude.cc
   r_things.cc

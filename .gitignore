@@ -33,6 +33,8 @@ source_files/edge/render/gles2/shaders/world_GL.*.glsl
 source_files/edge/render/gles2/shaders/world_GLES.*.glsl
 source_files/edge/render/gles2/shaders/movie_GL.*.glsl
 source_files/edge/render/gles2/shaders/movie_GLES.*.glsl
+source_files/edge/render/gles2/shaders/model_GL.*.glsl
+source_files/edge/render/gles2/shaders/model_GLES.*.glsl
 
 # Other
 source_files/glew/glew.pc

@@ -41,3 +41,5 @@ SDL_GPUGraphicsPipeline *GetMoviePipeline(void);
 
 SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
                                      GpuPrimitiveType primitive);
+
+SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);

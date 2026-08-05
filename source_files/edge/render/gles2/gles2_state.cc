@@ -494,6 +494,84 @@ class Gles2RenderState : public RenderState
         gles2_immediate.Draw(shape, vertex_array_base_, first, count);
     }
 
+    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count)
+    {
+        return gles2_immediate.CreateModelMesh(data, indices, index_count);
+    }
+
+    void DeleteModelMesh(uint32_t handle)
+    {
+        gles2_immediate.DeleteModelMesh(handle);
+    }
+
+    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
+    {
+        gles2_immediate.UpdateModelColors(handle, colors, vertex_count);
+    }
+
+    void DrawModel(const ModelDrawInfo &info)
+    {
+        if (info.handle == 0 || info.index_count <= 0)
+            return;
+
+        ApplyState();
+
+        gles2_model_program.Use();
+
+        const HMM_Mat4 &model_view = gles2_immediate.ModelViewMatrix();
+        const HMM_Mat4 &projection = gles2_immediate.ProjectionMatrix();
+
+        gles2_model_program.SetMatrices(HMM_MulM4(projection, model_view), model_view);
+        gles2_model_program.SetTransform(info.transform);
+        gles2_model_program.SetLerp(info.lerp);
+        gles2_model_program.SetTextureTransform(info.texture_scale, info.texture_offset);
+        gles2_model_program.SetAlpha(info.alpha);
+        gles2_model_program.SetAlphaTest(info.alpha_test);
+        gles2_model_program.SetAdditivePass(info.additive_pass);
+
+        Gles2FogMode fog_mode = kGles2FogModeNone;
+
+        if (enable_fog_)
+            fog_mode = (fog_mode_ == GL_LINEAR) ? kGles2FogModeLinear : kGles2FogModeExponential;
+
+        gles2_model_program.SetFog(fog_mode, epi::GetRGBARed(fog_color_) / 255.0f,
+                                   epi::GetRGBAGreen(fog_color_) / 255.0f, epi::GetRGBABlue(fog_color_) / 255.0f,
+                                   fog_density_, fog_start_, fog_end_);
+
+        for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
+        {
+            float equation[4];
+
+            for (int32_t e = 0; e < 4; e++)
+                equation[e] = (float)clip_plane_equation_[i][e];
+
+            gles2_model_program.SetClipPlane(i, clip_plane_enabled_[i], equation);
+        }
+
+        gles2_immediate.DrawModelMesh(info);
+
+        gles2_program.Use();
+
+        state_dirty_ = true;
+    }
+
+    void SetModelIndices(const uint16_t *indices, int count)
+    {
+        gles2_immediate.UploadModelIndices(indices, count);
+    }
+
+    void DrawModelIndexed(int index_first, int index_count)
+    {
+        if (!vertex_array_base_ || index_count <= 0)
+        {
+            return;
+        }
+
+        ApplyState();
+
+        gles2_immediate.DrawModelIndexed(index_first, index_count);
+    }
+
     void ApplyState()
     {
         if (!state_dirty_)

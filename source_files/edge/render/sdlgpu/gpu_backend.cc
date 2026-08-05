@@ -179,6 +179,7 @@ class GpuRenderBackend : public RenderBackend
         ShutdownPipelines(gpu_device.Handle());
 
         DestroyWorldShaders(gpu_device.Handle());
+        DestroyModelShaders(gpu_device.Handle());
 
         gpu_device.Shutdown();
     }

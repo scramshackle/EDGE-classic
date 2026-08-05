@@ -84,6 +84,20 @@ class Gles2Immediate
 
     void DrawMerged(int32_t index_offset, int32_t index_count);
 
+    void UploadModelIndices(const uint16_t *indices, int32_t count);
+
+    void DrawModelIndexed(int32_t index_offset, int32_t index_count);
+
+    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count);
+
+    void DeleteModelMesh(uint32_t handle);
+
+    void UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count);
+
+    void BindModelMesh(const ModelDrawInfo &info);
+
+    void DrawModelMesh(const ModelDrawInfo &info);
+
     void DrawMovieQuad(const RendererVertex *vertices);
 
     const HMM_Mat4 &ProjectionMatrix() const
@@ -123,6 +137,19 @@ class Gles2Immediate
     }
 
   private:
+    struct Gles2ModelMesh
+    {
+        GLuint position_buffer;
+        GLuint texture_coordinate_buffer;
+        GLuint color_buffer;
+        GLuint index_buffer;
+
+        int32_t vertex_count;
+        int32_t frame_count;
+    };
+
+    std::vector<Gles2ModelMesh> model_meshes_;
+
     bool CreateQuadIndexBuffer();
 
     void MarkMatrixDirty()
@@ -141,6 +168,7 @@ class Gles2Immediate
     GLuint vertex_buffer_       = 0;
     GLuint quad_index_buffer_   = 0;
     GLuint merged_index_buffer_ = 0;
+    GLuint model_index_buffer_  = 0;
     GLuint default_texture_     = 0;
 
     size_t vertex_buffer_offset_ = 0;

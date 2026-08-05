@@ -224,6 +224,18 @@ class RenderState
     virtual void SetVertexArrays(const RendererVertex *vertices, int count) = 0;
 
     virtual void DrawVertexArray(GLuint shape, int first, int count) = 0;
+
+    virtual void SetModelIndices(const uint16_t *indices, int count) = 0;
+
+    virtual void DrawModelIndexed(int index_first, int index_count) = 0;
+
+    virtual uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count) = 0;
+
+    virtual void DeleteModelMesh(uint32_t handle) = 0;
+
+    virtual void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count) = 0;
+
+    virtual void DrawModel(const ModelDrawInfo &info) = 0;
 };
 
 extern RenderState *render_state;

@@ -616,9 +616,8 @@ class GpuRenderState : public RenderState
 
     void SetVertexArrays(const RendererVertex *vertices, int count)
     {
-        EPI_UNUSED(count);
-
-        vertex_array_base_ = vertices;
+        vertex_array_base_  = vertices;
+        vertex_array_count_ = count;
     }
 
     void DrawVertexArray(GLuint shape, int first, int count)
@@ -626,31 +625,128 @@ class GpuRenderState : public RenderState
         if (!vertex_array_base_ || count <= 0)
             return;
 
-        if (enable_texture_2d_[0])
-        {
-            const GpuImage *image0 = GetGpuImage(bind_texture_2d_[0]);
-
-            if (enable_texture_2d_[1])
-            {
-                const GpuImage *image1 = GetGpuImage(bind_texture_2d_[1]);
-
-                gpu_immediate.SetMultiTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr,
-                                              image1 ? image1->texture : nullptr, image1 ? image1->sampler : nullptr);
-            }
-            else
-            {
-                gpu_immediate.SetTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr);
-            }
-        }
-        else
-        {
-            gpu_immediate.DisableTexture();
-        }
+        ApplyTextureBindings();
 
         gpu_immediate.Draw(shape, vertex_array_base_ + first, count);
     }
 
+    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count)
+    {
+        return gpu_immediate.CreateModelMesh(data, indices, index_count);
+    }
+
+    void DeleteModelMesh(uint32_t handle)
+    {
+        gpu_immediate.DeleteModelMesh(handle);
+    }
+
+    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
+    {
+        gpu_immediate.UpdateModelColors(handle, colors, vertex_count);
+    }
+
+    void DrawModel(const ModelDrawInfo &info)
+    {
+        if (info.handle == 0 || info.index_count <= 0)
+            return;
+
+        ApplyTextureBindings();
+
+        GpuModelVertexParameters vertex_parameters;
+        EPI_CLEAR_MEMORY(&vertex_parameters, GpuModelVertexParameters, 1);
+
+        const HMM_Mat4 &model_view = gpu_immediate.ModelViewMatrix();
+        const HMM_Mat4 &projection = gpu_immediate.ProjectionMatrix();
+
+        vertex_parameters.mvp             = HMM_MulM4(projection, model_view);
+        vertex_parameters.mv              = model_view;
+        vertex_parameters.model_transform = info.transform;
+        vertex_parameters.lerp            = info.lerp;
+
+        vertex_parameters.texture_scale[0] = info.texture_scale.X;
+        vertex_parameters.texture_scale[1] = info.texture_scale.Y;
+
+        vertex_parameters.texture_offset[0] = info.texture_offset.X;
+        vertex_parameters.texture_offset[1] = info.texture_offset.Y;
+
+        GpuModelFragmentParameters fragment_parameters;
+        EPI_CLEAR_MEMORY(&fragment_parameters, GpuModelFragmentParameters, 1);
+
+        fragment_parameters.alpha         = info.alpha;
+        fragment_parameters.alpha_test    = info.alpha_test;
+        fragment_parameters.additive_pass = info.additive_pass ? 1.0f : 0.0f;
+
+        for (int32_t i = 0; i < kGpuMaximumClipPlanes; i++)
+        {
+            if (!clip_planes_[i].enabled_)
+                continue;
+
+            fragment_parameters.clipplanes |= (1 << i);
+
+            for (int32_t e = 0; e < 4; e++)
+                vertex_parameters.clipplane[i][e] = (float)clip_planes_[i].equation_[e];
+        }
+
+        if (enable_fog_)
+        {
+            fragment_parameters.fog_mode =
+                (fog_mode_ == GL_LINEAR) ? (int32_t)kGpuFogModeLinear : (int32_t)kGpuFogModeExponential;
+
+            fragment_parameters.fog_color[0] = epi::GetRGBARed(fog_color_) / 255.0f;
+            fragment_parameters.fog_color[1] = epi::GetRGBAGreen(fog_color_) / 255.0f;
+            fragment_parameters.fog_color[2] = epi::GetRGBABlue(fog_color_) / 255.0f;
+            fragment_parameters.fog_color[3] = 1.0f;
+
+            fragment_parameters.fog_density = fog_density_;
+            fragment_parameters.fog_start   = fog_start_;
+            fragment_parameters.fog_end     = fog_end_;
+        }
+
+        gpu_immediate.RecordModelDraw(info, vertex_parameters, fragment_parameters);
+    }
+
+    void SetModelIndices(const uint16_t *indices, int count)
+    {
+        model_indices_     = indices;
+        model_index_count_ = count;
+    }
+
+    void DrawModelIndexed(int index_first, int index_count)
+    {
+        if (!vertex_array_base_ || !model_indices_ || index_count <= 0)
+            return;
+
+        if (index_first < 0 || index_first + index_count > model_index_count_)
+            return;
+
+        ApplyTextureBindings();
+
+        gpu_immediate.DrawIndexed(vertex_array_base_, vertex_array_count_, model_indices_ + index_first, index_count);
+    }
+
   private:
+    void ApplyTextureBindings()
+    {
+        if (!enable_texture_2d_[0])
+        {
+            gpu_immediate.DisableTexture();
+            return;
+        }
+
+        const GpuImage *image0 = GetGpuImage(bind_texture_2d_[0]);
+
+        if (enable_texture_2d_[1])
+        {
+            const GpuImage *image1 = GetGpuImage(bind_texture_2d_[1]);
+
+            gpu_immediate.SetMultiTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr,
+                                          image1 ? image1->texture : nullptr, image1 ? image1->sampler : nullptr);
+            return;
+        }
+
+        gpu_immediate.SetTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr);
+    }
+
     void DiscardMipLevels()
     {
         for (size_t i = 0; i < mip_levels_.size(); i++)
@@ -740,7 +836,11 @@ class GpuRenderState : public RenderState
 
     std::vector<GpuMipLevel> mip_levels_;
 
-    const RendererVertex *vertex_array_base_ = nullptr;
+    const RendererVertex *vertex_array_base_  = nullptr;
+    int                   vertex_array_count_ = 0;
+
+    const uint16_t *model_indices_     = nullptr;
+    int             model_index_count_ = 0;
 };
 
 static GpuRenderState state;

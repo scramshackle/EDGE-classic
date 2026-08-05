@@ -12,6 +12,11 @@ constexpr GLuint kGles2AttributePosition           = 0;
 constexpr GLuint kGles2AttributeTextureCoordinates = 1;
 constexpr GLuint kGles2AttributeColor              = 2;
 
+constexpr GLuint kGles2AttributeModelPositionFrame1     = 0;
+constexpr GLuint kGles2AttributeModelPositionFrame2     = 1;
+constexpr GLuint kGles2AttributeModelTextureCoordinates = 2;
+constexpr GLuint kGles2AttributeModelColor              = 3;
+
 constexpr GLint kGles2TextureUnit0 = 0;
 constexpr GLint kGles2TextureUnit1 = 1;
 
@@ -124,6 +129,69 @@ class Gles2Program
 };
 
 extern Gles2Program gles2_program;
+
+class Gles2ModelProgram
+{
+  public:
+    bool Init();
+
+    void Shutdown();
+
+    void Use();
+
+    void SetMatrices(const HMM_Mat4 &model_view_projection, const HMM_Mat4 &model_view);
+
+    void SetTransform(const HMM_Mat4 &transform);
+
+    void SetLerp(float lerp);
+
+    void SetTextureTransform(const HMM_Vec2 &scale, const HMM_Vec2 &offset);
+
+    void SetAlpha(float alpha);
+
+    void SetAlphaTest(float reference);
+
+    void SetAdditivePass(bool additive);
+
+    void SetClipPlane(int32_t index, bool enabled, const float equation[4]);
+
+    void SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end);
+
+  private:
+    void SetFloat(GLint location, float &shadow, float value);
+
+    GLuint program_ = 0;
+
+    GLint uniform_model_view_projection_ = -1;
+    GLint uniform_model_view_            = -1;
+    GLint uniform_model_transform_       = -1;
+    GLint uniform_lerp_                  = -1;
+    GLint uniform_texture_scale_         = -1;
+    GLint uniform_texture_offset_        = -1;
+    GLint uniform_texture0_              = -1;
+    GLint uniform_alpha_                 = -1;
+    GLint uniform_alpha_test_            = -1;
+    GLint uniform_additive_pass_         = -1;
+    GLint uniform_clip_plane_            = -1;
+    GLint uniform_fog_mode_              = -1;
+    GLint uniform_fog_color_             = -1;
+    GLint uniform_fog_density_           = -1;
+    GLint uniform_fog_start_             = -1;
+    GLint uniform_fog_end_               = -1;
+
+    float shadow_lerp_          = -1.0f;
+    float shadow_alpha_         = -1.0f;
+    float shadow_alpha_test_    = -1.0f;
+    float shadow_additive_pass_ = -1.0f;
+    float shadow_fog_mode_      = -1.0f;
+    float shadow_fog_density_   = -1.0f;
+    float shadow_fog_start_     = -1.0f;
+    float shadow_fog_end_       = -1.0f;
+
+    float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+};
+
+extern Gles2ModelProgram gles2_model_program;
 
 class Gles2MovieProgram
 {

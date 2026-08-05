@@ -35,6 +35,7 @@ enum GpuIndexSource
 enum GpuCommandType
 {
     kGpuCommandDraw = 0,
+    kGpuCommandModelDraw,
     kGpuCommandMovie,
     kGpuCommandViewport,
     kGpuCommandScissor,
@@ -64,6 +65,32 @@ struct GpuDrawArguments
     bool mergeable;
 };
 
+struct GpuModelDrawArguments
+{
+    SDL_GPUGraphicsPipeline *pipeline;
+
+    SDL_GPUTexture *texture;
+    SDL_GPUSampler *sampler;
+
+    SDL_GPUBuffer *position_buffer;
+    SDL_GPUBuffer *texture_coordinate_buffer;
+    SDL_GPUBuffer *color_buffer;
+    SDL_GPUBuffer *index_buffer;
+
+    uint32_t position_frame1_offset;
+    uint32_t position_frame2_offset;
+    uint32_t texture_coordinate_offset;
+    uint32_t color_offset;
+
+    int32_t index_first;
+    int32_t index_count;
+
+    int32_t vertex_parameter_index;
+    int32_t fragment_parameter_index;
+
+    uint8_t stencil_reference;
+};
+
 struct GpuMovieArguments
 {
     SDL_GPUTexture *texture[3];
@@ -90,6 +117,7 @@ struct GpuCommand
 
     union {
         GpuDrawArguments      draw;
+        GpuModelDrawArguments model_draw;
         GpuMovieArguments     movie;
         GpuRectangleArguments rectangle;
     } arguments;
@@ -194,6 +222,18 @@ class GpuImmediate
 
     void Draw(GLuint shape, const RendererVertex *vertices, int32_t count);
 
+    void DrawIndexed(const RendererVertex *vertices, int32_t vertex_count, const uint16_t *indices,
+                     int32_t index_count);
+
+    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count);
+
+    void DeleteModelMesh(uint32_t handle);
+
+    void UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count);
+
+    void RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
+                         const GpuModelFragmentParameters &fragment_parameters);
+
     uint32_t DrawCount() const
     {
         return draw_count_;
@@ -265,6 +305,24 @@ class GpuImmediate
 
     SDL_GPUTexture *default_texture_ = nullptr;
     SDL_GPUSampler *default_sampler_ = nullptr;
+
+    struct GpuModelMesh
+    {
+        SDL_GPUBuffer *position_buffer;
+        SDL_GPUBuffer *texture_coordinate_buffer;
+        SDL_GPUBuffer *color_buffer;
+        SDL_GPUBuffer *index_buffer;
+
+        SDL_GPUTransferBuffer *color_transfer_buffer;
+
+        int32_t vertex_count;
+        int32_t frame_count;
+    };
+
+    std::vector<GpuModelMesh> model_meshes_;
+
+    std::vector<GpuModelVertexParameters>   model_vertex_parameters_;
+    std::vector<GpuModelFragmentParameters> model_fragment_parameters_;
 
     std::vector<RendererVertex>        vertices_;
     int32_t                            vertex_count_ = 0;

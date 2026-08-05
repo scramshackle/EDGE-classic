@@ -124,6 +124,9 @@ class Gles2RenderBackend : public RenderBackend
         if (!gles2_program.Init())
             FatalError("OpenGL: failed to create the world shader program.\n");
 
+        if (!gles2_model_program.Init())
+            FatalError("OpenGL: failed to create the model shader program.\n");
+
         if (!gles2_immediate.Init())
             FatalError("OpenGL: failed to initialise the immediate renderer.\n");
 
@@ -193,6 +196,7 @@ class Gles2RenderBackend : public RenderBackend
         gles2_immediate.Shutdown();
 
         gles2_program.Shutdown();
+        gles2_model_program.Shutdown();
         gles2_movie_program.Shutdown();
     }
 

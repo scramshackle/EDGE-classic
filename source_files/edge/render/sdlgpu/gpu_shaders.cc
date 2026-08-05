@@ -2,6 +2,7 @@
 
 #include "epi.h"
 #include "i_system.h"
+#include "shaders/model_spirv.h"
 #include "shaders/movie_spirv.h"
 #include "shaders/world_spirv.h"
 
@@ -9,6 +10,8 @@ static SDL_GPUShader *world_vertex_shader   = nullptr;
 static SDL_GPUShader *world_fragment_shader = nullptr;
 static SDL_GPUShader *movie_vertex_shader    = nullptr;
 static SDL_GPUShader *movie_fragment_shader  = nullptr;
+static SDL_GPUShader *model_vertex_shader    = nullptr;
+static SDL_GPUShader *model_fragment_shader  = nullptr;
 
 static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage stage, const uint32_t *code,
                                    size_t code_size, uint32_t num_samplers, uint32_t num_uniform_buffers,
@@ -86,6 +89,53 @@ SDL_GPUShader *WorldVertexShader()
 SDL_GPUShader *WorldFragmentShader()
 {
     return world_fragment_shader;
+}
+
+bool CreateModelShaders(SDL_GPUDevice *device)
+{
+    if (model_vertex_shader && model_fragment_shader)
+        return true;
+
+    model_vertex_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kModelVertexShaderSpirv, sizeof(kModelVertexShaderSpirv),
+                     kModelVertexShaderSamplerCount, kModelVertexShaderUniformBufferCount, "model.vert");
+
+    model_fragment_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kModelFragmentShaderSpirv, sizeof(kModelFragmentShaderSpirv),
+                     kModelFragmentShaderSamplerCount, kModelFragmentShaderUniformBufferCount, "model.frag");
+
+    if (!model_vertex_shader || !model_fragment_shader)
+    {
+        DestroyModelShaders(device);
+        return false;
+    }
+
+    return true;
+}
+
+void DestroyModelShaders(SDL_GPUDevice *device)
+{
+    if (model_vertex_shader)
+    {
+        SDL_ReleaseGPUShader(device, model_vertex_shader);
+        model_vertex_shader = nullptr;
+    }
+
+    if (model_fragment_shader)
+    {
+        SDL_ReleaseGPUShader(device, model_fragment_shader);
+        model_fragment_shader = nullptr;
+    }
+}
+
+SDL_GPUShader *ModelVertexShader()
+{
+    return model_vertex_shader;
+}
+
+SDL_GPUShader *ModelFragmentShader()
+{
+    return model_fragment_shader;
 }
 
 bool CreateMovieShaders(SDL_GPUDevice *device)

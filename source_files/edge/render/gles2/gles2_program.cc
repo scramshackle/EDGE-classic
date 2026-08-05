@@ -5,10 +5,12 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
+#include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
 #include "shaders/world_glsl.h"
 
 Gles2Program      gles2_program;
+Gles2ModelProgram gles2_model_program;
 Gles2MovieProgram gles2_movie_program;
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
@@ -329,6 +331,186 @@ void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue,
         glUniform4f(uniform_fog_color_, red, green, blue, 1.0f);
 
         uniform_update_count_++;
+    }
+
+    SetFloat(uniform_fog_density_, shadow_fog_density_, density);
+    SetFloat(uniform_fog_start_, shadow_fog_start_, start);
+    SetFloat(uniform_fog_end_, shadow_fog_end_, end);
+}
+
+bool Gles2ModelProgram::Init()
+{
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kModelVertexSource, "model.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kModelFragmentSource, "model.frag.glsl");
+
+    program_ = glCreateProgram();
+
+    if (!program_)
+    {
+        FatalError("Gles2ModelProgram: glCreateProgram failed\n");
+    }
+
+    glAttachShader(program_, vertex_shader);
+    glAttachShader(program_, fragment_shader);
+
+    glBindAttribLocation(program_, kGles2AttributeModelPositionFrame1, "a_position_frame1");
+    glBindAttribLocation(program_, kGles2AttributeModelPositionFrame2, "a_position_frame2");
+    glBindAttribLocation(program_, kGles2AttributeModelTextureCoordinates, "a_texture_coordinates");
+    glBindAttribLocation(program_, kGles2AttributeModelColor, "a_color");
+
+    glLinkProgram(program_);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+
+    if (linked != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+        {
+            glGetProgramInfoLog(program_, log_length, nullptr, log);
+        }
+
+        FatalError("Gles2ModelProgram: model program failed to link:\n%s\n", log);
+    }
+
+    glDetachShader(program_, vertex_shader);
+    glDetachShader(program_, fragment_shader);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
+    uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
+    uniform_model_transform_       = glGetUniformLocation(program_, "u_model_transform");
+    uniform_lerp_                  = glGetUniformLocation(program_, "u_lerp");
+    uniform_texture_scale_         = glGetUniformLocation(program_, "u_texture_scale");
+    uniform_texture_offset_        = glGetUniformLocation(program_, "u_texture_offset");
+    uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
+    uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
+    uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
+    uniform_additive_pass_         = glGetUniformLocation(program_, "u_additive_pass");
+    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
+    uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
+    uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
+    uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
+    uniform_fog_start_             = glGetUniformLocation(program_, "u_fog_start");
+    uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
+
+    glUseProgram(program_);
+    glUniform1i(uniform_texture0_, kGles2TextureUnit0);
+
+    return true;
+}
+
+void Gles2ModelProgram::Shutdown()
+{
+    if (program_)
+    {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+}
+
+void Gles2ModelProgram::Use()
+{
+    glUseProgram(program_);
+}
+
+void Gles2ModelProgram::SetFloat(GLint location, float &shadow, float value)
+{
+    if (epi::AlmostEquals(shadow, value))
+    {
+        return;
+    }
+
+    shadow = value;
+
+    glUniform1f(location, value);
+}
+
+void Gles2ModelProgram::SetMatrices(const HMM_Mat4 &model_view_projection, const HMM_Mat4 &model_view)
+{
+    glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&model_view_projection);
+    glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&model_view);
+}
+
+void Gles2ModelProgram::SetTransform(const HMM_Mat4 &transform)
+{
+    glUniformMatrix4fv(uniform_model_transform_, 1, GL_FALSE, (const GLfloat *)&transform);
+}
+
+void Gles2ModelProgram::SetLerp(float lerp)
+{
+    SetFloat(uniform_lerp_, shadow_lerp_, lerp);
+}
+
+void Gles2ModelProgram::SetTextureTransform(const HMM_Vec2 &scale, const HMM_Vec2 &offset)
+{
+    glUniform2f(uniform_texture_scale_, scale.X, scale.Y);
+    glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+}
+
+void Gles2ModelProgram::SetAlpha(float alpha)
+{
+    SetFloat(uniform_alpha_, shadow_alpha_, alpha);
+}
+
+void Gles2ModelProgram::SetAlphaTest(float reference)
+{
+    SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
+}
+
+void Gles2ModelProgram::SetAdditivePass(bool additive)
+{
+    SetFloat(uniform_additive_pass_, shadow_additive_pass_, additive ? 1.0f : 0.0f);
+}
+
+void Gles2ModelProgram::SetClipPlane(int32_t index, bool enabled, const float equation[4])
+{
+    GLfloat values[4];
+
+    if (enabled)
+    {
+        values[0] = equation[0];
+        values[1] = equation[1];
+        values[2] = equation[2];
+        values[3] = equation[3];
+    }
+    else
+    {
+        values[0] = 0.0f;
+        values[1] = 0.0f;
+        values[2] = 0.0f;
+        values[3] = 1.0f;
+    }
+
+    glUniform4fv(uniform_clip_plane_ + index, 1, values);
+}
+
+void Gles2ModelProgram::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start,
+                               float end)
+{
+    SetFloat(uniform_fog_mode_, shadow_fog_mode_, (float)mode);
+
+    if (mode == kGles2FogModeNone)
+    {
+        return;
+    }
+
+    if (!epi::AlmostEquals(shadow_fog_color_[0], red) || !epi::AlmostEquals(shadow_fog_color_[1], green) ||
+        !epi::AlmostEquals(shadow_fog_color_[2], blue))
+    {
+        shadow_fog_color_[0] = red;
+        shadow_fog_color_[1] = green;
+        shadow_fog_color_[2] = blue;
+        shadow_fog_color_[3] = 1.0f;
+
+        glUniform4f(uniform_fog_color_, red, green, blue, 1.0f);
     }
 
     SetFloat(uniform_fog_density_, shadow_fog_density_, density);

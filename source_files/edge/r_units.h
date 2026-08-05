@@ -88,6 +88,38 @@ enum CustomTextureEnvironment
     // normally, i.e. passed on to next texture unit.
 };
 
+struct ModelMeshData
+{
+    const float *frame_positions    = nullptr;
+    const float *texture_coordinates = nullptr;
+
+    int frame_count  = 0;
+    int vertex_count = 0;
+};
+
+struct ModelDrawInfo
+{
+    uint32_t handle = 0;
+
+    int   frame1 = 0;
+    int   frame2 = 0;
+    float lerp   = 0.0f;
+
+    HMM_Mat4 transform = HMM_M4D(1.0f);
+
+    float alpha         = 1.0f;
+    float alpha_test    = 0.0f;
+    bool  additive_pass = false;
+
+    HMM_Vec2 texture_scale  = {{1.0f, 1.0f}};
+    HMM_Vec2 texture_offset = {{0.0f, 0.0f}};
+
+    int first_vertex = 0;
+    int vertex_count = 0;
+    int first_index  = 0;
+    int index_count  = 0;
+};
+
 struct SkyPassInfo
 {
     HMM_Mat4 inverse_projection = HMM_M4D(1.0f);

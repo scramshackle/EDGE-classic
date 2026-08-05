@@ -117,32 +117,79 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
 }
 
 static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
-                                               GpuPrimitiveType primitive)
+                                               GpuPrimitiveType primitive, bool model)
 {
-    SDL_GPUVertexBufferDescription buffer_description;
-    EPI_CLEAR_MEMORY(&buffer_description, SDL_GPUVertexBufferDescription, 1);
+    SDL_GPUVertexBufferDescription buffer_description[4];
+    EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 4);
 
-    buffer_description.slot       = 0;
-    buffer_description.pitch      = (uint32_t)sizeof(RendererVertex);
-    buffer_description.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+    SDL_GPUVertexAttribute attributes[4];
+    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 4);
 
-    SDL_GPUVertexAttribute attributes[3];
-    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 3);
+    uint32_t buffer_count    = 1;
+    uint32_t attribute_count = 3;
 
-    attributes[0].location    = kGpuAttributePosition;
-    attributes[0].buffer_slot = 0;
-    attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    attributes[0].offset      = (uint32_t)offsetof(RendererVertex, position);
+    if (model)
+    {
+        buffer_count    = 4;
+        attribute_count = 4;
 
-    attributes[1].location    = kGpuAttributeTextureCoords;
-    attributes[1].buffer_slot = 0;
-    attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
-    attributes[1].offset      = (uint32_t)offsetof(RendererVertex, texture_coordinates);
+        buffer_description[0].slot       = kGpuModelBufferSlotPositionFrame1;
+        buffer_description[0].pitch      = (uint32_t)(3 * sizeof(float));
+        buffer_description[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
-    attributes[2].location    = kGpuAttributeColor;
-    attributes[2].buffer_slot = 0;
-    attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM;
-    attributes[2].offset      = (uint32_t)offsetof(RendererVertex, rgba);
+        buffer_description[1].slot       = kGpuModelBufferSlotPositionFrame2;
+        buffer_description[1].pitch      = (uint32_t)(3 * sizeof(float));
+        buffer_description[1].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        buffer_description[2].slot       = kGpuModelBufferSlotTextureCoordinates;
+        buffer_description[2].pitch      = (uint32_t)(2 * sizeof(float));
+        buffer_description[2].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        buffer_description[3].slot       = kGpuModelBufferSlotColor;
+        buffer_description[3].pitch      = (uint32_t)(6 * sizeof(float));
+        buffer_description[3].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        attributes[0].location    = kGpuAttributeModelPositionFrame1;
+        attributes[0].buffer_slot = kGpuModelBufferSlotPositionFrame1;
+        attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[0].offset      = 0;
+
+        attributes[1].location    = kGpuAttributeModelPositionFrame2;
+        attributes[1].buffer_slot = kGpuModelBufferSlotPositionFrame2;
+        attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[1].offset      = 0;
+
+        attributes[2].location    = kGpuAttributeModelTextureCoordinates;
+        attributes[2].buffer_slot = kGpuModelBufferSlotTextureCoordinates;
+        attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+        attributes[2].offset      = 0;
+
+        attributes[3].location    = kGpuAttributeModelColor;
+        attributes[3].buffer_slot = kGpuModelBufferSlotColor;
+        attributes[3].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[3].offset      = 0;
+    }
+    else
+    {
+        buffer_description[0].slot       = 0;
+        buffer_description[0].pitch      = (uint32_t)sizeof(RendererVertex);
+        buffer_description[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        attributes[0].location    = kGpuAttributePosition;
+        attributes[0].buffer_slot = 0;
+        attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[0].offset      = (uint32_t)offsetof(RendererVertex, position);
+
+        attributes[1].location    = kGpuAttributeTextureCoords;
+        attributes[1].buffer_slot = 0;
+        attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+        attributes[1].offset      = (uint32_t)offsetof(RendererVertex, texture_coordinates);
+
+        attributes[2].location    = kGpuAttributeColor;
+        attributes[2].buffer_slot = 0;
+        attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM;
+        attributes[2].offset      = (uint32_t)offsetof(RendererVertex, rgba);
+    }
 
     SDL_GPUColorTargetDescription color_target;
     EPI_CLEAR_MEMORY(&color_target, SDL_GPUColorTargetDescription, 1);
@@ -155,13 +202,13 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     SDL_GPUGraphicsPipelineCreateInfo info;
     EPI_CLEAR_MEMORY(&info, SDL_GPUGraphicsPipelineCreateInfo, 1);
 
-    info.vertex_shader   = WorldVertexShader();
-    info.fragment_shader = WorldFragmentShader();
+    info.vertex_shader   = model ? ModelVertexShader() : WorldVertexShader();
+    info.fragment_shader = model ? ModelFragmentShader() : WorldFragmentShader();
 
-    info.vertex_input_state.vertex_buffer_descriptions = &buffer_description;
-    info.vertex_input_state.num_vertex_buffers         = 1;
+    info.vertex_input_state.vertex_buffer_descriptions = buffer_description;
+    info.vertex_input_state.num_vertex_buffers         = buffer_count;
     info.vertex_input_state.vertex_attributes          = attributes;
-    info.vertex_input_state.num_vertex_attributes      = 3;
+    info.vertex_input_state.num_vertex_attributes      = attribute_count;
 
     switch (primitive)
     {
@@ -362,7 +409,29 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
     if (itr != pipelines.end())
         return itr->second;
 
-    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend, primitive);
+    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend, primitive, false);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}
+
+SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend)
+{
+    if (!CreateModelShaders(pipeline_device))
+        FatalError("GpuPipeline: model shader creation failed\n");
+
+    pipeline_flags = EncodeBlendFlags(pipeline_flags, source_blend, destination_blend);
+
+    uint32_t key = pipeline_flags | (1u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline =
+        CreatePipeline(pipeline_flags, source_blend, destination_blend, kGpuPrimitiveTriangleList, true);
 
     pipelines[key] = pipeline;
 
