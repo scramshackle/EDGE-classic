@@ -89,6 +89,18 @@ class ColorMixer
 typedef void (*ShaderCoordinateFunction)(void *data, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc,
                                          HMM_Vec3 *normal, HMM_Vec3 *lit_pos);
 
+struct DynamicLightParameters
+{
+    HMM_Vec3 position;
+    float    radius;
+
+    HMM_Vec3 color;
+
+    GLuint image_texture;
+
+    bool additive;
+};
+
 /* abstract base class */
 class AbstractShader
 {
@@ -111,11 +123,29 @@ class AbstractShader
                           bool masked, void *data, ShaderCoordinateFunction func) = 0;
 
     virtual void SetRadius(float r) = 0;
+
+    virtual bool GetLightParameters(DynamicLightParameters *out)
+    {
+        EPI_UNUSED(out);
+        return false;
+    }
 };
 
 // Delete all dynamic light "images"; cannot be done in the various shader
 // destructors as these images are shared amongst multiple instances - Dasho
 void DeleteAllLightImages();
+
+enum LightRectResult
+{
+    kLightRectFull,
+    kLightRectBounded,
+    kLightRectCulled
+};
+
+LightRectResult GetDynamicLightScreenRect(AbstractShader *shader, RendererScissor *out);
+
+bool EmitMultiLightPass(AbstractShader **shaders, int count, GLuint shape, int num_vert, GLuint tex, float alpha,
+                        int *pass_var, BlendingMode blending, bool masked, void *data, ShaderCoordinateFunction func);
 
 void SetSurfaceLightBounds(float min_x, float min_y, float min_z, float max_x, float max_y, float max_z);
 

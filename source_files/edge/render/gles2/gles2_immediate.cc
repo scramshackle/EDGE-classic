@@ -409,6 +409,20 @@ void Gles2Immediate::DrawMerged(int32_t index_offset, int32_t index_count)
     draw_count_++;
 }
 
+void Gles2Immediate::DrawMergedWithoutMatrices(int32_t index_offset, int32_t index_count)
+{
+    if (index_count <= 0 || !merged_index_buffer_)
+        return;
+
+    BindVertexAttributes(batch_offset_);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, merged_index_buffer_);
+    glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_SHORT,
+                   (const void *)((size_t)index_offset * sizeof(uint16_t)));
+
+    draw_count_++;
+}
+
 void Gles2Immediate::UploadModelIndices(const uint16_t *indices, int32_t count)
 {
     if (!indices || count <= 0)

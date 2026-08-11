@@ -12,6 +12,11 @@ constexpr GLuint kGles2AttributePosition           = 0;
 constexpr GLuint kGles2AttributeTextureCoordinates = 1;
 constexpr GLuint kGles2AttributeColor              = 2;
 
+constexpr int32_t kGles2MaximumLightsPerPass = 4;
+
+constexpr GLuint kGles2AttributeLightPosition           = 0;
+constexpr GLuint kGles2AttributeLightTextureCoordinates = 1;
+
 constexpr GLuint kGles2AttributeModelPositionFrame1     = 0;
 constexpr GLuint kGles2AttributeModelPositionFrame2     = 1;
 constexpr GLuint kGles2AttributeModelTextureCoordinates = 2;
@@ -219,3 +224,49 @@ class Gles2MovieProgram
 };
 
 extern Gles2MovieProgram gles2_movie_program;
+
+class Gles2LightProgram
+{
+  public:
+    bool Init();
+
+    void Shutdown();
+
+    void Use();
+
+    void SetModelViewProjection(const HMM_Mat4 &matrix);
+
+    void SetSurfaceMode(float mode);
+
+    void SetAlpha(float alpha);
+
+    void SetAlphaTest(float reference);
+
+    void SetSurfaceNormal(float x, float y, float z, float radius_xy_divisor, bool normal_is_horizontal);
+
+    void SetLights(const float *position_radius, const float *color, int32_t count);
+
+  private:
+    void SetFloat(GLint location, float &shadow, float value);
+
+    GLuint program_ = 0;
+
+    GLint uniform_model_view_projection_ = -1;
+    GLint uniform_surface_texture_       = -1;
+    GLint uniform_light_texture_         = -1;
+    GLint uniform_surface_mode_          = -1;
+    GLint uniform_alpha_                 = -1;
+    GLint uniform_alpha_test_            = -1;
+    GLint uniform_surface_normal_        = -1;
+    GLint uniform_normal_horizontal_     = -1;
+    GLint uniform_light_count_           = -1;
+    GLint uniform_light_position_radius_ = -1;
+    GLint uniform_light_color_           = -1;
+
+    float shadow_surface_mode_      = -1.0f;
+    float shadow_alpha_             = -1.0f;
+    float shadow_alpha_test_        = -1.0f;
+    float shadow_normal_horizontal_ = -1.0f;
+};
+
+extern Gles2LightProgram gles2_light_program;

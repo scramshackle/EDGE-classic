@@ -45,6 +45,9 @@ struct RendererUnit
 
     bool            scissor_enabled = false;
     RendererScissor scissor;
+
+    bool              light_pass_enabled = false;
+    RendererLightPass light_pass;
 };
 
 static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
@@ -88,7 +91,8 @@ void FinishUnitBatch(void)
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                                const SkyPassInfo *sky_pass, const RendererScissor *scissor)
+                                const SkyPassInfo *sky_pass, const RendererScissor *scissor,
+                                const RendererLightPass *light_pass)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -137,6 +141,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     if (scissor)
         unit->scissor = *scissor;
+
+    unit->light_pass_enabled = (light_pass != nullptr);
+
+    if (light_pass)
+        unit->light_pass = *light_pass;
 
     return local_verts + current_render_vert;
 }
@@ -306,6 +315,9 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
         !epi::AlmostEquals(a->fog_density, b->fog_density))
         return false;
 
+    if (a->light_pass_enabled || b->light_pass_enabled)
+        return false;
+
     if (a->scissor_enabled != b->scissor_enabled)
         return false;
 
@@ -338,6 +350,41 @@ static void ApplyUnitEnvironment(int32_t texture_unit, GLuint environment)
         render_state->TextureEnvironmentCombineRGB(GL_MODULATE);
         render_state->TextureEnvironmentSource0RGB(GL_TEXTURE);
     }
+}
+
+static void DrawLightPassUnit(const RendererUnit *unit, int32_t run_index_count)
+{
+    const RendererLightPass &light_pass = unit->light_pass;
+
+    render_state->ActiveTexture(GL_TEXTURE1);
+    render_state->Enable(GL_TEXTURE_2D);
+    render_state->BindTexture(unit->texture[1]);
+    render_state->TextureWrapS(GL_CLAMP_TO_EDGE);
+    render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
+
+    render_state->ActiveTexture(GL_TEXTURE0);
+    render_state->Enable(GL_TEXTURE_2D);
+    render_state->BindTexture(unit->texture[0]);
+
+    Gles2ApplyRenderState();
+
+    gles2_light_program.Use();
+
+    gles2_light_program.SetModelViewProjection(render_backend->WorldViewProjection());
+
+    gles2_light_program.SetSurfaceMode(light_pass.surface_mode);
+    gles2_light_program.SetAlpha(light_pass.alpha);
+    gles2_light_program.SetAlphaTest(light_pass.alpha_test);
+
+    gles2_light_program.SetSurfaceNormal(light_pass.surface_normal[0], light_pass.surface_normal[1],
+                                         light_pass.surface_normal[2], light_pass.surface_normal[3],
+                                         light_pass.normal_is_horizontal);
+
+    gles2_light_program.SetLights(light_pass.position_radius, light_pass.color, light_pass.count);
+
+    gles2_immediate.DrawMergedWithoutMatrices(unit->index_first, run_index_count);
+
+    gles2_program.Use();
 }
 
 static void BindUnitTextures(const RendererUnit *unit)
@@ -722,7 +769,10 @@ void RenderCurrentUnits(void)
 
         Gles2ApplyRenderState();
 
-        gles2_immediate.DrawMerged(unit->index_first, run_index_count);
+        if (unit->light_pass_enabled)
+            DrawLightPassUnit(unit, run_index_count);
+        else
+            gles2_immediate.DrawMerged(unit->index_first, run_index_count);
 
         if (old_clamp_s != kDummyClamp)
         {

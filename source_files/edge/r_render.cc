@@ -341,6 +341,181 @@ static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
     *lit_pos = *pos;
 }
 
+static constexpr int kMaximumSurfaceLights = 64;
+
+static MapObject *surface_light_list[kMaximumSurfaceLights];
+static int        surface_light_total = 0;
+
+static int surface_light_group_sizes[kMaximumSurfaceLights];
+static int surface_light_group_total = 0;
+
+EDGE_DEFINE_CONSOLE_VARIABLE(renderer_multi_light, "0", kConsoleVariableFlagNone)
+
+static void EmitCollectedWallLights(WallCoordinateData *data);
+static void EmitCollectedPlaneLights(PlaneCoordinateData *data);
+
+static constexpr float kLightBatchOverlapFraction = 0.5f;
+
+static double RectangleArea(const RendererScissor &rect)
+{
+    return (double)rect.width * (double)rect.height;
+}
+
+static void UnionRectangle(RendererScissor *into, const RendererScissor &other)
+{
+    int32_t x1 = HMM_MIN(into->x, other.x);
+    int32_t y1 = HMM_MIN(into->y, other.y);
+    int32_t x2 = HMM_MAX(into->x + into->width, other.x + other.width);
+    int32_t y2 = HMM_MAX(into->y + into->height, other.y + other.height);
+
+    into->x      = x1;
+    into->y      = y1;
+    into->width  = x2 - x1;
+    into->height = y2 - y1;
+}
+
+static bool RectanglesOverlapEnough(const RendererScissor &a, const RendererScissor &b)
+{
+    int32_t x1 = HMM_MAX(a.x, b.x);
+    int32_t y1 = HMM_MAX(a.y, b.y);
+    int32_t x2 = HMM_MIN(a.x + a.width, b.x + b.width);
+    int32_t y2 = HMM_MIN(a.y + a.height, b.y + b.height);
+
+    if (x1 >= x2 || y1 >= y2)
+        return false;
+
+    double intersection = (double)(x2 - x1) * (double)(y2 - y1);
+
+    double smaller = HMM_MIN(RectangleArea(a), RectangleArea(b));
+
+    if (smaller <= 0.0)
+        return false;
+
+    return intersection >= smaller * (double)kLightBatchOverlapFraction;
+}
+
+static void GroupCollectedSurfaceLights()
+{
+    surface_light_group_total = 0;
+
+    if (surface_light_total < 2)
+    {
+        for (int i = 0; i < surface_light_total; i++)
+            surface_light_group_sizes[surface_light_group_total++] = 1;
+
+        return;
+    }
+
+    DynamicLightParameters parameters[kMaximumSurfaceLights];
+
+    int sortable = 0;
+
+    for (int i = 0; i < surface_light_total; i++)
+    {
+        if (!surface_light_list[i]->dynamic_light_.shader->GetLightParameters(&parameters[i]))
+        {
+            for (int k = 0; k < surface_light_total; k++)
+                surface_light_group_sizes[surface_light_group_total++] = 1;
+
+            return;
+        }
+
+        sortable++;
+    }
+
+    for (int i = 1; i < sortable; i++)
+    {
+        MapObject             *moved_light      = surface_light_list[i];
+        DynamicLightParameters moved_parameters = parameters[i];
+
+        int j = i - 1;
+
+        while (j >= 0 && (parameters[j].image_texture > moved_parameters.image_texture ||
+                          (parameters[j].image_texture == moved_parameters.image_texture &&
+                           (int)parameters[j].additive > (int)moved_parameters.additive)))
+        {
+            surface_light_list[j + 1] = surface_light_list[j];
+            parameters[j + 1]         = parameters[j];
+            j--;
+        }
+
+        surface_light_list[j + 1] = moved_light;
+        parameters[j + 1]         = moved_parameters;
+    }
+
+    RendererScissor rectangles[kMaximumSurfaceLights];
+    bool            rectangle_valid[kMaximumSurfaceLights];
+    bool            already_grouped[kMaximumSurfaceLights];
+
+    for (int i = 0; i < sortable; i++)
+    {
+        LightRectResult result =
+            GetDynamicLightScreenRect(surface_light_list[i]->dynamic_light_.shader, &rectangles[i]);
+
+        if (result == kLightRectFull)
+        {
+            rectangles[i].x      = view_window_x;
+            rectangles[i].y      = view_window_y;
+            rectangles[i].width  = view_window_width;
+            rectangles[i].height = view_window_height;
+        }
+
+        rectangle_valid[i] = (result != kLightRectCulled);
+        already_grouped[i] = false;
+    }
+
+    MapObject *ordered[kMaximumSurfaceLights];
+
+    int ordered_total = 0;
+
+    for (int i = 0; i < sortable; i++)
+    {
+        if (already_grouped[i])
+            continue;
+
+        already_grouped[i]       = true;
+        ordered[ordered_total++] = surface_light_list[i];
+
+        int emitted_group = 1;
+
+        if (!rectangle_valid[i])
+        {
+            surface_light_group_sizes[surface_light_group_total++] = emitted_group;
+            continue;
+        }
+
+        RendererScissor group_rectangle = rectangles[i];
+
+        int group_count = 1;
+
+        for (int j = i + 1; j < sortable && group_count < kMaximumLightsPerPass; j++)
+        {
+            if (already_grouped[j] || !rectangle_valid[j])
+                continue;
+
+            if (parameters[j].image_texture != parameters[i].image_texture ||
+                parameters[j].additive != parameters[i].additive)
+                continue;
+
+            if (!RectanglesOverlapEnough(group_rectangle, rectangles[j]))
+                continue;
+
+            already_grouped[j]       = true;
+            ordered[ordered_total++] = surface_light_list[j];
+
+            UnionRectangle(&group_rectangle, rectangles[j]);
+
+            group_count++;
+            emitted_group++;
+        }
+
+        surface_light_group_sizes[surface_light_group_total++] = emitted_group;
+    }
+
+    for (int i = 0; i < ordered_total; i++)
+        surface_light_list[i] = ordered[i];
+}
+
 static void DLIT_Wall(MapObject *mo, void *dataptr)
 {
     WallCoordinateData *data = (WallCoordinateData *)dataptr;
@@ -362,10 +537,52 @@ static void DLIT_Wall(MapObject *mo, void *dataptr)
 
     EPI_ASSERT(mo->dynamic_light_.shader);
 
+    if (surface_light_total >= kMaximumSurfaceLights)
+        EmitCollectedWallLights(data);
+
+    surface_light_list[surface_light_total++] = mo;
+}
+
+static void EmitCollectedWallLights(WallCoordinateData *data)
+{
+    GroupCollectedSurfaceLights();
+
     BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
 
-    mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass, blending,
-                                        data->mid_masked, data, WallCoordFunc);
+    int index = 0;
+
+    for (int g = 0; g < surface_light_group_total && index < surface_light_total; g++)
+    {
+        int group_size = surface_light_group_sizes[g];
+
+        if (renderer_multi_light.d_ && group_size > 1)
+        {
+            AbstractShader *shaders[kMaximumLightsPerPass];
+
+            for (int k = 0; k < group_size; k++)
+                shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
+
+            if (EmitMultiLightPass(shaders, group_size, GL_POLYGON, data->v_count, data->tex_id, data->trans,
+                                   &data->pass, blending, data->mid_masked, data, WallCoordFunc))
+            {
+                index += group_size;
+                continue;
+            }
+        }
+
+        for (int k = 0; k < group_size; k++)
+        {
+            MapObject *mo = surface_light_list[index + k];
+
+            mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass,
+                                                blending, data->mid_masked, data, WallCoordFunc);
+        }
+
+        index += group_size;
+    }
+
+    surface_light_total       = 0;
+    surface_light_group_total = 0;
 }
 
 static void GLOWLIT_Wall(MapObject *mo, void *dataptr)
@@ -401,10 +618,52 @@ static void DLIT_Plane(MapObject *mo, void *dataptr)
 
     EPI_ASSERT(mo->dynamic_light_.shader);
 
+    if (surface_light_total >= kMaximumSurfaceLights)
+        EmitCollectedPlaneLights(data);
+
+    surface_light_list[surface_light_total++] = mo;
+}
+
+static void EmitCollectedPlaneLights(PlaneCoordinateData *data)
+{
+    GroupCollectedSurfaceLights();
+
     BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
 
-    mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass, blending,
-                                        false /* masked */, data, PlaneCoordFunc);
+    int index = 0;
+
+    for (int g = 0; g < surface_light_group_total && index < surface_light_total; g++)
+    {
+        int group_size = surface_light_group_sizes[g];
+
+        if (renderer_multi_light.d_ && group_size > 1)
+        {
+            AbstractShader *shaders[kMaximumLightsPerPass];
+
+            for (int k = 0; k < group_size; k++)
+                shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
+
+            if (EmitMultiLightPass(shaders, group_size, GL_POLYGON, data->v_count, data->tex_id, data->trans,
+                                   &data->pass, blending, false, data, PlaneCoordFunc))
+            {
+                index += group_size;
+                continue;
+            }
+        }
+
+        for (int k = 0; k < group_size; k++)
+        {
+            MapObject *mo = surface_light_list[index + k];
+
+            mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass,
+                                                blending, false, data, PlaneCoordFunc);
+        }
+
+        index += group_size;
+    }
+
+    surface_light_total       = 0;
+    surface_light_group_total = 0;
 }
 
 static void GLOWLIT_Plane(MapObject *mo, void *dataptr)
@@ -701,6 +960,8 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
         DynamicLightIterator(v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom, v_bbox[kBoundingBoxRight],
                              v_bbox[kBoundingBoxTop], top, DLIT_Wall, &data);
+
+        EmitCollectedWallLights(&data);
 
         SectorGlowIterator(current_seg->front_sector, v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom,
                            v_bbox[kBoundingBoxRight], v_bbox[kBoundingBoxTop], top, GLOWLIT_Wall, &data);
@@ -1763,6 +2024,8 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     {
         DynamicLightIterator(v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], h, v_bbox[kBoundingBoxRight],
                              v_bbox[kBoundingBoxTop], h, DLIT_Plane, &data);
+
+        EmitCollectedPlaneLights(&data);
 
         SectorGlowIterator(current_subsector->sector, v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], h,
                            v_bbox[kBoundingBoxRight], v_bbox[kBoundingBoxTop], h, GLOWLIT_Plane, &data);

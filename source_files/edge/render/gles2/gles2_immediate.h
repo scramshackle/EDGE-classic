@@ -92,6 +92,8 @@ class Gles2Immediate
 
     void DrawMerged(int32_t index_offset, int32_t index_count);
 
+    void DrawMergedWithoutMatrices(int32_t index_offset, int32_t index_count);
+
     void UploadModelIndices(const uint16_t *indices, int32_t count);
 
     void DrawModelIndexed(int32_t index_offset, int32_t index_count);

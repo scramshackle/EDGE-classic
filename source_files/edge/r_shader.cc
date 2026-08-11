@@ -317,6 +317,187 @@ static LightScissorResult ComputeScissorFromBounds(const LightInfluenceBounds *b
     return kLightScissorRect;
 }
 
+LightRectResult GetDynamicLightScreenRect(AbstractShader *shader, RendererScissor *out)
+{
+    DynamicLightParameters light;
+
+    if (!shader->GetLightParameters(&light))
+        return kLightRectFull;
+
+    LightInfluenceBounds bounds;
+
+    SetInfluenceBoundsInfinite(&bounds);
+
+    ClipInfluenceToSlab(&bounds, 0, light.position.X - light.radius, light.position.X + light.radius);
+    ClipInfluenceToSlab(&bounds, 1, light.position.Y - light.radius, light.position.Y + light.radius);
+    ClipInfluenceToSlab(&bounds, 2, light.position.Z - light.radius, light.position.Z + light.radius);
+
+    ClipInfluenceToSurface(&bounds);
+
+    LightScissorResult result = ComputeScissorFromBounds(&bounds, out);
+
+    if (result == kLightScissorCull)
+        return kLightRectCulled;
+
+    if (result == kLightScissorRect)
+        return kLightRectBounded;
+
+    return kLightRectFull;
+}
+
+static void ComputeSurfaceLightNormal(const HMM_Vec3 *normal, float *out_normal, bool *out_horizontal)
+{
+    float nx = normal->X;
+    float ny = normal->Y;
+    float nz = normal->Z;
+
+    if (fabs(nz) > 50 * (fabs(nx) + fabs(ny)))
+    {
+        *out_horizontal = true;
+
+        out_normal[0] = 0.0f;
+        out_normal[1] = 0.0f;
+        out_normal[2] = 1.0f;
+        out_normal[3] = 1.0f;
+
+        return;
+    }
+
+    *out_horizontal = false;
+
+    float length = sqrt(nx * nx + ny * ny + nz * nz);
+
+    out_normal[0] = nx / length;
+    out_normal[1] = ny / length;
+    out_normal[2] = nz / length;
+    out_normal[3] = sqrt(out_normal[0] * out_normal[0] + out_normal[1] * out_normal[1]);
+}
+
+bool EmitMultiLightPass(AbstractShader **shaders, int count, GLuint shape, int num_vert, GLuint tex, float alpha,
+                        int *pass_var, BlendingMode blending, bool masked, void *data,
+                        ShaderCoordinateFunction func)
+{
+    if (count <= 0 || count > kMaximumLightsPerPass)
+        return false;
+
+    DynamicLightParameters lights[kMaximumLightsPerPass];
+
+    for (int i = 0; i < count; i++)
+    {
+        if (!shaders[i]->GetLightParameters(&lights[i]))
+            return false;
+    }
+
+    RendererLightPass light_pass;
+
+    light_pass.count = count;
+
+    for (int i = 0; i < count; i++)
+    {
+        light_pass.position_radius[i * 4 + 0] = lights[i].position.X;
+        light_pass.position_radius[i * 4 + 1] = lights[i].position.Y;
+        light_pass.position_radius[i * 4 + 2] = lights[i].position.Z;
+        light_pass.position_radius[i * 4 + 3] = lights[i].radius;
+
+        light_pass.color[i * 4 + 0] = lights[i].color.X / 255.0f;
+        light_pass.color[i * 4 + 1] = lights[i].color.Y / 255.0f;
+        light_pass.color[i * 4 + 2] = lights[i].color.Z / 255.0f;
+        light_pass.color[i * 4 + 3] = 1.0f;
+    }
+
+    for (int i = count; i < kMaximumLightsPerPass; i++)
+    {
+        for (int e = 0; e < 4; e++)
+        {
+            light_pass.position_radius[i * 4 + e] = 0.0f;
+            light_pass.color[i * 4 + e]           = 0.0f;
+        }
+    }
+
+    bool is_additive = lights[0].additive;
+
+    light_pass.surface_mode = is_additive ? (masked ? 2.0f : 1.0f) : 0.0f;
+    light_pass.alpha        = alpha;
+    light_pass.alpha_test   = (blending & kBlendingMasked) ? 0.01f : 0.0f;
+
+    {
+        HMM_Vec3  probe_position = {};
+        HMM_Vec2  probe_texture  = {};
+        HMM_Vec3  probe_normal   = {};
+        HMM_Vec3  probe_lit_pos  = {};
+        RGBAColor probe_rgba     = kRGBAWhite;
+
+        (*func)(data, 0, &probe_position, &probe_rgba, &probe_texture, &probe_normal, &probe_lit_pos);
+
+        ComputeSurfaceLightNormal(&probe_normal, light_pass.surface_normal, &light_pass.normal_is_horizontal);
+    }
+
+    RendererScissor scissor;
+
+    bool have_scissor = false;
+
+    for (int i = 0; i < count; i++)
+    {
+        RendererScissor light_rect;
+
+        LightRectResult result = GetDynamicLightScreenRect(shaders[i], &light_rect);
+
+        if (result == kLightRectCulled)
+            continue;
+
+        if (result == kLightRectFull)
+        {
+            have_scissor = false;
+            break;
+        }
+
+        if (!have_scissor)
+        {
+            scissor      = light_rect;
+            have_scissor = true;
+        }
+        else
+        {
+            int32_t x1 = HMM_MIN(scissor.x, light_rect.x);
+            int32_t y1 = HMM_MIN(scissor.y, light_rect.y);
+            int32_t x2 = HMM_MAX(scissor.x + scissor.width, light_rect.x + light_rect.width);
+            int32_t y2 = HMM_MAX(scissor.y + scissor.height, light_rect.y + light_rect.height);
+
+            scissor.x      = x1;
+            scissor.y      = y1;
+            scissor.width  = x2 - x1;
+            scissor.height = y2 - y1;
+        }
+    }
+
+    RendererVertex *glvert =
+        BeginRenderUnit(shape, num_vert,
+                        (is_additive && masked) ? (GLuint)kTextureEnvironmentSkipRGB
+                        : is_additive           ? (GLuint)kTextureEnvironmentDisable
+                                                : GL_MODULATE,
+                        (is_additive && !masked) ? 0 : tex, GL_MODULATE, lights[0].image_texture, *pass_var, blending,
+                        kRGBANoValue, 0.0f, nullptr, have_scissor ? &scissor : nullptr, &light_pass);
+
+    for (int v_idx = 0; v_idx < num_vert; v_idx++)
+    {
+        RendererVertex *dest = glvert + v_idx;
+
+        HMM_Vec3 lit_pos;
+        HMM_Vec3 normal;
+
+        (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
+
+        dest->rgba                   = kRGBAWhite;
+        dest->texture_coordinates[1] = {{0.0f, 0.0f}};
+    }
+
+    EndRenderUnit(num_vert);
+
+    (*pass_var) += 1;
+
+    return true;
+}
+
 //----------------------------------------------------------------------------
 //  DYNAMIC LIGHTS
 //----------------------------------------------------------------------------
@@ -585,6 +766,33 @@ class dynlight_shader_c : public AbstractShader
     void SetRadius(float r)
     {
         radius = r;
+    }
+
+    bool GetLightParameters(DynamicLightParameters *out)
+    {
+        if (WhatType() == kDynamicLightTypeNone)
+            return false;
+
+        float light_x = mo->x;
+        float light_y = mo->y;
+        float light_z = MapObjectMidZ(mo);
+
+        render_mirror_set.Coordinate(light_x, light_y);
+        render_mirror_set.Height(light_z);
+
+        out->position = {{light_x, light_y, light_z}};
+        out->radius   = WhatRadius();
+
+        RGBAColor col = WhatColor();
+
+        float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
+
+        out->color = {{L * epi::GetRGBARed(col), L * epi::GetRGBAGreen(col), L * epi::GetRGBABlue(col)}};
+
+        out->image_texture = lim->TextureId();
+        out->additive      = (WhatType() == kDynamicLightTypeAdd);
+
+        return true;
     }
 };
 

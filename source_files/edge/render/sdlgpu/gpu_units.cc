@@ -44,6 +44,9 @@ struct RendererUnit
 
     bool            scissor_enabled = false;
     RendererScissor scissor;
+
+    bool              light_pass_enabled = false;
+    RendererLightPass light_pass;
 };
 
 static RendererVertex local_verts[kMaximumLocalVertices];
@@ -84,7 +87,8 @@ void FinishUnitBatch(void)
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                                const SkyPassInfo *sky_pass, const RendererScissor *scissor)
+                                const SkyPassInfo *sky_pass, const RendererScissor *scissor,
+                                const RendererLightPass *light_pass)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -133,6 +137,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     if (scissor)
         unit->scissor = *scissor;
+
+    unit->light_pass_enabled = (light_pass != nullptr);
+
+    if (light_pass)
+        unit->light_pass = *light_pass;
 
     return local_verts + current_render_vert;
 }

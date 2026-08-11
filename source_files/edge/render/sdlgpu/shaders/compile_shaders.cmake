@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model)
+set(SHADER_NAMES world movie model light)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)

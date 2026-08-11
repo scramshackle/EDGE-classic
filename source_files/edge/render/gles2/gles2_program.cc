@@ -6,6 +6,7 @@
 #include "epi_math.h"
 #include "i_system.h"
 #include "r_backend.h"
+#include "shaders/light_glsl.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
 #include "shaders/world_glsl.h"
@@ -13,6 +14,7 @@
 Gles2Program      gles2_program;
 Gles2ModelProgram gles2_model_program;
 Gles2MovieProgram gles2_movie_program;
+Gles2LightProgram gles2_light_program;
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
 {
@@ -603,4 +605,133 @@ void Gles2MovieProgram::SetPlaneScales(float luma_x, float luma_y, float chroma_
 {
     glUniform2f(uniform_luma_scale_, luma_x, luma_y);
     glUniform2f(uniform_chroma_scale_, chroma_x, chroma_y);
+}
+
+bool Gles2LightProgram::Init()
+{
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kLightVertexSource, "light.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kLightFragmentSource, "light.frag.glsl");
+
+    program_ = glCreateProgram();
+
+    if (!program_)
+    {
+        FatalError("Gles2LightProgram: glCreateProgram failed\n");
+    }
+
+    glAttachShader(program_, vertex_shader);
+    glAttachShader(program_, fragment_shader);
+
+    glBindAttribLocation(program_, kGles2AttributeLightPosition, "a_position");
+    glBindAttribLocation(program_, kGles2AttributeLightTextureCoordinates, "a_texture_coordinates");
+
+    glLinkProgram(program_);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+
+    if (linked != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+        {
+            glGetProgramInfoLog(program_, log_length, nullptr, log);
+        }
+
+        FatalError("Gles2LightProgram: light program failed to link:\n%s\n", log);
+    }
+
+    glDetachShader(program_, vertex_shader);
+    glDetachShader(program_, fragment_shader);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
+    uniform_surface_texture_       = glGetUniformLocation(program_, "u_surface_texture");
+    uniform_light_texture_         = glGetUniformLocation(program_, "u_light_texture");
+    uniform_surface_mode_          = glGetUniformLocation(program_, "u_surface_mode");
+    uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
+    uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
+    uniform_surface_normal_        = glGetUniformLocation(program_, "u_surface_normal");
+    uniform_normal_horizontal_     = glGetUniformLocation(program_, "u_normal_horizontal");
+    uniform_light_count_           = glGetUniformLocation(program_, "u_light_count");
+    uniform_light_position_radius_ = glGetUniformLocation(program_, "u_light_position_radius");
+    uniform_light_color_           = glGetUniformLocation(program_, "u_light_color");
+
+    glUseProgram(program_);
+
+    glUniform1i(uniform_surface_texture_, kGles2TextureUnit0);
+    glUniform1i(uniform_light_texture_, kGles2TextureUnit1);
+
+    return true;
+}
+
+void Gles2LightProgram::Shutdown()
+{
+    if (program_)
+    {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+}
+
+void Gles2LightProgram::Use()
+{
+    glUseProgram(program_);
+}
+
+void Gles2LightProgram::SetFloat(GLint location, float &shadow, float value)
+{
+    if (epi::AlmostEquals(shadow, value))
+    {
+        return;
+    }
+
+    shadow = value;
+
+    glUniform1f(location, value);
+}
+
+void Gles2LightProgram::SetModelViewProjection(const HMM_Mat4 &matrix)
+{
+    glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&matrix);
+}
+
+void Gles2LightProgram::SetSurfaceMode(float mode)
+{
+    SetFloat(uniform_surface_mode_, shadow_surface_mode_, mode);
+}
+
+void Gles2LightProgram::SetAlpha(float alpha)
+{
+    SetFloat(uniform_alpha_, shadow_alpha_, alpha);
+}
+
+void Gles2LightProgram::SetAlphaTest(float reference)
+{
+    SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
+}
+
+void Gles2LightProgram::SetSurfaceNormal(float x, float y, float z, float radius_xy_divisor,
+                                         bool normal_is_horizontal)
+{
+    glUniform4f(uniform_surface_normal_, x, y, z, radius_xy_divisor);
+
+    SetFloat(uniform_normal_horizontal_, shadow_normal_horizontal_, normal_is_horizontal ? 1.0f : 0.0f);
+}
+
+void Gles2LightProgram::SetLights(const float *position_radius, const float *color, int32_t count)
+{
+    if (count > kGles2MaximumLightsPerPass)
+        count = kGles2MaximumLightsPerPass;
+
+    glUniform4fv(uniform_light_position_radius_, kGles2MaximumLightsPerPass, position_radius);
+    glUniform4fv(uniform_light_color_, kGles2MaximumLightsPerPass, color);
+
+    glUniform1i(uniform_light_count_, count);
 }

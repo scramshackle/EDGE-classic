@@ -120,6 +120,24 @@ struct ModelDrawInfo
     int index_count  = 0;
 };
 
+constexpr int kMaximumLightsPerPass = 4;
+
+struct RendererLightPass
+{
+    float position_radius[kMaximumLightsPerPass * 4];
+    float color[kMaximumLightsPerPass * 4];
+
+    int count = 0;
+
+    float surface_normal[4];
+
+    bool normal_is_horizontal = false;
+
+    float surface_mode = 0.0f;
+    float alpha        = 1.0f;
+    float alpha_test   = 0.0f;
+};
+
 struct RendererScissor
 {
     int32_t x      = 0;
@@ -147,7 +165,8 @@ struct SkyPassInfo
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
                                 float fog_density = 0, const SkyPassInfo *sky_pass = nullptr,
-                                const RendererScissor *scissor = nullptr);
+                                const RendererScissor *scissor = nullptr,
+                                const RendererLightPass *light_pass = nullptr);
 void            EndRenderUnit(int actual_vert);
 
 //--- editor settings ---
