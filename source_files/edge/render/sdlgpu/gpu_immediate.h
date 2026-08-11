@@ -40,7 +40,24 @@ enum GpuCommandType
     kGpuCommandViewport,
     kGpuCommandScissor,
     kGpuCommandClearDepth,
-    kGpuCommandClearStencil
+    kGpuCommandClearStencil,
+    kGpuCommandBeginWorldTarget,
+    kGpuCommandResolveWorldTarget
+};
+
+struct GpuResolveArguments
+{
+    int32_t source_x;
+    int32_t source_y;
+    int32_t source_width;
+    int32_t source_height;
+
+    int32_t destination_x;
+    int32_t destination_y;
+    int32_t destination_width;
+    int32_t destination_height;
+
+    bool smooth;
 };
 
 struct GpuDrawArguments
@@ -120,6 +137,7 @@ struct GpuCommand
         GpuModelDrawArguments model_draw;
         GpuMovieArguments     movie;
         GpuRectangleArguments rectangle;
+        GpuResolveArguments   resolve;
     } arguments;
 };
 
@@ -208,6 +226,10 @@ class GpuImmediate
     void Viewport(int32_t x, int32_t y, int32_t width, int32_t height);
 
     void ScissorRect(int32_t x, int32_t y, int32_t width, int32_t height);
+
+    void BeginWorldTarget();
+
+    void ResolveWorldTarget(const GpuResolveArguments &resolve);
 
     void ClearDepth();
 

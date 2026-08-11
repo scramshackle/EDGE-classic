@@ -7,6 +7,7 @@
 #include "epi_color.h"
 
 extern ConsoleVariable fliplevels;
+extern ConsoleVariable render_scale;
 
 struct PassInfo
 {
@@ -101,13 +102,72 @@ class RenderBackend
         return max_texture_size_;
     }
 
+    int32_t RenderTargetWidth() const
+    {
+        return render_target_width_;
+    }
+
+    int32_t RenderTargetHeight() const
+    {
+        return render_target_height_;
+    }
+
+    float RenderTargetScaleX() const
+    {
+        return render_target_scale_x_;
+    }
+
+    float RenderTargetScaleY() const
+    {
+        return render_target_scale_y_;
+    }
+
+    bool RenderTargetScaled() const
+    {
+        return render_target_scaled_;
+    }
+
+    bool RenderTargetActive() const
+    {
+        return render_target_active_;
+    }
+
+    int32_t ScaleToRenderTargetX(int32_t value) const
+    {
+        return render_target_active_ ? (int32_t)((float)value * render_target_scale_x_ + 0.5f) : value;
+    }
+
+    int32_t ScaleToRenderTargetY(int32_t value) const
+    {
+        return render_target_active_ ? (int32_t)((float)value * render_target_scale_y_ + 0.5f) : value;
+    }
+
+    float ActiveScaleX() const
+    {
+        return render_target_active_ ? render_target_scale_x_ : 1.0f;
+    }
+
+    float ActiveScaleY() const
+    {
+        return render_target_active_ ? render_target_scale_y_ : 1.0f;
+    }
+
     // Setup the GL matrices for drawing 2D stuff.
     virtual void SetupMatrices2D(bool flip) = 0;
 
   protected:
+    bool UpdateRenderTargetSize();
+
     int32_t max_texture_size_ = 0;
     int64_t frame_number_;
     bool    units_locked_ = false;
+
+    int32_t render_target_width_   = 0;
+    int32_t render_target_height_  = 0;
+    float   render_target_scale_x_ = 1.0f;
+    float   render_target_scale_y_ = 1.0f;
+    bool    render_target_scaled_  = false;
+    bool    render_target_active_  = false;
 
     std::vector<FrameFinishedCallback> on_frame_finished_;
 

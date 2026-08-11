@@ -11,6 +11,20 @@ enum GpuLoadOperation
     kGpuLoadOperationDontCare
 };
 
+enum GpuPassTarget
+{
+    kGpuPassTargetMain = 0,
+    kGpuPassTargetWorld
+};
+
+struct GpuBlitRectangle
+{
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+};
+
 class GpuDevice
 {
   public:
@@ -22,9 +36,39 @@ class GpuDevice
 
     void SubmitFrame();
 
-    void BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load);
+    void BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load,
+                   GpuPassTarget target = kGpuPassTargetMain);
 
     void EndPass();
+
+    bool EnsureWorldTextures(int32_t width, int32_t height);
+
+    void BlitWorldToMain(const GpuBlitRectangle &source, const GpuBlitRectangle &destination, bool smooth);
+
+    int32_t CurrentTargetWidth() const
+    {
+        return (current_target_ == kGpuPassTargetWorld) ? world_width_ : target_width_;
+    }
+
+    int32_t CurrentTargetHeight() const
+    {
+        return (current_target_ == kGpuPassTargetWorld) ? world_height_ : target_height_;
+    }
+
+    GpuPassTarget CurrentTarget() const
+    {
+        return current_target_;
+    }
+
+    int32_t WorldWidth() const
+    {
+        return world_width_;
+    }
+
+    int32_t WorldHeight() const
+    {
+        return world_height_;
+    }
 
     SDL_GPUCommandBuffer *BeginUpload();
 
@@ -101,6 +145,8 @@ class GpuDevice
     SDL_GPUTexture       *swapchain_texture_ = nullptr;
     SDL_GPUTexture       *color_texture_     = nullptr;
     SDL_GPUTexture       *depth_texture_     = nullptr;
+    SDL_GPUTexture       *world_color_texture_ = nullptr;
+    SDL_GPUTexture       *world_depth_texture_ = nullptr;
 
     SDL_GPUTransferBuffer *download_buffer_          = nullptr;
     uint32_t               download_buffer_capacity_ = 0;
@@ -110,6 +156,14 @@ class GpuDevice
 
     int32_t target_width_  = 0;
     int32_t target_height_ = 0;
+
+    int32_t swapchain_width_  = 0;
+    int32_t swapchain_height_ = 0;
+
+    int32_t world_width_  = 0;
+    int32_t world_height_ = 0;
+
+    GpuPassTarget current_target_ = kGpuPassTargetMain;
 
     RGBAColor clear_color_ = kRGBABlack;
 

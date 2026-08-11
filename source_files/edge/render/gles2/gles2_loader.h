@@ -38,8 +38,21 @@
     X(PFNGLUSEPROGRAMPROC, glUseProgram)                                                                                \
     X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer)
 
+#define EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(X)                                                                         \
+    X(PFNGLBINDFRAMEBUFFERPROC, glBindFramebuffer)                                                                     \
+    X(PFNGLBINDRENDERBUFFERPROC, glBindRenderbuffer)                                                                   \
+    X(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus)                                                       \
+    X(PFNGLDELETEFRAMEBUFFERSPROC, glDeleteFramebuffers)                                                               \
+    X(PFNGLDELETERENDERBUFFERSPROC, glDeleteRenderbuffers)                                                             \
+    X(PFNGLFRAMEBUFFERRENDERBUFFERPROC, glFramebufferRenderbuffer)                                                     \
+    X(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D)                                                           \
+    X(PFNGLGENFRAMEBUFFERSPROC, glGenFramebuffers)                                                                     \
+    X(PFNGLGENRENDERBUFFERSPROC, glGenRenderbuffers)                                                                   \
+    X(PFNGLRENDERBUFFERSTORAGEPROC, glRenderbufferStorage)
+
 #define EDGE_GLES2_DECLARE(type, name) extern type ec_##name;
 EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_DECLARE)
+EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #undef EDGE_GLES2_DECLARE
 
 #define glActiveTexture            ec_glActiveTexture
@@ -73,6 +86,17 @@ EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glUseProgram               ec_glUseProgram
 #define glVertexAttribPointer      ec_glVertexAttribPointer
 
+#define glBindFramebuffer          ec_glBindFramebuffer
+#define glBindRenderbuffer         ec_glBindRenderbuffer
+#define glCheckFramebufferStatus   ec_glCheckFramebufferStatus
+#define glDeleteFramebuffers       ec_glDeleteFramebuffers
+#define glDeleteRenderbuffers      ec_glDeleteRenderbuffers
+#define glFramebufferRenderbuffer  ec_glFramebufferRenderbuffer
+#define glFramebufferTexture2D     ec_glFramebufferTexture2D
+#define glGenFramebuffers          ec_glGenFramebuffers
+#define glGenRenderbuffers         ec_glGenRenderbuffers
+#define glRenderbufferStorage      ec_glRenderbufferStorage
+
 #else
 
 #include <GLES2/gl2.h>
@@ -80,6 +104,8 @@ EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_DECLARE)
 #endif
 
 void Gles2LoadEntryPoints();
+
+bool Gles2HasFramebufferObjects();
 
 int32_t Gles2MaxVaryingVectors();
 

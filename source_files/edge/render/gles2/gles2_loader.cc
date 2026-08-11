@@ -9,7 +9,10 @@
 
 #define EDGE_GLES2_DEFINE(type, name) type ec_##name = nullptr;
 EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_DEFINE)
+EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DEFINE)
 #undef EDGE_GLES2_DEFINE
+
+static bool gles2_framebuffer_objects_available = false;
 
 void Gles2LoadEntryPoints()
 {
@@ -20,6 +23,23 @@ void Gles2LoadEntryPoints()
 
     EDGE_GLES2_GL_FUNCTIONS(EDGE_GLES2_LOAD)
 #undef EDGE_GLES2_LOAD
+
+    gles2_framebuffer_objects_available = true;
+
+#define EDGE_GLES2_LOAD_OPTIONAL(type, name)                                                                           \
+    ec_##name = (type)SDL_GL_GetProcAddress(#name);                                                                    \
+    if (!ec_##name)                                                                                                    \
+        ec_##name = (type)SDL_GL_GetProcAddress(#name "EXT");                                                          \
+    if (!ec_##name)                                                                                                    \
+        gles2_framebuffer_objects_available = false;
+
+    EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_LOAD_OPTIONAL)
+#undef EDGE_GLES2_LOAD_OPTIONAL
+}
+
+bool Gles2HasFramebufferObjects()
+{
+    return gles2_framebuffer_objects_available;
 }
 
 int32_t Gles2MaxVaryingVectors()
@@ -42,6 +62,11 @@ const char *Gles2ShaderPreamble(bool fragment_stage)
 
 void Gles2LoadEntryPoints()
 {
+}
+
+bool Gles2HasFramebufferObjects()
+{
+    return true;
 }
 
 int32_t Gles2MaxVaryingVectors()

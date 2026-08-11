@@ -5,6 +5,7 @@
 
 #include "epi.h"
 #include "i_system.h"
+#include "r_backend.h"
 
 Gles2Immediate gles2_immediate;
 
@@ -141,6 +142,8 @@ bool Gles2Immediate::Init()
 
 void Gles2Immediate::Shutdown()
 {
+    DestroyRenderTarget();
+
     if (vertex_buffer_)
     {
         glDeleteBuffers(1, &vertex_buffer_);
@@ -289,7 +292,8 @@ void Gles2Immediate::ApplyMatrices()
 
 void Gles2Immediate::Viewport(int32_t x, int32_t y, int32_t width, int32_t height)
 {
-    glViewport(x, y, width, height);
+    glViewport(render_backend->ScaleToRenderTargetX(x), render_backend->ScaleToRenderTargetY(y),
+               render_backend->ScaleToRenderTargetX(width), render_backend->ScaleToRenderTargetY(height));
 }
 
 void Gles2Immediate::ClearDepth()
@@ -598,6 +602,253 @@ void Gles2Immediate::DrawMovieQuad(const RendererVertex *vertices)
     InvalidateBatch();
 
     draw_count_++;
+}
+
+static int32_t Gles2NextPowerOfTwo(int32_t value)
+{
+    int32_t result = 1;
+
+    while (result < value)
+        result <<= 1;
+
+    return result;
+}
+
+bool Gles2Immediate::AttachRenderTargetDepth(int32_t width, int32_t height)
+{
+    struct Gles2DepthFormat
+    {
+        GLenum internal_format;
+        GLenum attachment;
+        bool   separate_stencil;
+        bool   has_stencil;
+    };
+
+    static const Gles2DepthFormat formats[4] = {{GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, false, true},
+                                                {GL_DEPTH_STENCIL, GL_DEPTH_STENCIL_ATTACHMENT, false, true},
+                                                {GL_DEPTH24_STENCIL8, GL_DEPTH_ATTACHMENT, true, true},
+                                                {GL_DEPTH_COMPONENT16, GL_DEPTH_ATTACHMENT, false, false}};
+
+    for (int32_t i = 0; i < 4; i++)
+    {
+        if (render_target_depth_)
+        {
+            glDeleteRenderbuffers(1, &render_target_depth_);
+            render_target_depth_ = 0;
+        }
+
+        glGenRenderbuffers(1, &render_target_depth_);
+
+        if (!render_target_depth_)
+            return false;
+
+        glBindRenderbuffer(GL_RENDERBUFFER, render_target_depth_);
+        glRenderbufferStorage(GL_RENDERBUFFER, formats[i].internal_format, width, height);
+
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, formats[i].attachment, GL_RENDERBUFFER, render_target_depth_);
+
+        if (formats[i].separate_stencil)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, render_target_depth_);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+        {
+            render_target_has_stencil_ = formats[i].has_stencil;
+            return true;
+        }
+    }
+
+    if (render_target_depth_)
+    {
+        glDeleteRenderbuffers(1, &render_target_depth_);
+        render_target_depth_ = 0;
+    }
+
+    return false;
+}
+
+bool Gles2Immediate::EnsureRenderTarget(int32_t width, int32_t height)
+{
+    if (width < 1 || height < 1 || !Gles2HasFramebufferObjects())
+        return false;
+
+    if (render_target_framebuffer_ && render_target_width_ == width && render_target_height_ == height)
+        return true;
+
+    if (CreateRenderTarget(width, height, width, height))
+        return true;
+
+    return CreateRenderTarget(width, height, Gles2NextPowerOfTwo(width), Gles2NextPowerOfTwo(height));
+}
+
+bool Gles2Immediate::CreateRenderTarget(int32_t width, int32_t height, int32_t texture_width, int32_t texture_height)
+{
+    DestroyRenderTarget();
+
+    glGenFramebuffers(1, &render_target_framebuffer_);
+
+    if (!render_target_framebuffer_)
+        return false;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+
+    glGenTextures(1, &render_target_color_);
+
+    if (!render_target_color_)
+    {
+        DestroyRenderTarget();
+        return false;
+    }
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, render_target_color_);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_target_color_, 0);
+
+    if (!AttachRenderTargetDepth(texture_width, texture_height))
+    {
+        DestroyRenderTarget();
+        return false;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    render_target_width_          = width;
+    render_target_height_         = height;
+    render_target_texture_width_  = texture_width;
+    render_target_texture_height_ = texture_height;
+
+    return true;
+}
+
+void Gles2Immediate::DestroyRenderTarget()
+{
+    if (render_target_framebuffer_)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDeleteFramebuffers(1, &render_target_framebuffer_);
+        render_target_framebuffer_ = 0;
+    }
+
+    if (render_target_color_)
+    {
+        glDeleteTextures(1, &render_target_color_);
+        render_target_color_ = 0;
+    }
+
+    if (render_target_depth_)
+    {
+        glDeleteRenderbuffers(1, &render_target_depth_);
+        render_target_depth_ = 0;
+    }
+
+    render_target_width_          = 0;
+    render_target_height_         = 0;
+    render_target_texture_width_  = 0;
+    render_target_texture_height_ = 0;
+    render_target_has_stencil_    = false;
+}
+
+void Gles2Immediate::BindRenderTarget()
+{
+    if (!Gles2HasFramebufferObjects())
+        return;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+}
+
+void Gles2Immediate::ResolveRenderTarget(const Gles2ResolveRect &source, const Gles2ResolveRect &destination,
+                                         int32_t window_width, int32_t window_height, bool smooth)
+{
+    if (!render_target_framebuffer_)
+        return;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glViewport(0, 0, window_width, window_height);
+
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_STENCIL_TEST);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    glDepthMask(GL_FALSE);
+
+    gles2_program.Use();
+
+    gles2_program.SetModelViewProjection(HMM_M4D(1.0f));
+    gles2_program.SetModelView(HMM_M4D(1.0f));
+    gles2_program.SetMultiTexture(false);
+    gles2_program.SetLineMode(false);
+    gles2_program.SetSkipRGB(false);
+    gles2_program.SetAlphaTest(0.0f);
+    gles2_program.SetFog(kGles2FogModeNone, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    gles2_program.SetSkyPass(nullptr);
+
+    for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
+        gles2_program.SetClipPlaneEnabled(i, false);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, default_texture_);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, render_target_color_);
+
+    GLint filter = smooth ? GL_LINEAR : GL_NEAREST;
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+
+    float u0 = (float)source.x / (float)render_target_texture_width_;
+    float v0 = (float)source.y / (float)render_target_texture_height_;
+    float u1 = (float)(source.x + source.width) / (float)render_target_texture_width_;
+    float v1 = (float)(source.y + source.height) / (float)render_target_texture_height_;
+
+    float x0 = (float)destination.x / (float)window_width * 2.0f - 1.0f;
+    float y0 = (float)destination.y / (float)window_height * 2.0f - 1.0f;
+    float x1 = (float)(destination.x + destination.width) / (float)window_width * 2.0f - 1.0f;
+    float y1 = (float)(destination.y + destination.height) / (float)window_height * 2.0f - 1.0f;
+
+    RendererVertex quad[4];
+
+    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+
+    for (int32_t i = 0; i < 4; i++)
+        quad[i].rgba = kRGBAWhite;
+
+    quad[0].position               = {{x0, y0, 0.0f}};
+    quad[0].texture_coordinates[0] = {{u0, v0}};
+
+    quad[1].position               = {{x1, y0, 0.0f}};
+    quad[1].texture_coordinates[0] = {{u1, v0}};
+
+    quad[2].position               = {{x1, y1, 0.0f}};
+    quad[2].texture_coordinates[0] = {{u1, v1}};
+
+    quad[3].position               = {{x0, y1, 0.0f}};
+    quad[3].texture_coordinates[0] = {{u0, v1}};
+
+    size_t offset = StreamVertices(quad, 4);
+
+    BindVertexAttributes(offset);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_index_buffer_);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *)0);
+
+    InvalidateBatch();
+
+    draw_count_++;
+
+    MarkMatrixDirty();
 }
 
 void Gles2Immediate::DrawRange(GLuint shape, size_t byte_offset, int32_t count)

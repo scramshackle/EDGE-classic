@@ -129,6 +129,8 @@ class GpuRenderBackend : public RenderBackend
         if (vsync.CheckModified())
             gpu_device.SetVerticalSync(vsync.d_);
 
+        UpdateRenderTargetSize();
+
         gpu_device.AcquireFrame(width, height);
 
         gpu_device.SetClearColor(clear_color_);
@@ -191,8 +193,8 @@ class GpuRenderBackend : public RenderBackend
 
     void GetPassInfo(PassInfo &info)
     {
-        info.width_  = gpu_device.TargetWidth() ? gpu_device.TargetWidth() : current_screen_width;
-        info.height_ = gpu_device.TargetHeight() ? gpu_device.TargetHeight() : current_screen_height;
+        info.width_  = current_screen_width;
+        info.height_ = current_screen_height;
     }
 
     void BeginWorldRender()
@@ -221,6 +223,13 @@ class GpuRenderBackend : public RenderBackend
         world_state_[i].used_   = true;
 
         world_state_index_ = i;
+
+        if (render_target_scaled_ && gpu_device.EnsureWorldTextures(render_target_width_, render_target_height_))
+        {
+            render_target_active_ = true;
+
+            gpu_immediate.BeginWorldTarget();
+        }
     }
 
     void FinishWorldRender()
@@ -241,6 +250,27 @@ class GpuRenderBackend : public RenderBackend
         if (i == kRenderWorldMax)
         {
             FatalError("GpuRenderBackend: FinishWorldRender called with no active world render");
+        }
+
+        if (render_target_active_)
+        {
+            GpuResolveArguments resolve;
+
+            resolve.source_x      = ScaleToRenderTargetX(view_window_x);
+            resolve.source_y      = ScaleToRenderTargetY(view_window_y);
+            resolve.source_width  = ScaleToRenderTargetX(view_window_width);
+            resolve.source_height = ScaleToRenderTargetY(view_window_height);
+
+            resolve.destination_x      = view_window_x;
+            resolve.destination_y      = view_window_y;
+            resolve.destination_width  = view_window_width;
+            resolve.destination_height = view_window_height;
+
+            resolve.smooth = image_smoothing > 0;
+
+            render_target_active_ = false;
+
+            gpu_immediate.ResolveWorldTarget(resolve);
         }
 
         SetRenderLayer(kRenderLayerHUD);

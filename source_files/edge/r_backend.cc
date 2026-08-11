@@ -16,6 +16,42 @@ EDGE_DEFINE_CONSOLE_VARIABLE(draw_culling, "0", kConsoleVariableFlagArchive)
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(draw_culling_distance, "3000", kConsoleVariableFlagArchive, 1000.0f, 16000.0f)
 EDGE_DEFINE_CONSOLE_VARIABLE(cull_fog_color, "0", kConsoleVariableFlagArchive)
 EDGE_DEFINE_CONSOLE_VARIABLE(fliplevels, "0", kConsoleVariableFlagNone)
+EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(render_scale, "1.0", kConsoleVariableFlagArchive, 0.25f, 1.0f)
+
+bool RenderBackend::UpdateRenderTargetSize()
+{
+    float scale = render_scale.f_;
+
+    if (scale > 1.0f)
+        scale = 1.0f;
+    if (scale < 0.25f)
+        scale = 0.25f;
+
+    int32_t width  = (int32_t)((float)current_screen_width * scale + 0.5f);
+    int32_t height = (int32_t)((float)current_screen_height * scale + 0.5f);
+
+    if (width < 1)
+        width = 1;
+    if (height < 1)
+        height = 1;
+
+    if (width > current_screen_width)
+        width = current_screen_width;
+    if (height > current_screen_height)
+        height = current_screen_height;
+
+    bool changed = (width != render_target_width_) || (height != render_target_height_);
+
+    render_target_width_  = width;
+    render_target_height_ = height;
+
+    render_target_scale_x_ = (float)width / (float)current_screen_width;
+    render_target_scale_y_ = (float)height / (float)current_screen_height;
+
+    render_target_scaled_ = (width != current_screen_width) || (height != current_screen_height);
+
+    return changed;
+}
 
 void RenderBackend::SoftInit(void)
 {

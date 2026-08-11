@@ -147,6 +147,54 @@ class Gles2RenderBackend : public RenderBackend
         }
     }
 
+    void DisableRenderTarget(const char *reason)
+    {
+        gles2_immediate.DestroyRenderTarget();
+
+        render_target_width_   = current_screen_width;
+        render_target_height_  = current_screen_height;
+        render_target_scale_x_ = 1.0f;
+        render_target_scale_y_ = 1.0f;
+        render_target_scaled_  = false;
+
+        if (reason && !render_target_unsupported_)
+        {
+            render_target_unsupported_ = true;
+
+            LogPrint("OpenGL: %s, resolution scaling disabled\n", reason);
+        }
+    }
+
+    void RefreshRenderTarget()
+    {
+        bool changed = UpdateRenderTargetSize();
+
+        if (render_target_unsupported_)
+        {
+            DisableRenderTarget(nullptr);
+            return;
+        }
+
+        bool target_matches = (render_target_scaled_ == gles2_immediate.RenderTargetReady());
+
+        if (!changed && render_target_applied_ && target_matches)
+            return;
+
+        render_target_applied_ = true;
+
+        if (render_target_scaled_)
+        {
+            if (!gles2_immediate.EnsureRenderTarget(render_target_width_, render_target_height_))
+                DisableRenderTarget("render target unavailable");
+        }
+        else
+        {
+            gles2_immediate.DestroyRenderTarget();
+        }
+
+        Gles2DetectStencilBuffer();
+    }
+
     void StartFrame(int32_t width, int32_t height)
     {
         EPI_UNUSED(width);
@@ -189,6 +237,8 @@ class Gles2RenderBackend : public RenderBackend
     {
         EPI_UNUSED(width);
         EPI_UNUSED(height);
+
+        RefreshRenderTarget();
     }
 
     void Shutdown()
@@ -213,10 +263,43 @@ class Gles2RenderBackend : public RenderBackend
 
     void BeginWorldRender()
     {
+        RefreshRenderTarget();
+
+        if (!render_target_scaled_ || !gles2_immediate.RenderTargetReady())
+            return;
+
+        gles2_immediate.BindRenderTarget();
+
+        render_target_active_ = true;
+
+        render_state->ClearColor(kRGBABlack);
+        render_state->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     }
 
     void FinishWorldRender()
     {
+        if (render_target_active_)
+        {
+            Gles2ResolveRect source;
+            source.x      = ScaleToRenderTargetX(view_window_x);
+            source.y      = ScaleToRenderTargetY(view_window_y);
+            source.width  = ScaleToRenderTargetX(view_window_width);
+            source.height = ScaleToRenderTargetY(view_window_height);
+
+            Gles2ResolveRect destination;
+            destination.x      = view_window_x;
+            destination.y      = view_window_y;
+            destination.width  = view_window_width;
+            destination.height = view_window_height;
+
+            gles2_immediate.ResolveRenderTarget(source, destination, current_screen_width, current_screen_height,
+                                                image_smoothing > 0);
+
+            render_target_active_ = false;
+
+            Gles2InvalidateRenderState();
+        }
+
         SetRenderLayer(kRenderLayerHUD);
     }
 
@@ -267,6 +350,9 @@ class Gles2RenderBackend : public RenderBackend
     RenderLayer render_layer_ = kRenderLayerInvalid;
 
     RGBAColor clear_color_ = kRGBABlack;
+
+    bool render_target_applied_     = false;
+    bool render_target_unsupported_ = false;
 };
 
 static Gles2RenderBackend gles2_render_backend;

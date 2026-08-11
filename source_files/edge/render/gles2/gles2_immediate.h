@@ -15,6 +15,14 @@ constexpr int32_t kGles2MaximumQuads = 16384;
 
 constexpr size_t kGles2VertexBufferBytes = 4 * 1024 * 1024;
 
+struct Gles2ResolveRect
+{
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+};
+
 enum Gles2MatrixMode
 {
     kGles2MatrixModeModelView = 0,
@@ -100,6 +108,25 @@ class Gles2Immediate
 
     void DrawMovieQuad(const RendererVertex *vertices);
 
+    bool EnsureRenderTarget(int32_t width, int32_t height);
+
+    void DestroyRenderTarget();
+
+    void BindRenderTarget();
+
+    void ResolveRenderTarget(const Gles2ResolveRect &source, const Gles2ResolveRect &destination, int32_t window_width,
+                             int32_t window_height, bool smooth);
+
+    bool RenderTargetReady() const
+    {
+        return render_target_framebuffer_ != 0;
+    }
+
+    bool RenderTargetHasStencil() const
+    {
+        return render_target_has_stencil_;
+    }
+
     const HMM_Mat4 &ProjectionMatrix() const
     {
         return matrix_stack_[kGles2MatrixModeProjection][matrix_top_[kGles2MatrixModeProjection]];
@@ -165,6 +192,21 @@ class Gles2Immediate
 
     bool CreateDefaultTexture();
 
+    bool AttachRenderTargetDepth(int32_t width, int32_t height);
+
+    bool CreateRenderTarget(int32_t width, int32_t height, int32_t texture_width, int32_t texture_height);
+
+    GLuint render_target_framebuffer_ = 0;
+    GLuint render_target_color_       = 0;
+    GLuint render_target_depth_       = 0;
+
+    int32_t render_target_width_          = 0;
+    int32_t render_target_height_         = 0;
+    int32_t render_target_texture_width_  = 0;
+    int32_t render_target_texture_height_ = 0;
+
+    bool render_target_has_stencil_ = false;
+
     GLuint vertex_buffer_       = 0;
     GLuint quad_index_buffer_   = 0;
     GLuint merged_index_buffer_ = 0;
@@ -194,5 +236,7 @@ class Gles2Immediate
 extern Gles2Immediate gles2_immediate;
 
 void Gles2ApplyRenderState();
+
+void Gles2InvalidateRenderState();
 
 void Gles2DetectStencilBuffer();

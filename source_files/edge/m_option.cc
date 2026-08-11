@@ -131,6 +131,7 @@ extern ConsoleVariable draw_culling_distance;
 extern ConsoleVariable cull_fog_color;
 extern ConsoleVariable distance_cull_thinkers;
 extern ConsoleVariable max_dynamic_light_radius;
+extern ConsoleVariable render_scale;
 extern ConsoleVariable vsync;
 extern ConsoleVariable view_bobbing;
 extern ConsoleVariable gore_level;
@@ -176,6 +177,8 @@ static void OptionMenuAnalogueOptions(int key_pressed, ConsoleVariable *console_
 static void OptionMenuSoundOptions(int key_pressed, ConsoleVariable *console_variable);
 
 static void OptionMenuKeyToString(int key, char *deststring);
+
+static void OptionMenuChangeRenderScale(int key_pressed, ConsoleVariable *console_variable);
 
 // Use these when a menu option does nothing special other than update a value
 static void OptionMenuUpdateConsoleVariableFromFloat(int key_pressed, ConsoleVariable *console_variable);
@@ -655,7 +658,16 @@ static OptionMenuDefinition gameplay_optmenu = {playoptions,
 //  PERFORMANCE OPTIONS
 //
 //
+static constexpr int kTotalRenderScaleSteps = 4;
+
+static const float render_scale_steps[kTotalRenderScaleSteps] = {0.25f, 0.5f, 0.75f, 1.0f};
+
+static int render_scale_index = kTotalRenderScaleSteps - 1;
+
 static OptionMenuItem perfoptions[] = {
+    {kOptionMenuItemTypeSwitch, "World Render Scaling", "25%/50%/75%/100%", kTotalRenderScaleSteps,
+     &render_scale_index, OptionMenuChangeRenderScale, "Renders the world at reduced size; HUD stays sharp", nullptr, 0,
+     0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Detail Level", "Low/Medium/High", 3, &detail_level, OptionMenuChangeMipMap, nullptr,
      nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeBoolean, "Draw Distance Culling", YesNo, 2, &draw_culling.d_,
@@ -1824,6 +1836,17 @@ static void OptionMenuPerformanceOptions(int key_pressed, ConsoleVariable *conso
     if (network_game)
         return;
 
+    render_scale_index = kTotalRenderScaleSteps - 1;
+
+    for (int i = 0; i < kTotalRenderScaleSteps; i++)
+    {
+        if (fabs(render_scale.f_ - render_scale_steps[i]) <
+            fabs(render_scale.f_ - render_scale_steps[render_scale_index]))
+        {
+            render_scale_index = i;
+        }
+    }
+
     current_menu = &perf_optmenu;
     current_item = current_menu->items + current_menu->pos;
 }
@@ -2057,6 +2080,16 @@ static void OptionMenuChangeBobbing(int key_pressed, ConsoleVariable *console_va
             psp->old_screen_y = 0;
         }
     }
+}
+
+static void OptionMenuChangeRenderScale(int key_pressed, ConsoleVariable *console_variable)
+{
+    EPI_UNUSED(key_pressed);
+    EPI_UNUSED(console_variable);
+
+    render_scale_index = HMM_Clamp(0, render_scale_index, kTotalRenderScaleSteps - 1);
+
+    render_scale = render_scale_steps[render_scale_index];
 }
 
 static void OptionMenuUpdateConsoleVariableFromFloat(int key_pressed, ConsoleVariable *console_variable)

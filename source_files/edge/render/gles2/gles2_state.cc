@@ -15,6 +15,12 @@ static bool gles2_stencil_available = false;
 
 void Gles2DetectStencilBuffer()
 {
+    if (gles2_immediate.RenderTargetReady())
+    {
+        gles2_stencil_available = gles2_immediate.RenderTargetHasStencil();
+        return;
+    }
+
     GLint stencil_bits = 0;
 
     glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
@@ -349,7 +355,8 @@ class Gles2RenderState : public RenderState
 
     void Scissor(GLint x, GLint y, GLsizei width, GLsizei height)
     {
-        glScissor(x, y, width, height);
+        glScissor(render_backend->ScaleToRenderTargetX(x), render_backend->ScaleToRenderTargetY(y),
+                  render_backend->ScaleToRenderTargetX(width), render_backend->ScaleToRenderTargetY(height));
     }
 
     void GenTextures(GLsizei n, GLuint *textures)
@@ -390,6 +397,27 @@ class Gles2RenderState : public RenderState
     void Flush()
     {
         glFlush();
+    }
+
+    void InvalidateApplied()
+    {
+        applied_blend_          = !enable_blend_;
+        applied_cull_face_      = !enable_cull_face_;
+        applied_depth_test_     = !enable_depth_test_;
+        applied_scissor_test_   = !enable_scissor_test_;
+        applied_depth_mask_     = !depth_mask_;
+        applied_polygon_offset_ = !applied_polygon_offset_;
+
+        applied_depth_func_ = 0;
+        applied_cull_mode_  = 0;
+
+        applied_blend_source_      = 0;
+        applied_blend_destination_ = 0;
+
+        gl_bound_texture_[0] = 0xFFFFFFFFu;
+        gl_bound_texture_[1] = 0xFFFFFFFFu;
+
+        state_dirty_ = true;
     }
 
     void Reset()
@@ -802,4 +830,9 @@ RenderState            *render_state = &state;
 void Gles2ApplyRenderState()
 {
     state.ApplyState();
+}
+
+void Gles2InvalidateRenderState()
+{
+    state.InvalidateApplied();
 }

@@ -8,6 +8,7 @@
 #include "gpu_device.h"
 #include "gpu_matrix.h"
 #include "i_system.h"
+#include "r_backend.h"
 
 GpuImmediate gpu_immediate;
 
@@ -566,10 +567,16 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
         current_fragment_parameters_.sky_inverse_projection = sky_pass->inverse_projection;
         current_fragment_parameters_.sky_inverse_view       = sky_pass->inverse_view;
 
-        current_fragment_parameters_.sky_viewport[0] = sky_pass->viewport_origin.X;
-        current_fragment_parameters_.sky_viewport[1] = (float)gpu_device.TargetHeight() - sky_pass->viewport_origin.Y;
-        current_fragment_parameters_.sky_viewport[2] = sky_pass->viewport_size.X;
-        current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.Y;
+        float sky_scale_x = render_backend->ActiveScaleX();
+        float sky_scale_y = render_backend->ActiveScaleY();
+
+        float sky_target_height =
+            render_backend->RenderTargetActive() ? (float)gpu_device.WorldHeight() : (float)gpu_device.TargetHeight();
+
+        current_fragment_parameters_.sky_viewport[0] = sky_pass->viewport_origin.X * sky_scale_x;
+        current_fragment_parameters_.sky_viewport[1] = sky_target_height - sky_pass->viewport_origin.Y * sky_scale_y;
+        current_fragment_parameters_.sky_viewport[2] = sky_pass->viewport_size.X * sky_scale_x;
+        current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.Y * sky_scale_y;
 
         current_fragment_parameters_.sky_stretch_mode       = (float)sky_pass->stretch_mode;
         current_fragment_parameters_.sky_u_scale            = sky_pass->u_scale;
@@ -637,11 +644,11 @@ void GpuImmediate::Viewport(int32_t x, int32_t y, int32_t width, int32_t height)
 {
     GpuCommand command;
 
-    command.type                   = kGpuCommandViewport;
-    command.arguments.rectangle.x  = x;
-    command.arguments.rectangle.y  = y;
-    command.arguments.rectangle.width  = width;
-    command.arguments.rectangle.height = height;
+    command.type                       = kGpuCommandViewport;
+    command.arguments.rectangle.x      = render_backend->ScaleToRenderTargetX(x);
+    command.arguments.rectangle.y      = render_backend->ScaleToRenderTargetY(y);
+    command.arguments.rectangle.width  = render_backend->ScaleToRenderTargetX(width);
+    command.arguments.rectangle.height = render_backend->ScaleToRenderTargetY(height);
 
     commands_.push_back(command);
 }
@@ -651,10 +658,29 @@ void GpuImmediate::ScissorRect(int32_t x, int32_t y, int32_t width, int32_t heig
     GpuCommand command;
 
     command.type                       = kGpuCommandScissor;
-    command.arguments.rectangle.x      = x;
-    command.arguments.rectangle.y      = y;
-    command.arguments.rectangle.width  = width;
-    command.arguments.rectangle.height = height;
+    command.arguments.rectangle.x      = render_backend->ScaleToRenderTargetX(x);
+    command.arguments.rectangle.y      = render_backend->ScaleToRenderTargetY(y);
+    command.arguments.rectangle.width  = render_backend->ScaleToRenderTargetX(width);
+    command.arguments.rectangle.height = render_backend->ScaleToRenderTargetY(height);
+
+    commands_.push_back(command);
+}
+
+void GpuImmediate::BeginWorldTarget()
+{
+    GpuCommand command;
+
+    command.type = kGpuCommandBeginWorldTarget;
+
+    commands_.push_back(command);
+}
+
+void GpuImmediate::ResolveWorldTarget(const GpuResolveArguments &resolve)
+{
+    GpuCommand command;
+
+    command.type              = kGpuCommandResolveWorldTarget;
+    command.arguments.resolve = resolve;
 
     commands_.push_back(command);
 }
@@ -1472,7 +1498,7 @@ void GpuImmediate::ApplyPassState()
         SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
     }
 
-    int32_t target_height = gpu_device.TargetHeight();
+    int32_t target_height = gpu_device.CurrentTargetHeight();
 
     if (viewport_set_)
     {
@@ -1489,7 +1515,7 @@ void GpuImmediate::ApplyPassState()
 
     if (scissor_set_)
     {
-        int32_t target_width = gpu_device.TargetWidth();
+        int32_t target_width = gpu_device.CurrentTargetWidth();
 
         int32_t left   = HMM_MAX(0, current_scissor_.x);
         int32_t bottom = HMM_MAX(0, current_scissor_.y);
@@ -1704,13 +1730,41 @@ void GpuImmediate::Replay()
                 current_scissor_ = command->arguments.rectangle;
                 scissor_set_     = true;
             }
+            else if (command->type == kGpuCommandBeginWorldTarget)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear,
+                                     kGpuPassTargetWorld);
+            }
+            else if (command->type == kGpuCommandResolveWorldTarget)
+            {
+                const GpuResolveArguments *resolve = &command->arguments.resolve;
+
+                GpuBlitRectangle source;
+                source.x      = resolve->source_x;
+                source.y      = resolve->source_y;
+                source.width  = resolve->source_width;
+                source.height = resolve->source_height;
+
+                GpuBlitRectangle destination;
+                destination.x      = resolve->destination_x;
+                destination.y      = resolve->destination_y;
+                destination.width  = resolve->destination_width;
+                destination.height = resolve->destination_height;
+
+                gpu_device.BlitWorldToMain(source, destination, resolve->smooth);
+
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
+                                     kGpuPassTargetMain);
+            }
             else if (command->type == kGpuCommandClearStencil)
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear);
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear,
+                                     gpu_device.CurrentTarget());
             }
             else
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad);
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
+                                     gpu_device.CurrentTarget());
             }
 
             ApplyPassState();

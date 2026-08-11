@@ -5,6 +5,7 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
+#include "r_backend.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
 #include "shaders/world_glsl.h"
@@ -296,8 +297,11 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
     glUniformMatrix4fv(uniform_sky_inverse_projection_, 1, GL_FALSE, (const GLfloat *)&sky_pass->inverse_projection);
     glUniformMatrix4fv(uniform_sky_inverse_view_, 1, GL_FALSE, (const GLfloat *)&sky_pass->inverse_view);
 
-    glUniform4f(uniform_sky_viewport_, sky_pass->viewport_origin.X, sky_pass->viewport_origin.Y,
-                sky_pass->viewport_size.X, sky_pass->viewport_size.Y);
+    float scale_x = render_backend->ActiveScaleX();
+    float scale_y = render_backend->ActiveScaleY();
+
+    glUniform4f(uniform_sky_viewport_, sky_pass->viewport_origin.X * scale_x, sky_pass->viewport_origin.Y * scale_y,
+                sky_pass->viewport_size.X * scale_x, sky_pass->viewport_size.Y * scale_y);
 
     glUniform1f(uniform_sky_stretch_mode_, (float)sky_pass->stretch_mode);
     glUniform1f(uniform_sky_u_scale_, sky_pass->u_scale);
