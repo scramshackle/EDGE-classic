@@ -114,6 +114,11 @@ class GpuRenderBackend : public RenderBackend
         RenderBackend::Init();
     }
 
+    HMM_Mat4 WorldViewProjection()
+    {
+        return gpu_immediate.ProjectionMatrix() * gpu_immediate.ModelViewMatrix();
+    }
+
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         if (!gpu_device.ReadColorTarget(width, height, stride, dest))

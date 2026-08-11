@@ -41,6 +41,9 @@ struct RendererUnit
 
     bool        sky_pass_enabled = false;
     SkyPassInfo sky_pass;
+
+    bool            scissor_enabled = false;
+    RendererScissor scissor;
 };
 
 static RendererVertex local_verts[kMaximumLocalVertices];
@@ -81,7 +84,7 @@ void FinishUnitBatch(void)
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                                const SkyPassInfo *sky_pass)
+                                const SkyPassInfo *sky_pass, const RendererScissor *scissor)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -125,6 +128,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
+
+    unit->scissor_enabled = (scissor != nullptr);
+
+    if (scissor)
+        unit->scissor = *scissor;
 
     return local_verts + current_render_vert;
 }
@@ -329,11 +337,36 @@ void RenderCurrentUnits(void)
     else
         render_state->Disable(GL_FOG);
 
+    bool    ambient_scissor_enabled = render_state->ScissorTestEnabled();
+    GLint   ambient_scissor_x       = 0;
+    GLint   ambient_scissor_y       = 0;
+    GLsizei ambient_scissor_width   = 0;
+    GLsizei ambient_scissor_height  = 0;
+
+    render_state->GetScissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
+
+    bool scissor_overridden = false;
+
     for (int j = 0; j < current_render_unit; j++)
     {
         RendererUnit *unit = local_unit_map[j];
 
         EPI_ASSERT(unit->count > 0);
+
+        if (unit->scissor_enabled)
+        {
+            render_state->Enable(GL_SCISSOR_TEST);
+            render_state->Scissor(unit->scissor.x, unit->scissor.y, unit->scissor.width, unit->scissor.height);
+
+            scissor_overridden = true;
+        }
+        else if (scissor_overridden)
+        {
+            render_state->Enable(GL_SCISSOR_TEST, ambient_scissor_enabled);
+            render_state->Scissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
+
+            scissor_overridden = false;
+        }
 
         if (!culling && unit->fog_color != kRGBANoValue && !(unit->blending & kBlendingNoFog) && !no_fog)
         {
@@ -457,6 +490,12 @@ void RenderCurrentUnits(void)
         BindUnitTextures(unit);
 
         gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);
+    }
+
+    if (scissor_overridden)
+    {
+        render_state->Enable(GL_SCISSOR_TEST, ambient_scissor_enabled);
+        render_state->Scissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
     }
 
     gpu_immediate.SetSkipRGB(false);

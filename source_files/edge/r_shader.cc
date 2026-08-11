@@ -18,14 +18,18 @@
 
 #include "r_shader.h"
 
+#include <float.h>
+
 #include <unordered_map>
 
+#include "con_var.h"
 #include "ddf_main.h"
 #include "epi.h"
 #include "epi_str_hash.h"
 #include "i_defs_gl.h"
 #include "im_data.h"
 #include "p_mobj.h"
+#include "r_backend.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
 #include "r_image.h"
@@ -151,6 +155,166 @@ static LightImage *GetLightImage(const MapObjectDefinition *info)
     }
 
     return (LightImage *)D_info->cache_data_;
+}
+
+//----------------------------------------------------------------------------
+//  LIGHT SCISSORS
+//----------------------------------------------------------------------------
+
+EDGE_DEFINE_CONSOLE_VARIABLE(renderer_light_scissor, "1", kConsoleVariableFlagNone)
+
+static constexpr float kLightScissorMinimumW = 0.0001f;
+
+enum LightScissorResult
+{
+    kLightScissorFull,
+    kLightScissorRect,
+    kLightScissorCull
+};
+
+struct LightInfluenceBounds
+{
+    float minimum[3];
+    float maximum[3];
+};
+
+static LightInfluenceBounds surface_light_bounds;
+static bool                 surface_light_bounds_valid = false;
+
+void SetSurfaceLightBounds(float min_x, float min_y, float min_z, float max_x, float max_y, float max_z)
+{
+    surface_light_bounds.minimum[0] = min_x;
+    surface_light_bounds.minimum[1] = min_y;
+    surface_light_bounds.minimum[2] = min_z;
+
+    surface_light_bounds.maximum[0] = max_x;
+    surface_light_bounds.maximum[1] = max_y;
+    surface_light_bounds.maximum[2] = max_z;
+
+    surface_light_bounds_valid = true;
+}
+
+void ClearSurfaceLightBounds()
+{
+    surface_light_bounds_valid = false;
+}
+
+static void SetInfluenceBoundsInfinite(LightInfluenceBounds *bounds)
+{
+    for (int axis = 0; axis < 3; axis++)
+    {
+        bounds->minimum[axis] = -FLT_MAX;
+        bounds->maximum[axis] = FLT_MAX;
+    }
+}
+
+static void ClipInfluenceToSlab(LightInfluenceBounds *bounds, int axis, float low, float high)
+{
+    bounds->minimum[axis] = HMM_MAX(bounds->minimum[axis], low);
+    bounds->maximum[axis] = HMM_MIN(bounds->maximum[axis], high);
+}
+
+static void ClipInfluenceToSurface(LightInfluenceBounds *bounds)
+{
+    if (!surface_light_bounds_valid)
+        return;
+
+    for (int axis = 0; axis < 3; axis++)
+        ClipInfluenceToSlab(bounds, axis, surface_light_bounds.minimum[axis], surface_light_bounds.maximum[axis]);
+}
+
+static LightScissorResult ComputeScissorFromBounds(const LightInfluenceBounds *bounds, RendererScissor *out)
+{
+    if (!renderer_light_scissor.d_)
+        return kLightScissorFull;
+
+    if (view_window_width <= 0 || view_window_height <= 0)
+        return kLightScissorFull;
+
+    for (int axis = 0; axis < 3; axis++)
+    {
+        if (bounds->minimum[axis] > bounds->maximum[axis])
+            return kLightScissorCull;
+
+        if (bounds->minimum[axis] <= -FLT_MAX || bounds->maximum[axis] >= FLT_MAX)
+            return kLightScissorFull;
+    }
+
+    HMM_Mat4 view_projection = render_backend->WorldViewProjection();
+
+    float minimum_x = 0.0f;
+    float minimum_y = 0.0f;
+    float maximum_x = 0.0f;
+    float maximum_y = 0.0f;
+
+    int in_front = 0;
+
+    for (int corner = 0; corner < 8; corner++)
+    {
+        HMM_Vec4 world;
+
+        world.X = (corner & 1) ? bounds->maximum[0] : bounds->minimum[0];
+        world.Y = (corner & 2) ? bounds->maximum[1] : bounds->minimum[1];
+        world.Z = (corner & 4) ? bounds->maximum[2] : bounds->minimum[2];
+        world.W = 1.0f;
+
+        HMM_Vec4 clip = HMM_MulM4V4(view_projection, world);
+
+        if (clip.W <= kLightScissorMinimumW)
+            continue;
+
+        float screen_x = (float)view_window_x + ((clip.X / clip.W) * 0.5f + 0.5f) * (float)view_window_width;
+        float screen_y = (float)view_window_y + ((clip.Y / clip.W) * 0.5f + 0.5f) * (float)view_window_height;
+
+        in_front++;
+
+        if (in_front == 1)
+        {
+            minimum_x = maximum_x = screen_x;
+            minimum_y = maximum_y = screen_y;
+        }
+        else
+        {
+            minimum_x = HMM_MIN(minimum_x, screen_x);
+            maximum_x = HMM_MAX(maximum_x, screen_x);
+            minimum_y = HMM_MIN(minimum_y, screen_y);
+            maximum_y = HMM_MAX(maximum_y, screen_y);
+        }
+    }
+
+    if (in_front == 0)
+        return kLightScissorCull;
+
+    if (in_front < 8)
+        return kLightScissorFull;
+
+    int32_t x1 = (int32_t)floor(minimum_x) - 1;
+    int32_t y1 = (int32_t)floor(minimum_y) - 1;
+    int32_t x2 = (int32_t)ceil(maximum_x) + 1;
+    int32_t y2 = (int32_t)ceil(maximum_y) + 1;
+
+    int32_t window_x1 = view_window_x;
+    int32_t window_y1 = view_window_y;
+    int32_t window_x2 = view_window_x + view_window_width;
+    int32_t window_y2 = view_window_y + view_window_height;
+
+    x1 = HMM_MAX(x1, window_x1);
+    y1 = HMM_MAX(y1, window_y1);
+    x2 = HMM_MIN(x2, window_x2);
+    y2 = HMM_MIN(y2, window_y2);
+
+    if (x1 >= x2 || y1 >= y2)
+        return kLightScissorCull;
+
+    if (x1 <= window_x1 && y1 <= window_y1 && x2 >= window_x2 && y2 >= window_y2)
+        return kLightScissorFull;
+
+    out->x      = x1;
+    out->y      = y1;
+    out->width  = x2 - x1;
+    out->height = y2 - y1;
+
+    return kLightScissorRect;
 }
 
 //----------------------------------------------------------------------------
@@ -357,6 +521,32 @@ class dynlight_shader_c : public AbstractShader
         float G = L * epi::GetRGBAGreen(col);
         float B = L * epi::GetRGBABlue(col);
 
+        float light_x = mo->x;
+        float light_y = mo->y;
+        float light_z = MapObjectMidZ(mo);
+
+        render_mirror_set.Coordinate(light_x, light_y);
+        render_mirror_set.Height(light_z);
+
+        float light_radius = WhatRadius();
+
+        LightInfluenceBounds bounds;
+
+        SetInfluenceBoundsInfinite(&bounds);
+
+        ClipInfluenceToSlab(&bounds, 0, light_x - light_radius, light_x + light_radius);
+        ClipInfluenceToSlab(&bounds, 1, light_y - light_radius, light_y + light_radius);
+        ClipInfluenceToSlab(&bounds, 2, light_z - light_radius, light_z + light_radius);
+
+        ClipInfluenceToSurface(&bounds);
+
+        RendererScissor scissor;
+
+        LightScissorResult scissor_result = ComputeScissorFromBounds(&bounds, &scissor);
+
+        if (scissor_result == kLightScissorCull)
+            return;
+
         RendererVertex *glvert =
             BeginRenderUnit(shape, num_vert,
                             (is_additive && masked) ? (GLuint)kTextureEnvironmentSkipRGB
@@ -364,7 +554,8 @@ class dynlight_shader_c : public AbstractShader
                                                     : GL_MODULATE,
                             (is_additive && !masked) ? 0 : tex, GL_MODULATE, lim->TextureId(), *pass_var, blending,
                             *pass_var > 0 ? kRGBANoValue : mo->subsector_->sector->properties.fog_color,
-                            mo->subsector_->sector->properties.fog_density);
+                            mo->subsector_->sector->properties.fog_density, nullptr,
+                            (scissor_result == kLightScissorRect) ? &scissor : nullptr);
 
         for (int v_idx = 0; v_idx < num_vert; v_idx++)
         {
@@ -542,6 +733,26 @@ class plane_glow_c : public AbstractShader
         float G = L * epi::GetRGBAGreen(col);
         float B = L * epi::GetRGBABlue(col);
 
+        float glow_radius = WhatRadius();
+
+        LightInfluenceBounds bounds;
+
+        SetInfluenceBoundsInfinite(&bounds);
+
+        if (mo->info_->glow_type_ == kSectorGlowTypeFloor)
+            ClipInfluenceToSlab(&bounds, 2, sec->floor_height, sec->floor_height + glow_radius);
+        else
+            ClipInfluenceToSlab(&bounds, 2, sec->ceiling_height - glow_radius, sec->ceiling_height);
+
+        ClipInfluenceToSurface(&bounds);
+
+        RendererScissor scissor;
+
+        LightScissorResult scissor_result = ComputeScissorFromBounds(&bounds, &scissor);
+
+        if (scissor_result == kLightScissorCull)
+            return;
+
         RendererVertex *glvert =
             BeginRenderUnit(shape, num_vert,
                             (is_additive && masked) ? (GLuint)kTextureEnvironmentSkipRGB
@@ -549,7 +760,8 @@ class plane_glow_c : public AbstractShader
                                                     : GL_MODULATE,
                             (is_additive && !masked) ? 0 : tex, GL_MODULATE, lim->TextureId(), *pass_var, blending,
                             *pass_var > 0 ? kRGBANoValue : mo->subsector_->sector->properties.fog_color,
-                            mo->subsector_->sector->properties.fog_density);
+                            mo->subsector_->sector->properties.fog_density, nullptr,
+                            (scissor_result == kLightScissorRect) ? &scissor : nullptr);
 
         for (int v_idx = 0; v_idx < num_vert; v_idx++)
         {

@@ -351,6 +351,19 @@ class GpuRenderState : public RenderState
         scissor_.dirty_  = true;
     }
 
+    bool ScissorTestEnabled()
+    {
+        return scissor_.enabled_;
+    }
+
+    void GetScissor(GLint &x, GLint &y, GLsizei &width, GLsizei &height)
+    {
+        x      = scissor_.x_;
+        y      = scissor_.y_;
+        width  = scissor_.width_;
+        height = scissor_.height_;
+    }
+
     void GenTextures(GLsizei n, GLuint *textures)
     {
         if (generating_texture_)

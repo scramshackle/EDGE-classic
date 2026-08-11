@@ -2,6 +2,7 @@
 #pragma once
 #include <functional>
 
+#include "HandmadeMath.h"
 #include "con_var.h"
 #include "dm_defs.h"
 #include "epi_color.h"
@@ -86,6 +87,8 @@ class RenderBackend
     virtual void Init();
 
     virtual void GetPassInfo(PassInfo &info) = 0;
+
+    virtual HMM_Mat4 WorldViewProjection() = 0;
 
     virtual void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest) = 0;
 

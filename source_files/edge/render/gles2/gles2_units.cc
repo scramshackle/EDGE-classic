@@ -42,6 +42,9 @@ struct RendererUnit
 
     bool        sky_pass_enabled = false;
     SkyPassInfo sky_pass;
+
+    bool            scissor_enabled = false;
+    RendererScissor scissor;
 };
 
 static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
@@ -85,7 +88,7 @@ void FinishUnitBatch(void)
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                                const SkyPassInfo *sky_pass)
+                                const SkyPassInfo *sky_pass, const RendererScissor *scissor)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -129,6 +132,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
+
+    unit->scissor_enabled = (scissor != nullptr);
+
+    if (scissor)
+        unit->scissor = *scissor;
 
     return local_verts + current_render_vert;
 }
@@ -296,6 +304,13 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
         a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
         a->blending != b->blending || a->fog_color != b->fog_color || a->sky_pass_enabled || b->sky_pass_enabled ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
+        return false;
+
+    if (a->scissor_enabled != b->scissor_enabled)
+        return false;
+
+    if (a->scissor_enabled && (a->scissor.x != b->scissor.x || a->scissor.y != b->scissor.y ||
+                               a->scissor.width != b->scissor.width || a->scissor.height != b->scissor.height))
         return false;
 
     if (a->blending & (kBlendingLess | kBlendingGEqual))
@@ -553,6 +568,16 @@ void RenderCurrentUnits(void)
 
     render_state->SetVertexArrays(local_verts, current_render_vert);
 
+    bool    ambient_scissor_enabled = render_state->ScissorTestEnabled();
+    GLint   ambient_scissor_x       = 0;
+    GLint   ambient_scissor_y       = 0;
+    GLsizei ambient_scissor_width   = 0;
+    GLsizei ambient_scissor_height  = 0;
+
+    render_state->GetScissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
+
+    bool scissor_overridden = false;
+
     int j = 0;
 
     while (j < current_render_unit)
@@ -660,6 +685,21 @@ void RenderCurrentUnits(void)
             }
         }
 
+        if (unit->scissor_enabled)
+        {
+            render_state->Enable(GL_SCISSOR_TEST);
+            render_state->Scissor(unit->scissor.x, unit->scissor.y, unit->scissor.width, unit->scissor.height);
+
+            scissor_overridden = true;
+        }
+        else if (scissor_overridden)
+        {
+            render_state->Enable(GL_SCISSOR_TEST, ambient_scissor_enabled);
+            render_state->Scissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
+
+            scissor_overridden = false;
+        }
+
         render_state->PolygonOffset(0, -unit->pass);
 
         if (unit->shape == GL_LINES)
@@ -697,6 +737,12 @@ void RenderCurrentUnits(void)
         }
 
         j = run_end;
+    }
+
+    if (scissor_overridden)
+    {
+        render_state->Enable(GL_SCISSOR_TEST, ambient_scissor_enabled);
+        render_state->Scissor(ambient_scissor_x, ambient_scissor_y, ambient_scissor_width, ambient_scissor_height);
     }
 
     for (int t = 1; t >= 0; t--)

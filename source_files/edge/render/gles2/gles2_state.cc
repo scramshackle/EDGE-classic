@@ -355,8 +355,26 @@ class Gles2RenderState : public RenderState
 
     void Scissor(GLint x, GLint y, GLsizei width, GLsizei height)
     {
+        scissor_x_      = x;
+        scissor_y_      = y;
+        scissor_width_  = width;
+        scissor_height_ = height;
+
         glScissor(render_backend->ScaleToRenderTargetX(x), render_backend->ScaleToRenderTargetY(y),
                   render_backend->ScaleToRenderTargetX(width), render_backend->ScaleToRenderTargetY(height));
+    }
+
+    bool ScissorTestEnabled()
+    {
+        return enable_scissor_test_;
+    }
+
+    void GetScissor(GLint &x, GLint &y, GLsizei &width, GLsizei &height)
+    {
+        x      = scissor_x_;
+        y      = scissor_y_;
+        width  = scissor_width_;
+        height = scissor_height_;
     }
 
     void GenTextures(GLsizei n, GLuint *textures)
@@ -775,6 +793,11 @@ class Gles2RenderState : public RenderState
     GLenum depth_function_    = GL_LEQUAL;
 
     bool enable_scissor_test_ = false;
+
+    GLint   scissor_x_      = 0;
+    GLint   scissor_y_      = 0;
+    GLsizei scissor_width_  = 0;
+    GLsizei scissor_height_ = 0;
 
     bool     clip_plane_enabled_[kGles2MaximumClipPlanes]     = {};
     GLdouble clip_plane_equation_[kGles2MaximumClipPlanes][4] = {};

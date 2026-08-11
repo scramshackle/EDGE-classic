@@ -198,6 +198,10 @@ class RenderState
 
     virtual void Scissor(GLint x, GLint y, GLsizei width, GLsizei height) = 0;
 
+    virtual bool ScissorTestEnabled() = 0;
+
+    virtual void GetScissor(GLint &x, GLint &y, GLsizei &width, GLsizei &height) = 0;
+
     virtual void GenTextures(GLsizei n, GLuint *textures) = 0;
 
     virtual void FinishTextures(GLsizei n, GLuint *textures) = 0;

@@ -135,6 +135,11 @@ class Gles2RenderBackend : public RenderBackend
         RenderBackend::Init();
     }
 
+    HMM_Mat4 WorldViewProjection()
+    {
+        return gles2_immediate.ProjectionMatrix() * gles2_immediate.ModelViewMatrix();
+    }
+
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         render_state->Flush();

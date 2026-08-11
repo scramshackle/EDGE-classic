@@ -120,6 +120,14 @@ struct ModelDrawInfo
     int index_count  = 0;
 };
 
+struct RendererScissor
+{
+    int32_t x      = 0;
+    int32_t y      = 0;
+    int32_t width  = 0;
+    int32_t height = 0;
+};
+
 struct SkyPassInfo
 {
     HMM_Mat4 inverse_projection = HMM_M4D(1.0f);
@@ -138,7 +146,8 @@ struct SkyPassInfo
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
-                                float fog_density = 0, const SkyPassInfo *sky_pass = nullptr);
+                                float fog_density = 0, const SkyPassInfo *sky_pass = nullptr,
+                                const RendererScissor *scissor = nullptr);
 void            EndRenderUnit(int actual_vert);
 
 //--- editor settings ---

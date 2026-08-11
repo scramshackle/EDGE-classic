@@ -117,5 +117,9 @@ class AbstractShader
 // destructors as these images are shared amongst multiple instances - Dasho
 void DeleteAllLightImages();
 
+void SetSurfaceLightBounds(float min_x, float min_y, float min_z, float max_x, float max_y, float max_z);
+
+void ClearSurfaceLightBounds();
+
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

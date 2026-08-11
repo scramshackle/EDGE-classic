@@ -678,11 +678,34 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         float bottom = HMM_MIN(lz1, rz1);
         float top    = HMM_MAX(lz2, rz2);
 
+        float surface_low[3];
+        float surface_high[3];
+
+        for (int axis = 0; axis < 3; axis++)
+        {
+            surface_low[axis]  = vertices[0].Elements[axis];
+            surface_high[axis] = vertices[0].Elements[axis];
+        }
+
+        for (int v_idx = 1; v_idx < v_count; v_idx++)
+        {
+            for (int axis = 0; axis < 3; axis++)
+            {
+                surface_low[axis]  = HMM_MIN(surface_low[axis], vertices[v_idx].Elements[axis]);
+                surface_high[axis] = HMM_MAX(surface_high[axis], vertices[v_idx].Elements[axis]);
+            }
+        }
+
+        SetSurfaceLightBounds(surface_low[0], surface_low[1], surface_low[2], surface_high[0], surface_high[1],
+                              surface_high[2]);
+
         DynamicLightIterator(v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom, v_bbox[kBoundingBoxRight],
                              v_bbox[kBoundingBoxTop], top, DLIT_Wall, &data);
 
         SectorGlowIterator(current_seg->front_sector, v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom,
                            v_bbox[kBoundingBoxRight], v_bbox[kBoundingBoxTop], top, GLOWLIT_Wall, &data);
+
+        ClearSurfaceLightBounds();
     }
 
     swirl_pass = 0;
