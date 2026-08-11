@@ -321,6 +321,8 @@ void GpuImmediate::BeginFrame()
     fragment_parameters_.clear();
     model_vertex_parameters_.clear();
     model_fragment_parameters_.clear();
+    light_vertex_parameters_.clear();
+    light_fragment_parameters_.clear();
 
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
@@ -1174,6 +1176,73 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     commands_.push_back(command);
 }
 
+void GpuImmediate::RecordLightDraw(GLuint shape, const RendererVertex *vertices, int32_t count,
+                                   const GpuLightVertexParameters   &vertex_parameters,
+                                   const GpuLightFragmentParameters &fragment_parameters)
+{
+    if (count <= 0)
+        return;
+
+    switch (shape)
+    {
+    case GL_QUADS:
+        count -= count % 4;
+        if (count < 4)
+            return;
+        break;
+
+    case GL_TRIANGLES:
+        count -= count % 3;
+        if (count < 3)
+            return;
+        break;
+
+    case GL_POLYGON:
+    case GL_TRIANGLE_FAN:
+    case GL_QUAD_STRIP:
+    case GL_TRIANGLE_STRIP:
+        if (count < 3)
+            return;
+        break;
+
+    default:
+        FatalError("GpuImmediate: unsupported light pass shape 0x%04X\n", shape);
+    }
+
+    SDL_GPUGraphicsPipeline *pipeline = GetLightPipeline(pipeline_flags_, source_blend_, destination_blend_);
+
+    RendererVertex *destination = ReserveVertices(count);
+
+    memcpy(destination, vertices, (size_t)count * sizeof(RendererVertex));
+
+    light_vertex_parameters_.push_back(vertex_parameters);
+    light_fragment_parameters_.push_back(fragment_parameters);
+
+    GpuCommand command;
+
+    command.type = kGpuCommandLightDraw;
+
+    GpuLightDrawArguments *draw = &command.arguments.light_draw;
+
+    draw->pipeline = pipeline;
+
+    draw->texture[0] = current_texture_[0];
+    draw->sampler[0] = current_sampler_[0];
+    draw->texture[1] = current_texture_[1];
+    draw->sampler[1] = current_sampler_[1];
+
+    draw->base_vertex = pending_base_;
+    draw->index_first = (int32_t)dynamic_indices_.size();
+    draw->index_count = AppendDynamicIndices(shape, count, 0);
+
+    draw->vertex_parameter_index   = (int32_t)light_vertex_parameters_.size() - 1;
+    draw->fragment_parameter_index = (int32_t)light_fragment_parameters_.size() - 1;
+
+    draw->stencil_reference = stencil_reference_;
+
+    commands_.push_back(command);
+}
+
 void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_count, const uint16_t *indices,
                                int32_t index_count)
 {
@@ -1714,6 +1783,89 @@ void GpuImmediate::Replay()
                 SDL_BindGPUVertexBuffers(pass, 0, &world_binding, 1);
                 binding_count_++;
             }
+
+            continue;
+        }
+
+        if (command->type == kGpuCommandLightDraw)
+        {
+            const GpuLightDrawArguments *light = &command->arguments.light_draw;
+
+            SDL_GPURenderPass *pass = gpu_device.RenderPass();
+
+            if (!pass)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad);
+                ApplyPassState();
+                pass = gpu_device.RenderPass();
+            }
+
+            if (!pass || !vertex_buffer_)
+                continue;
+
+            if (bound_pipeline_ != light->pipeline)
+            {
+                SDL_BindGPUGraphicsPipeline(pass, light->pipeline);
+                bound_pipeline_ = light->pipeline;
+                pipeline_bind_count_++;
+            }
+
+            if (bound_stencil_reference_ != light->stencil_reference)
+            {
+                SDL_SetGPUStencilReference(pass, light->stencil_reference);
+                bound_stencil_reference_ = light->stencil_reference;
+            }
+
+            if (bound_texture_[0] != light->texture[0] || bound_sampler_[0] != light->sampler[0] ||
+                bound_texture_[1] != light->texture[1] || bound_sampler_[1] != light->sampler[1])
+            {
+                SDL_GPUTextureSamplerBinding bindings[2];
+
+                bindings[0].texture = light->texture[0];
+                bindings[0].sampler = light->sampler[0];
+                bindings[1].texture = light->texture[1];
+                bindings[1].sampler = light->sampler[1];
+
+                SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
+
+                bound_texture_[0] = light->texture[0];
+                bound_sampler_[0] = light->sampler[0];
+                bound_texture_[1] = light->texture[1];
+                bound_sampler_[1] = light->sampler[1];
+
+                binding_count_++;
+            }
+
+            SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuVertexUniformSlot,
+                                         &light_vertex_parameters_[(size_t)light->vertex_parameter_index],
+                                         (uint32_t)sizeof(GpuLightVertexParameters));
+
+            SDL_PushGPUFragmentUniformData(gpu_device.CommandBuffer(), kGpuFragmentUniformSlot,
+                                           &light_fragment_parameters_[(size_t)light->fragment_parameter_index],
+                                           (uint32_t)sizeof(GpuLightFragmentParameters));
+
+            uniform_push_count_ += 2;
+            uniform_bytes_ += sizeof(GpuLightVertexParameters) + sizeof(GpuLightFragmentParameters);
+
+            bound_vertex_parameter_index_   = -1;
+            bound_fragment_parameter_index_ = -1;
+
+            if (bound_index_buffer_ != dynamic_index_buffer_)
+            {
+                SDL_GPUBufferBinding binding;
+                binding.buffer = dynamic_index_buffer_;
+                binding.offset = 0;
+
+                SDL_BindGPUIndexBuffer(pass, &binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+                bound_index_buffer_ = dynamic_index_buffer_;
+                binding_count_++;
+            }
+
+            SDL_DrawGPUIndexedPrimitives(pass, (uint32_t)light->index_count, 1, (uint32_t)light->index_first,
+                                         light->base_vertex, 0);
+
+            draw_count_++;
 
             continue;
         }

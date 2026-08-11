@@ -14,6 +14,13 @@ static_assert(offsetof(RendererVertex, rgba) == 0, "RendererVertex::rgba offset"
 static_assert(offsetof(RendererVertex, position) == 4, "RendererVertex::position offset");
 static_assert(offsetof(RendererVertex, texture_coordinates) == 16, "RendererVertex::texture_coordinates offset");
 
+enum GpuPipelineShaderKind
+{
+    kGpuPipelineShaderWorld = 0,
+    kGpuPipelineShaderModel,
+    kGpuPipelineShaderLight
+};
+
 static std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *> pipelines;
 
 static SDL_GPUDevice       *pipeline_device        = nullptr;
@@ -117,8 +124,10 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
 }
 
 static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
-                                               GpuPrimitiveType primitive, bool model)
+                                               GpuPrimitiveType primitive, GpuPipelineShaderKind shader_kind)
 {
+    bool model = (shader_kind == kGpuPipelineShaderModel);
+
     SDL_GPUVertexBufferDescription buffer_description[4];
     EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 4);
 
@@ -202,8 +211,21 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     SDL_GPUGraphicsPipelineCreateInfo info;
     EPI_CLEAR_MEMORY(&info, SDL_GPUGraphicsPipelineCreateInfo, 1);
 
-    info.vertex_shader   = model ? ModelVertexShader() : WorldVertexShader();
-    info.fragment_shader = model ? ModelFragmentShader() : WorldFragmentShader();
+    if (shader_kind == kGpuPipelineShaderModel)
+    {
+        info.vertex_shader   = ModelVertexShader();
+        info.fragment_shader = ModelFragmentShader();
+    }
+    else if (shader_kind == kGpuPipelineShaderLight)
+    {
+        info.vertex_shader   = LightVertexShader();
+        info.fragment_shader = LightFragmentShader();
+    }
+    else
+    {
+        info.vertex_shader   = WorldVertexShader();
+        info.fragment_shader = WorldFragmentShader();
+    }
 
     info.vertex_input_state.vertex_buffer_descriptions = buffer_description;
     info.vertex_input_state.num_vertex_buffers         = buffer_count;
@@ -409,7 +431,8 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
     if (itr != pipelines.end())
         return itr->second;
 
-    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend, primitive, false);
+    SDL_GPUGraphicsPipeline *pipeline =
+        CreatePipeline(pipeline_flags, source_blend, destination_blend, primitive, kGpuPipelineShaderWorld);
 
     pipelines[key] = pipeline;
 
@@ -430,8 +453,30 @@ SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source
     if (itr != pipelines.end())
         return itr->second;
 
-    SDL_GPUGraphicsPipeline *pipeline =
-        CreatePipeline(pipeline_flags, source_blend, destination_blend, kGpuPrimitiveTriangleList, true);
+    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend,
+                                                       kGpuPrimitiveTriangleList, kGpuPipelineShaderModel);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}
+
+SDL_GPUGraphicsPipeline *GetLightPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend)
+{
+    if (!CreateLightShaders(pipeline_device))
+        FatalError("GpuPipeline: light shader creation failed\n");
+
+    pipeline_flags = EncodeBlendFlags(pipeline_flags, source_blend, destination_blend);
+
+    uint32_t key = pipeline_flags | (2u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend,
+                                                       kGpuPrimitiveTriangleList, kGpuPipelineShaderLight);
 
     pipelines[key] = pipeline;
 

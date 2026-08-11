@@ -161,8 +161,6 @@ static LightImage *GetLightImage(const MapObjectDefinition *info)
 //  LIGHT SCISSORS
 //----------------------------------------------------------------------------
 
-EDGE_DEFINE_CONSOLE_VARIABLE(renderer_light_scissor, "1", kConsoleVariableFlagNone)
-
 static constexpr float kLightScissorMinimumW = 0.0001f;
 
 enum LightScissorResult
@@ -225,9 +223,6 @@ static void ClipInfluenceToSurface(LightInfluenceBounds *bounds)
 
 static LightScissorResult ComputeScissorFromBounds(const LightInfluenceBounds *bounds, RendererScissor *out)
 {
-    if (!renderer_light_scissor.d_)
-        return kLightScissorFull;
-
     if (view_window_width <= 0 || view_window_height <= 0)
         return kLightScissorFull;
 

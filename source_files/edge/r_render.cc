@@ -349,8 +349,6 @@ static int        surface_light_total = 0;
 static int surface_light_group_sizes[kMaximumSurfaceLights];
 static int surface_light_group_total = 0;
 
-EDGE_DEFINE_CONSOLE_VARIABLE(renderer_multi_light, "0", kConsoleVariableFlagNone)
-
 static void EmitCollectedWallLights(WallCoordinateData *data);
 static void EmitCollectedPlaneLights(PlaneCoordinateData *data);
 
@@ -555,7 +553,7 @@ static void EmitCollectedWallLights(WallCoordinateData *data)
     {
         int group_size = surface_light_group_sizes[g];
 
-        if (renderer_multi_light.d_ && group_size > 1)
+        if (group_size > 1)
         {
             AbstractShader *shaders[kMaximumLightsPerPass];
 
@@ -636,7 +634,7 @@ static void EmitCollectedPlaneLights(PlaneCoordinateData *data)
     {
         int group_size = surface_light_group_sizes[g];
 
-        if (renderer_multi_light.d_ && group_size > 1)
+        if (group_size > 1)
         {
             AbstractShader *shaders[kMaximumLightsPerPass];
 

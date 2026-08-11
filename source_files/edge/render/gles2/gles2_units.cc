@@ -285,6 +285,9 @@ static int32_t ExpandUnitIndices(GLuint shape, int first, int count, uint16_t *o
 
 static void PromoteSecondTexture(RendererUnit *unit, RendererVertex *verts)
 {
+    if (unit->light_pass_enabled)
+        return;
+
     if ((unit->texture[0] && unit->environment_mode[0] != kTextureEnvironmentDisable) || !unit->texture[1] ||
         unit->environment_mode[1] == kTextureEnvironmentDisable)
         return;

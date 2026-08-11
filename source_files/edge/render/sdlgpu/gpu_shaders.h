@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "HandmadeMath.h"
+#include "r_units.h"
 
 constexpr int32_t kGpuMaximumClipPlanes = 6;
 
@@ -93,6 +94,28 @@ struct GpuFragmentParameters
     float    sky_padding;
 };
 
+struct GpuLightVertexParameters
+{
+    HMM_Mat4 mvp;
+};
+
+struct GpuLightFragmentParameters
+{
+    float surface_normal[4];
+    float light_position_radius[kMaximumLightsPerPass][4];
+    float light_color[kMaximumLightsPerPass][4];
+
+    int32_t light_count;
+    float   normal_horizontal;
+    float   surface_mode;
+    float   alpha;
+
+    float alpha_test;
+    float light_padding0;
+    float light_padding1;
+    float light_padding2;
+};
+
 struct GpuModelVertexParameters
 {
     HMM_Mat4 mvp;
@@ -120,6 +143,24 @@ struct GpuModelFragmentParameters
 
     float fog_color[4];
 };
+
+static_assert(kMaximumLightsPerPass == 4, "GpuLightFragmentParameters assumes 4 lights per pass");
+static_assert(sizeof(GpuLightVertexParameters) == 64, "GpuLightVertexParameters size");
+static_assert(offsetof(GpuLightFragmentParameters, surface_normal) == 0,
+              "GpuLightFragmentParameters::surface_normal offset");
+static_assert(offsetof(GpuLightFragmentParameters, light_position_radius) == 16,
+              "GpuLightFragmentParameters::light_position_radius offset");
+static_assert(offsetof(GpuLightFragmentParameters, light_color) == 80,
+              "GpuLightFragmentParameters::light_color offset");
+static_assert(offsetof(GpuLightFragmentParameters, light_count) == 144,
+              "GpuLightFragmentParameters::light_count offset");
+static_assert(offsetof(GpuLightFragmentParameters, normal_horizontal) == 148,
+              "GpuLightFragmentParameters::normal_horizontal offset");
+static_assert(offsetof(GpuLightFragmentParameters, surface_mode) == 152,
+              "GpuLightFragmentParameters::surface_mode offset");
+static_assert(offsetof(GpuLightFragmentParameters, alpha) == 156, "GpuLightFragmentParameters::alpha offset");
+static_assert(offsetof(GpuLightFragmentParameters, alpha_test) == 160, "GpuLightFragmentParameters::alpha_test offset");
+static_assert(sizeof(GpuLightFragmentParameters) == 176, "GpuLightFragmentParameters size");
 
 static_assert(offsetof(GpuModelVertexParameters, mvp) == 0, "GpuModelVertexParameters::mvp offset");
 static_assert(offsetof(GpuModelVertexParameters, mv) == 64, "GpuModelVertexParameters::mv offset");
@@ -181,6 +222,14 @@ void DestroyModelShaders(SDL_GPUDevice *device);
 SDL_GPUShader *ModelVertexShader();
 
 SDL_GPUShader *ModelFragmentShader();
+
+bool CreateLightShaders(SDL_GPUDevice *device);
+
+void DestroyLightShaders(SDL_GPUDevice *device);
+
+SDL_GPUShader *LightVertexShader();
+
+SDL_GPUShader *LightFragmentShader();
 
 bool CreateWorldShaders(SDL_GPUDevice *device);
 

@@ -187,6 +187,7 @@ class GpuRenderBackend : public RenderBackend
 
         DestroyWorldShaders(gpu_device.Handle());
         DestroyModelShaders(gpu_device.Handle());
+        DestroyLightShaders(gpu_device.Handle());
 
         gpu_device.Shutdown();
     }

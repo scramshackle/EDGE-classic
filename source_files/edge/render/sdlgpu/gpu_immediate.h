@@ -36,6 +36,7 @@ enum GpuCommandType
 {
     kGpuCommandDraw = 0,
     kGpuCommandModelDraw,
+    kGpuCommandLightDraw,
     kGpuCommandMovie,
     kGpuCommandViewport,
     kGpuCommandScissor,
@@ -108,6 +109,23 @@ struct GpuModelDrawArguments
     uint8_t stencil_reference;
 };
 
+struct GpuLightDrawArguments
+{
+    SDL_GPUGraphicsPipeline *pipeline;
+
+    SDL_GPUTexture *texture[2];
+    SDL_GPUSampler *sampler[2];
+
+    int32_t base_vertex;
+    int32_t index_count;
+    int32_t index_first;
+
+    int32_t vertex_parameter_index;
+    int32_t fragment_parameter_index;
+
+    uint8_t stencil_reference;
+};
+
 struct GpuMovieArguments
 {
     SDL_GPUTexture *texture[3];
@@ -135,6 +153,7 @@ struct GpuCommand
     union {
         GpuDrawArguments      draw;
         GpuModelDrawArguments model_draw;
+        GpuLightDrawArguments light_draw;
         GpuMovieArguments     movie;
         GpuRectangleArguments rectangle;
         GpuResolveArguments   resolve;
@@ -256,6 +275,10 @@ class GpuImmediate
     void RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
                          const GpuModelFragmentParameters &fragment_parameters);
 
+    void RecordLightDraw(GLuint shape, const RendererVertex *vertices, int32_t count,
+                         const GpuLightVertexParameters   &vertex_parameters,
+                         const GpuLightFragmentParameters &fragment_parameters);
+
     uint32_t DrawCount() const
     {
         return draw_count_;
@@ -345,6 +368,9 @@ class GpuImmediate
 
     std::vector<GpuModelVertexParameters>   model_vertex_parameters_;
     std::vector<GpuModelFragmentParameters> model_fragment_parameters_;
+
+    std::vector<GpuLightVertexParameters>   light_vertex_parameters_;
+    std::vector<GpuLightFragmentParameters> light_fragment_parameters_;
 
     std::vector<RendererVertex>        vertices_;
     int32_t                            vertex_count_ = 0;

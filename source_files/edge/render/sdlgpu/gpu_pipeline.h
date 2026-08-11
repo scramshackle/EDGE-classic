@@ -43,3 +43,5 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
                                      GpuPrimitiveType primitive);
 
 SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
+
+SDL_GPUGraphicsPipeline *GetLightPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
