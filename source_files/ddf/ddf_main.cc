@@ -95,26 +95,29 @@ std::string cur_ddf_linedata;
 
     // put actual error message on first line
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
     if (cur_ddf_filename != "")
     {
-        stbsp_sprintf(pos, "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)),
+                       "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_entryname != "")
     {
-        stbsp_sprintf(pos, "Error occurred in entry: %s\n", cur_ddf_entryname.c_str());
+        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred in entry: %s\n",
+                       cur_ddf_entryname.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_linedata != "")
     {
-        stbsp_sprintf(pos, "Line contents: %s\n", cur_ddf_linedata.c_str());
+        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                       cur_ddf_linedata.c_str());
         pos += strlen(pos);
     }
 
@@ -137,7 +140,7 @@ void DDFWarning(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     LogWarning("%s", buffer);
@@ -167,7 +170,7 @@ void DDFDebug(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     LogDebug("%s", buffer);
@@ -194,7 +197,7 @@ void DDFWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)

@@ -294,22 +294,35 @@ void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...)
     char    buffer[1024];
 
     va_start(argptr, message);
-    stbsp_vsprintf(buffer, message, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), message, argptr);
     va_end(argptr);
+
+    bool append_newline = false;
 
     switch (target)
     {
     case kConsoleHUDTop:
         HUDStartMessage(buffer);
-        strcat(buffer, "\n");
+        append_newline = true;
         break;
     case kConsoleHUDCenter:
         HUDStartImportantMessage(buffer);
-        strcat(buffer, "\n");
+        append_newline = true;
         break;
     case kConsoleOnly:
     default:
         break;
+    }
+
+    if (append_newline)
+    {
+        size_t length = strlen(buffer);
+
+        if (length + 2 <= sizeof(buffer))
+        {
+            buffer[length]     = '\n';
+            buffer[length + 1] = 0;
+        }
     }
 
     SplitIntoLines(buffer);

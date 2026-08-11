@@ -1541,6 +1541,19 @@ void GpuImmediate::UploadVertices()
     uploaded_bytes_ = bytes;
 }
 
+void GpuImmediate::ResetTargetRectangles()
+{
+    current_viewport_.x      = 0;
+    current_viewport_.y      = 0;
+    current_viewport_.width  = gpu_device.CurrentTargetWidth();
+    current_viewport_.height = gpu_device.CurrentTargetHeight();
+
+    current_scissor_ = current_viewport_;
+
+    viewport_set_ = true;
+    scissor_set_  = true;
+}
+
 void GpuImmediate::ApplyPassState()
 {
     SDL_GPURenderPass *pass = gpu_device.RenderPass();
@@ -1795,7 +1808,8 @@ void GpuImmediate::Replay()
 
             if (!pass)
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad);
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
+                                     gpu_device.CurrentTarget());
                 ApplyPassState();
                 pass = gpu_device.RenderPass();
             }
@@ -1886,6 +1900,8 @@ void GpuImmediate::Replay()
             {
                 gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear,
                                      kGpuPassTargetWorld);
+
+                ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandResolveWorldTarget)
             {
@@ -1907,6 +1923,8 @@ void GpuImmediate::Replay()
 
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetMain);
+
+                ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandClearStencil)
             {

@@ -149,7 +149,7 @@ void RealVM::LexNewLine()
     char    buffer[1024];
 
     va_start(argptr, error);
-    stbsp_vsprintf(buffer, error, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), error, argptr);
     va_end(argptr);
 
     FatalError("%s:%i: %s", comp_.source_file, comp_.source_line, buffer);

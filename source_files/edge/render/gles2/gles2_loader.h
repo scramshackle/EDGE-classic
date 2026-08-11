@@ -20,6 +20,7 @@
     X(PFNGLDELETEPROGRAMPROC, glDeleteProgram)                                                                          \
     X(PFNGLDELETESHADERPROC, glDeleteShader)                                                                            \
     X(PFNGLDETACHSHADERPROC, glDetachShader)                                                                            \
+    X(PFNGLDISABLEVERTEXATTRIBARRAYPROC, glDisableVertexAttribArray)                                                    \
     X(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray)                                                      \
     X(PFNGLGENBUFFERSPROC, glGenBuffers)                                                                                \
     X(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog)                                                                  \
@@ -68,6 +69,7 @@ EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glDeleteProgram            ec_glDeleteProgram
 #define glDeleteShader             ec_glDeleteShader
 #define glDetachShader             ec_glDetachShader
+#define glDisableVertexAttribArray ec_glDisableVertexAttribArray
 #define glEnableVertexAttribArray  ec_glEnableVertexAttribArray
 #define glGenBuffers               ec_glGenBuffers
 #define glGetProgramInfoLog        ec_glGetProgramInfoLog

@@ -67,7 +67,7 @@ void Printf(const char *str, ...)
     va_list args;
 
     va_start(args, str);
-    stbsp_vsprintf(wad_msg_buf, str, args);
+    stbsp_vsnprintf(wad_msg_buf, sizeof(wad_msg_buf), str, args);
     va_end(args);
 
     cur_lump->data += (const char *)wad_msg_buf;

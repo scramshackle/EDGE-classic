@@ -331,6 +331,8 @@ class GpuImmediate
 
     int32_t CurrentFragmentParameters();
 
+    void ResetTargetRectangles();
+
     void ApplyPassState();
 
     SDL_GPUDevice *device_ = nullptr;

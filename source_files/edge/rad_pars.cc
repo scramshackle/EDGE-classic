@@ -89,15 +89,17 @@ static char *pending_label     = nullptr;
 
     // put actual message on first line
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
-    stbsp_sprintf(pos, "Error occurred near line %d of %s\n", current_script_line_number, current_script_filename);
+    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred near line %d of %s\n",
+                   current_script_line_number, current_script_filename);
     pos += strlen(pos);
 
-    stbsp_sprintf(pos, "Line contents: %s\n", current_script_line.c_str());
+    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                   current_script_line.c_str());
     pos += strlen(pos);
 
     // check for buffer overflow
@@ -119,7 +121,7 @@ void ScriptWarning(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     LogWarning("\n");
@@ -134,7 +136,7 @@ void ScriptWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsprintf(buffer, err, argptr);
+    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)

@@ -498,7 +498,7 @@ void WarningOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsprintf(message_buf, error, argptr);
+    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -522,7 +522,7 @@ void DebugOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsprintf(message_buf, error, argptr);
+    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -554,7 +554,7 @@ void LogDebug(const char *message, ...)
     va_list argptr;
 
     va_start(argptr, message);
-    stbsp_vsprintf(message_buf, message, argptr);
+    stbsp_vsnprintf(message_buf, sizeof(message_buf), message, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...

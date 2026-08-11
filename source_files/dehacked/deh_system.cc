@@ -56,7 +56,7 @@ void SetErrorMsg(const char *str, ...)
     va_list args;
 
     va_start(args, str);
-    stbsp_vsprintf(global_error_buf, str, args);
+    stbsp_vsnprintf(global_error_buf, sizeof(global_error_buf), str, args);
     va_end(args);
 
     has_error_msg = true;

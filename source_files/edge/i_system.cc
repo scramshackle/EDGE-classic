@@ -63,7 +63,7 @@ void LogWarning(const char *warning, ...)
     va_list argptr;
 
     va_start(argptr, warning);
-    stbsp_vsprintf(message_buffer, warning, argptr);
+    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), warning, argptr);
     va_end(argptr);
 
     LogPrint("WARNING: %s", message_buffer);
@@ -74,7 +74,7 @@ void LogWarning(const char *warning, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsprintf(message_buffer, error, argptr);
+    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), error, argptr);
     va_end(argptr);
 
     if (log_file)
