@@ -202,6 +202,13 @@ void AddSpecialLine(Line *ld);
 void AddSpecialSector(Sector *sec);
 void SectorChangeSpecial(Sector *sec, int new_type);
 
+void     ClassifyStaticGeometry(void);
+void     DemoteSectorToDynamic(Sector *sec);
+void     DemoteSideToDynamic(Side *side);
+void     SuppressSectorForMovement(Sector *sec);
+void     PromoteSettledSectors(void);
+uint32_t StaticGeometryGeneration(void);
+
 void          RunLights(void);
 LightSpecial *NewLight(void);
 void          DestroyAllLights(void);

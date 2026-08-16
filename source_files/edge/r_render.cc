@@ -2038,31 +2038,39 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 {
     EDGE_ZoneScoped;
 
-    // draw all solid walls and planes
-    solid_mode = true;
-    // if (!for_mirror)
-    render_backend->SetRenderLayer(kRenderLayerSolid, false);
-    StartUnitBatch(solid_mode);
+    {
+        EDGE_ZoneScopedN("RenderSubList solid pass");
 
-    std::list<DrawSubsector *>::iterator FI; // Forward Iterator
+        // draw all solid walls and planes
+        solid_mode = true;
+        // if (!for_mirror)
+        render_backend->SetRenderLayer(kRenderLayerSolid, false);
+        StartUnitBatch(solid_mode);
 
-    for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
-        RenderSubsector(*FI, for_mirror);
+        std::list<DrawSubsector *>::iterator FI; // Forward Iterator
 
-    FinishUnitBatch();
+        for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
+            RenderSubsector(*FI, for_mirror);
 
-    // draw all sprites and masked/translucent walls/planes
-    solid_mode = false;
-    // if (!for_mirror)
-    render_backend->SetRenderLayer(kRenderLayerTransparent, false);
-    StartUnitBatch(solid_mode);
+        FinishUnitBatch();
+    }
 
-    std::list<DrawSubsector *>::reverse_iterator RI;
+    {
+        EDGE_ZoneScopedN("RenderSubList transparent pass");
 
-    for (RI = dsubs.rbegin(); RI != dsubs.rend(); RI++)
-        RenderSubsector(*RI, for_mirror);
+        // draw all sprites and masked/translucent walls/planes
+        solid_mode = false;
+        // if (!for_mirror)
+        render_backend->SetRenderLayer(kRenderLayerTransparent, false);
+        StartUnitBatch(solid_mode);
 
-    FinishUnitBatch();
+        std::list<DrawSubsector *>::reverse_iterator RI;
+
+        for (RI = dsubs.rbegin(); RI != dsubs.rend(); RI++)
+            RenderSubsector(*RI, for_mirror);
+
+        FinishUnitBatch();
+    }
 }
 
 static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub)
@@ -2319,70 +2327,85 @@ void RenderTrueBSP(void)
 {
     EDGE_ZoneScoped;
 
-    FuzzUpdate();
-
-    ClearBSP();
-    OcclusionClear();
-
     Player *v_player = view_camera_map_object->player_;
 
-    // handle powerup effects and BOOM colormaps
-    RendererRainbowEffect(v_player);
-
-    // update interpolation for moving sectors
-    for (std::vector<PlaneMover *>::iterator PMI = active_planes.begin(), PMI_END = active_planes.end(); PMI != PMI_END;
-         ++PMI)
     {
-        PlaneMover *pmov = *PMI;
-        if (pmov->sector)
-            UpdateSectorInterpolation(pmov->sector);
+        EDGE_ZoneScopedN("RenderTrueBSP setup");
+
+        FuzzUpdate();
+
+        ClearBSP();
+        OcclusionClear();
+
+        // handle powerup effects and BOOM colormaps
+        RendererRainbowEffect(v_player);
+
+        // update interpolation for moving sectors
+        for (std::vector<PlaneMover *>::iterator PMI = active_planes.begin(), PMI_END = active_planes.end();
+             PMI != PMI_END; ++PMI)
+        {
+            PlaneMover *pmov = *PMI;
+            if (pmov->sector)
+                UpdateSectorInterpolation(pmov->sector);
+        }
+
+        draw_subsector_list.clear();
+
+        render_backend->SetRenderLayer(kRenderLayerSolid, false);
+        render_state->Clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        render_state->Enable(GL_DEPTH_TEST);
     }
 
+    {
+        EDGE_ZoneScopedN("RenderTrueBSP BeginSky");
 
-    draw_subsector_list.clear();
+        // needed for drawing the sky
+        BeginSky();
+    }
 
-    render_backend->SetRenderLayer(kRenderLayerSolid, false);
-    render_state->Clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    render_state->Enable(GL_DEPTH_TEST);
-
-    // needed for drawing the sky
-    BeginSky();
+    {
+        EDGE_ZoneScopedN("RenderTrueBSP BSP walk");
 
 #ifdef EDGE_THREADED_BSP
-    BSPTraverse();
+        BSPTraverse();
 
-    while (BSPTraversing())
-    {
-        RenderBatch *batch = BSPReadRenderBatch();
-
-        if (!batch)
-            continue;
-
-        for (int32_t i = 0; i < batch->num_items_; i++)
+        while (BSPTraversing())
         {
-            RenderItem *item = &batch->items_[i];
+            RenderBatch *batch = BSPReadRenderBatch();
 
-            switch (item->type_)
+            if (!batch)
+                continue;
+
+            for (int32_t i = 0; i < batch->num_items_; i++)
             {
-            case kRenderSubsector:
-                draw_subsector_list.push_back(item->subsector_);
-                break;
-            case kRenderSkyWall:
-                RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_);
-                break;
-            case kRenderSkyPlane:
-                RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_);
-                break;
+                RenderItem *item = &batch->items_[i];
+
+                switch (item->type_)
+                {
+                case kRenderSubsector:
+                    draw_subsector_list.push_back(item->subsector_);
+                    break;
+                case kRenderSkyWall:
+                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_);
+                    break;
+                case kRenderSkyPlane:
+                    RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_);
+                    break;
+                }
             }
         }
-    }
 #else
-    // walk the bsp tree
-    BSPWalkNode(root_node);
+        // walk the bsp tree
+        BSPWalkNode(root_node);
 #endif
+    }
 
-    FlushSky();
-    FinishSky(true);
+    {
+        EDGE_ZoneScopedN("RenderTrueBSP FinishSky");
+
+        FlushSky();
+        FinishSky(true);
+    }
 
     RenderSubList(draw_subsector_list);
 
@@ -2396,6 +2419,8 @@ void RenderTrueBSP(void)
         }
         newly_seen_lines.clear();
     }
+
+    EDGE_ZoneNamedN(zone_weapon_hud, "RenderTrueBSP weapon/HUD", true);
 
     if (v_player && v_player->ready_weapon_ >= 0)
     {

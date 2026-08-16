@@ -3058,6 +3058,8 @@ bool SolidSectorMove(Sector *sec, bool is_ceiling, float dh, int crush, bool noc
     if (epi::AlmostEquals(dh, 0.0f))
         return false;
 
+    SuppressSectorForMovement(sec);
+
     no_fit       = false;
     crush_damage = crush;
 

@@ -153,6 +153,8 @@ void ChangeSwitchTexture(Line *line, bool useAgain, LineSpecial specials, bool n
 
             if (pos != kButtonNone)
             {
+                DemoteSideToDynamic(side);
+
                 // -KM- 98/07/31 Implement sounds
                 if (!noSound && sw->on_sfx_)
                 {
@@ -213,6 +215,8 @@ void UpdateButtons(void)
 
         if (b->button_timer == 0)
         {
+            DemoteSideToDynamic(b->line->side[0]);
+
             switch (b->where)
             {
             case kButtonTop:

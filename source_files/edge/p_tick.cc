@@ -101,6 +101,8 @@ void MapObjectTicker()
 
     UpdateSpecials();
 
+    PromoteSettledSectors();
+
     ItemRespawn();
 
     // for par times

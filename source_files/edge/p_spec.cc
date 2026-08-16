@@ -33,6 +33,7 @@
 
 #include "epi_math.h"
 #include "con_main.h"
+#include "ddf_switch.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
@@ -356,6 +357,11 @@ void AddSpecialLine(Line *ld)
             return;
     }
 
+    if (ld->side[0])
+        DemoteSideToDynamic(ld->side[0]);
+    if (ld->side[1])
+        DemoteSideToDynamic(ld->side[1]);
+
     active_line_animations.push_back(ld);
 }
 
@@ -369,6 +375,8 @@ void AddSpecialSector(Sector *sec)
         if (*SI == sec)
             return;
     }
+
+    DemoteSectorToDynamic(sec);
 
     active_sector_animations.push_back(sec);
 }
@@ -1003,6 +1011,8 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
     // support for drawn heights coming from different sector
     if (special->sector_effect_ & kSectorEffectTypeBoomHeights)
     {
+        DemoteSectorToDynamic(target);
+
         target->height_sector      = source->side[0]->sector;
         target->height_sector_side = source->side[0];
         for (int i = 0; i < target->line_count; i++)
@@ -2762,9 +2772,165 @@ static bool DoSectorsFromTag(int tag, const void *p1, void *p2, bool (*func)(Sec
 
 void SectorChangeSpecial(Sector *sec, int new_type)
 {
+    DemoteSectorToDynamic(sec);
+
     sec->properties.type = HMM_MAX(0, new_type);
 
     sec->properties.special = LookupSectorType(sec->properties.type);
+}
+
+static uint32_t static_geometry_generation = 0;
+
+uint32_t StaticGeometryGeneration(void)
+{
+    return static_geometry_generation;
+}
+
+void DemoteSectorToDynamic(Sector *sec)
+{
+    if (!sec || sec->bake_dynamic)
+        return;
+
+    sec->bake_dynamic = true;
+
+    static_geometry_generation++;
+}
+
+void DemoteSideToDynamic(Side *side)
+{
+    if (!side || side->bake_dynamic)
+        return;
+
+    side->bake_dynamic = true;
+
+    static_geometry_generation++;
+}
+
+void SuppressSectorForMovement(Sector *sec)
+{
+    if (!sec || sec->bake_dynamic)
+        return;
+
+    if (!sec->movement_suppressed)
+    {
+        sec->movement_suppressed = true;
+
+        static_geometry_generation++;
+    }
+
+    sec->movement_tick_stamp = level_time_elapsed;
+}
+
+void PromoteSettledSectors(void)
+{
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        Sector *sec = level_sectors + i;
+
+        if (!sec->movement_suppressed)
+            continue;
+
+        if (sec->movement_tick_stamp == level_time_elapsed)
+            continue;
+
+        sec->movement_suppressed = false;
+
+        static_geometry_generation++;
+    }
+}
+
+static bool SideUsesSwitchTexture(const Side *side)
+{
+    for (std::vector<SwitchDefinition *>::iterator iter = switchdefs.begin(), iter_end = switchdefs.end();
+         iter != iter_end; iter++)
+    {
+        SwitchDefinition *sw = *iter;
+
+        for (int k = 0; k < 2; k++)
+        {
+            const Image *image = sw->cache_.image[k];
+
+            if (!image)
+                continue;
+
+            if (side->top.image == image || side->middle.image == image || side->bottom.image == image)
+                return true;
+        }
+    }
+
+    return false;
+}
+
+void ClassifyStaticGeometry(void)
+{
+    for (int i = 0; i < total_level_lines; i++)
+    {
+        Line *line = level_lines + i;
+
+        bool side_dynamic = false;
+
+        const LineType *special = line->special;
+
+        if (special)
+        {
+            if (special->s_xspeed_ || special->s_yspeed_ || special->scroll_type_ > BoomScrollerTypeNone ||
+                (special->line_effect_ &
+                 (kLineEffectTypeVectorScroll | kLineEffectTypeOffsetScroll | kLineEffectTypeTaggedOffsetScroll)))
+                side_dynamic = true;
+
+            if (special->sector_effect_ & kSectorEffectTypeBoomHeights)
+            {
+                if (!line->tag)
+                {
+                    Sector *target =
+                        (special->special_flags_ & kLineSpecialBackSector) ? line->back_sector : line->front_sector;
+
+                    DemoteSectorToDynamic(target);
+                }
+                else
+                {
+                    for (Sector *tsec = FindSectorFromTag(line->tag); tsec; tsec = tsec->tag_next)
+                        DemoteSectorToDynamic(tsec);
+                }
+            }
+        }
+
+        if (line->slide_door)
+            side_dynamic = true;
+
+        if ((line->flags & kLineFlagMirror) || line->portal_pair)
+            side_dynamic = true;
+
+        for (int s = 0; s < 2; s++)
+        {
+            Side *side = line->side[s];
+
+            if (!side)
+                continue;
+
+            if (side_dynamic || SideUsesSwitchTexture(side))
+                DemoteSideToDynamic(side);
+        }
+    }
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        Sector *sec = level_sectors + i;
+
+        const SectorType *sector_special = sec->properties.special;
+
+        if (sector_special)
+        {
+            if (sector_special->f_.scroll_speed_ > 0 || sector_special->c_.scroll_speed_ > 0)
+                DemoteSectorToDynamic(sec);
+        }
+
+        if (sec->bottom_extrafloor || sec->top_extrafloor)
+            DemoteSectorToDynamic(sec);
+
+        if (sec->height_sector)
+            DemoteSectorToDynamic(sec);
+    }
 }
 
 //--- editor settings ---

@@ -852,6 +852,8 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
                     continue;
             }
 
+            DemoteSectorToDynamic(tsec);
+
             if (ctex->what == kChangeTextureFloor)
             {
                 tsec->floor.image = image;
@@ -899,6 +901,8 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
 
         if (ctex->subtag && side->sector->tag != ctex->subtag)
             continue;
+
+        DemoteSideToDynamic(side);
 
         switch (ctex->what)
         {

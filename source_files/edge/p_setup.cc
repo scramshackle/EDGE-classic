@@ -3699,6 +3699,8 @@ void LevelSetup(void)
 
     SpawnMapSpecials2(current_map->autotag_);
 
+    ClassifyStaticGeometry();
+
     AutomapInitLevel();
 
     UpdateSkyboxTextures();

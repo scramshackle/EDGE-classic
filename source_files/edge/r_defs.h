@@ -348,6 +348,10 @@ struct Sector
 
     float bob_depth;
     float sink_depth;
+
+    bool bake_dynamic        = false;
+    bool movement_suppressed = false;
+    int  movement_tick_stamp = -1;
 };
 
 //
@@ -364,6 +368,8 @@ struct Side
 
     // midmasker Y offset
     float middle_mask_offset;
+
+    bool bake_dynamic = false;
 };
 
 //

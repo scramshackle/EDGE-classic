@@ -580,6 +580,52 @@ int ConsoleCommandShowFiles(char **argv, int argc)
 }
 
 
+int ConsoleCommandShowStatic(char **argv, int argc)
+{
+    EPI_UNUSED(argv);
+    EPI_UNUSED(argc);
+
+    if (!level_sectors || total_level_sectors == 0)
+    {
+        LogPrint("No level loaded.\n");
+        return 0;
+    }
+
+    int static_sectors     = 0;
+    int dynamic_sectors    = 0;
+    int suppressed_sectors = 0;
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        Sector *sec = level_sectors + i;
+
+        if (sec->bake_dynamic)
+            dynamic_sectors++;
+        else if (sec->movement_suppressed)
+            suppressed_sectors++;
+        else
+            static_sectors++;
+    }
+
+    int static_sides  = 0;
+    int dynamic_sides = 0;
+
+    for (int i = 0; i < total_level_sides; i++)
+    {
+        if (level_sides[i].bake_dynamic)
+            dynamic_sides++;
+        else
+            static_sides++;
+    }
+
+    LogPrint("Static geometry classification (generation %u):\n", StaticGeometryGeneration());
+    LogPrint("  sectors: %d static, %d dynamic, %d suppressed (of %d)\n", static_sectors, dynamic_sectors,
+             suppressed_sectors, total_level_sectors);
+    LogPrint("  sides:   %d static, %d dynamic (of %d)\n", static_sides, dynamic_sides, total_level_sides);
+
+    return 0;
+}
+
 int ConsoleCommandShowVars(char **argv, int argc)
 {
     bool show_default = false;
@@ -804,6 +850,7 @@ const ConsoleCommand builtin_commands[] = {{"cat", ConsoleCommandType},
                                            {"showgamepads", ConsoleCommandShowGamepads},
                                            {"showcmds", ConsoleCommandShowCommands},
                                            {"showmaps", ConsoleCommandShowMaps},
+                                           {"showstatic", ConsoleCommandShowStatic},
                                            {"showvars", ConsoleCommandShowVars},
                                            {"screenshot", ConsoleCommandScreenShot},
                                            {"type", ConsoleCommandType},
