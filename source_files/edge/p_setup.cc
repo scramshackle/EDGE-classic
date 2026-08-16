@@ -60,6 +60,7 @@
 #include "r_image.h"
 #include "r_misc.h"
 #include "r_sky.h"
+#include "r_static.h"
 #include "rad_trig.h" // MUSINFO changers
 #include "s_music.h"
 #include "s_sound.h"
@@ -3708,6 +3709,8 @@ void LevelSetup(void)
     // preload graphics
     if (precache)
         PrecacheLevelGraphics();
+
+    BuildStaticMesh();
 
     ChangeMusic(current_map->music_, true); // start level music
 

@@ -122,6 +122,18 @@ class AbstractShader
     virtual void WorldMix(GLuint shape, int num_vert, GLuint tex, float alpha, int *pass_var, BlendingMode blending,
                           bool masked, void *data, ShaderCoordinateFunction func) = 0;
 
+    virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
+                            int *pass_var, BlendingMode blending)
+    {
+        EPI_UNUSED(shape);
+        EPI_UNUSED(source);
+        EPI_UNUSED(num_vert);
+        EPI_UNUSED(tex);
+        EPI_UNUSED(alpha);
+        EPI_UNUSED(pass_var);
+        EPI_UNUSED(blending);
+    }
+
     virtual void SetRadius(float r) = 0;
 
     virtual bool GetLightParameters(DynamicLightParameters *out)

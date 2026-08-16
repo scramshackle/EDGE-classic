@@ -43,6 +43,7 @@
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_shader.h"
+#include "r_static.h"
 #include "r_texgl.h"
 #include "r_units.h"
 #include "w_files.h"
@@ -663,6 +664,52 @@ class ColormapShader : public AbstractShader
             (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
 
             TextureCoordinates(dest, 1, &lit_pos);
+        }
+
+        StaticCaptureVertices(glvert, num_vert);
+
+        EndRenderUnit(num_vert);
+
+        (*pass_var) += 1;
+    }
+
+    virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
+                            int *pass_var, BlendingMode blending)
+    {
+        RGBAColor fc_to_use = fog_color_;
+        float     fd_to_use = fog_density_;
+
+        if (fc_to_use == kRGBANoValue)
+        {
+            if (EDGE_IMAGE_IS_SKY(sector_->ceiling))
+            {
+                fc_to_use = current_map->outdoor_fog_color_;
+                fd_to_use = 0.01f * current_map->outdoor_fog_density_;
+            }
+            else
+            {
+                fc_to_use = current_map->indoor_fog_color_;
+                fd_to_use = 0.01f * current_map->indoor_fog_density_;
+            }
+        }
+
+        RendererVertex *glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_,
+                                                 *pass_var, blending, fc_to_use, fd_to_use);
+
+        RGBAColor tint = epi::MakeRGBA((uint8_t)(255.0f * render_view_red_multiplier),
+                                       (uint8_t)(255.0f * render_view_green_multiplier),
+                                       (uint8_t)(255.0f * render_view_blue_multiplier), (uint8_t)(alpha * 255.0f));
+
+        for (int v_idx = 0; v_idx < num_vert; v_idx++)
+        {
+            RendererVertex *dest = glvert + v_idx;
+
+            *dest = source[v_idx];
+
+            dest->rgba = tint;
+
+            dest->texture_coordinates[1].X =
+                DistanceFromViewPlane(dest->position.X, dest->position.Y, dest->position.Z) / 1600.0f;
         }
 
         EndRenderUnit(num_vert);

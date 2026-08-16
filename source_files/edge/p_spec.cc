@@ -47,7 +47,8 @@
 #include "n_network.h"
 #include "p_local.h"
 #include "r_misc.h"
-#include "r_sky.h" //Lobo 2022: added for our Sky Transfer special
+#include "r_sky.h"
+#include "r_static.h" //Lobo 2022: added for our Sky Transfer special
 #include "rad_trig.h"
 #include "s_blit.h"
 #include "s_music.h"
@@ -2793,6 +2794,8 @@ void DemoteSectorToDynamic(Sector *sec)
 
     sec->bake_dynamic = true;
 
+    StaticMeshInvalidateSector(sec);
+
     static_geometry_generation++;
 }
 
@@ -2802,6 +2805,9 @@ void DemoteSideToDynamic(Side *side)
         return;
 
     side->bake_dynamic = true;
+
+    if (side->sector)
+        StaticMeshInvalidateSector(side->sector);
 
     static_geometry_generation++;
 }
@@ -2814,6 +2820,8 @@ void SuppressSectorForMovement(Sector *sec)
     if (!sec->movement_suppressed)
     {
         sec->movement_suppressed = true;
+
+        StaticMeshInvalidateSector(sec);
 
         static_geometry_generation++;
     }

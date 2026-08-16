@@ -35,6 +35,7 @@
 #include "m_misc.h"
 #include "p_local.h"
 #include "r_misc.h"
+#include "r_static.h"
 #include "s_sound.h"
 #include "stb_sprintf.h"
 #include "version.h"
@@ -622,6 +623,13 @@ int ConsoleCommandShowStatic(char **argv, int argc)
     LogPrint("  sectors: %d static, %d dynamic, %d suppressed (of %d)\n", static_sectors, dynamic_sectors,
              suppressed_sectors, total_level_sectors);
     LogPrint("  sides:   %d static, %d dynamic (of %d)\n", static_sides, dynamic_sides, total_level_sides);
+
+    int batches, live_spans, dead_spans, mesh_vertices;
+
+    StaticMeshStats(&batches, &live_spans, &dead_spans, &mesh_vertices);
+
+    LogPrint("Static mesh: %d batches, %d live spans (%d dead), %d vertices\n", batches, live_spans, dead_spans,
+             mesh_vertices);
 
     return 0;
 }

@@ -56,6 +56,7 @@
 #include "r_shader.h"
 #include "r_sky.h"
 #include "r_state.h"
+#include "r_static.h"
 #include "r_things.h"
 #include "r_units.h"
 
@@ -228,12 +229,28 @@ struct WallCoordinateData
     HMM_Vec3 normal;
 
     bool mid_masked;
+
+    const RendererVertex *baked = nullptr;
+    GLuint                shape = GL_POLYGON;
 };
 
 static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *normal,
                           HMM_Vec3 *lit_pos)
 {
     const WallCoordinateData *data = (WallCoordinateData *)d;
+
+    if (data->baked)
+    {
+        *pos     = data->baked[v_idx].position;
+        *normal  = data->normal;
+        *texc    = data->baked[v_idx].texture_coordinates[0];
+        *lit_pos = *pos;
+
+        *rgb = epi::MakeRGBA((uint8_t)(255.0f * render_view_red_multiplier),
+                             (uint8_t)(255.0f * render_view_green_multiplier),
+                             (uint8_t)(255.0f * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
+        return;
+    }
 
     *pos    = data->vertices[v_idx];
     *normal = data->normal;
@@ -298,12 +315,28 @@ struct PlaneCoordinateData
     SlopePlane *slope;
 
     BAMAngle rotation = 0;
+
+    const RendererVertex *baked = nullptr;
+    GLuint                shape = GL_POLYGON;
 };
 
 static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *normal,
                            HMM_Vec3 *lit_pos)
 {
     PlaneCoordinateData *data = (PlaneCoordinateData *)d;
+
+    if (data->baked)
+    {
+        *pos     = data->baked[v_idx].position;
+        *normal  = data->normal;
+        *texc    = data->baked[v_idx].texture_coordinates[0];
+        *lit_pos = *pos;
+
+        *rgb = epi::MakeRGBA((uint8_t)(255.0f * render_view_red_multiplier),
+                             (uint8_t)(255.0f * render_view_green_multiplier),
+                             (uint8_t)(255.0f * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
+        return;
+    }
 
     *pos    = data->vertices[v_idx];
     *normal = data->normal;
@@ -560,7 +593,7 @@ static void EmitCollectedWallLights(WallCoordinateData *data)
             for (int k = 0; k < group_size; k++)
                 shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
 
-            if (EmitMultiLightPass(shaders, group_size, GL_POLYGON, data->v_count, data->tex_id, data->trans,
+            if (EmitMultiLightPass(shaders, group_size, data->shape, data->v_count, data->tex_id, data->trans,
                                    &data->pass, blending, data->mid_masked, data, WallCoordFunc))
             {
                 index += group_size;
@@ -572,7 +605,7 @@ static void EmitCollectedWallLights(WallCoordinateData *data)
         {
             MapObject *mo = surface_light_list[index + k];
 
-            mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass,
+            mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass,
                                                 blending, data->mid_masked, data, WallCoordFunc);
         }
 
@@ -591,7 +624,7 @@ static void GLOWLIT_Wall(MapObject *mo, void *dataptr)
 
     BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
 
-    mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass, blending,
+    mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass, blending,
                                         data->mid_masked, data, WallCoordFunc);
 }
 
@@ -603,7 +636,7 @@ static void DLIT_Plane(MapObject *mo, void *dataptr)
     if (!mo->info_->dlight_.leaky_ &&
         !(mo->subsector_->sector->floor_vertex_slope || mo->subsector_->sector->ceiling_vertex_slope))
     {
-        float z = data->vertices[0].Z;
+        float z = data->baked ? data->baked[0].position.Z : data->vertices[0].Z;
 
         if (data->slope)
             z += Slope_GetHeight(data->slope, mo->x, mo->y);
@@ -641,7 +674,7 @@ static void EmitCollectedPlaneLights(PlaneCoordinateData *data)
             for (int k = 0; k < group_size; k++)
                 shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
 
-            if (EmitMultiLightPass(shaders, group_size, GL_POLYGON, data->v_count, data->tex_id, data->trans,
+            if (EmitMultiLightPass(shaders, group_size, data->shape, data->v_count, data->tex_id, data->trans,
                                    &data->pass, blending, false, data, PlaneCoordFunc))
             {
                 index += group_size;
@@ -653,7 +686,7 @@ static void EmitCollectedPlaneLights(PlaneCoordinateData *data)
         {
             MapObject *mo = surface_light_list[index + k];
 
-            mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass,
+            mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass,
                                                 blending, false, data, PlaneCoordFunc);
         }
 
@@ -672,7 +705,7 @@ static void GLOWLIT_Plane(MapObject *mo, void *dataptr)
 
     BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
 
-    mo->dynamic_light_.shader->WorldMix(GL_POLYGON, data->v_count, data->tex_id, data->trans, &data->pass, blending,
+    mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass, blending,
                                         false, data, PlaneCoordFunc);
 }
 
@@ -737,6 +770,9 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 {
     // Note: tex_x1 and tex_x2 are in world coordinates.
     //       top, bottom and tex_top_h as well.
+
+    if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversWall(current_seg, surf))
+        return;
 
     ec_frame_stats.draw_wall_parts++;
 
@@ -912,8 +948,18 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_subsector->sector);
 
+    bool capture = render_mirror_set.TotalActive() == 0 && solid_mode &&
+                   StaticWallBakeEligible(current_seg, surf, mid_masked);
+
+    if (capture)
+        StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, blending, lit_adjust,
+                           data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y);
+
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
+
+    if (capture)
+        StaticCaptureEnd();
 
     if (surf->image && surf->image->liquid_type_ > kLiquidImageNone && swirling_flats == kLiquidSwirlParallax)
     {
@@ -968,6 +1014,68 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     }
 
     swirl_pass = 0;
+}
+
+void EmitStaticSpanLights(const StaticSpanLighting &info)
+{
+    if (!use_dynamic_lights || render_view_extra_light >= 250 || info.count < 3)
+        return;
+
+    SetSurfaceLightBounds(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2]);
+
+    if (info.is_wall)
+    {
+        WallCoordinateData data;
+
+        data.v_count    = info.count;
+        data.vertices   = nullptr;
+        data.baked      = info.vertices;
+        data.shape      = GL_TRIANGLES;
+        data.tex_id     = info.tex_id;
+        data.pass       = 1;
+        data.blending   = info.blending;
+        data.trans      = 1.0f;
+        data.mid_masked = false;
+        data.normal     = info.normal;
+
+        data.div.x       = info.div_x;
+        data.div.y       = info.div_y;
+        data.div.delta_x = info.div_delta_x;
+        data.div.delta_y = info.div_delta_y;
+
+        DynamicLightIterator(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2], DLIT_Wall,
+                             &data);
+
+        EmitCollectedWallLights(&data);
+
+        SectorGlowIterator(info.sector, info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2],
+                           GLOWLIT_Wall, &data);
+    }
+    else
+    {
+        PlaneCoordinateData data;
+
+        data.v_count  = info.count;
+        data.vertices = nullptr;
+        data.baked    = info.vertices;
+        data.shape    = GL_TRIANGLES;
+        data.tex_id   = info.tex_id;
+        data.pass     = 1;
+        data.blending = info.blending;
+        data.trans    = 1.0f;
+        data.normal   = info.normal;
+        data.slope    = nullptr;
+
+        DynamicLightIterator(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2], DLIT_Plane,
+                             &data);
+
+        EmitCollectedPlaneLights(&data);
+
+        SectorGlowIterator(info.sector, info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2],
+                           GLOWLIT_Plane, &data);
+    }
+
+    ClearSurfaceLightBounds();
 }
 
 static void DrawSlidingDoor(DrawFloor *dfloor, float c, float f, float tex_top_h, MapSurface *surf, bool opaque,
@@ -1255,8 +1363,6 @@ static inline float SafeImageHeight(const Image *image)
 static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_min, float c_max,
                              bool mirror_sub = false)
 {
-    EDGE_ZoneScoped;
-
     Line       *ld = seg->linedef;
     Side       *sd = ld->side[sidenum];
     Sector     *sec, *other;
@@ -1710,8 +1816,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
 
 static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
 {
-    EDGE_ZoneScoped;
-
     //
     // Analyses floor/ceiling heights, and add corresponding walls/floors
     // to the drawfloor.  Returns true if the whole region was "solid".
@@ -1813,8 +1917,6 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
 
 static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_dir)
 {
-    EDGE_ZoneScoped;
-
     float orig_h = h;
 
     render_mirror_set.Height(h);
@@ -1827,6 +1929,16 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     // ignore sky
     if (EDGE_IMAGE_IS_SKY(*surf))
         return;
+
+    if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversFlat(current_subsector, face_dir))
+    {
+        Sector           *own_sec  = current_subsector->sector;
+        const MapSurface *own_surf = (face_dir > 0) ? &own_sec->floor : &own_sec->ceiling;
+        float             own_h    = (face_dir > 0) ? own_sec->floor_height : own_sec->ceiling_height;
+
+        if (surf == own_surf && epi::AlmostEquals(h, own_h))
+            return;
+    }
 
     ec_frame_stats.draw_planes++;
 
@@ -1999,8 +2111,21 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     AbstractShader *cmap_shader = GetColormapShader(props, 0, current_subsector->sector);
 
+    bool capture = render_mirror_set.TotalActive() == 0 && solid_mode &&
+                   surf == ((face_dir > 0) ? &current_subsector->sector->floor : &current_subsector->sector->ceiling) &&
+                   epi::AlmostEquals(h, (face_dir > 0) ? current_subsector->sector->floor_height
+                                                       : current_subsector->sector->ceiling_height) &&
+                   StaticFlatBakeEligible(current_subsector->sector, face_dir);
+
+    if (capture)
+        StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector, blending,
+                               data.normal);
+
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, false /* masked */,
                           &data, PlaneCoordFunc);
+
+    if (capture)
+        StaticCaptureEnd();
 
     if (surf->image->liquid_type_ > kLiquidImageNone &&
         swirling_flats == kLiquidSwirlParallax) // Kept as an example for future effects
@@ -2047,6 +2172,9 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
         render_backend->SetRenderLayer(kRenderLayerSolid, false);
         StartUnitBatch(solid_mode);
 
+        if (!for_mirror)
+            DrawStaticMesh();
+
         std::list<DrawSubsector *>::iterator FI; // Forward Iterator
 
         for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
@@ -2075,8 +2203,6 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 
 static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub)
 {
-    EDGE_ZoneScoped;
-
     Subsector *sub = dsub->subsector;
 
 #if (DEBUG >= 1)
@@ -2290,6 +2416,7 @@ void           RendererEndFrame()
 void RendererShutdownLevel()
 {
     ShutdownSky();
+    DestroyStaticMesh();
 }
 
 void UpdateSectorInterpolation(Sector *sector)
