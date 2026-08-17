@@ -258,6 +258,16 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     model_meshes_.clear();
 
+    for (size_t i = 0; i < static_buffers_.size(); i++)
+    {
+        if (static_buffers_[i])
+            SDL_ReleaseGPUBuffer(device, static_buffers_[i]);
+    }
+
+    static_buffers_.clear();
+
+    bound_vertex_buffer_ = nullptr;
+
     if (vertex_buffer_)
     {
         SDL_ReleaseGPUBuffer(device, vertex_buffer_);
@@ -551,6 +561,102 @@ void GpuImmediate::SetLineMode(bool enabled)
     fragment_parameters_dirty_ = true;
 }
 
+static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBufferUsageFlags usage, const void *data,
+                                              size_t bytes, const char *what);
+
+uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int count)
+{
+    if (!vertices || count <= 0 || !device_)
+        return 0;
+
+    SDL_GPUBuffer *buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, vertices,
+                                                    (size_t)count * sizeof(RendererVertex), "static mesh");
+
+    if (!buffer)
+        return 0;
+
+    for (size_t i = 0; i < static_buffers_.size(); i++)
+    {
+        if (!static_buffers_[i])
+        {
+            static_buffers_[i] = buffer;
+            return (uint32_t)(i + 1);
+        }
+    }
+
+    static_buffers_.push_back(buffer);
+
+    return (uint32_t)static_buffers_.size();
+}
+
+void GpuImmediate::DeleteStaticBuffer(uint32_t handle)
+{
+    if (handle == 0 || handle > static_buffers_.size())
+        return;
+
+    SDL_GPUBuffer *buffer = static_buffers_[handle - 1];
+
+    if (!buffer)
+        return;
+
+    if (bound_vertex_buffer_ == buffer)
+        bound_vertex_buffer_ = nullptr;
+
+    SDL_ReleaseGPUBuffer(device_, buffer);
+
+    static_buffers_[handle - 1] = nullptr;
+}
+
+void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
+{
+    if (handle == 0 || handle > static_buffers_.size() || count < 3)
+        return;
+
+    SDL_GPUBuffer *buffer = static_buffers_[handle - 1];
+
+    if (!buffer)
+        return;
+
+    count -= count % 3;
+
+    SDL_GPUGraphicsPipeline *pipeline =
+        GetPipeline(pipeline_flags_, source_blend_, destination_blend_, kGpuPrimitiveTriangleList);
+
+    GpuCommand command;
+
+    command.type = kGpuCommandDraw;
+
+    GpuDrawArguments *draw = &command.arguments.draw;
+
+    draw->pipeline                 = pipeline;
+    draw->texture[0]               = texturing_enabled_ ? current_texture_[0] : default_texture_;
+    draw->sampler[0]               = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
+    draw->texture[1]               = texturing_enabled_ ? current_texture_[1] : default_texture_;
+    draw->sampler[1]               = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
+    draw->base_vertex              = first;
+    draw->vertex_count             = count;
+    draw->index_first              = 0;
+    draw->index_count              = 0;
+    draw->vertex_parameter_index   = CurrentVertexParameters();
+    draw->fragment_parameter_index = CurrentFragmentParameters();
+    draw->index_source             = kGpuIndexSourceNone;
+    draw->stencil_reference        = stencil_reference_;
+    draw->mergeable                = false;
+    draw->vertex_buffer            = buffer;
+
+    commands_.push_back(command);
+}
+
+void GpuImmediate::SetLightDepth(bool enabled)
+{
+    if (enabled == light_depth_enabled_)
+        return;
+
+    light_depth_enabled_ = enabled;
+
+    vertex_parameters_dirty_ = true;
+}
+
 void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
 {
     bool enabled = (sky_pass != nullptr);
@@ -712,10 +818,10 @@ int32_t GpuImmediate::CurrentVertexParameters()
 
     memcpy(parameters.clipplane, clip_plane_, sizeof(clip_plane_));
 
-    parameters.sky_pass         = sky_pass_enabled_ ? 1.0f : 0.0f;
-    parameters.sky_fog_depth    = sky_pass_info_.fog_depth;
-    parameters.vertex_padding[0] = 0.0f;
-    parameters.vertex_padding[1] = 0.0f;
+    parameters.sky_pass      = sky_pass_enabled_ ? 1.0f : 0.0f;
+    parameters.sky_fog_depth = sky_pass_info_.fog_depth;
+    parameters.light_depth   = light_depth_enabled_ ? 1.0f : 0.0f;
+    parameters.vertex_padding = 0.0f;
 
     vertex_parameters_.push_back(parameters);
 
@@ -868,6 +974,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->vertex_parameter_index   = vertex_parameters;
     draw->fragment_parameter_index = fragment_parameters;
     draw->index_source             = index_source;
+    draw->vertex_buffer            = nullptr;
     draw->stencil_reference        = stencil_reference_;
     draw->mergeable                = mergeable;
 
@@ -1329,6 +1436,8 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
 
     vertex_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
 
+    bound_vertex_buffer_ = nullptr;
+
     if (!vertex_buffer_)
     {
         LogPrint("GpuImmediate: SDL_CreateGPUBuffer (vertex) failed: %s\n", SDL_GetError());
@@ -1564,6 +1673,7 @@ void GpuImmediate::ApplyPassState()
     bound_sampler_[0]               = nullptr;
     bound_sampler_[1]               = nullptr;
     bound_index_buffer_             = nullptr;
+    bound_vertex_buffer_            = nullptr;
     bound_vertex_parameter_index_   = -1;
     bound_fragment_parameter_index_ = -1;
     bound_stencil_reference_        = -1;
@@ -1578,6 +1688,8 @@ void GpuImmediate::ApplyPassState()
         binding.offset = 0;
 
         SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
+
+        bound_vertex_buffer_ = vertex_buffer_;
     }
 
     int32_t target_height = gpu_device.CurrentTargetHeight();
@@ -2001,6 +2113,20 @@ void GpuImmediate::Replay()
             bound_fragment_parameter_index_ = draw->fragment_parameter_index;
             uniform_push_count_++;
             uniform_bytes_ += sizeof(GpuFragmentParameters);
+        }
+
+        SDL_GPUBuffer *wanted_vertex_buffer = draw->vertex_buffer ? draw->vertex_buffer : vertex_buffer_;
+
+        if (wanted_vertex_buffer && bound_vertex_buffer_ != wanted_vertex_buffer)
+        {
+            SDL_GPUBufferBinding vertex_binding;
+            vertex_binding.buffer = wanted_vertex_buffer;
+            vertex_binding.offset = 0;
+
+            SDL_BindGPUVertexBuffers(pass, 0, &vertex_binding, 1);
+
+            bound_vertex_buffer_ = wanted_vertex_buffer;
+            binding_count_++;
         }
 
         if (draw->index_source != kGpuIndexSourceNone)

@@ -11,6 +11,7 @@
 #include "epi.h"
 #include "epi_color.h"
 #include "epi_doomdefs.h"
+#include "edge_profiling.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
 #include "r_colormap.h"
@@ -23,6 +24,7 @@
 #include "r_units.h"
 
 EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh, "1", kConsoleVariableFlagArchive)
+EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh_resident, "1", kConsoleVariableFlagArchive)
 
 static constexpr size_t kMaximumStaticRun = 3 * 4096;
 
@@ -76,6 +78,9 @@ struct StaticBatch
 
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
+
+    uint32_t gpu_handle = 0;
+    bool     gpu_dirty  = true;
 };
 
 static std::vector<StaticBatch> static_batches;
@@ -84,6 +89,7 @@ static std::vector<uint8_t>     seg_wall_baked;
 static bool                     static_mesh_built = false;
 
 static std::vector<std::vector<SpanReference>> sector_spans;
+static std::vector<int>                       sector_light_cache;
 
 static int capture_dependencies[2 + kVertexSectorListMaximum * 2];
 static int capture_dependency_count = 0;
@@ -149,7 +155,7 @@ bool StaticMeshEnabled(void)
 
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir)
 {
-    if (!r_static_mesh.d_ || !sec || sec->bake_dynamic || sec->movement_suppressed)
+    if (!r_static_mesh.d_ || !static_mesh_built || !sec || sec->bake_dynamic || sec->movement_suppressed)
         return false;
 
     if (sec->floor_slope || sec->ceiling_slope || sec->floor_vertex_slope || sec->ceiling_vertex_slope)
@@ -270,7 +276,7 @@ static bool StaticImageEligible(const Image *image, float translucency)
 
 bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked)
 {
-    if (!r_static_mesh.d_ || mid_masked || !seg || seg->miniseg || !seg->sidedef || !surf)
+    if (!r_static_mesh.d_ || !static_mesh_built || mid_masked || !seg || seg->miniseg || !seg->sidedef || !surf)
         return false;
 
     if (WallPartIndex(seg, surf) < 0)
@@ -447,6 +453,8 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
 
     span.count = (int)batch.vertices.size() - span.start;
 
+    batch.gpu_dirty = true;
+
     SpanReference ref;
 
     ref.batch = capture_batch;
@@ -514,23 +522,36 @@ void StaticCaptureEnd(void)
     capture_sector = nullptr;
 }
 
-static void RefreshBatchLighting(StaticBatch &batch)
+static void RefreshStaticLighting(void)
 {
-    for (size_t i = 0; i < batch.spans.size(); i++)
+    for (size_t i = 0; i < sector_light_cache.size(); i++)
     {
-        StaticSpan &span = batch.spans[i];
+        Sector *sec = level_sectors + i;
 
-        int current = span.sector->properties.light_level + span.light_adjust;
+        int current = sec->properties.light_level;
 
-        if (current == span.baked_light)
+        if (current == sector_light_cache[i])
             continue;
 
-        span.baked_light = current;
+        sector_light_cache[i] = current;
 
-        float light = ((float)(current / 4) + 0.5f) / 64.0f;
+        const std::vector<SpanReference> &refs = sector_spans[i];
 
-        for (int v = span.start; v < span.start + span.count; v++)
-            batch.vertices[v].texture_coordinates[1].Y = light;
+        for (size_t r = 0; r < refs.size(); r++)
+        {
+            StaticBatch &batch = static_batches[refs[r].batch];
+            StaticSpan  &span  = batch.spans[refs[r].span];
+
+            if (!span.live || span.sector != sec)
+                continue;
+
+            float light = ((float)((current + span.light_adjust) / 4) + 0.5f) / 64.0f;
+
+            for (int v = span.start; v < span.start + span.count; v++)
+                batch.vertices[v].texture_coordinates[1].Y = light;
+
+            batch.gpu_dirty = true;
+        }
     }
 }
 
@@ -538,22 +559,31 @@ void BuildStaticMesh(void)
 {
     DestroyStaticMesh();
 
-    if (!r_static_mesh.d_)
-        return;
-
     subsector_flat_baked.assign((size_t)total_level_subsectors * 2, 0);
     seg_wall_baked.assign((size_t)total_level_segs * 3, 0);
     sector_spans.assign((size_t)total_level_sectors, std::vector<SpanReference>());
+
+    sector_light_cache.resize((size_t)total_level_sectors);
+
+    for (int i = 0; i < total_level_sectors; i++)
+        sector_light_cache[i] = level_sectors[i].properties.light_level;
 
     static_mesh_built = true;
 }
 
 void DestroyStaticMesh(void)
 {
+    for (size_t i = 0; i < static_batches.size(); i++)
+    {
+        if (static_batches[i].gpu_handle)
+            DeleteStaticVertexBuffer(static_batches[i].gpu_handle);
+    }
+
     static_batches.clear();
     subsector_flat_baked.clear();
     seg_wall_baked.clear();
     sector_spans.clear();
+    sector_light_cache.clear();
 
     StaticCaptureEnd();
 
@@ -589,6 +619,14 @@ void DrawStaticMesh(void)
     if (!r_static_mesh.d_ || !static_mesh_built)
         return;
 
+    EDGE_ZoneScoped;
+
+    {
+        EDGE_ZoneScopedN("StaticMesh RefreshLighting");
+
+        RefreshStaticLighting();
+    }
+
     for (size_t i = 0; i < static_batches.size(); i++)
     {
         StaticBatch &batch = static_batches[i];
@@ -596,11 +634,25 @@ void DrawStaticMesh(void)
         if (batch.spans.empty())
             continue;
 
-        RefreshBatchLighting(batch);
-
         GLuint tex_id = ImageCache(batch.image, true, render_view_effect_colormap);
 
         AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
+
+        bool resident = r_static_mesh_resident.d_ != 0;
+
+        if (resident && batch.gpu_dirty)
+        {
+            EDGE_ZoneScopedN("StaticMesh upload");
+
+            if (batch.gpu_handle)
+                DeleteStaticVertexBuffer(batch.gpu_handle);
+
+            batch.gpu_handle = CreateStaticVertexBuffer(batch.vertices.data(), (int)batch.vertices.size());
+            batch.gpu_dirty  = false;
+        }
+
+        if (resident && !batch.gpu_handle)
+            resident = false;
 
         int pass = 0;
 
@@ -622,8 +674,12 @@ void DrawStaticMesh(void)
 
             if (run_start >= 0)
             {
-                shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run_start, run_end - run_start, tex_id, 1.0f,
-                                   &pass, batch.blending);
+                if (resident)
+                    shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run_start, run_end - run_start, tex_id,
+                                               &pass, batch.blending);
+                else
+                    shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run_start, run_end - run_start, tex_id,
+                                       1.0f, &pass, batch.blending);
 
                 run_start = -1;
                 run_end   = -1;
@@ -638,6 +694,8 @@ void DrawStaticMesh(void)
 
         if (!use_dynamic_lights)
             continue;
+
+        EDGE_ZoneScopedN("StaticMesh lights");
 
         for (size_t k = 0; k < batch.spans.size(); k++)
         {

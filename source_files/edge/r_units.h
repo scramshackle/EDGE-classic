@@ -166,8 +166,13 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
                                 float fog_density = 0, const SkyPassInfo *sky_pass = nullptr,
                                 const RendererScissor *scissor = nullptr,
-                                const RendererLightPass *light_pass = nullptr);
+                                const RendererLightPass *light_pass = nullptr, bool light_depth = false);
 void            EndRenderUnit(int actual_vert);
+
+uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
+void     DeleteStaticVertexBuffer(uint32_t handle);
+void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
+                             GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

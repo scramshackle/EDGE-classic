@@ -66,7 +66,8 @@ struct GpuVertexParameters
     float    clipplane[kGpuMaximumClipPlanes][4];
     float    sky_pass;
     float    sky_fog_depth;
-    float    vertex_padding[2];
+    float    light_depth;
+    float    vertex_padding;
 };
 
 struct GpuFragmentParameters
@@ -193,6 +194,7 @@ static_assert(offsetof(GpuVertexParameters, mv) == 128, "GpuVertexParameters::mv
 static_assert(offsetof(GpuVertexParameters, clipplane) == 192, "GpuVertexParameters::clipplane offset");
 static_assert(offsetof(GpuVertexParameters, sky_pass) == 288, "GpuVertexParameters::sky_pass offset");
 static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 292, "GpuVertexParameters::sky_fog_depth offset");
+static_assert(offsetof(GpuVertexParameters, light_depth) == 296, "GpuVertexParameters::light_depth offset");
 static_assert(sizeof(GpuVertexParameters) == 304, "GpuVertexParameters size");
 
 static_assert(offsetof(GpuFragmentParameters, flags) == 0, "GpuFragmentParameters::flags offset");

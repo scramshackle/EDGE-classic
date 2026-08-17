@@ -4,6 +4,8 @@ uniform mat4 u_model_view;
 uniform float u_sky_pass;
 uniform float u_sky_fog_depth;
 
+uniform float u_light_depth;
+
 attribute vec3 a_position;
 attribute vec4 a_texture_coordinates;
 attribute vec4 a_color;
@@ -28,6 +30,11 @@ void main()
     else
     {
         v_eye_position = (u_model_view * model_position).xyz;
+
+        if (u_light_depth > 0.5)
+        {
+            v_texture_coordinates.z = -v_eye_position.z * 0.000625;
+        }
 
         gl_Position = u_model_view_projection * model_position;
     }

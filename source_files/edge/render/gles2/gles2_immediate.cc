@@ -373,6 +373,66 @@ void Gles2Immediate::BindVertexAttributes(size_t byte_offset)
                           (const void *)(byte_offset + offsetof(RendererVertex, rgba)));
 }
 
+void Gles2Immediate::BindVertexAttributesFrom(GLuint buffer)
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    glVertexAttribPointer(kGles2AttributePosition, 3, GL_FLOAT, GL_FALSE, sizeof(RendererVertex),
+                          (const void *)offsetof(RendererVertex, position));
+
+    glVertexAttribPointer(kGles2AttributeTextureCoordinates, 4, GL_FLOAT, GL_FALSE, sizeof(RendererVertex),
+                          (const void *)offsetof(RendererVertex, texture_coordinates));
+
+    glVertexAttribPointer(kGles2AttributeColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(RendererVertex),
+                          (const void *)offsetof(RendererVertex, rgba));
+}
+
+GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count)
+{
+    if (!vertices || count <= 0)
+        return 0;
+
+    GLuint buffer = 0;
+
+    glGenBuffers(1, &buffer);
+
+    if (!buffer)
+        return 0;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+
+    return buffer;
+}
+
+void Gles2Immediate::DeleteStaticBuffer(GLuint buffer)
+{
+    if (!buffer)
+        return;
+
+    glDeleteBuffers(1, &buffer);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+}
+
+void Gles2Immediate::DrawStatic(GLuint buffer, GLuint shape, int first, int count)
+{
+    if (!buffer || count <= 0)
+        return;
+
+    ApplyMatrices();
+
+    BindVertexAttributesFrom(buffer);
+
+    glDrawArrays(shape, first, count);
+
+    draw_count_++;
+
+    BindVertexAttributes(batch_offset_);
+}
+
 void Gles2Immediate::UploadMergedIndices(const uint16_t *indices, int32_t count)
 {
     if (!indices || count <= 0)

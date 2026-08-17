@@ -189,6 +189,14 @@ class Gles2Immediate
     size_t StreamVertices(const RendererVertex *vertices, int32_t count);
 
     void BindVertexAttributes(size_t byte_offset);
+    void BindVertexAttributesFrom(GLuint buffer);
+
+  public:
+    GLuint CreateStaticBuffer(const RendererVertex *vertices, int count);
+    void   DeleteStaticBuffer(GLuint buffer);
+    void   DrawStatic(GLuint buffer, GLuint shape, int first, int count);
+
+  private:
 
     void DrawRange(GLuint shape, size_t byte_offset, int32_t count);
 

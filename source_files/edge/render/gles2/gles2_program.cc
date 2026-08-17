@@ -112,6 +112,7 @@ bool Gles2Program::Init()
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
 
     uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
+    uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
     uniform_sky_fog_depth_          = glGetUniformLocation(program_, "u_sky_fog_depth");
     uniform_sky_inverse_projection_ = glGetUniformLocation(program_, "u_sky_inverse_projection");
     uniform_sky_inverse_view_       = glGetUniformLocation(program_, "u_sky_inverse_view");
@@ -284,6 +285,11 @@ void Gles2Program::SetSkipRGB(bool enabled)
 void Gles2Program::SetAlphaTest(float reference)
 {
     SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
+}
+
+void Gles2Program::SetLightDepth(bool enabled)
+{
+    SetFloat(uniform_light_depth_, shadow_light_depth_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)

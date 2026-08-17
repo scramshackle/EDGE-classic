@@ -81,6 +81,8 @@ struct GpuDrawArguments
     uint8_t stencil_reference;
 
     bool mergeable;
+
+    SDL_GPUBuffer *vertex_buffer;
 };
 
 struct GpuModelDrawArguments
@@ -237,6 +239,12 @@ class GpuImmediate
     void SetSkipRGB(bool enabled);
 
     void SetSkyPass(const SkyPassInfo *sky_pass);
+
+    void SetLightDepth(bool enabled);
+
+    uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count);
+    void     DeleteStaticBuffer(uint32_t handle);
+    void     DrawStatic(uint32_t handle, int32_t first, int32_t count);
 
     void SetClipPlane(int32_t index, const double equation[4]);
 
@@ -406,6 +414,10 @@ class GpuImmediate
     bool texturing_enabled_ = false;
 
     bool        sky_pass_enabled_ = false;
+    bool        light_depth_enabled_ = false;
+
+    std::vector<SDL_GPUBuffer *> static_buffers_;
+    SDL_GPUBuffer               *bound_vertex_buffer_ = nullptr;
     SkyPassInfo sky_pass_info_;
 
     int32_t pending_base_  = 0;

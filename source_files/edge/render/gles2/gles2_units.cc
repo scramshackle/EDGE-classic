@@ -41,6 +41,10 @@ struct RendererUnit
     float     fog_density = 0;
 
     bool        sky_pass_enabled = false;
+    bool        light_depth_enabled = false;
+
+    uint32_t static_buffer = 0;
+    int      static_first  = 0;
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -89,10 +93,64 @@ void FinishUnitBatch(void)
     RenderCurrentUnits();
 }
 
+uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
+{
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count);
+}
+
+void DeleteStaticVertexBuffer(uint32_t handle)
+{
+    gles2_immediate.DeleteStaticBuffer((GLuint)handle);
+}
+
+void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
+                         GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density)
+{
+    if (!handle || count <= 0)
+        return;
+
+    if (render_backend->RenderUnitsLocked())
+        FatalError("AddStaticRenderUnit - Render units are locked");
+
+    if (current_render_unit >= kMaximumLocalUnits)
+        RenderCurrentUnits();
+
+    RendererUnit *unit = local_units + current_render_unit;
+
+    if (env1 == kTextureEnvironmentDisable)
+        tex1 = 0;
+    if (env2 == kTextureEnvironmentDisable)
+        tex2 = 0;
+
+    unit->shape               = shape;
+    unit->environment_mode[0] = env1;
+    unit->environment_mode[1] = env2;
+    unit->texture[0]          = tex1;
+    unit->texture[1]          = tex2;
+    unit->pass                = pass;
+    unit->blending            = blending;
+    unit->first               = current_render_vert;
+    unit->count               = 0;
+    unit->line_width          = 1.0f;
+    unit->fog_color           = fog_color;
+    unit->fog_density         = fog_density;
+    unit->sky_pass_enabled    = false;
+    unit->light_depth_enabled = true;
+    unit->scissor_enabled     = false;
+    unit->light_pass_enabled  = false;
+    unit->index_first         = 0;
+    unit->index_count         = 0;
+    unit->static_buffer       = handle;
+    unit->static_first        = first;
+    unit->count               = count;
+
+    current_render_unit++;
+}
+
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
                                 const SkyPassInfo *sky_pass, const RendererScissor *scissor,
-                                const RendererLightPass *light_pass)
+                                const RendererLightPass *light_pass, bool light_depth)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -132,7 +190,8 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->fog_color   = fog_color;
     unit->fog_density = fog_density;
 
-    unit->sky_pass_enabled = (sky_pass != nullptr);
+    unit->sky_pass_enabled    = (sky_pass != nullptr);
+    unit->light_depth_enabled = light_depth;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -146,6 +205,9 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     if (light_pass)
         unit->light_pass = *light_pass;
+
+    unit->static_buffer = 0;
+    unit->static_first  = 0;
 
     return local_verts + current_render_vert;
 }
@@ -315,6 +377,7 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
     if (a->pass != b->pass || a->texture[0] != b->texture[0] || a->texture[1] != b->texture[1] ||
         a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
         a->blending != b->blending || a->fog_color != b->fog_color || a->sky_pass_enabled || b->sky_pass_enabled ||
+        a->light_depth_enabled != b->light_depth_enabled || a->static_buffer || b->static_buffer ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
         return false;
 
@@ -557,13 +620,25 @@ void RenderCurrentUnits(void)
     }
 
     for (int j = 0; j < current_render_unit; j++)
+    {
+        if (local_unit_map[j]->static_buffer)
+            continue;
+
         PromoteSecondTexture(local_unit_map[j], local_verts);
+    }
 
     int32_t merged_index_total = 0;
 
     for (int j = 0; j < current_render_unit; j++)
     {
         RendererUnit *unit = local_unit_map[j];
+
+        if (unit->static_buffer)
+        {
+            unit->index_first = merged_index_total;
+            unit->index_count = 0;
+            continue;
+        }
 
         EPI_ASSERT(merged_index_total + UnitIndexCount(unit->shape, unit->count) <= kMaximumMergedIndices);
 
@@ -769,10 +844,13 @@ void RenderCurrentUnits(void)
         render_state->SetPipeline(0);
 
         gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
+        gles2_program.SetLightDepth(unit->light_depth_enabled);
 
         Gles2ApplyRenderState();
 
-        if (unit->light_pass_enabled)
+        if (unit->static_buffer)
+            gles2_immediate.DrawStatic(unit->static_buffer, unit->shape, unit->static_first, unit->count);
+        else if (unit->light_pass_enabled)
             DrawLightPassUnit(unit, run_index_count);
         else
             gles2_immediate.DrawMerged(unit->index_first, run_index_count);

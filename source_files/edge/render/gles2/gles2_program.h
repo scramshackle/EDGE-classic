@@ -61,6 +61,8 @@ class Gles2Program
 
     void SetSkyPass(const SkyPassInfo *sky_pass);
 
+    void SetLightDepth(bool enabled);
+
     uint32_t UniformUpdateCount() const
     {
         return uniform_update_count_;
@@ -100,6 +102,7 @@ class Gles2Program
     GLint uniform_fog_end_               = -1;
 
     GLint uniform_sky_pass_               = -1;
+    GLint uniform_light_depth_           = -1;
     GLint uniform_sky_fog_depth_          = -1;
     GLint uniform_sky_inverse_projection_ = -1;
     GLint uniform_sky_inverse_view_       = -1;
@@ -129,6 +132,7 @@ class Gles2Program
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 
     float shadow_sky_pass_ = -1.0f;
+    float shadow_light_depth_ = -1.0f;
 
     uint32_t uniform_update_count_ = 0;
 };

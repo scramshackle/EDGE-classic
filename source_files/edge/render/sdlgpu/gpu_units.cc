@@ -40,6 +40,10 @@ struct RendererUnit
     float     fog_density = 0;
 
     bool        sky_pass_enabled = false;
+    bool        light_depth_enabled = false;
+
+    uint32_t static_buffer = 0;
+    int      static_first  = 0;
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -85,10 +89,60 @@ void FinishUnitBatch(void)
     RenderCurrentUnits();
 }
 
+uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
+{
+    return gpu_immediate.CreateStaticBuffer(vertices, count);
+}
+
+void DeleteStaticVertexBuffer(uint32_t handle)
+{
+    gpu_immediate.DeleteStaticBuffer(handle);
+}
+
+void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
+                         GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density)
+{
+    if (!handle || count <= 0)
+        return;
+
+    if (render_backend->RenderUnitsLocked())
+        FatalError("AddStaticRenderUnit - Render units are locked");
+
+    if (current_render_unit >= kMaximumLocalUnits)
+        RenderCurrentUnits();
+
+    RendererUnit *unit = local_units + current_render_unit;
+
+    if (env1 == kTextureEnvironmentDisable)
+        tex1 = 0;
+    if (env2 == kTextureEnvironmentDisable)
+        tex2 = 0;
+
+    unit->shape               = shape;
+    unit->environment_mode[0] = env1;
+    unit->environment_mode[1] = env2;
+    unit->texture[0]          = tex1;
+    unit->texture[1]          = tex2;
+    unit->pass                = pass;
+    unit->blending            = blending;
+    unit->first               = current_render_vert;
+    unit->count               = count;
+    unit->fog_color           = fog_color;
+    unit->fog_density         = fog_density;
+    unit->sky_pass_enabled    = false;
+    unit->light_depth_enabled = true;
+    unit->scissor_enabled     = false;
+    unit->light_pass_enabled  = false;
+    unit->static_buffer       = handle;
+    unit->static_first        = first;
+
+    current_render_unit++;
+}
+
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
                                 const SkyPassInfo *sky_pass, const RendererScissor *scissor,
-                                const RendererLightPass *light_pass)
+                                const RendererLightPass *light_pass, bool light_depth)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -125,7 +179,10 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->first      = current_render_vert;
     unit->line_width = (shape == GL_LINES) ? render_state->GetLineWidth() : 1.0f;
 
-    unit->sky_pass_enabled = (sky_pass != nullptr);
+    unit->sky_pass_enabled    = (sky_pass != nullptr);
+    unit->light_depth_enabled = light_depth;
+    unit->static_buffer       = 0;
+    unit->static_first        = 0;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -520,7 +577,7 @@ void RenderCurrentUnits(void)
             continue;
         }
 
-        if ((!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
+        if (!unit->static_buffer && (!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
             (unit->texture[1] && unit->environment_mode[1] != kTextureEnvironmentDisable))
         {
             unit->texture[0]          = unit->texture[1];
@@ -541,6 +598,7 @@ void RenderCurrentUnits(void)
         gpu_immediate.SetSkipRGB(unit->environment_mode[0] == (GLuint)kTextureEnvironmentSkipRGB);
 
         gpu_immediate.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
+        gpu_immediate.SetLightDepth(unit->light_depth_enabled);
 
         if (unit->shape == GL_LINES)
         {
@@ -550,7 +608,10 @@ void RenderCurrentUnits(void)
 
         BindUnitTextures(unit);
 
-        gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);
+        if (unit->static_buffer)
+            gpu_immediate.DrawStatic(unit->static_buffer, unit->static_first, unit->count);
+        else
+            gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);
     }
 
     if (scissor_overridden)

@@ -8,7 +8,7 @@ layout(set = 1, binding = 0) uniform VertexParameters
     vec4 clipplane[6];
     float sky_pass;
     float sky_fog_depth;
-    float vertex_padding0;
+    float light_depth;
     float vertex_padding1;
 };
 
@@ -42,6 +42,11 @@ void main()
     }
     else
     {
+        if (light_depth > 0.5)
+        {
+            uv.z = -vertex.z * 0.000625;
+        }
+
         gl_Position = mvp * model_position;
     }
 
