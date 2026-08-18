@@ -104,7 +104,8 @@ void DeleteStaticVertexBuffer(uint32_t handle)
 }
 
 void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
-                         GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density)
+                         GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
+                         const SkyPassInfo *sky_pass)
 {
     if (!handle || count <= 0)
         return;
@@ -134,7 +135,7 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->line_width          = 1.0f;
     unit->fog_color           = fog_color;
     unit->fog_density         = fog_density;
-    unit->sky_pass_enabled    = false;
+    unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = true;
     unit->scissor_enabled     = false;
     unit->light_pass_enabled  = false;
@@ -143,6 +144,9 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->static_buffer       = handle;
     unit->static_first        = first;
     unit->count               = count;
+
+    if (sky_pass)
+        unit->sky_pass = *sky_pass;
 
     current_render_unit++;
 }
@@ -845,6 +849,11 @@ void RenderCurrentUnits(void)
 
         gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gles2_program.SetLightDepth(unit->light_depth_enabled);
+
+        if (unit->light_depth_enabled)
+            gles2_program.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
+        else
+            gles2_program.SetViewTint(1.0f, 1.0f, 1.0f);
 
         Gles2ApplyRenderState();
 

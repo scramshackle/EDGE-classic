@@ -24,6 +24,7 @@ constexpr GLuint kGles2AttributeModelColor              = 3;
 
 constexpr GLint kGles2TextureUnit0 = 0;
 constexpr GLint kGles2TextureUnit1 = 1;
+constexpr GLint kGles2TextureUnitSkyCube = 2;
 
 enum Gles2FogMode
 {
@@ -62,6 +63,8 @@ class Gles2Program
     void SetSkyPass(const SkyPassInfo *sky_pass);
 
     void SetLightDepth(bool enabled);
+
+    void SetViewTint(float r, float g, float b);
 
     uint32_t UniformUpdateCount() const
     {
@@ -103,6 +106,7 @@ class Gles2Program
 
     GLint uniform_sky_pass_               = -1;
     GLint uniform_light_depth_           = -1;
+    GLint uniform_view_tint_             = -1;
     GLint uniform_sky_fog_depth_          = -1;
     GLint uniform_sky_inverse_projection_ = -1;
     GLint uniform_sky_inverse_view_       = -1;
@@ -113,6 +117,9 @@ class Gles2Program
     GLint uniform_sky_u_offset_           = -1;
     GLint uniform_sky_v_offset_           = -1;
     GLint uniform_sky_vertical_fov_slope_ = -1;
+    GLint uniform_sky_geometry_ = -1;
+    GLint uniform_sky_is_box_ = -1;
+    GLint uniform_sky_cube_    = -1;
     GLint uniform_sky_horizon_shift_      = -1;
 
     HMM_Mat4 shadow_model_view_projection_ = {};
@@ -133,6 +140,7 @@ class Gles2Program
 
     float shadow_sky_pass_ = -1.0f;
     float shadow_light_depth_ = -1.0f;
+    float shadow_view_tint_[3] = {-1.0f, -1.0f, -1.0f};
 
     uint32_t uniform_update_count_ = 0;
 };

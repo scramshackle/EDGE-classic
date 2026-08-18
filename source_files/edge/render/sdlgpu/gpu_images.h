@@ -29,6 +29,8 @@ struct GpuImageLevel
 bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *levels, int32_t level_count,
                     const SDL_GPUSamplerCreateInfo *sampler_info);
 
+bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel faces[6]);
+
 bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t height, const void *pixels);
 
 void DeleteGpuImage(GLuint id);
@@ -38,3 +40,7 @@ void FlushDeletedGpuImages(SDL_GPUDevice *device);
 void ShutdownGpuImages(SDL_GPUDevice *device);
 
 const GpuImage *GetGpuImage(GLuint id);
+
+const GpuImage *GetDefaultGpuCubemap(SDL_GPUDevice *device);
+
+GLuint AllocateGpuCubemapId(void);

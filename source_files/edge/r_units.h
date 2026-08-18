@@ -160,6 +160,9 @@ struct SkyPassInfo
     float    fog_depth          = 0.0f;
     float    vertical_fov_slope = 1.0f;
     float    horizon_shift      = 0.0f;
+    GLuint   cube_texture       = 0;
+    int      is_box             = 0;
+    int      is_geometry        = 0;
 };
 
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
@@ -172,7 +175,8 @@ void            EndRenderUnit(int actual_vert);
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
 void     DeleteStaticVertexBuffer(uint32_t handle);
 void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
-                             GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density);
+                             GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
+                             const SkyPassInfo *sky_pass = nullptr);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

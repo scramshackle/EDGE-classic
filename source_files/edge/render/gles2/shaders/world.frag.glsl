@@ -28,6 +28,9 @@ uniform float u_sky_u_offset;
 uniform float u_sky_v_offset;
 uniform float u_sky_vertical_fov_slope;
 uniform float u_sky_horizon_shift;
+uniform float u_sky_is_box;
+
+uniform samplerCube u_sky_cube;
 
 varying vec4 v_texture_coordinates;
 varying vec4 v_color;
@@ -60,13 +63,36 @@ float FogFactor()
     return 1.0 - clamp(exp2(-u_fog_density * u_fog_density * fog_distance * fog_distance * kLog2), 0.0, 1.0);
 }
 
-vec4 SampleEquirectSky()
+vec3 SkyDirection()
 {
     vec2 ndc  = ((gl_FragCoord.xy - u_sky_viewport.xy) / u_sky_viewport.zw) * 2.0 - 1.0;
     vec4 clip = vec4(ndc, 1.0, 1.0);
     vec4 eye  = u_sky_inverse_projection * clip;
     eye       = vec4(eye.xy, -1.0, 0.0);
-    vec3 dir  = normalize((u_sky_inverse_view * eye).xyz);
+    return normalize((u_sky_inverse_view * eye).xyz);
+}
+
+vec4 SampleCubeSky()
+{
+    vec3 dir = SkyDirection();
+
+    vec4 sampled = textureCube(u_sky_cube, vec3(dir.x, dir.z, -dir.y));
+
+    vec3 rgb = sampled.rgb * v_color.rgb;
+
+    float fog_factor = FogFactor();
+
+    if (fog_factor > 0.0)
+    {
+        rgb = mix(rgb, u_fog_color.rgb, fog_factor);
+    }
+
+    return vec4(rgb, sampled.a * v_color.a);
+}
+
+vec4 SampleEquirectSky()
+{
+    vec3 dir = SkyDirection();
 
     const float kTwoPi = 6.28318530718;
 
@@ -134,7 +160,10 @@ void main()
 {
     if (u_sky_pass > 0.5)
     {
-        gl_FragColor = SampleEquirectSky();
+        if (u_sky_is_box > 0.5)
+            gl_FragColor = SampleCubeSky();
+        else
+            gl_FragColor = SampleEquirectSky();
         return;
     }
 

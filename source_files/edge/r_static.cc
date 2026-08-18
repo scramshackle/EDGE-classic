@@ -54,6 +54,7 @@ struct StaticSpan
     int     light_adjust;
     int     flag_slot;
     bool    is_wall;
+    bool    mid_masked;
     bool    live;
 
     HMM_Vec3 normal;
@@ -125,6 +126,7 @@ static void AddCaptureDependencyList(const VertexSectorList *seclist)
 static int  capture_batch      = -1;
 static int  capture_flag_slot  = -1;
 static bool capture_is_wall    = false;
+static bool capture_mid_masked = false;
 static HMM_Vec3 capture_normal = {{0, 0, 1}};
 static float capture_div[4]    = {0, 0, 0, 0};
 static int  capture_light      = 0;
@@ -156,45 +158,67 @@ bool StaticMeshEnabled(void)
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir)
 {
     if (!r_static_mesh.d_ || !static_mesh_built || !sec || sec->bake_dynamic || sec->movement_suppressed)
+    {
         return false;
+    }
 
     if (sec->floor_slope || sec->ceiling_slope || sec->floor_vertex_slope || sec->ceiling_vertex_slope)
+    {
         return false;
+    }
 
     if (sec->height_sector || sec->bottom_extrafloor || sec->top_extrafloor)
+    {
         return false;
+    }
 
     const MapSurface &surf = (face_dir > 0) ? sec->floor : sec->ceiling;
 
     if (EDGE_IMAGE_IS_SKY(surf))
+    {
         return false;
+    }
 
     if (surf.override_properties || surf.boom_colormap)
+    {
         return false;
+    }
 
     const Image *image = surf.image;
 
     if (!image)
+    {
         return false;
+    }
 
     if (image->liquid_type_ != kLiquidImageNone)
+    {
         return false;
+    }
 
     if (image->animation_.speed != 0)
+    {
         return false;
+    }
 
     if ((ImageOpacity)image->opacity_ == kOpacityComplex)
+    {
         return false;
+    }
 
     if (surf.translucency < 0.99f)
+    {
         return false;
+    }
 
     if (sec->properties.special)
     {
         float bob = (face_dir > 0) ? sec->properties.special->floor_bob_ : sec->properties.special->ceiling_bob_;
 
         if (bob > 0)
+        {
             return false;
+        }
     }
 
     return true;
@@ -274,62 +298,107 @@ static bool StaticImageEligible(const Image *image, float translucency)
     return true;
 }
 
-bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked)
+bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked, BlendingMode blending)
 {
-    if (!r_static_mesh.d_ || !static_mesh_built || mid_masked || !seg || seg->miniseg || !seg->sidedef || !surf)
+    if (!r_static_mesh.d_ || !static_mesh_built || !seg || seg->miniseg || !seg->sidedef || !surf)
+    {
         return false;
+    }
+
+    if (mid_masked && (blending & kBlendingAlpha))
+    {
+        return false;
+    }
+
+    if (mid_masked && seg->linedef && seg->linedef->special && seg->linedef->special->glass_)
+    {
+        return false;
+    }
 
     if (WallPartIndex(seg, surf) < 0)
+    {
         return false;
+    }
 
     const Side *side = seg->sidedef;
 
     if (side->bake_dynamic)
+    {
         return false;
+    }
 
     const Sector *front = seg->front_sector;
     const Sector *back  = seg->back_sector;
 
     if (!front || front->bake_dynamic || front->movement_suppressed)
+    {
         return false;
+    }
 
     if (front->floor_slope || front->ceiling_slope || front->floor_vertex_slope || front->ceiling_vertex_slope)
+    {
         return false;
+    }
 
     if (front->height_sector || front->bottom_extrafloor || front->top_extrafloor)
+    {
         return false;
+    }
 
     if (back)
     {
         if (back->bake_dynamic || back->movement_suppressed)
+        {
             return false;
+        }
 
         if (back->floor_slope || back->ceiling_slope || back->floor_vertex_slope || back->ceiling_vertex_slope)
+        {
             return false;
+        }
 
         if (back->height_sector || back->bottom_extrafloor || back->top_extrafloor)
+        {
             return false;
+        }
     }
 
     if (seg->linedef && (seg->linedef->flags & kLineFlagMirror))
+    {
         return false;
+    }
 
     if (seg->linedef && seg->linedef->portal_pair)
+    {
         return false;
+    }
 
     if (seg->linedef && seg->linedef->slide_door)
+    {
         return false;
+    }
 
     if (!SectorListStatic(seg->vertex_sectors[0]) || !SectorListStatic(seg->vertex_sectors[1]))
+    {
         return false;
+    }
 
     if (surf->override_properties || surf->boom_colormap)
+    {
         return false;
+    }
 
     if (EDGE_IMAGE_IS_SKY(*surf))
+    {
         return false;
+    }
 
-    return StaticImageEligible(surf->image, surf->translucency);
+    if (!StaticImageEligible(surf->image, surf->translucency))
+    {
+        return false;
+    }
+
+    return true;
 }
 
 bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf)
@@ -352,8 +421,10 @@ bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf)
 
 void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
-                        float div_x, float div_y, float div_delta_x, float div_delta_y)
+                        float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked)
 {
+    capture_mid_masked = mid_masked;
+
     capture_normal = normal;
     capture_div[0] = div_x;
     capture_div[1] = div_y;
@@ -399,7 +470,8 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
     capture_adjust = 0;
     capture_light  = sector->properties.light_level;
 
-    capture_is_wall   = false;
+    capture_is_wall    = false;
+    capture_mid_masked = false;
     capture_flag_slot = (int)((sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1));
 
     capture_dependency_count = 0;
@@ -422,6 +494,7 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
     span.light_adjust = capture_adjust;
     span.flag_slot    = capture_flag_slot;
     span.is_wall      = capture_is_wall;
+    span.mid_masked   = capture_mid_masked;
     span.live         = true;
     span.normal       = capture_normal;
     span.div_x        = capture_div[0];
@@ -449,6 +522,13 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
         batch.vertices.push_back(verts[0]);
         batch.vertices.push_back(verts[t]);
         batch.vertices.push_back(verts[t + 1]);
+    }
+
+    for (int v = span.start; v < (int)batch.vertices.size(); v++)
+    {
+        RendererVertex &dest = batch.vertices[v];
+
+        dest.rgba = epi::MakeRGBA(255, 255, 255, epi::GetRGBAAlpha(dest.rgba));
     }
 
     span.count = (int)batch.vertices.size() - span.start;
@@ -709,7 +789,8 @@ void DrawStaticMesh(void)
             info.vertices = batch.vertices.data() + span.start;
             info.count    = span.count;
             info.normal   = span.normal;
-            info.is_wall  = span.is_wall;
+            info.is_wall    = span.is_wall;
+            info.mid_masked = span.mid_masked;
             info.sector   = span.sector;
             info.tex_id   = tex_id;
             info.blending = batch.blending;

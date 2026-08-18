@@ -113,6 +113,7 @@ bool Gles2Program::Init()
 
     uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
     uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
+    uniform_view_tint_              = glGetUniformLocation(program_, "u_view_tint");
     uniform_sky_fog_depth_          = glGetUniformLocation(program_, "u_sky_fog_depth");
     uniform_sky_inverse_projection_ = glGetUniformLocation(program_, "u_sky_inverse_projection");
     uniform_sky_inverse_view_       = glGetUniformLocation(program_, "u_sky_inverse_view");
@@ -124,11 +125,15 @@ bool Gles2Program::Init()
     uniform_sky_v_offset_           = glGetUniformLocation(program_, "u_sky_v_offset");
     uniform_sky_vertical_fov_slope_ = glGetUniformLocation(program_, "u_sky_vertical_fov_slope");
     uniform_sky_horizon_shift_      = glGetUniformLocation(program_, "u_sky_horizon_shift");
+    uniform_sky_is_box_             = glGetUniformLocation(program_, "u_sky_is_box");
+    uniform_sky_geometry_           = glGetUniformLocation(program_, "u_sky_geometry");
+    uniform_sky_cube_               = glGetUniformLocation(program_, "u_sky_cube");
 
     glUseProgram(program_);
 
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
     glUniform1i(uniform_texture1_, kGles2TextureUnit1);
+    glUniform1i(uniform_sky_cube_, kGles2TextureUnitSkyCube);
 
     for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
     {
@@ -287,6 +292,23 @@ void Gles2Program::SetAlphaTest(float reference)
     SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
 }
 
+void Gles2Program::SetViewTint(float r, float g, float b)
+{
+    if (uniform_view_tint_ < 0)
+        return;
+
+    if (shadow_view_tint_[0] == r && shadow_view_tint_[1] == g && shadow_view_tint_[2] == b)
+        return;
+
+    shadow_view_tint_[0] = r;
+    shadow_view_tint_[1] = g;
+    shadow_view_tint_[2] = b;
+
+    glUniform4f(uniform_view_tint_, r, g, b, 1.0f);
+
+    uniform_update_count_++;
+}
+
 void Gles2Program::SetLightDepth(bool enabled)
 {
     SetFloat(uniform_light_depth_, shadow_light_depth_, enabled ? 1.0f : 0.0f);
@@ -298,6 +320,16 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
     {
         SetFloat(uniform_sky_pass_, shadow_sky_pass_, 0.0f);
         return;
+    }
+
+    glUniform1f(uniform_sky_is_box_, sky_pass->is_box ? 1.0f : 0.0f);
+    glUniform1f(uniform_sky_geometry_, sky_pass->is_geometry ? 1.0f : 0.0f);
+
+    if (sky_pass->is_box && sky_pass->cube_texture)
+    {
+        glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitSkyCube);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, sky_pass->cube_texture);
+        glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
     }
 
     SetFloat(uniform_sky_pass_, shadow_sky_pass_, 1.0f);

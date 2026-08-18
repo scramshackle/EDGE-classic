@@ -35,6 +35,8 @@ struct RenderItem
 
     float height1_;
     float height2_;
+
+    int part_;
 };
 
 struct RenderBatch

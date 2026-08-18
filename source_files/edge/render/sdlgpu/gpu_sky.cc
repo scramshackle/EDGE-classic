@@ -5,6 +5,8 @@
 #include "epi.h"
 #include "epi_bam.h"
 #include "g_game.h"
+#include "gpu_device.h"
+#include "gpu_images.h"
 #include "gpu_immediate.h"
 #include "i_defs_gl.h"
 #include "m_math.h"
@@ -111,4 +113,36 @@ void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view)
 {
     inverse_projection = HMM_InvGeneralM4(gpu_immediate.ProjectionMatrix());
     inverse_view       = HMM_InvGeneralM4(gpu_immediate.ModelViewMatrix());
+}
+
+GLuint CreateSkyCubemap(ImageData *faces[6], int face_size)
+{
+    EPI_UNUSED(face_size);
+
+    GpuImageLevel levels[6];
+
+    for (int face = 0; face < 6; face++)
+    {
+        if (!faces[face] || faces[face]->depth_ != 4)
+            return 0;
+
+        levels[face].width  = faces[face]->width_;
+        levels[face].height = faces[face]->height_;
+        levels[face].pixels = faces[face]->pixels_;
+    }
+
+    GLuint cubemap = AllocateGpuCubemapId();
+
+    if (!CreateGpuCubemap(gpu_device.Handle(), cubemap, levels))
+        return 0;
+
+    return cubemap;
+}
+
+void DeleteSkyCubemap(GLuint cubemap)
+{
+    if (cubemap == 0)
+        return;
+
+    DeleteGpuImage(cubemap);
 }

@@ -27,6 +27,7 @@ layout(set = 3, binding = 0) uniform FragmentParameters
     float sky_v_offset;
     float sky_vertical_fov_slope;
     float sky_horizon_shift;
+    float sky_is_box;
 };
 
 #define SKY_STRETCH_MIRROR 0.0
@@ -41,6 +42,7 @@ layout(set = 3, binding = 0) uniform FragmentParameters
 
 layout(set = 2, binding = 0) uniform sampler2D tex0;
 layout(set = 2, binding = 1) uniform sampler2D tex1;
+layout(set = 2, binding = 2) uniform samplerCube texCube;
 
 layout(location = 0) out vec4 frag_color;
 
@@ -69,13 +71,36 @@ float FogFactor(float fog_dist)
     return 1.0 - clamp(exp2(-fog_density * fog_density * fog_dist * fog_dist * LOG2), 0.0, 1.0);
 }
 
-vec4 SampleEquirectSky()
+vec3 SkyDirection()
 {
     vec2 ndc  = ((gl_FragCoord.xy - sky_viewport.xy) / sky_viewport.zw) * 2.0 - 1.0;
     vec4 clip = vec4(ndc, 1.0, 1.0);
     vec4 eye  = sky_inverse_projection * clip;
     eye       = vec4(eye.xy, -1.0, 0.0);
-    vec3 dir  = normalize((sky_inverse_view * eye).xyz);
+    return normalize((sky_inverse_view * eye).xyz);
+}
+
+vec4 SampleCubeSky()
+{
+    vec3 dir = SkyDirection();
+
+    vec4 sampled = texture(texCube, vec3(dir.x, dir.z, -dir.y));
+
+    vec3 rgb = sampled.rgb * color.rgb;
+
+    float fogf = FogFactor(length(vpos));
+
+    if (fogf > 0.0)
+    {
+        rgb = mix(rgb, fog_color.rgb, fogf);
+    }
+
+    return vec4(rgb, sampled.a * color.a);
+}
+
+vec4 SampleEquirectSky()
+{
+    vec3 dir = SkyDirection();
 
     const float kTwoPi = 6.28318530718;
 
@@ -143,7 +168,10 @@ void main()
 {
     if ((flags & 8) == 8)
     {
-        frag_color = SampleEquirectSky();
+        if (sky_is_box > 0.5)
+            frag_color = SampleCubeSky();
+        else
+            frag_color = SampleEquirectSky();
         return;
     }
 

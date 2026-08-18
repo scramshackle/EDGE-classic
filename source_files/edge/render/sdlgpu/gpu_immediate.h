@@ -65,8 +65,8 @@ struct GpuDrawArguments
 {
     SDL_GPUGraphicsPipeline *pipeline;
 
-    SDL_GPUTexture *texture[2];
-    SDL_GPUSampler *sampler[2];
+    SDL_GPUTexture *texture[3];
+    SDL_GPUSampler *sampler[3];
 
     int32_t base_vertex;
     int32_t vertex_count;
@@ -242,6 +242,8 @@ class GpuImmediate
 
     void SetLightDepth(bool enabled);
 
+    void SetViewTint(float r, float g, float b);
+
     uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count);
     void     DeleteStaticBuffer(uint32_t handle);
     void     DrawStatic(uint32_t handle, int32_t first, int32_t count);
@@ -409,12 +411,15 @@ class GpuImmediate
     GLenum   destination_blend_ = GL_ONE_MINUS_SRC_ALPHA;
 
     SDL_GPUTexture *current_texture_[2] = {nullptr, nullptr};
+    SDL_GPUTexture *current_sky_cube_texture_ = nullptr;
+    SDL_GPUSampler *current_sky_cube_sampler_ = nullptr;
     SDL_GPUSampler *current_sampler_[2] = {nullptr, nullptr};
 
     bool texturing_enabled_ = false;
 
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;
+    float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;
     SDL_GPUBuffer               *bound_vertex_buffer_ = nullptr;
@@ -424,8 +429,8 @@ class GpuImmediate
     int32_t pending_count_ = 0;
 
     SDL_GPUGraphicsPipeline *bound_pipeline_    = nullptr;
-    SDL_GPUTexture          *bound_texture_[2]  = {nullptr, nullptr};
-    SDL_GPUSampler          *bound_sampler_[2]  = {nullptr, nullptr};
+    SDL_GPUTexture          *bound_texture_[3]  = {nullptr, nullptr, nullptr};
+    SDL_GPUSampler          *bound_sampler_[3]  = {nullptr, nullptr, nullptr};
     SDL_GPUBuffer           *bound_index_buffer_ = nullptr;
 
     int32_t bound_stencil_reference_        = -1;

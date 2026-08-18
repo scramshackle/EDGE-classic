@@ -229,6 +229,7 @@ static inline bool DoTest(BAMAngle low, BAMAngle high)
 {
     for (AngleRange *AR = occlusion_buffer_head; AR; AR = AR->next)
     {
+
         if (AR->low <= low && high <= AR->high)
             return true;
 
@@ -246,6 +247,7 @@ bool OcclusionTest(BAMAngle low, BAMAngle high)
     // Angles are relative to the VIEW angle.
 
     EPI_ASSERT((BAMAngle)(high - low) < kBAMAngle180);
+
 
     if (low <= high)
         return DoTest(low, high);

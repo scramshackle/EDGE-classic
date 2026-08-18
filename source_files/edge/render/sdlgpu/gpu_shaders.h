@@ -67,7 +67,8 @@ struct GpuVertexParameters
     float    sky_pass;
     float    sky_fog_depth;
     float    light_depth;
-    float    vertex_padding;
+    float    sky_geometry;
+    float    view_tint[4];
 };
 
 struct GpuFragmentParameters
@@ -92,7 +93,7 @@ struct GpuFragmentParameters
     float    sky_v_offset;
     float    sky_vertical_fov_slope;
     float    sky_horizon_shift;
-    float    sky_padding;
+    float    sky_is_box;
 };
 
 struct GpuLightVertexParameters
@@ -195,7 +196,8 @@ static_assert(offsetof(GpuVertexParameters, clipplane) == 192, "GpuVertexParamet
 static_assert(offsetof(GpuVertexParameters, sky_pass) == 288, "GpuVertexParameters::sky_pass offset");
 static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 292, "GpuVertexParameters::sky_fog_depth offset");
 static_assert(offsetof(GpuVertexParameters, light_depth) == 296, "GpuVertexParameters::light_depth offset");
-static_assert(sizeof(GpuVertexParameters) == 304, "GpuVertexParameters size");
+static_assert(offsetof(GpuVertexParameters, view_tint) == 304, "GpuVertexParameters::view_tint offset");
+static_assert(sizeof(GpuVertexParameters) == 320, "GpuVertexParameters size");
 
 static_assert(offsetof(GpuFragmentParameters, flags) == 0, "GpuFragmentParameters::flags offset");
 static_assert(offsetof(GpuFragmentParameters, alpha_test) == 4, "GpuFragmentParameters::alpha_test offset");

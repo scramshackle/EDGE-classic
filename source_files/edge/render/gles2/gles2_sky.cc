@@ -112,3 +112,49 @@ void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view)
     inverse_projection = HMM_InvGeneralM4(gles2_immediate.ProjectionMatrix());
     inverse_view       = HMM_InvGeneralM4(gles2_immediate.ModelViewMatrix());
 }
+
+static const GLenum kSkyCubeFaceTargets[6] = {
+    GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z};
+
+GLuint CreateSkyCubemap(ImageData *faces[6], int face_size)
+{
+    GLuint cubemap = 0;
+
+    glGenTextures(1, &cubemap);
+
+    if (cubemap == 0)
+        return 0;
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);
+
+    for (int face = 0; face < 6; face++)
+    {
+        ImageData *data = faces[face];
+
+        if (!data || !data->pixels_)
+            continue;
+
+        GLenum format = (data->depth_ == 4) ? GL_RGBA : GL_RGB;
+
+        glTexImage2D(kSkyCubeFaceTargets[face], 0, format, data->width_, data->height_, 0, format, GL_UNSIGNED_BYTE,
+                     data->pixels_);
+    }
+
+    EPI_UNUSED(face_size);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    return cubemap;
+}
+
+void DeleteSkyCubemap(GLuint cubemap)
+{
+    if (cubemap != 0)
+        glDeleteTextures(1, &cubemap);
+}

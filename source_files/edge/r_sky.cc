@@ -62,8 +62,6 @@ SkyStretch current_sky_stretch = kSkyStretchUnset;
 
 static constexpr uint8_t kMBFSkyYShift = 28;
 
-static constexpr int kMaximumSkyGroups = 8;
-
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 2);
 
 struct SectorSkyRing
@@ -79,34 +77,6 @@ struct SectorSkyRing
     float maximum_height;
 };
 
-static std::unordered_map<const Image *, int> sky_image_group_lookup;
-
-static int overflowed_sky_group_count = 0;
-
-static int SkyGroupForImage(const Image *image)
-{
-    if (!render_state->HasStencilBuffer())
-        return 0;
-
-    std::unordered_map<const Image *, int>::iterator it = sky_image_group_lookup.find(image);
-
-    if (it != sky_image_group_lookup.end())
-        return it->second;
-
-    if ((int)sky_image_group_lookup.size() >= kMaximumSkyGroups)
-    {
-        overflowed_sky_group_count++;
-        sky_image_group_lookup.emplace(image, kMaximumSkyGroups - 1);
-        return kMaximumSkyGroups - 1;
-    }
-
-    int group = (int)sky_image_group_lookup.size();
-
-    sky_image_group_lookup.emplace(image, group);
-
-    return group;
-}
-
 //
 // ComputeSkyHeights
 //
@@ -119,8 +89,12 @@ static int SkyGroupForImage(const Image *image)
 // both sides, merge the two groups into one.  Simple :).  We can
 // compute the maximal height of the group as we go.
 //
+static void SkyResidentReset(void);
+
 void ComputeSkyHeights(void)
 {
+    SkyResidentReset();
+
     int     i;
     Line   *ld;
     Sector *sec;
@@ -207,25 +181,11 @@ void ComputeSkyHeights(void)
 
     // --- now store the results, and free up ---
 
-    sky_image_group_lookup.clear();
-    overflowed_sky_group_count = 0;
-
     for (i = 0, sec = level_sectors; i < total_level_sectors; i++, sec++)
     {
         if (rings[i].group > 0)
-        {
             sec->sky_height = rings[i].maximum_height;
-            sec->sky_group  = SkyGroupForImage(sec->sky_image);
-        }
-        else if (EDGE_IMAGE_IS_SKY(sec->floor))
-            sec->sky_group = SkyGroupForImage(sec->sky_image);
-        else
-            sec->sky_group = -1;
     }
-
-    if (overflowed_sky_group_count > 0)
-        LogWarning("Level uses more than %d distinct skies; %d had to share a sky group.\n", kMaximumSkyGroups,
-                   overflowed_sky_group_count);
 
     delete[] rings;
 }
@@ -243,6 +203,8 @@ struct FakeSkybox
     int face_size = 1;
 
     GLuint texture[6] = {0, 0, 0, 0, 0, 0};
+
+    GLuint cubemap = 0;
 
     // face images are only present for custom skyboxes.
     // pseudo skyboxes are generated outside of the image system.
@@ -268,6 +230,12 @@ static void DeleteSkyTexGroup(FakeSkybox &box)
             box.texture[i] = 0;
         }
     }
+
+    if (box.cubemap != 0)
+    {
+        DeleteSkyCubemap(box.cubemap);
+        box.cubemap = 0;
+    }
 }
 
 void DeleteSkyTextures(void)
@@ -281,58 +249,329 @@ void DeleteSkyTextures(void)
     current_fake_box = nullptr;
 }
 
-struct SkyGroupAccumulator
-{
-    std::vector<RendererVertex> vertices;
+EDGE_DEFINE_CONSOLE_VARIABLE(r_sky_resident, "1", kConsoleVariableFlagArchive)
 
+struct SkySpan
+{
+    int  start;
+    int  count;
+    int  flag_slot;
+    bool is_wall;
+    bool live;
+};
+
+struct SkySpanReference
+{
+    int section;
+    int span;
+};
+
+struct SkySection
+{
     const Image *image = nullptr;
     MapSurface  *ref   = nullptr;
+
+    std::vector<RendererVertex> vertices;
+
+    std::vector<RendererVertex> resident_vertices;
+    std::vector<SkySpan>        spans;
+
+    uint32_t gpu_handle = 0;
+    bool     gpu_dirty  = false;
 
     bool used = false;
 };
 
-static SkyGroupAccumulator sky_group_accumulator[kMaximumSkyGroups];
+static std::vector<SkySection> sky_sections;
 
-static void PushSkyVertex(int group, const HMM_Vec3 &position)
+static std::vector<uint8_t> sky_plane_baked;
+static std::vector<uint8_t> sky_wall_baked;
+
+static std::vector<std::vector<SkySpanReference>> sky_sector_spans;
+
+static constexpr size_t kMaximumSkyRun = 3 * 4096;
+
+static bool sky_capture_active  = false;
+static int  sky_current_section = 0;
+
+static int sky_capture_section   = -1;
+static int sky_capture_start     = 0;
+static int sky_capture_flag_slot = -1;
+static bool sky_capture_is_wall  = false;
+
+static constexpr int kMaximumSkyDependencies = 8;
+
+static int sky_capture_dependencies[kMaximumSkyDependencies];
+static int sky_capture_dependency_count = 0;
+
+static void SkyResidentReset(void)
+{
+    for (size_t i = 0; i < sky_sections.size(); i++)
+    {
+        if (sky_sections[i].gpu_handle)
+            DeleteStaticVertexBuffer(sky_sections[i].gpu_handle);
+    }
+
+    sky_sections.clear();
+
+    sky_plane_baked.assign((size_t)total_level_subsectors * 2, 0);
+    sky_wall_baked.assign((size_t)total_level_segs * 3, 0);
+    sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
+
+    sky_capture_active = false;
+}
+
+static void SkyAddCaptureDependency(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    int index = (int)(sec - level_sectors);
+
+    for (int i = 0; i < sky_capture_dependency_count; i++)
+    {
+        if (sky_capture_dependencies[i] == index)
+            return;
+    }
+
+    if (sky_capture_dependency_count >= kMaximumSkyDependencies)
+        return;
+
+    sky_capture_dependencies[sky_capture_dependency_count++] = index;
+}
+
+static void SkyCaptureBegin(int section, int flag_slot, bool is_wall)
+{
+    sky_capture_active           = true;
+    sky_capture_section          = section;
+    sky_capture_start            = (int)sky_sections[section].resident_vertices.size();
+    sky_capture_flag_slot        = flag_slot;
+    sky_capture_is_wall          = is_wall;
+    sky_capture_dependency_count = 0;
+}
+
+static void SkyCaptureEnd(void)
+{
+    if (!sky_capture_active)
+        return;
+
+    sky_capture_active = false;
+
+    SkySection &section = sky_sections[sky_capture_section];
+
+    int count = (int)section.resident_vertices.size() - sky_capture_start;
+
+    if (count <= 0)
+        return;
+
+    SkySpan span;
+
+    span.start     = sky_capture_start;
+    span.count     = count;
+    span.flag_slot = sky_capture_flag_slot;
+    span.is_wall   = sky_capture_is_wall;
+    span.live      = true;
+
+    section.spans.push_back(span);
+
+    SkySpanReference reference;
+
+    reference.section = sky_capture_section;
+    reference.span    = (int)section.spans.size() - 1;
+
+    for (int i = 0; i < sky_capture_dependency_count; i++)
+    {
+        size_t index = (size_t)sky_capture_dependencies[i];
+
+        if (index < sky_sector_spans.size())
+            sky_sector_spans[index].push_back(reference);
+    }
+
+    if (sky_capture_is_wall)
+    {
+        if ((size_t)sky_capture_flag_slot < sky_wall_baked.size())
+            sky_wall_baked[sky_capture_flag_slot] = 1;
+    }
+    else if ((size_t)sky_capture_flag_slot < sky_plane_baked.size())
+        sky_plane_baked[sky_capture_flag_slot] = 1;
+}
+
+void SkyResidentInvalidateSector(Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index >= sky_sector_spans.size())
+        return;
+
+    std::vector<SkySpanReference> &refs = sky_sector_spans[index];
+
+    for (size_t i = 0; i < refs.size(); i++)
+    {
+        SkySection &section = sky_sections[refs[i].section];
+        SkySpan     &span   = section.spans[refs[i].span];
+
+        if (!span.live)
+            continue;
+
+        span.live = false;
+
+        if (span.flag_slot < 0)
+            continue;
+
+        if (span.is_wall)
+        {
+            if ((size_t)span.flag_slot < sky_wall_baked.size())
+                sky_wall_baked[span.flag_slot] = 0;
+        }
+        else if ((size_t)span.flag_slot < sky_plane_baked.size())
+            sky_plane_baked[span.flag_slot] = 0;
+    }
+
+
+    refs.clear();
+}
+
+static void PushSkyVertex(int section, const HMM_Vec3 &position)
 {
     RendererVertex vertex;
 
     vertex.rgba     = kRGBAWhite;
     vertex.position = position;
 
-    sky_group_accumulator[group].vertices.push_back(vertex);
+    if (sky_capture_active)
+    {
+        sky_sections[section].resident_vertices.push_back(vertex);
+        sky_sections[section].gpu_dirty = true;
+        return;
+    }
+
+    sky_sections[section].vertices.push_back(vertex);
 }
 
-static int MarkSkyGroup(Sector *sky_owner)
+static int MarkSkySection(Sector *sky_owner)
 {
-    int group = (sky_owner && sky_owner->sky_group >= 0) ? sky_owner->sky_group : 0;
+    const Image *image = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
+    MapSurface  *ref   = sky_owner ? sky_owner->sky_ref : nullptr;
 
-    if (group >= kMaximumSkyGroups)
-        group = kMaximumSkyGroups - 1;
+    for (size_t i = 0; i < sky_sections.size(); i++)
+    {
+        if (sky_sections[i].image == image && sky_sections[i].ref == ref)
+        {
+            sky_sections[i].used = true;
+            return (int)i;
+        }
+    }
 
-    SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
+    SkySection section;
 
-    accumulator.image = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
-    accumulator.ref   = sky_owner ? sky_owner->sky_ref : nullptr;
-    accumulator.used  = true;
+    section.image = image;
+    section.ref   = ref;
+    section.used  = true;
 
-    return group;
+    sky_sections.push_back(section);
+
+    return (int)sky_sections.size() - 1;
 }
 
 void BeginSky(void)
 {
     need_to_draw_sky = false;
 
-    for (int group = 0; group < kMaximumSkyGroups; group++)
+    for (size_t i = 0; i < sky_sections.size(); i++)
     {
-        sky_group_accumulator[group].vertices.clear();
-        sky_group_accumulator[group].used = false;
+        sky_sections[i].vertices.clear();
+        sky_sections[i].used = false;
     }
-
-    render_state->ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 }
 
-static void RenderSkyEquirect(void)
+static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingMode blend,
+                            RGBAColor fog_color, float fog_density, const SkyPassInfo *sky_pass_info)
+{
+    SkySection &resident = sky_sections[sky_current_section];
+
+    if (!resident.resident_vertices.empty())
+    {
+        if (resident.gpu_dirty)
+        {
+            if (resident.gpu_handle)
+                DeleteStaticVertexBuffer(resident.gpu_handle);
+
+            resident.gpu_handle =
+                CreateStaticVertexBuffer(resident.resident_vertices.data(), (int)resident.resident_vertices.size());
+            resident.gpu_dirty  = false;
+        }
+
+        if (resident.gpu_handle)
+        {
+            int run_start = -1;
+            int run_end   = -1;
+
+            for (size_t k = 0; k <= resident.spans.size(); k++)
+            {
+                bool live = (k < resident.spans.size()) && resident.spans[k].live;
+
+                bool contiguous = live && run_start >= 0 && resident.spans[k].start == run_end &&
+                                  (size_t)(run_end + resident.spans[k].count - run_start) <= kMaximumSkyRun;
+
+                if (contiguous)
+                {
+                    run_end += resident.spans[k].count;
+                    continue;
+                }
+
+                if (run_start >= 0)
+                {
+                    AddStaticRenderUnit(resident.gpu_handle, GL_TRIANGLES, run_start, run_end - run_start,
+                                        GL_MODULATE, texture, (GLuint)kTextureEnvironmentDisable, 0, 0, blend,
+                                        fog_color, fog_density, sky_pass_info);
+
+                    run_start = -1;
+                    run_end   = -1;
+                }
+
+                if (live)
+                {
+                    run_start = resident.spans[k].start;
+                    run_end   = resident.spans[k].start + resident.spans[k].count;
+                }
+            }
+        }
+    }
+
+    size_t offset = 0;
+
+    while (offset < section.vertices.size())
+    {
+        size_t chunk = section.vertices.size() - offset;
+
+        if (chunk > kMaximumLocalVertices)
+            chunk = kMaximumLocalVertices;
+
+        chunk -= chunk % 3;
+
+        if (chunk == 0)
+            break;
+
+        RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, (int)chunk, GL_MODULATE, texture,
+                                                 (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fog_color,
+                                                 fog_density, sky_pass_info);
+
+        for (size_t i = 0; i < chunk; i++)
+        {
+            glvert[i]      = section.vertices[offset + i];
+            glvert[i].rgba = kRGBAWhite;
+        }
+
+        EndRenderUnit((int)chunk);
+
+        offset += chunk;
+    }
+}
+
+static void RenderSkyEquirect(const SkySection &section)
 {
     GLuint sky_tex_id = ImageCache(sky_image, true, render_view_effect_colormap);
 
@@ -343,7 +582,11 @@ static void RenderSkyEquirect(void)
     else
         current_sky_stretch = (SkyStretch)sky_stretch_mode.d_;
 
+    SkyPassInfo sky_pass_info;
+
     SetupSkyMatrices();
+    GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
+    RendererRevertSkyMatrices();
 
     float ty = 2.0f;
 
@@ -352,7 +595,7 @@ static void RenderSkyEquirect(void)
 
     RGBAColor    fc_to_use = current_map->outdoor_fog_color_;
     float        fd_to_use = 0.01f * current_map->outdoor_fog_density_;
-    BlendingMode blend     = kBlendingNoZBuffer;
+    BlendingMode blend     = kBlendingNone;
 
     if (fc_to_use == kRGBANoValue)
     {
@@ -425,10 +668,6 @@ static void RenderSkyEquirect(void)
         horizon_shift = (1.0f - 2.0f * band_fraction) * view_y_slope;
     }
 
-    SkyPassInfo sky_pass_info;
-
-    GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
-
     sky_pass_info.viewport_origin    = {{(float)view_window_x, (float)view_window_y}};
     sky_pass_info.viewport_size      = {{(float)view_window_width, (float)view_window_height}};
     sky_pass_info.stretch_mode       = (int)current_sky_stretch;
@@ -439,38 +678,19 @@ static void RenderSkyEquirect(void)
     sky_pass_info.fog_depth          = renderer_far_clip.f_ * 2.0f;
     sky_pass_info.vertical_fov_slope = view_y_slope;
     sky_pass_info.horizon_shift      = horizon_shift;
+    sky_pass_info.is_geometry        = 1;
 
-    RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, 6, GL_MODULATE, sky_tex_id,
-                                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use,
-                                             &sky_pass_info);
-
-    static const HMM_Vec2 kFullscreenQuad[6] = {
-        {{-1.0f, -1.0f}}, {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{-1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{-1.0f, 1.0f}}};
-
-    for (int i = 0; i < 6; i++)
-    {
-        glvert->rgba       = kRGBAWhite;
-        glvert++->position = {{kFullscreenQuad[i].X, kFullscreenQuad[i].Y, 0.0f}};
-    }
-
-    EndRenderUnit(6);
+    EmitSkyGeometry(section, sky_tex_id, blend, fc_to_use, fd_to_use, &sky_pass_info);
 }
 
-static void RenderSkybox(void)
+static void RenderSkybox(const SkySection &section)
 {
-    float dist = renderer_far_clip.f_ / 2.0f;
-
     EPI_ASSERT(current_fake_box);
 
-    SetupSkyMatrices();
+    RGBAColor    fc_to_use = current_map->outdoor_fog_color_;
+    float        fd_to_use = 0.01f * current_map->outdoor_fog_density_;
+    BlendingMode blend     = kBlendingNone;
 
-    float v0 = 0.0f;
-    float v1 = 1.0f;
-
-    RGBAColor fc_to_use = current_map->outdoor_fog_color_;
-    float     fd_to_use = 0.01f * current_map->outdoor_fog_density_;
-    BlendingMode blend     = kBlendingNoZBuffer;
-    // check for sector fog
     if (fc_to_use == kRGBANoValue)
     {
         fc_to_use = view_properties->fog_color;
@@ -485,182 +705,42 @@ static void RenderSkybox(void)
     else if (fc_to_use != kRGBANoValue)
     {
         fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.015f : 0.045f);
-        //fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.015f : 0.005f);
     }
 
-    RGBAColor unit_col =
-        epi::MakeRGBA((uint8_t)(render_view_red_multiplier * 255.0f), (uint8_t)(render_view_green_multiplier * 255.0f),
-                      (uint8_t)(render_view_blue_multiplier * 255.0f));
-    // top
-    RendererVertex *glvert =
-        BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxTop], (GLuint)kTextureEnvironmentDisable,
-                        0, 0, blend, fc_to_use, fd_to_use);
+    SkyPassInfo sky_pass_info;
 
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{-dist, dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{-dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{dist, dist, +dist}};
+    SetupSkyMatrices();
+    GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
+    RendererRevertSkyMatrices();
 
-    EndRenderUnit(4);
+    sky_pass_info.viewport_origin = {{(float)view_window_x, (float)view_window_y}};
+    sky_pass_info.viewport_size   = {{(float)view_window_width, (float)view_window_height}};
+    sky_pass_info.fog_depth       = renderer_far_clip.f_ * 2.0f;
+    sky_pass_info.cube_texture    = current_fake_box->cubemap;
+    sky_pass_info.is_box          = 1;
+    sky_pass_info.is_geometry     = 1;
 
-    // bottom
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxBottom],
-                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
-
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{-dist, -dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{-dist, dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{dist, dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{dist, -dist, -dist}};
-
-    EndRenderUnit(4);
-
-    // north
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxNorth],
-                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
-
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{-dist, dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{-dist, dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{dist, dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{dist, dist, -dist}};
-
-    EndRenderUnit(4);
-
-    // east
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxEast],
-                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
-
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{dist, dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{dist, dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{dist, -dist, -dist}};
-
-    EndRenderUnit(4);
-
-    // south
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxSouth],
-                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
-
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{dist, -dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{-dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{-dist, -dist, -dist}};
-
-    EndRenderUnit(4);
-
-    // west
-    glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, current_fake_box->texture[kSkyboxWest],
-                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fc_to_use, fd_to_use);
-
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v0}};
-    glvert++->position             = {{-dist, -dist, -dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v0, v1}};
-    glvert++->position             = {{-dist, -dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v1}};
-    glvert++->position             = {{-dist, dist, +dist}};
-    glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{v1, v0}};
-    glvert++->position             = {{-dist, dist, -dist}};
-
-    EndRenderUnit(4);
-}
-
-static void FlushSkyGroupPunch(int group)
-{
-    EDGE_ZoneScoped;
-
-    SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
-
-    if (accumulator.vertices.empty())
-        return;
-
-    if (render_state->HasStencilBuffer())
-    {
-        render_state->Enable(GL_STENCIL_TEST);
-        render_state->StencilFunction(GL_ALWAYS, group + 1, 0xFF);
-        render_state->StencilOperation(GL_KEEP, GL_KEEP, GL_REPLACE);
-        render_state->StencilWriteMask(0xFF);
-    }
-
-    size_t offset = 0;
-
-    while (offset < accumulator.vertices.size())
-    {
-        size_t chunk = accumulator.vertices.size() - offset;
-
-        if (chunk > kMaximumLocalVertices)
-            chunk = kMaximumLocalVertices;
-
-        StartUnitBatch(false);
-
-        RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, (int)chunk, GL_MODULATE, 0,
-                                                 (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingNone);
-
-        for (size_t i = 0; i < chunk; i++)
-            glvert[i] = accumulator.vertices[offset + i];
-
-        EndRenderUnit((int)chunk);
-        FinishUnitBatch();
-
-        offset += chunk;
-    }
-}
-
-void FlushSky(void)
-{
-    EDGE_ZoneScoped;
-
-    for (int group = 0; group < kMaximumSkyGroups; group++)
-        FlushSkyGroupPunch(group);
+    EmitSkyGeometry(section, 0, blend, fc_to_use, fd_to_use, &sky_pass_info);
 }
 
 void FinishSky(bool use_depth_mask)
 {
     EDGE_ZoneScoped;
 
+
     render_state->ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    if (!need_to_draw_sky)
+    {
+        for (size_t i = 0; i < sky_sections.size(); i++)
+        {
+            if (!sky_sections[i].resident_vertices.empty())
+            {
+                need_to_draw_sky = true;
+                break;
+            }
+        }
+    }
 
     if (!need_to_draw_sky)
         return;
@@ -668,71 +748,82 @@ void FinishSky(bool use_depth_mask)
     if (draw_culling.d_)
         render_state->Disable(GL_DEPTH_TEST);
 
-    if (use_depth_mask)
-        render_state->DepthFunction(GL_GREATER);
-    else
-        render_state->DepthMask(false);
-
-    if (render_state->HasStencilBuffer())
-    {
-        render_state->StencilOperation(GL_KEEP, GL_KEEP, GL_KEEP);
-        render_state->StencilWriteMask(0x00);
-    }
+    EPI_UNUSED(use_depth_mask);
 
     const Image *saved_sky_image = sky_image;
     MapSurface  *saved_sky_ref   = sky_ref;
 
-    for (int group = 0; group < kMaximumSkyGroups; group++)
+    for (size_t i = 0; i < sky_sections.size(); i++)
     {
-        SkyGroupAccumulator &accumulator = sky_group_accumulator[group];
+        SkySection &section = sky_sections[i];
 
-        if (!accumulator.used)
+        if (!section.used && section.resident_vertices.empty())
             continue;
 
-        if (render_state->HasStencilBuffer())
-            render_state->StencilFunction(GL_EQUAL, group + 1, 0xFF);
+        sky_current_section = (int)i;
 
-        sky_image = accumulator.image ? accumulator.image : saved_sky_image;
-        sky_ref   = accumulator.ref;
+        sky_image = section.image ? section.image : saved_sky_image;
+        sky_ref   = section.ref;
 
         StartUnitBatch(false);
 
         UpdateSkyboxTextures();
 
         if (custom_skybox)
-            RenderSkybox();
+            RenderSkybox(section);
         else
-            RenderSkyEquirect();
+            RenderSkyEquirect(section);
 
         FinishUnitBatch();
-
-        RendererRevertSkyMatrices();
     }
+
 
     sky_image = saved_sky_image;
     sky_ref   = saved_sky_ref;
 
-    if (render_state->HasStencilBuffer())
-    {
-        render_state->Disable(GL_STENCIL_TEST);
-        render_state->StencilWriteMask(0xFF);
-    }
-
     if (draw_culling.d_)
         render_state->Enable(GL_DEPTH_TEST);
-
-    if (use_depth_mask)
-        render_state->DepthFunction(GL_LEQUAL);
-    else
-        render_state->DepthMask(true);
 }
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner)
+bool SkyPlaneIsBaked(const Subsector *sub, int face)
+{
+    if (!r_sky_resident.d_ || !sub || face < 0 || face > 1)
+        return false;
+
+    size_t slot = (size_t)(sub - level_subsectors) * 2 + (size_t)face;
+
+    if (slot >= sky_plane_baked.size())
+        return false;
+
+    return sky_plane_baked[slot] != 0;
+}
+
+bool SkyWallIsBaked(const Seg *seg, int part)
+{
+    if (!r_sky_resident.d_ || !seg || part < 0 || part > 2)
+        return false;
+
+    size_t slot = (size_t)(seg - level_segs) * 3 + (size_t)part;
+
+    if (slot >= sky_wall_baked.size())
+        return false;
+
+    return sky_wall_baked[slot] != 0;
+}
+
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
 {
     need_to_draw_sky = true;
 
     Seg *seg = sub->segs;
     if (!seg)
+        return;
+
+    size_t plane_slot = (size_t)(sub - level_subsectors) * 2 + (size_t)(face ? 1 : 0);
+
+    bool bake = r_sky_resident.d_ && plane_slot < sky_plane_baked.size() && render_mirror_set.TotalActive() == 0;
+
+    if (bake && sky_plane_baked[plane_slot])
         return;
 
     float x0 = seg->vertex_1->X;
@@ -749,7 +840,16 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner)
     if (!seg)
         return;
 
-    int group = MarkSkyGroup(sky_owner);
+    int group = MarkSkySection(sky_owner);
+
+    if (bake)
+    {
+        SkyCaptureBegin(group, (int)plane_slot, false);
+
+        SkyAddCaptureDependency(sub->sector);
+        SkyAddCaptureDependency(sky_owner);
+        SkyAddCaptureDependency(sub->deep_water_reference);
+    }
 
     render_mirror_set.Height(h);
 
@@ -767,13 +867,48 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner)
         y1  = y2;
         seg = seg->subsector_next;
     }
+
+    SkyCaptureEnd();
 }
 
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
 {
     need_to_draw_sky = true;
 
-    int group = MarkSkyGroup(sky_owner);
+    size_t wall_slot = (size_t)(seg - level_segs) * 3 + (size_t)(part < 0 ? 0 : (part > 2 ? 2 : part));
+
+    bool bake = r_sky_resident.d_ && wall_slot < sky_wall_baked.size() && render_mirror_set.TotalActive() == 0;
+
+    if (bake && seg->back_sector && seg->front_sector)
+    {
+        const Sector *other = (sky_owner == seg->front_sector) ? seg->back_sector : seg->front_sector;
+
+        const Image *owner_sky = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
+        const Image *other_sky = (other && other->sky_image) ? other->sky_image : sky_image;
+
+        if (owner_sky != other_sky)
+            bake = false;
+    }
+
+    if (bake && sky_wall_baked[wall_slot])
+        return;
+
+    int group = MarkSkySection(sky_owner);
+
+    if (bake)
+    {
+        SkyCaptureBegin(group, (int)wall_slot, true);
+
+        SkyAddCaptureDependency(sky_owner);
+        SkyAddCaptureDependency(seg->front_sector);
+        SkyAddCaptureDependency(seg->back_sector);
+
+        if (seg->front_subsector)
+            SkyAddCaptureDependency(seg->front_subsector->sector);
+
+        if (seg->back_subsector)
+            SkyAddCaptureDependency(seg->back_subsector->sector);
+    }
 
     float x1 = seg->vertex_1->X;
     float y1 = seg->vertex_1->Y;
@@ -792,6 +927,8 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
     PushSkyVertex(group, {{x2, y2, h1}});
     PushSkyVertex(group, {{x2, y2, h2}});
     PushSkyVertex(group, {{x1, y1, h1}});
+
+    SkyCaptureEnd();
 }
 
 //----------------------------------------------------------------------------
@@ -803,6 +940,65 @@ static const char *UserSkyFaceName(const char *base, int face)
 
     stbsp_sprintf(buffer, "%s_%c", base, letters[face]);
     return buffer;
+}
+
+static ImageData *SkyFaceAsRGBA(const Image *face)
+{
+    if (!face)
+        return nullptr;
+
+    const uint8_t *face_palette = nullptr;
+
+    if (face->source_palette_ >= 0)
+        face_palette = (const uint8_t *)LoadLumpIntoMemory(face->source_palette_);
+
+    ImageData *data = ReadAsEpiBlock((Image *)face);
+
+    if (data->depth_ == 1)
+    {
+        ImageData *rgb = RGBFromPalettised(data, face_palette ? face_palette : (const uint8_t *)&playpal_data[0],
+                                           face->opacity_);
+        delete data;
+        data = rgb;
+    }
+
+    if (face_palette)
+        delete[] face_palette;
+
+    if (data->depth_ == 3)
+        data->SetAlpha(255);
+
+    return data;
+}
+
+static void BuildSkyCubemap(FakeSkybox *info)
+{
+    if (info->cubemap)
+    {
+        DeleteSkyCubemap(info->cubemap);
+        info->cubemap = 0;
+    }
+
+    static const int kCubeFaceOrder[6] = {kSkyboxEast, kSkyboxWest,  kSkyboxTop,
+                                          kSkyboxBottom, kSkyboxSouth, kSkyboxNorth};
+
+    ImageData *faces[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+
+    bool complete = true;
+
+    for (int i = 0; i < 6; i++)
+    {
+        faces[i] = SkyFaceAsRGBA(info->face[kCubeFaceOrder[i]]);
+
+        if (!faces[i])
+            complete = false;
+    }
+
+    if (complete)
+        info->cubemap = CreateSkyCubemap(faces, info->face_size);
+
+    for (int i = 0; i < 6; i++)
+        delete faces[i];
 }
 
 void UpdateSkyboxTextures(void)
@@ -866,6 +1062,8 @@ void UpdateSkyboxTextures(void)
 
         for (int k = 0; k < 6; k++)
             info->texture[k] = ImageCache(info->face[k], true, render_view_effect_colormap);
+
+        BuildSkyCubemap(info);
     }
     else
     {
@@ -876,6 +1074,8 @@ void UpdateSkyboxTextures(void)
 
 void ShutdownSky(void)
 {
+    SkyResidentReset();
+
     sky_ref            = nullptr;
     ddf_scroll_tic     = -1;
     ddf_sky_scroll     = {{0, 0}};

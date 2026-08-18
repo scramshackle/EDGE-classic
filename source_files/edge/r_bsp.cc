@@ -37,6 +37,7 @@
 #include "epi_simd.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
+#include "i_system.h"
 #include "m_bbox.h"
 #include "n_network.h" // NetworkUpdate
 #include "p_local.h"
@@ -60,8 +61,8 @@
 #ifdef EDGE_THREADED_BSP
 static void BSPQueueRenderBatch(RenderBatch *batch);
 static void BSPQueueDrawSubsector(DrawSubsector *subsector);
-static void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner);
-static void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner);
+static void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part);
+static void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face);
 
 static RenderBatch *current_batch = nullptr;
 
@@ -143,6 +144,7 @@ static int BSPQueueProduce(BSPQueue *q, void *value, int timeout_ms)
 {
     while (GetAtomicU32(&q->count) == q->size)
     {
+
         if (timeout_ms == 0)
             return 0;
         if (BSPSignalWait(&q->space_open, timeout_ms) == 0)
@@ -234,6 +236,7 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     mir->right     = view_angle + right;
     mir->is_portal = is_portal;
 
+
     dsub->mirrors.push_back(mir);
 
     // push mirror (translation matrix)
@@ -270,9 +273,12 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
 //
 static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 {
+
     // ignore segs sitting on current mirror
     if (bsp_mirror_set.SegOnPortal(seg))
+    {
         return;
+    }
 
     float sx1 = seg->vertex_1->X;
     float sy1 = seg->vertex_1->Y;
@@ -347,7 +353,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 
     // back side ?
     if (span >= kBAMAngle180)
+    {
         return;
+    }
 
     angle_L -= view_angle;
     angle_R -= view_angle;
@@ -361,7 +369,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         {
             // Totally off the left edge?
             if (tspan2 >= kBAMAngle180)
+            {
                 return;
+            }
 
             angle_L = clip_left;
         }
@@ -370,7 +380,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         {
             // Totally off the left edge?
             if (tspan1 >= kBAMAngle180)
+            {
                 return;
+            }
 
             angle_R = clip_right;
         }
@@ -392,7 +404,10 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     dsub->visible = true;
 
     if (seg->miniseg || span == 0)
+    {
         return;
+    }
+
 
     if (active_mirrors < kMaximumMirrors)
     {
@@ -424,7 +439,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     // only 1 sided walls affect the 1D occlusion buffer
 
     if (seg->linedef->blocked)
+    {
         OcclusionSet(angle_R, angle_L);
+    }
 
     // --- handle sky (using the depth buffer) ---
     float             f_fh    = 0;
@@ -508,9 +525,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         if (f_fh < b_fh)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_fh, b_fh, fsector);
+            BSPQueueSkyWall(seg, f_fh, b_fh, fsector, 0);
 #else
-            RenderSkyWall(seg, f_fh, b_fh, fsector);
+            RenderSkyWall(seg, f_fh, b_fh, fsector, 0);
 #endif
         }
     }
@@ -520,9 +537,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         if (f_ch < fsector->sky_height && (!bsector || !EDGE_IMAGE_IS_SKY(*b_ceil) || b_fh >= f_ch))
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_ch, fsector->sky_height, fsector);
+            BSPQueueSkyWall(seg, f_ch, fsector->sky_height, fsector, 1);
 #else
-            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector);
+            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector, 1);
 #endif
         }
         else if (bsector && EDGE_IMAGE_IS_SKY(*b_ceil))
@@ -532,9 +549,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
             if (b_ch <= max_f && max_f < fsector->sky_height)
             {
                 #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, max_f, fsector->sky_height, fsector);
+            BSPQueueSkyWall(seg, max_f, fsector->sky_height, fsector, 1);
 #else
-            RenderSkyWall(seg, max_f, fsector->sky_height, fsector);
+            RenderSkyWall(seg, max_f, fsector->sky_height, fsector, 1);
 #endif
             }
         }
@@ -544,9 +561,9 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
              b_ch < f_ch)
     {
         #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, b_ch, f_ch, bsector);
+            BSPQueueSkyWall(seg, b_ch, f_ch, bsector, 2);
 #else
-            RenderSkyWall(seg, b_ch, f_ch, bsector);
+            RenderSkyWall(seg, b_ch, f_ch, bsector, 2);
 #endif
     }
 }
@@ -679,6 +696,7 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
 {
     DrawFloor *dfloor;
 
+
     dfloor = GetDrawFloor();
 
     dfloor->is_highest      = false;
@@ -732,6 +750,35 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
     }
 }
 
+static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
+{
+    for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
+    {
+        BSPWalkThing(K, mo);
+    }
+
+    // clip 1D occlusion buffer.
+    for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
+    {
+        BSPWalkSeg(K, seg);
+    }
+
+    // add drawsub to list (closest -> furthest)
+    int32_t active_mirrors = bsp_mirror_set.TotalActive();
+    if (active_mirrors > 0)
+    {
+        bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
+    }
+    else
+    {
+#ifdef EDGE_THREADED_BSP
+        BSPQueueDrawSubsector(K);
+#else
+        draw_subsector_list.push_back(K);
+#endif
+    }
+}
+
 //
 // BSPWalkSubsector
 //
@@ -767,18 +814,18 @@ static void BSPWalkSubsector(int num)
         if (EDGE_IMAGE_IS_SKY(sub->sector->floor) && view_z > sub->sector->interpolated_floor_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector);
+            BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1);
 #else
-            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector);
+            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1);
 #endif
         }
 
         if (EDGE_IMAGE_IS_SKY(sub->sector->ceiling) && view_z < sub->sector->sky_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height, sub->sector);
+            BSPQueueSkyPlane(sub, sub->sector->sky_height, sub->sector, 0);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector);
+            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector, 0);
 #endif
         }
     }
@@ -818,17 +865,17 @@ static void BSPWalkSubsector(int num)
         if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, floor_h, sector->height_sector);
+            BSPQueueSkyPlane(sub, floor_h, sector->height_sector, 1);
 #else
-            RenderSkyPlane(sub, floor_h, sector->height_sector);
+            RenderSkyPlane(sub, floor_h, sector->height_sector, 1);
 #endif
         }
         if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sub->sector->sky_height)
         {
             #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height, sector->height_sector);
+            BSPQueueSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector);
+            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0);
 #endif
         }
     }
@@ -913,54 +960,12 @@ static void BSPWalkSubsector(int num)
 
         if (!skip)
         {
-            for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
-            {
-                BSPWalkThing(K, mo);
-            }
-            // clip 1D occlusion buffer.
-            for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
-            {
-                BSPWalkSeg(K, seg);
-            }
-
-            // add drawsub to list (closest -> furthest)
-            int32_t active_mirrors = bsp_mirror_set.TotalActive();
-            if (active_mirrors > 0)
-                bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
-            else
-            {
-                #ifdef EDGE_THREADED_BSP
-                BSPQueueDrawSubsector(K);
-#else
-                draw_subsector_list.push_back(K);
-#endif
-            }
+            BSPWalkSubsectorContents(K, sub);
         }
     }
     else
     {
-        for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
-        {
-            BSPWalkThing(K, mo);
-        }
-        // clip 1D occlusion buffer.
-        for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
-        {
-            BSPWalkSeg(K, seg);
-        }
-
-        // add drawsub to list (closest -> furthest)
-        int32_t active_mirrors = bsp_mirror_set.TotalActive();
-        if (active_mirrors > 0)
-            bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
-        else
-        {
-            #ifdef EDGE_THREADED_BSP
-                BSPQueueDrawSubsector(K);
-#else
-                draw_subsector_list.push_back(K);
-#endif
-        }
+        BSPWalkSubsectorContents(K, sub);
     }
 }
 
@@ -983,6 +988,7 @@ void BSPWalkNode(unsigned int bspnum)
     }
 
     node = &level_nodes[bspnum];
+
 
     // Decide which side the view point is on.
 
@@ -1062,6 +1068,7 @@ static uint32_t    render_batch_counter = 0;
 
 void BSPQueueRenderBatch(RenderBatch *batch)
 {
+
     BSPQueueProduce(&bsp_thread.queue_, batch, -1);
 }
 
@@ -1076,6 +1083,7 @@ static RenderBatch *GetRenderBatch()
 
 static RenderItem *GetRenderItem()
 {
+
     if (!current_batch || current_batch->num_items_ == kRenderItemBatchSize)
     {
         if (current_batch)
@@ -1089,8 +1097,12 @@ static RenderItem *GetRenderItem()
     return &current_batch->items_[current_batch->num_items_++];
 }
 
-void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
+void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
 {
+    if (bsp_mirror_set.TotalActive() == 0 && SkyWallIsBaked(seg, part))
+        return;
+
+
     RenderItem *item = GetRenderItem();
 
     item->type_     = kRenderSkyWall;
@@ -1098,16 +1110,22 @@ void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner)
     item->height2_  = h2;
     item->wallSeg_  = seg;
     item->skyOwner_ = sky_owner;
+    item->part_     = part;
 }
 
-void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner)
+void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
 {
+    if (bsp_mirror_set.TotalActive() == 0 && SkyPlaneIsBaked(sub, face))
+        return;
+
+
     RenderItem *item = GetRenderItem();
 
     item->type_      = kRenderSkyPlane;
     item->height1_   = h;
     item->wallPlane_ = sub;
     item->skyOwner_  = sky_owner;
+    item->part_      = face;
 }
 
 void BSPQueueDrawSubsector(DrawSubsector *subsector)

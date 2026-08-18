@@ -26,6 +26,7 @@
 #pragma once
 
 #include "HandmadeMath.h"
+#include "im_data.h"
 #include "r_image.h"
 
 extern const Image *sky_image;
@@ -49,11 +50,10 @@ enum SkyboxFace
 void ComputeSkyHeights(void);
 
 void BeginSky(void);
-void FlushSky(void);
 void FinishSky(bool use_depth_mask);
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner);
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner);
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face);
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part);
 
 void UpdateSkyboxTextures(void);
 
@@ -61,7 +61,15 @@ void SetupSkyMatrices(void);
 void RendererRevertSkyMatrices(void);
 void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view);
 
+GLuint CreateSkyCubemap(ImageData *faces[6], int face_size);
+void   DeleteSkyCubemap(GLuint cubemap);
+
 void ShutdownSky(void);
+
+void SkyResidentInvalidateSector(Sector *sec);
+
+bool SkyPlaneIsBaked(const Subsector *sub, int face);
+bool SkyWallIsBaked(const Seg *seg, int part);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

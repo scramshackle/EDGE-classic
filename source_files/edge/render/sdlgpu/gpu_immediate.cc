@@ -1,5 +1,7 @@
 #include "gpu_immediate.h"
 
+#include "gpu_images.h"
+
 #include <math.h>
 #include <string.h>
 
@@ -16,6 +18,17 @@ static constexpr int32_t kGpuQuadIndexTotal = kGpuMaximumQuads * 6;
 static constexpr int32_t kGpuFanIndexTotal  = (kGpuMaximumFanVertices - 2) * 3;
 
 static constexpr size_t kGpuInitialVertexCapacity = 64 * 1024 * sizeof(RendererVertex);
+
+static void ResolveSkyCubeBinding(SDL_GPUTexture **texture, SDL_GPUSampler **sampler)
+{
+    if (*texture && *sampler)
+        return;
+
+    const GpuImage *cube = GetDefaultGpuCubemap(gpu_device.Handle());
+
+    *texture = cube ? cube->texture : nullptr;
+    *sampler = cube ? cube->sampler : nullptr;
+}
 
 bool GpuImmediate::Init(SDL_GPUDevice *device)
 {
@@ -633,6 +646,9 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
     draw->sampler[0]               = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
     draw->texture[1]               = texturing_enabled_ ? current_texture_[1] : default_texture_;
     draw->sampler[1]               = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
+    draw->texture[2]               = current_sky_cube_texture_;
+    draw->sampler[2]               = current_sky_cube_sampler_;
+    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
     draw->base_vertex              = first;
     draw->vertex_count             = count;
     draw->index_first              = 0;
@@ -645,6 +661,18 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
     draw->vertex_buffer            = buffer;
 
     commands_.push_back(command);
+}
+
+void GpuImmediate::SetViewTint(float r, float g, float b)
+{
+    if (view_tint_[0] == r && view_tint_[1] == g && view_tint_[2] == b)
+        return;
+
+    view_tint_[0] = r;
+    view_tint_[1] = g;
+    view_tint_[2] = b;
+
+    vertex_parameters_dirty_ = true;
 }
 
 void GpuImmediate::SetLightDepth(bool enabled)
@@ -693,9 +721,25 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
         current_fragment_parameters_.sky_v_offset           = sky_pass->v_offset;
         current_fragment_parameters_.sky_vertical_fov_slope = sky_pass->vertical_fov_slope;
         current_fragment_parameters_.sky_horizon_shift      = sky_pass->horizon_shift;
+        current_fragment_parameters_.sky_is_box            = sky_pass->is_box ? 1.0f : 0.0f;
+
+        const GpuImage *cube = sky_pass->cube_texture ? GetGpuImage(sky_pass->cube_texture) : nullptr;
+
+        if (!cube)
+            cube = GetDefaultGpuCubemap(gpu_device.Handle());
+
+        current_sky_cube_texture_ = cube ? cube->texture : nullptr;
+        current_sky_cube_sampler_ = cube ? cube->sampler : nullptr;
     }
     else
+    {
         current_fragment_parameters_.flags &= ~kGpuFragmentFlagSkyPass;
+
+        const GpuImage *cube = GetDefaultGpuCubemap(gpu_device.Handle());
+
+        current_sky_cube_texture_ = cube ? cube->texture : nullptr;
+        current_sky_cube_sampler_ = cube ? cube->sampler : nullptr;
+    }
 
     fragment_parameters_dirty_ = true;
     vertex_parameters_dirty_   = true;
@@ -820,8 +864,12 @@ int32_t GpuImmediate::CurrentVertexParameters()
 
     parameters.sky_pass      = sky_pass_enabled_ ? 1.0f : 0.0f;
     parameters.sky_fog_depth = sky_pass_info_.fog_depth;
-    parameters.light_depth   = light_depth_enabled_ ? 1.0f : 0.0f;
-    parameters.vertex_padding = 0.0f;
+    parameters.light_depth    = light_depth_enabled_ ? 1.0f : 0.0f;
+    parameters.sky_geometry   = (sky_pass_enabled_ && sky_pass_info_.is_geometry) ? 1.0f : 0.0f;
+    parameters.view_tint[0]   = view_tint_[0];
+    parameters.view_tint[1]   = view_tint_[1];
+    parameters.view_tint[2]   = view_tint_[2];
+    parameters.view_tint[3]   = 1.0f;
 
     vertex_parameters_.push_back(parameters);
 
@@ -963,6 +1011,9 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->sampler[0]               = sampler0;
     draw->texture[1]               = texture1;
     draw->sampler[1]               = sampler1;
+    draw->texture[2]               = current_sky_cube_texture_;
+    draw->sampler[2]               = current_sky_cube_sampler_;
+    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
     draw->base_vertex = pending_base_;
     draw->index_first = (int32_t)dynamic_indices_.size();
 
@@ -1390,6 +1441,9 @@ void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_co
     draw->sampler[0] = sampler0;
     draw->texture[1] = texture1;
     draw->sampler[1] = sampler1;
+    draw->texture[2] = current_sky_cube_texture_;
+    draw->sampler[2] = current_sky_cube_sampler_;
+    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
 
     draw->base_vertex = pending_base_;
     draw->index_first = (int32_t)dynamic_indices_.size();
@@ -2074,21 +2128,26 @@ void GpuImmediate::Replay()
         }
 
         if (bound_texture_[0] != draw->texture[0] || bound_sampler_[0] != draw->sampler[0] ||
-            bound_texture_[1] != draw->texture[1] || bound_sampler_[1] != draw->sampler[1])
+            bound_texture_[1] != draw->texture[1] || bound_sampler_[1] != draw->sampler[1] ||
+            bound_texture_[2] != draw->texture[2] || bound_sampler_[2] != draw->sampler[2])
         {
-            SDL_GPUTextureSamplerBinding bindings[2];
+            SDL_GPUTextureSamplerBinding bindings[3];
 
-            bindings[0].texture = draw->texture[0];
-            bindings[0].sampler = draw->sampler[0];
-            bindings[1].texture = draw->texture[1];
-            bindings[1].sampler = draw->sampler[1];
+            bindings[0].texture = draw->texture[0] ? draw->texture[0] : default_texture_;
+            bindings[0].sampler = draw->sampler[0] ? draw->sampler[0] : default_sampler_;
+            bindings[1].texture = draw->texture[1] ? draw->texture[1] : default_texture_;
+            bindings[1].sampler = draw->sampler[1] ? draw->sampler[1] : default_sampler_;
+            bindings[2].texture = draw->texture[2];
+            bindings[2].sampler = draw->sampler[2];
 
-            SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
+            SDL_BindGPUFragmentSamplers(pass, 0, bindings, 3);
 
             bound_texture_[0] = draw->texture[0];
             bound_sampler_[0] = draw->sampler[0];
             bound_texture_[1] = draw->texture[1];
             bound_sampler_[1] = draw->sampler[1];
+            bound_texture_[2] = draw->texture[2];
+            bound_sampler_[2] = draw->sampler[2];
 
             binding_count_++;
         }

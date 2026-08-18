@@ -17,7 +17,7 @@ bool StaticMeshCoversFlat(const Subsector *sub, int face_dir);
 bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf);
 bool StaticMeshEnabled(void);
 
-bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked);
+bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked, BlendingMode blending);
 
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir);
 
@@ -38,6 +38,7 @@ struct StaticSpanLighting
     float div_x, div_y, div_delta_x, div_delta_y;
 
     bool    is_wall;
+    bool    mid_masked;
     Sector *sector;
 
     GLuint       tex_id;
@@ -50,6 +51,6 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
                             Sector *sector, BlendingMode blending, const HMM_Vec3 &normal);
 void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
-                        float div_x, float div_y, float div_delta_x, float div_delta_y);
+                        float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked);
 void StaticCaptureVertices(const RendererVertex *verts, int count);
 void StaticCaptureEnd(void);

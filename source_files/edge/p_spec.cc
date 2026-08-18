@@ -2795,6 +2795,7 @@ void DemoteSectorToDynamic(Sector *sec)
     sec->bake_dynamic = true;
 
     StaticMeshInvalidateSector(sec);
+    SkyResidentInvalidateSector(sec);
 
     static_geometry_generation++;
 }
@@ -2807,7 +2808,10 @@ void DemoteSideToDynamic(Side *side)
     side->bake_dynamic = true;
 
     if (side->sector)
+    {
         StaticMeshInvalidateSector(side->sector);
+        SkyResidentInvalidateSector(side->sector);
+    }
 
     static_geometry_generation++;
 }
@@ -2822,6 +2826,7 @@ void SuppressSectorForMovement(Sector *sec)
         sec->movement_suppressed = true;
 
         StaticMeshInvalidateSector(sec);
+    SkyResidentInvalidateSector(sec);
 
         static_geometry_generation++;
     }

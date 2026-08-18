@@ -3661,7 +3661,6 @@ void LevelSetup(void)
     {
         level_sectors[j].sky_image = sky_image;
         level_sectors[j].sky_ref   = nullptr;
-        level_sectors[j].sky_group = -1;
     }
 
     ComputeSkyHeights();

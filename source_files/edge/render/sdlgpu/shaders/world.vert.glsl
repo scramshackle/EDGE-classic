@@ -9,7 +9,8 @@ layout(set = 1, binding = 0) uniform VertexParameters
     float sky_pass;
     float sky_fog_depth;
     float light_depth;
-    float vertex_padding1;
+    float sky_geometry;
+    vec4  view_tint;
 };
 
 layout(location = 0) in vec3 position;
@@ -33,12 +34,16 @@ void main()
 
     uv    = texcoords;
     color = color0;
+    color.rgb *= view_tint.rgb;
 
     if (sky_pass > 0.5)
     {
         vertex = vec4(0.0, 0.0, -sky_fog_depth, 1.0);
 
-        gl_Position = vec4(position.xy, 1.0, 1.0);
+        if (sky_geometry > 0.5)
+            gl_Position = mvp * model_position;
+        else
+            gl_Position = vec4(position.xy, 1.0, 1.0);
     }
     else
     {

@@ -38,6 +38,7 @@
 #include "epi_doomdefs.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
+#include "i_system.h"
 #include "m_bbox.h"
 #include "n_network.h" // NetworkUpdate
 #include "p_local.h"
@@ -81,6 +82,7 @@ extern unsigned int root_node;
 EDGE_DEFINE_CONSOLE_VARIABLE(default_lighting, "1", kConsoleVariableFlagArchive)
 
 bool solid_mode;
+
 int  detail_level       = 1;
 int  use_dynamic_lights = 0;
 
@@ -771,8 +773,11 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     // Note: tex_x1 and tex_x2 are in world coordinates.
     //       top, bottom and tex_top_h as well.
 
+
     if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversWall(current_seg, surf))
+    {
         return;
+    }
 
     ec_frame_stats.draw_wall_parts++;
 
@@ -949,11 +954,11 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_subsector->sector);
 
     bool capture = render_mirror_set.TotalActive() == 0 && solid_mode &&
-                   StaticWallBakeEligible(current_seg, surf, mid_masked);
+                   StaticWallBakeEligible(current_seg, surf, mid_masked, blending);
 
     if (capture)
         StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, blending, lit_adjust,
-                           data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y);
+                           data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked);
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
@@ -1035,7 +1040,7 @@ void EmitStaticSpanLights(const StaticSpanLighting &info)
         data.pass       = 1;
         data.blending   = info.blending;
         data.trans      = 1.0f;
-        data.mid_masked = false;
+        data.mid_masked = info.mid_masked;
         data.normal     = info.normal;
 
         data.div.x       = info.div_x;
@@ -1913,6 +1918,7 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
             EmulateFloodPlane(dfloor, current_seg->back_subsector->sector, -1, b_ch, f_ch);
         }
     }
+
 }
 
 static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_dir)
@@ -1923,12 +1929,15 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     int num_vert, i;
 
+
     if (!surf->image)
         return;
 
     // ignore sky
     if (EDGE_IMAGE_IS_SKY(*surf))
+    {
         return;
+    }
 
     if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversFlat(current_subsector, face_dir))
     {
@@ -1937,7 +1946,9 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         float             own_h    = (face_dir > 0) ? own_sec->floor_height : own_sec->ceiling_height;
 
         if (surf == own_surf && epi::AlmostEquals(h, own_h))
+        {
             return;
+        }
     }
 
     ec_frame_stats.draw_planes++;
@@ -1995,6 +2006,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
         return;
     }
+
 
     // count number of actual vertices
     Seg *seg;
@@ -2456,6 +2468,7 @@ void RenderTrueBSP(void)
 
     Player *v_player = view_camera_map_object->player_;
 
+
     {
         EDGE_ZoneScopedN("RenderTrueBSP setup");
 
@@ -2490,6 +2503,7 @@ void RenderTrueBSP(void)
         BeginSky();
     }
 
+
     {
         EDGE_ZoneScopedN("RenderTrueBSP BSP walk");
 
@@ -2498,10 +2512,14 @@ void RenderTrueBSP(void)
 
         while (BSPTraversing())
         {
+
             RenderBatch *batch = BSPReadRenderBatch();
 
             if (!batch)
+            {
                 continue;
+            }
+
 
             for (int32_t i = 0; i < batch->num_items_; i++)
             {
@@ -2513,10 +2531,10 @@ void RenderTrueBSP(void)
                     draw_subsector_list.push_back(item->subsector_);
                     break;
                 case kRenderSkyWall:
-                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_);
+                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_, item->part_);
                     break;
                 case kRenderSkyPlane:
-                    RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_);
+                    RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_, item->part_);
                     break;
                 }
             }
@@ -2527,14 +2545,16 @@ void RenderTrueBSP(void)
 #endif
     }
 
+
     {
         EDGE_ZoneScopedN("RenderTrueBSP FinishSky");
 
-        FlushSky();
         FinishSky(true);
     }
 
+
     RenderSubList(draw_subsector_list);
+
 
 
     // Add lines seen during render to the automap

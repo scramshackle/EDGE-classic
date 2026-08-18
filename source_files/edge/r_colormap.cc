@@ -729,9 +729,7 @@ class ColormapShader : public AbstractShader
                                      fc_to_use, fd_to_use, nullptr, nullptr, nullptr, true);
         }
 
-        RGBAColor tint = epi::MakeRGBA((uint8_t)(255.0f * render_view_red_multiplier),
-                                       (uint8_t)(255.0f * render_view_green_multiplier),
-                                       (uint8_t)(255.0f * render_view_blue_multiplier), (uint8_t)(alpha * 255.0f));
+        RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));
 
         {
             EDGE_ZoneScopedN("WorldBaked vertex loop");
