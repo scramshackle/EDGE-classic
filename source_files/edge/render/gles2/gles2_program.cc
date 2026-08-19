@@ -9,12 +9,14 @@
 #include "shaders/light_glsl.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
+#include "shaders/oit_glsl.h"
 #include "shaders/world_glsl.h"
 
 Gles2Program      gles2_program;
 Gles2ModelProgram gles2_model_program;
 Gles2MovieProgram gles2_movie_program;
 Gles2LightProgram gles2_light_program;
+Gles2OitProgram   gles2_oit_program;
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
 {
@@ -98,7 +100,6 @@ bool Gles2Program::Init()
 
     uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
     uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
-    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
     uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
     uniform_texture1_              = glGetUniformLocation(program_, "u_texture1");
     uniform_multi_texture_         = glGetUniformLocation(program_, "u_multi_texture");
@@ -112,6 +113,10 @@ bool Gles2Program::Init()
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
 
     uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
+    uniform_oit_mode_               = glGetUniformLocation(program_, "u_oit_mode");
+    uniform_oit_scale_              = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_texture_offset_         = glGetUniformLocation(program_, "u_texture_offset");
+    uniform_liquid_                 = glGetUniformLocation(program_, "u_liquid");
     uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
     uniform_view_tint_              = glGetUniformLocation(program_, "u_view_tint");
     uniform_sky_fog_depth_          = glGetUniformLocation(program_, "u_sky_fog_depth");
@@ -134,17 +139,6 @@ bool Gles2Program::Init()
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
     glUniform1i(uniform_texture1_, kGles2TextureUnit1);
     glUniform1i(uniform_sky_cube_, kGles2TextureUnitSkyCube);
-
-    for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
-    {
-        clip_planes_[i].enabled     = false;
-        clip_planes_[i].equation[0] = 0.0f;
-        clip_planes_[i].equation[1] = 0.0f;
-        clip_planes_[i].equation[2] = 0.0f;
-        clip_planes_[i].equation[3] = 1.0f;
-
-        UploadClipPlane(i);
-    }
 
     return true;
 }
@@ -205,73 +199,6 @@ void Gles2Program::SetModelView(const HMM_Mat4 &matrix)
     uniform_update_count_++;
 }
 
-void Gles2Program::UploadClipPlane(int32_t index)
-{
-    GLfloat values[4];
-
-    if (clip_planes_[index].enabled)
-    {
-        values[0] = clip_planes_[index].equation[0];
-        values[1] = clip_planes_[index].equation[1];
-        values[2] = clip_planes_[index].equation[2];
-        values[3] = clip_planes_[index].equation[3];
-    }
-    else
-    {
-        values[0] = 0.0f;
-        values[1] = 0.0f;
-        values[2] = 0.0f;
-        values[3] = 1.0f;
-    }
-
-    glUniform4fv(uniform_clip_plane_ + index, 1, values);
-
-    uniform_update_count_++;
-}
-
-void Gles2Program::SetClipPlane(int32_t index, const double equation[4])
-{
-    if (index < 0 || index >= kGles2MaximumClipPlanes)
-    {
-        return;
-    }
-
-    bool changed = false;
-
-    for (int32_t i = 0; i < 4; i++)
-    {
-        float value = (float)equation[i];
-
-        if (!epi::AlmostEquals(clip_planes_[index].equation[i], value))
-        {
-            clip_planes_[index].equation[i] = value;
-            changed                         = true;
-        }
-    }
-
-    if (changed && clip_planes_[index].enabled)
-    {
-        UploadClipPlane(index);
-    }
-}
-
-void Gles2Program::SetClipPlaneEnabled(int32_t index, bool enabled)
-{
-    if (index < 0 || index >= kGles2MaximumClipPlanes)
-    {
-        return;
-    }
-
-    if (clip_planes_[index].enabled == enabled)
-    {
-        return;
-    }
-
-    clip_planes_[index].enabled = enabled;
-
-    UploadClipPlane(index);
-}
-
 void Gles2Program::SetMultiTexture(bool enabled)
 {
     SetFloat(uniform_multi_texture_, shadow_multi_texture_, enabled ? 1.0f : 0.0f);
@@ -312,6 +239,39 @@ void Gles2Program::SetViewTint(float r, float g, float b)
 void Gles2Program::SetLightDepth(bool enabled)
 {
     SetFloat(uniform_light_depth_, shadow_light_depth_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetOit(float mode, float scale)
+{
+    SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
+    SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
+}
+
+void Gles2Program::SetTextureOffset(const HMM_Vec2 &offset)
+{
+    if (epi::AlmostEquals(shadow_texture_offset_.X, offset.X) && epi::AlmostEquals(shadow_texture_offset_.Y, offset.Y))
+        return;
+
+    shadow_texture_offset_ = offset;
+
+    glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+}
+
+void Gles2Program::SetLiquid(const HMM_Vec2 &liquid)
+{
+    if (epi::AlmostEquals(shadow_liquid_.X, liquid.X) && epi::AlmostEquals(shadow_liquid_.Y, liquid.Y))
+        return;
+
+    shadow_liquid_ = liquid;
+
+    glUniform2f(uniform_liquid_, liquid.X, liquid.Y);
+}
+
+void Gles2Program::ForceOitReset()
+{
+    shadow_oit_mode_ = 0.0f;
+
+    glUniform1f(uniform_oit_mode_, 0.0f);
 }
 
 void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
@@ -438,12 +398,13 @@ bool Gles2ModelProgram::Init()
     uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
     uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
     uniform_additive_pass_         = glGetUniformLocation(program_, "u_additive_pass");
-    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
     uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
     uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
     uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
     uniform_fog_start_             = glGetUniformLocation(program_, "u_fog_start");
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
+    uniform_oit_mode_              = glGetUniformLocation(program_, "u_oit_mode");
+    uniform_oit_scale_             = glGetUniformLocation(program_, "u_oit_scale");
 
     glUseProgram(program_);
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
@@ -514,26 +475,10 @@ void Gles2ModelProgram::SetAdditivePass(bool additive)
     SetFloat(uniform_additive_pass_, shadow_additive_pass_, additive ? 1.0f : 0.0f);
 }
 
-void Gles2ModelProgram::SetClipPlane(int32_t index, bool enabled, const float equation[4])
+void Gles2ModelProgram::SetOit(float mode, float scale)
 {
-    GLfloat values[4];
-
-    if (enabled)
-    {
-        values[0] = equation[0];
-        values[1] = equation[1];
-        values[2] = equation[2];
-        values[3] = equation[3];
-    }
-    else
-    {
-        values[0] = 0.0f;
-        values[1] = 0.0f;
-        values[2] = 0.0f;
-        values[3] = 1.0f;
-    }
-
-    glUniform4fv(uniform_clip_plane_ + index, 1, values);
+    SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
+    SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
 }
 
 void Gles2ModelProgram::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start,
@@ -772,4 +717,82 @@ void Gles2LightProgram::SetLights(const float *position_radius, const float *col
     glUniform4fv(uniform_light_color_, kGles2MaximumLightsPerPass, color);
 
     glUniform1i(uniform_light_count_, count);
+}
+
+bool Gles2OitProgram::Init()
+{
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kOitVertexSource, "oit.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kOitFragmentSource, "oit.frag.glsl");
+
+    program_ = glCreateProgram();
+
+    if (!program_)
+    {
+        FatalError("Gles2OitProgram: glCreateProgram failed\n");
+    }
+
+    glAttachShader(program_, vertex_shader);
+    glAttachShader(program_, fragment_shader);
+
+    glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
+    glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
+
+    glLinkProgram(program_);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+
+    if (linked != GL_TRUE)
+    {
+        GLint log_length = 0;
+        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+
+        char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
+
+        if (log_length > 1)
+            glGetProgramInfoLog(program_, log_length, nullptr, log);
+
+        FatalError("Gles2OitProgram: composite program failed to link:\n%s\n", log);
+    }
+
+    glDetachShader(program_, vertex_shader);
+    glDetachShader(program_, fragment_shader);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    uniform_accumulation_ = glGetUniformLocation(program_, "u_accumulation");
+    uniform_revealage_    = glGetUniformLocation(program_, "u_revealage");
+    uniform_scale_        = glGetUniformLocation(program_, "u_oit_scale");
+
+    glUseProgram(program_);
+
+    glUniform1i(uniform_accumulation_, kGles2TextureUnit0);
+    glUniform1i(uniform_revealage_, kGles2TextureUnit1);
+
+    return true;
+}
+
+void Gles2OitProgram::Shutdown()
+{
+    if (program_)
+    {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+}
+
+void Gles2OitProgram::Use()
+{
+    glUseProgram(program_);
+}
+
+void Gles2OitProgram::SetScale(float scale)
+{
+    if (epi::AlmostEquals(shadow_scale_, scale))
+        return;
+
+    shadow_scale_ = scale;
+
+    glUniform1f(uniform_scale_, scale);
 }

@@ -119,14 +119,20 @@ class Gles2Immediate
     void ResolveRenderTarget(const Gles2ResolveRect &source, const Gles2ResolveRect &destination, int32_t window_width,
                              int32_t window_height, bool smooth);
 
+    void BindOitTarget(int32_t mode);
+
+    void ClearOitTargets();
+
+    void CompositeOit(const Gles2ResolveRect &view);
+
+    float OitScale() const
+    {
+        return oit_scale_;
+    }
+
     bool RenderTargetReady() const
     {
         return render_target_framebuffer_ != 0;
-    }
-
-    bool RenderTargetHasStencil() const
-    {
-        return render_target_has_stencil_;
     }
 
     const HMM_Mat4 &ProjectionMatrix() const
@@ -204,7 +210,16 @@ class Gles2Immediate
 
     bool AttachRenderTargetDepth(int32_t width, int32_t height);
 
+    void DestroyRenderTargetDepth();
+
     bool CreateRenderTarget(int32_t width, int32_t height, int32_t texture_width, int32_t texture_height);
+
+    bool CreateOitTargets(int32_t texture_width, int32_t texture_height);
+
+    bool CreateOitTarget(GLuint &framebuffer, GLuint &texture, GLint internal_format, GLenum format, GLenum type,
+                         int32_t texture_width, int32_t texture_height);
+
+    void DestroyOitTargets();
 
     GLuint render_target_framebuffer_ = 0;
     GLuint render_target_color_       = 0;
@@ -215,7 +230,16 @@ class Gles2Immediate
     int32_t render_target_texture_width_  = 0;
     int32_t render_target_texture_height_ = 0;
 
-    bool render_target_has_stencil_ = false;
+    GLuint render_target_stencil_          = 0;
+    GLenum render_target_depth_attachment_ = 0;
+    bool   render_target_separate_stencil_ = false;
+
+    GLuint oit_accumulation_framebuffer_ = 0;
+    GLuint oit_accumulation_texture_     = 0;
+    GLuint oit_revealage_framebuffer_    = 0;
+    GLuint oit_revealage_texture_        = 0;
+
+    float oit_scale_ = 1.0f;
 
     GLuint vertex_buffer_       = 0;
     GLuint quad_index_buffer_   = 0;
@@ -249,4 +273,3 @@ void Gles2ApplyRenderState();
 
 void Gles2InvalidateRenderState();
 
-void Gles2DetectStencilBuffer();

@@ -151,6 +151,9 @@ struct MapSurface
     HMM_Vec2 net_scroll = {{0, 0}};
     HMM_Vec2 old_scroll = {{0, 0}};
 
+    HMM_Vec2 base_offset = {{0, 0}};
+    bool     scrolls = false;
+
     // lighting override (as in BOOM).  Usually nullptr.
     RegionProperties *override_properties;
 

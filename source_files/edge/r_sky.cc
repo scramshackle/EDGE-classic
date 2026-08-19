@@ -284,6 +284,40 @@ struct SkySection
 
 static std::vector<SkySection> sky_sections;
 
+struct SkyMirrorBucket
+{
+    const DrawMirror *mirror = nullptr;
+
+    std::vector<std::vector<RendererVertex>> section_vertices;
+};
+
+static std::vector<SkyMirrorBucket> sky_mirror_buckets;
+
+static int32_t sky_current_bucket = -1;
+
+static bool     sky_mirror_active  = false;
+static HMM_Mat4 sky_mirror_inverse = {};
+
+static int32_t SkyBucketFor(const DrawMirror *mir)
+{
+    if (!mir)
+        return -1;
+
+    for (size_t i = 0; i < sky_mirror_buckets.size(); i++)
+    {
+        if (sky_mirror_buckets[i].mirror == mir)
+            return (int32_t)i;
+    }
+
+    SkyMirrorBucket bucket;
+
+    bucket.mirror = mir;
+
+    sky_mirror_buckets.push_back(bucket);
+
+    return (int32_t)sky_mirror_buckets.size() - 1;
+}
+
 static std::vector<uint8_t> sky_plane_baked;
 static std::vector<uint8_t> sky_wall_baked;
 
@@ -441,6 +475,17 @@ static void PushSkyVertex(int section, const HMM_Vec3 &position)
     vertex.rgba     = kRGBAWhite;
     vertex.position = position;
 
+    if (sky_current_bucket >= 0)
+    {
+        SkyMirrorBucket &bucket = sky_mirror_buckets[(size_t)sky_current_bucket];
+
+        if (bucket.section_vertices.size() <= (size_t)section)
+            bucket.section_vertices.resize((size_t)section + 1);
+
+        bucket.section_vertices[(size_t)section].push_back(vertex);
+        return;
+    }
+
     if (sky_capture_active)
     {
         sky_sections[section].resident_vertices.push_back(vertex);
@@ -480,6 +525,9 @@ void BeginSky(void)
 {
     need_to_draw_sky = false;
 
+    sky_mirror_buckets.clear();
+    sky_current_bucket = -1;
+
     for (size_t i = 0; i < sky_sections.size(); i++)
     {
         sky_sections[i].vertices.clear();
@@ -492,7 +540,7 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
 {
     SkySection &resident = sky_sections[sky_current_section];
 
-    if (!resident.resident_vertices.empty())
+    if (!sky_mirror_active && !resident.resident_vertices.empty())
     {
         if (resident.gpu_dirty)
         {
@@ -587,6 +635,9 @@ static void RenderSkyEquirect(const SkySection &section)
     SetupSkyMatrices();
     GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
     RendererRevertSkyMatrices();
+
+    if (sky_mirror_active)
+        sky_pass_info.inverse_view = HMM_MulM4(sky_mirror_inverse, sky_pass_info.inverse_view);
 
     float ty = 2.0f;
 
@@ -713,6 +764,9 @@ static void RenderSkybox(const SkySection &section)
     GetSkyInverseMatrices(sky_pass_info.inverse_projection, sky_pass_info.inverse_view);
     RendererRevertSkyMatrices();
 
+    if (sky_mirror_active)
+        sky_pass_info.inverse_view = HMM_MulM4(sky_mirror_inverse, sky_pass_info.inverse_view);
+
     sky_pass_info.viewport_origin = {{(float)view_window_x, (float)view_window_y}};
     sky_pass_info.viewport_size   = {{(float)view_window_width, (float)view_window_height}};
     sky_pass_info.fog_depth       = renderer_far_clip.f_ * 2.0f;
@@ -785,6 +839,67 @@ void FinishSky(bool use_depth_mask)
         render_state->Enable(GL_DEPTH_TEST);
 }
 
+void FinishSkyForMirror(const DrawMirror *mir)
+{
+    SkyMirrorBucket *bucket = nullptr;
+
+    for (size_t i = 0; i < sky_mirror_buckets.size(); i++)
+    {
+        if (sky_mirror_buckets[i].mirror == mir)
+        {
+            bucket = &sky_mirror_buckets[i];
+            break;
+        }
+    }
+
+    if (!bucket)
+        return;
+
+    const Image *saved_sky_image = sky_image;
+    MapSurface  *saved_sky_ref   = sky_ref;
+
+    sky_mirror_inverse = HMM_InvGeneralM4(mir->view_matrix);
+
+    sky_mirror_inverse.Columns[3] = HMM_V4(0.0f, 0.0f, 0.0f, 1.0f);
+
+    sky_mirror_active = true;
+
+    for (size_t i = 0; i < bucket->section_vertices.size() && i < sky_sections.size(); i++)
+    {
+        if (bucket->section_vertices[i].empty())
+            continue;
+
+        SkySection &section = sky_sections[i];
+
+        SkySection view_section;
+
+        view_section.image    = section.image;
+        view_section.ref      = section.ref;
+        view_section.vertices = bucket->section_vertices[i];
+
+        sky_current_section = (int)i;
+
+        sky_image = section.image ? section.image : saved_sky_image;
+        sky_ref   = section.ref;
+
+        StartUnitBatch(false);
+
+        UpdateSkyboxTextures();
+
+        if (custom_skybox)
+            RenderSkybox(view_section);
+        else
+            RenderSkyEquirect(view_section);
+
+        FinishUnitBatch();
+    }
+
+    sky_mirror_active = false;
+
+    sky_image = saved_sky_image;
+    sky_ref   = saved_sky_ref;
+}
+
 bool SkyPlaneIsBaked(const Subsector *sub, int face)
 {
     if (!r_sky_resident.d_ || !sub || face < 0 || face > 1)
@@ -811,9 +926,12 @@ bool SkyWallIsBaked(const Seg *seg, int part)
     return sky_wall_baked[slot] != 0;
 }
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMirror *mir)
 {
-    need_to_draw_sky = true;
+    sky_current_bucket = SkyBucketFor(mir);
+
+    if (!mir)
+        need_to_draw_sky = true;
 
     Seg *seg = sub->segs;
     if (!seg)
@@ -821,21 +939,19 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
 
     size_t plane_slot = (size_t)(sub - level_subsectors) * 2 + (size_t)(face ? 1 : 0);
 
-    bool bake = r_sky_resident.d_ && plane_slot < sky_plane_baked.size() && render_mirror_set.TotalActive() == 0;
+    bool bake = !mir && r_sky_resident.d_ && plane_slot < sky_plane_baked.size();
 
     if (bake && sky_plane_baked[plane_slot])
         return;
 
     float x0 = seg->vertex_1->X;
     float y0 = seg->vertex_1->Y;
-    render_mirror_set.Coordinate(x0, y0);
     seg = seg->subsector_next;
     if (!seg)
         return;
 
     float x1 = seg->vertex_1->X;
     float y1 = seg->vertex_1->Y;
-    render_mirror_set.Coordinate(x1, y1);
     seg = seg->subsector_next;
     if (!seg)
         return;
@@ -851,13 +967,11 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
         SkyAddCaptureDependency(sub->deep_water_reference);
     }
 
-    render_mirror_set.Height(h);
 
     while (seg)
     {
         float x2 = seg->vertex_1->X;
         float y2 = seg->vertex_1->Y;
-        render_mirror_set.Coordinate(x2, y2);
 
         PushSkyVertex(group, {{x0, y0, h}});
         PushSkyVertex(group, {{x1, y1, h}});
@@ -871,13 +985,16 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
     SkyCaptureEnd();
 }
 
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir)
 {
-    need_to_draw_sky = true;
+    sky_current_bucket = SkyBucketFor(mir);
+
+    if (!mir)
+        need_to_draw_sky = true;
 
     size_t wall_slot = (size_t)(seg - level_segs) * 3 + (size_t)(part < 0 ? 0 : (part > 2 ? 2 : part));
 
-    bool bake = r_sky_resident.d_ && wall_slot < sky_wall_baked.size() && render_mirror_set.TotalActive() == 0;
+    bool bake = !mir && r_sky_resident.d_ && wall_slot < sky_wall_baked.size();
 
     if (bake && seg->back_sector && seg->front_sector)
     {
@@ -914,12 +1031,6 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
     float y1 = seg->vertex_1->Y;
     float x2 = seg->vertex_2->X;
     float y2 = seg->vertex_2->Y;
-
-    render_mirror_set.Coordinate(x1, y1);
-    render_mirror_set.Coordinate(x2, y2);
-
-    render_mirror_set.Height(h1);
-    render_mirror_set.Height(h2);
 
     PushSkyVertex(group, {{x1, y1, h1}});
     PushSkyVertex(group, {{x1, y1, h2}});

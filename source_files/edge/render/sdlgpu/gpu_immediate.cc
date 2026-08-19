@@ -140,7 +140,6 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     current_sampler_[1] = default_sampler_;
 
     EPI_CLEAR_MEMORY(&current_fragment_parameters_, GpuFragmentParameters, 1);
-    memset(clip_plane_, 0, sizeof(clip_plane_));
 
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
@@ -279,6 +278,11 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     static_buffers_.clear();
 
+    for (size_t i = 0; i < deleted_static_buffers_.size(); i++)
+        SDL_ReleaseGPUBuffer(device, deleted_static_buffers_[i]);
+
+    deleted_static_buffers_.clear();
+
     bound_vertex_buffer_ = nullptr;
 
     if (vertex_buffer_)
@@ -340,6 +344,8 @@ void GpuImmediate::BeginFrame()
     vertex_count_ = 0;
     dynamic_indices_.clear();
     commands_.clear();
+
+    FlushDeletedStaticBuffers();
     vertex_parameters_.clear();
     fragment_parameters_.clear();
     model_vertex_parameters_.clear();
@@ -355,7 +361,6 @@ void GpuImmediate::BeginFrame()
 
     current_matrix_mode_ = kGpuMatrixModeModelView;
 
-    memset(clip_plane_, 0, sizeof(clip_plane_));
     EPI_CLEAR_MEMORY(&current_fragment_parameters_, GpuFragmentParameters, 1);
 
     vertex_parameters_dirty_   = true;
@@ -374,6 +379,8 @@ void GpuImmediate::BeginFrame()
     current_sampler_[1] = default_sampler_;
 
     texturing_enabled_ = false;
+
+    oit_pipeline_ = false;
 
     pending_base_  = 0;
     pending_count_ = 0;
@@ -615,9 +622,20 @@ void GpuImmediate::DeleteStaticBuffer(uint32_t handle)
     if (bound_vertex_buffer_ == buffer)
         bound_vertex_buffer_ = nullptr;
 
-    SDL_ReleaseGPUBuffer(device_, buffer);
+    deleted_static_buffers_.push_back(buffer);
 
     static_buffers_[handle - 1] = nullptr;
+}
+
+void GpuImmediate::FlushDeletedStaticBuffers()
+{
+    if (device_)
+    {
+        for (size_t i = 0; i < deleted_static_buffers_.size(); i++)
+            SDL_ReleaseGPUBuffer(device_, deleted_static_buffers_[i]);
+    }
+
+    deleted_static_buffers_.clear();
 }
 
 void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
@@ -632,8 +650,7 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
 
     count -= count % 3;
 
-    SDL_GPUGraphicsPipeline *pipeline =
-        GetPipeline(pipeline_flags_, source_blend_, destination_blend_, kGpuPrimitiveTriangleList);
+    SDL_GPUGraphicsPipeline *pipeline = SelectWorldPipeline(kGpuPrimitiveTriangleList);
 
     GpuCommand command;
 
@@ -671,6 +688,28 @@ void GpuImmediate::SetViewTint(float r, float g, float b)
     view_tint_[0] = r;
     view_tint_[1] = g;
     view_tint_[2] = b;
+
+    vertex_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetTextureOffset(const HMM_Vec2 &offset)
+{
+    if (epi::AlmostEquals(texture_offset_[0], offset.X) && epi::AlmostEquals(texture_offset_[1], offset.Y))
+        return;
+
+    texture_offset_[0] = offset.X;
+    texture_offset_[1] = offset.Y;
+
+    vertex_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetLiquid(const HMM_Vec2 &liquid)
+{
+    if (epi::AlmostEquals(liquid_[0], liquid.X) && epi::AlmostEquals(liquid_[1], liquid.Y))
+        return;
+
+    liquid_[0] = liquid.X;
+    liquid_[1] = liquid.Y;
 
     vertex_parameters_dirty_ = true;
 }
@@ -745,6 +784,26 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
     vertex_parameters_dirty_   = true;
 }
 
+void GpuImmediate::SetOitPipeline(bool enabled)
+{
+    oit_pipeline_ = enabled;
+}
+
+void GpuImmediate::SetOitComposite(bool enabled)
+{
+    bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagOitComposite) != 0;
+
+    if (current == enabled)
+        return;
+
+    if (enabled)
+        current_fragment_parameters_.flags |= kGpuFragmentFlagOitComposite;
+    else
+        current_fragment_parameters_.flags &= ~kGpuFragmentFlagOitComposite;
+
+    fragment_parameters_dirty_ = true;
+}
+
 void GpuImmediate::SetSkipRGB(bool enabled)
 {
     bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagSkipRGB) != 0;
@@ -756,38 +815,6 @@ void GpuImmediate::SetSkipRGB(bool enabled)
         current_fragment_parameters_.flags |= kGpuFragmentFlagSkipRGB;
     else
         current_fragment_parameters_.flags &= ~kGpuFragmentFlagSkipRGB;
-
-    fragment_parameters_dirty_ = true;
-}
-
-void GpuImmediate::SetClipPlane(int32_t index, const double equation[4])
-{
-    EPI_ASSERT(index >= 0 && index < kGpuMaximumClipPlanes);
-
-    HMM_Mat4 inverse = HMM_InvGeneralM4(ModelViewMatrix());
-
-    HMM_Vec4 plane = HMM_V4((float)equation[0], (float)equation[1], (float)equation[2], (float)equation[3]);
-
-    for (int32_t i = 0; i < 4; i++)
-        clip_plane_[index][i] = HMM_DotV4(inverse.Columns[i], plane);
-
-    vertex_parameters_dirty_ = true;
-}
-
-void GpuImmediate::SetClipPlaneEnabled(int32_t index, bool enabled)
-{
-    EPI_ASSERT(index >= 0 && index < kGpuMaximumClipPlanes);
-
-    int32_t mask    = 1 << index;
-    int32_t current = current_fragment_parameters_.clipplanes;
-
-    if (enabled == ((current & mask) != 0))
-        return;
-
-    if (enabled)
-        current_fragment_parameters_.clipplanes = current | mask;
-    else
-        current_fragment_parameters_.clipplanes = current & ~mask;
 
     fragment_parameters_dirty_ = true;
 }
@@ -827,6 +854,24 @@ void GpuImmediate::BeginWorldTarget()
     commands_.push_back(command);
 }
 
+void GpuImmediate::BeginOitTarget()
+{
+    GpuCommand command;
+
+    command.type = kGpuCommandBeginOitTarget;
+
+    commands_.push_back(command);
+}
+
+void GpuImmediate::EndOitTarget()
+{
+    GpuCommand command;
+
+    command.type = kGpuCommandEndOitTarget;
+
+    commands_.push_back(command);
+}
+
 void GpuImmediate::ResolveWorldTarget(const GpuResolveArguments &resolve)
 {
     GpuCommand command;
@@ -860,7 +905,6 @@ int32_t GpuImmediate::CurrentVertexParameters()
                                parameters.mv);
     parameters.tm  = matrix_stack_[kGpuMatrixModeTexture][matrix_top_[kGpuMatrixModeTexture]];
 
-    memcpy(parameters.clipplane, clip_plane_, sizeof(clip_plane_));
 
     parameters.sky_pass      = sky_pass_enabled_ ? 1.0f : 0.0f;
     parameters.sky_fog_depth = sky_pass_info_.fog_depth;
@@ -870,6 +914,11 @@ int32_t GpuImmediate::CurrentVertexParameters()
     parameters.view_tint[1]   = view_tint_[1];
     parameters.view_tint[2]   = view_tint_[2];
     parameters.view_tint[3]   = 1.0f;
+
+    parameters.texture_offset[0] = texture_offset_[0];
+    parameters.texture_offset[1] = texture_offset_[1];
+    parameters.liquid[0]         = liquid_[0];
+    parameters.liquid[1]         = liquid_[1];
 
     vertex_parameters_.push_back(parameters);
 
@@ -914,6 +963,14 @@ RendererVertex *GpuImmediate::ReserveVertices(int32_t count)
     vertex_count_ += count;
 
     return vertices_.data() + pending_base_;
+}
+
+SDL_GPUGraphicsPipeline *GpuImmediate::SelectWorldPipeline(GpuPrimitiveType primitive)
+{
+    if (oit_pipeline_)
+        return GetOitPipeline(pipeline_flags_, primitive);
+
+    return GetPipeline(pipeline_flags_, source_blend_, destination_blend_, primitive);
 }
 
 void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
@@ -973,7 +1030,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     SDL_GPUTexture *texture1 = texturing_enabled_ ? current_texture_[1] : default_texture_;
     SDL_GPUSampler *sampler1 = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
 
-    SDL_GPUGraphicsPipeline *pipeline = GetPipeline(pipeline_flags_, source_blend_, destination_blend_, primitive);
+    SDL_GPUGraphicsPipeline *pipeline = SelectWorldPipeline(primitive);
 
     if (mergeable && !commands_.empty())
     {
@@ -1291,7 +1348,9 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     if (!mesh->position_buffer || info.frame1 >= mesh->frame_count || info.frame2 >= mesh->frame_count)
         return;
 
-    SDL_GPUGraphicsPipeline *pipeline = GetModelPipeline(pipeline_flags_, source_blend_, destination_blend_);
+    SDL_GPUGraphicsPipeline *pipeline = oit_pipeline_
+                                            ? GetModelOitPipeline(pipeline_flags_)
+                                            : GetModelPipeline(pipeline_flags_, source_blend_, destination_blend_);
 
     model_vertex_parameters_.push_back(vertex_parameters);
     model_fragment_parameters_.push_back(fragment_parameters);
@@ -1427,8 +1486,7 @@ void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_co
     SDL_GPUTexture *texture1 = texturing_enabled_ ? current_texture_[1] : default_texture_;
     SDL_GPUSampler *sampler1 = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
 
-    SDL_GPUGraphicsPipeline *pipeline =
-        GetPipeline(pipeline_flags_, source_blend_, destination_blend_, kGpuPrimitiveTriangleList);
+    SDL_GPUGraphicsPipeline *pipeline = SelectWorldPipeline(kGpuPrimitiveTriangleList);
 
     GpuCommand command;
 
@@ -2068,6 +2126,16 @@ void GpuImmediate::Replay()
                                      kGpuPassTargetWorld);
 
                 ResetTargetRectangles();
+            }
+            else if (command->type == kGpuCommandBeginOitTarget)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
+                                     kGpuPassTargetOit);
+            }
+            else if (command->type == kGpuCommandEndOitTarget)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
+                                     kGpuPassTargetWorld);
             }
             else if (command->type == kGpuCommandResolveWorldTarget)
             {

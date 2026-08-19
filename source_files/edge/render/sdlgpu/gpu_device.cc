@@ -1,4 +1,5 @@
 #include "gpu_device.h"
+#include "gpu_images.h"
 
 #include "epi.h"
 #include "i_system.h"
@@ -52,10 +53,7 @@ bool GpuDevice::Init(SDL_Window *window)
                                           SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET))
         depth_format_ = SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT;
     else
-        depth_format_ = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
-
-    has_stencil_ = (depth_format_ == SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT ||
-                    depth_format_ == SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT);
+        FatalError("SDL_GPU: no depth-stencil format is supported by this device\n");
 
     SDL_PropertiesID device_props = SDL_GetGPUDeviceProperties(device_);
 
@@ -96,6 +94,8 @@ void GpuDevice::Shutdown()
         SDL_ReleaseGPUTexture(device_, world_depth_texture_);
         world_depth_texture_ = nullptr;
     }
+
+    ReleaseOitTextures();
 
     world_width_  = 0;
     world_height_ = 0;
@@ -281,6 +281,8 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
         world_depth_texture_ = nullptr;
     }
 
+    ReleaseOitTextures();
+
     world_width_  = 0;
     world_height_ = 0;
 
@@ -301,6 +303,33 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
     if (!world_color_texture_)
     {
         LogPrint("GpuDevice: SDL_CreateGPUTexture (world color) failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    info.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+    info.usage  = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    oit_accumulation_texture_ = SDL_CreateGPUTexture(device_, &info);
+    oit_revealage_texture_    = SDL_CreateGPUTexture(device_, &info);
+
+    if (!oit_accumulation_texture_ || !oit_revealage_texture_)
+    {
+        LogPrint("GpuDevice: SDL_CreateGPUTexture (transparency) failed: %s\n", SDL_GetError());
+
+        ReleaseOitTextures();
+        SDL_ReleaseGPUTexture(device_, world_color_texture_);
+        world_color_texture_ = nullptr;
+        return false;
+    }
+
+    if (!RegisterGpuExternalImage(device_, kGpuImageOitAccumulation, oit_accumulation_texture_, width, height) ||
+        !RegisterGpuExternalImage(device_, kGpuImageOitRevealage, oit_revealage_texture_, width, height))
+    {
+        LogPrint("GpuDevice: could not register transparency targets for sampling\n");
+
+        ReleaseOitTextures();
+        SDL_ReleaseGPUTexture(device_, world_color_texture_);
+        world_color_texture_ = nullptr;
         return false;
     }
 
@@ -357,6 +386,24 @@ void GpuDevice::BlitWorldToMain(const GpuBlitRectangle &source, const GpuBlitRec
     color_written_ = true;
 }
 
+void GpuDevice::ReleaseOitTextures(void)
+{
+    ForgetGpuExternalImage(device_, kGpuImageOitAccumulation);
+    ForgetGpuExternalImage(device_, kGpuImageOitRevealage);
+
+    if (oit_accumulation_texture_)
+    {
+        SDL_ReleaseGPUTexture(device_, oit_accumulation_texture_);
+        oit_accumulation_texture_ = nullptr;
+    }
+
+    if (oit_revealage_texture_)
+    {
+        SDL_ReleaseGPUTexture(device_, oit_revealage_texture_);
+        oit_revealage_texture_ = nullptr;
+    }
+}
+
 void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load,
                           GpuPassTarget target)
 {
@@ -366,14 +413,22 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     if (target == kGpuPassTargetWorld && (!world_color_texture_ || !world_depth_texture_))
         target = kGpuPassTargetMain;
 
+    if (target == kGpuPassTargetOit && (!oit_accumulation_texture_ || !oit_revealage_texture_))
+        target = kGpuPassTargetWorld;
+
     EndPass();
 
     current_target_ = target;
 
-    SDL_GPUColorTargetInfo color_target;
-    EPI_CLEAR_MEMORY(&color_target, SDL_GPUColorTargetInfo, 1);
+    SDL_GPUColorTargetInfo color_target[2];
+    EPI_CLEAR_MEMORY(color_target, SDL_GPUColorTargetInfo, 2);
 
-    color_target.texture = (target == kGpuPassTargetWorld) ? world_color_texture_ : color_texture_;
+    if (target == kGpuPassTargetOit)
+        color_target[0].texture = oit_accumulation_texture_;
+    else if (target == kGpuPassTargetWorld)
+        color_target[0].texture = world_color_texture_;
+    else
+        color_target[0].texture = color_texture_;
 
     if (target == kGpuPassTargetMain && color_load == kGpuLoadOperationLoad && !color_written_)
         color_load = kGpuLoadOperationClear;
@@ -381,26 +436,35 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     switch (color_load)
     {
     case kGpuLoadOperationClear:
-        color_target.load_op = SDL_GPU_LOADOP_CLEAR;
+        color_target[0].load_op = SDL_GPU_LOADOP_CLEAR;
         break;
     case kGpuLoadOperationDontCare:
-        color_target.load_op = SDL_GPU_LOADOP_DONT_CARE;
+        color_target[0].load_op = SDL_GPU_LOADOP_DONT_CARE;
         break;
     default:
-        color_target.load_op = SDL_GPU_LOADOP_LOAD;
+        color_target[0].load_op = SDL_GPU_LOADOP_LOAD;
         break;
     }
 
-    color_target.store_op         = SDL_GPU_STOREOP_STORE;
-    color_target.clear_color.r    = epi::GetRGBARed(clear_color_) / 255.0f;
-    color_target.clear_color.g    = epi::GetRGBAGreen(clear_color_) / 255.0f;
-    color_target.clear_color.b    = epi::GetRGBABlue(clear_color_) / 255.0f;
-    color_target.clear_color.a    = 1.0f;
+    color_target[0].store_op = SDL_GPU_STOREOP_STORE;
+
+    if (target == kGpuPassTargetOit)
+    {
+        color_target[0].clear_color = {0.0f, 0.0f, 0.0f, 0.0f};
+    }
+    else
+    {
+        color_target[0].clear_color.r = epi::GetRGBARed(clear_color_) / 255.0f;
+        color_target[0].clear_color.g = epi::GetRGBAGreen(clear_color_) / 255.0f;
+        color_target[0].clear_color.b = epi::GetRGBABlue(clear_color_) / 255.0f;
+        color_target[0].clear_color.a = 1.0f;
+    }
 
     SDL_GPUDepthStencilTargetInfo depth_target;
     EPI_CLEAR_MEMORY(&depth_target, SDL_GPUDepthStencilTargetInfo, 1);
 
-    depth_target.texture = (target == kGpuPassTargetWorld) ? world_depth_texture_ : depth_texture_;
+    depth_target.texture = (target == kGpuPassTargetWorld || target == kGpuPassTargetOit) ? world_depth_texture_
+                                                                                          : depth_texture_;
 
     switch (depth_load)
     {
@@ -417,40 +481,44 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
 
     depth_target.store_op = SDL_GPU_STOREOP_STORE;
 
-    if (!has_stencil_)
+    switch (stencil_load)
     {
-        depth_target.stencil_load_op  = SDL_GPU_LOADOP_DONT_CARE;
-        depth_target.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    case kGpuLoadOperationClear:
+        depth_target.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+        break;
+    case kGpuLoadOperationDontCare:
+        depth_target.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+        break;
+    default:
+        depth_target.stencil_load_op = SDL_GPU_LOADOP_LOAD;
+        break;
     }
-    else
-    {
-        switch (stencil_load)
-        {
-        case kGpuLoadOperationClear:
-            depth_target.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
-            break;
-        case kGpuLoadOperationDontCare:
-            depth_target.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
-            break;
-        default:
-            depth_target.stencil_load_op = SDL_GPU_LOADOP_LOAD;
-            break;
-        }
 
-        depth_target.stencil_store_op = SDL_GPU_STOREOP_STORE;
-    }
+    depth_target.stencil_store_op = SDL_GPU_STOREOP_STORE;
 
     depth_target.clear_depth   = 1.0f;
     depth_target.clear_stencil = 0;
     depth_target.cycle         = false;
 
-    render_pass_ = SDL_BeginGPURenderPass(command_buffer_, &color_target, 1, &depth_target);
+    uint32_t color_target_count = 1;
+
+    if (target == kGpuPassTargetOit)
+    {
+        color_target[1]             = color_target[0];
+        color_target[1].texture     = oit_revealage_texture_;
+        color_target[1].clear_color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+        color_target_count = 2;
+    }
+
+    render_pass_ = SDL_BeginGPURenderPass(command_buffer_, color_target, color_target_count, &depth_target);
 
     if (!render_pass_)
         LogPrint("GpuDevice: SDL_BeginGPURenderPass failed: %s\n", SDL_GetError());
 
     if (target == kGpuPassTargetMain)
         color_written_ = true;
+
 }
 
 void GpuDevice::EndPass()

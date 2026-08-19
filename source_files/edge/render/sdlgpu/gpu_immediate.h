@@ -43,6 +43,8 @@ enum GpuCommandType
     kGpuCommandClearDepth,
     kGpuCommandClearStencil,
     kGpuCommandBeginWorldTarget,
+    kGpuCommandBeginOitTarget,
+    kGpuCommandEndOitTarget,
     kGpuCommandResolveWorldTarget
 };
 
@@ -238,25 +240,35 @@ class GpuImmediate
 
     void SetSkipRGB(bool enabled);
 
+    void SetOitPipeline(bool enabled);
+
+    void SetOitComposite(bool enabled);
+
+
     void SetSkyPass(const SkyPassInfo *sky_pass);
 
     void SetLightDepth(bool enabled);
 
     void SetViewTint(float r, float g, float b);
 
+    void SetTextureOffset(const HMM_Vec2 &offset);
+
+    void SetLiquid(const HMM_Vec2 &liquid);
+
     uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count);
     void     DeleteStaticBuffer(uint32_t handle);
+    void     FlushDeletedStaticBuffers();
     void     DrawStatic(uint32_t handle, int32_t first, int32_t count);
-
-    void SetClipPlane(int32_t index, const double equation[4]);
-
-    void SetClipPlaneEnabled(int32_t index, bool enabled);
 
     void Viewport(int32_t x, int32_t y, int32_t width, int32_t height);
 
     void ScissorRect(int32_t x, int32_t y, int32_t width, int32_t height);
 
     void BeginWorldTarget();
+
+    void BeginOitTarget();
+
+    void EndOitTarget();
 
     void ResolveWorldTarget(const GpuResolveArguments &resolve);
 
@@ -319,7 +331,10 @@ class GpuImmediate
         return uploaded_bytes_;
     }
 
+
   private:
+    SDL_GPUGraphicsPipeline *SelectWorldPipeline(GpuPrimitiveType primitive);
+
     bool CreateIndexBuffers(SDL_GPUDevice *device);
 
     bool EnsureVertexCapacity(size_t bytes);
@@ -395,7 +410,6 @@ class GpuImmediate
 
     GpuMatrixMode current_matrix_mode_ = kGpuMatrixModeModelView;
 
-    float clip_plane_[kGpuMaximumClipPlanes][4];
 
     GpuFragmentParameters current_fragment_parameters_;
 
@@ -417,11 +431,16 @@ class GpuImmediate
 
     bool texturing_enabled_ = false;
 
+    bool oit_pipeline_ = false;
+
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;
+    float       texture_offset_[2]  = {0.0f, 0.0f};
+    float       liquid_[2]          = {0.0f, 0.0f};
     float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;
+    std::vector<SDL_GPUBuffer *> deleted_static_buffers_;
     SDL_GPUBuffer               *bound_vertex_buffer_ = nullptr;
     SkyPassInfo sky_pass_info_;
 

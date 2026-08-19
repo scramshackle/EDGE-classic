@@ -47,7 +47,6 @@ class ModelMesh
 void ModelMeshBuild(ModelMesh &mesh, const ModelMeshVertex *points, int total_points, const int *triangle_points,
                     int total_triangles, int vertices_per_frame);
 
-HMM_Mat4 ModelBuildTransform(float xy_scale, float z_scale, float bias, bool reflective,
-                             const HMM_Vec2 &mouselook_x_matrix, const HMM_Vec2 &mouselook_z_matrix,
-                             const HMM_Vec2 &rotation_x_matrix, const HMM_Vec2 &rotation_y_matrix, float x, float y,
-                             float z);
+HMM_Mat4 ModelBuildTransform(float xy_scale, float z_scale, float bias, const HMM_Vec2 &mouselook_x_matrix,
+                             const HMM_Vec2 &mouselook_z_matrix, const HMM_Vec2 &rotation_x_matrix,
+                             const HMM_Vec2 &rotation_y_matrix, float x, float y, float z);

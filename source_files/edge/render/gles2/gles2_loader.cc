@@ -26,15 +26,15 @@ void Gles2LoadEntryPoints()
 
     gles2_framebuffer_objects_available = true;
 
-#define EDGE_GLES2_LOAD_OPTIONAL(type, name)                                                                           \
+#define EDGE_GLES2_LOAD_FRAMEBUFFER(type, name)                                                                        \
     ec_##name = (type)SDL_GL_GetProcAddress(#name);                                                                    \
     if (!ec_##name)                                                                                                    \
         ec_##name = (type)SDL_GL_GetProcAddress(#name "EXT");                                                          \
     if (!ec_##name)                                                                                                    \
-        gles2_framebuffer_objects_available = false;
+        FatalError("OpenGL: framebuffer objects are required but %s is unavailable\n", #name);
 
-    EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_LOAD_OPTIONAL)
-#undef EDGE_GLES2_LOAD_OPTIONAL
+    EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_LOAD_FRAMEBUFFER)
+#undef EDGE_GLES2_LOAD_FRAMEBUFFER
 }
 
 bool Gles2HasFramebufferObjects()

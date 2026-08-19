@@ -44,6 +44,9 @@ struct RendererVertex
 
 extern RGBAColor culling_fog_color;
 
+extern HMM_Vec2 static_batch_texture_offset;
+extern HMM_Vec2 static_batch_liquid;
+
 void StartUnitBatch(bool sort_em);
 void FinishUnitBatch(void);
 void RenderCurrentUnits(void);

@@ -18,7 +18,9 @@ enum GpuPipelineShaderKind
 {
     kGpuPipelineShaderWorld = 0,
     kGpuPipelineShaderModel,
-    kGpuPipelineShaderLight
+    kGpuPipelineShaderLight,
+    kGpuPipelineShaderOit,
+    kGpuPipelineShaderModelOit
 };
 
 static std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *> pipelines;
@@ -76,6 +78,10 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
 
     switch (source_blend)
     {
+    case GL_ONE:
+        source_color = SDL_GPU_BLENDFACTOR_ONE;
+        source_alpha = SDL_GPU_BLENDFACTOR_ONE;
+        break;
     case GL_SRC_ALPHA:
         source_color = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
         source_alpha = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
@@ -126,7 +132,7 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
 static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
                                                GpuPrimitiveType primitive, GpuPipelineShaderKind shader_kind)
 {
-    bool model = (shader_kind == kGpuPipelineShaderModel);
+    bool model = (shader_kind == kGpuPipelineShaderModel || shader_kind == kGpuPipelineShaderModelOit);
 
     SDL_GPUVertexBufferDescription buffer_description[4];
     EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 4);
@@ -200,18 +206,49 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         attributes[2].offset      = (uint32_t)offsetof(RendererVertex, rgba);
     }
 
-    SDL_GPUColorTargetDescription color_target;
-    EPI_CLEAR_MEMORY(&color_target, SDL_GPUColorTargetDescription, 1);
+    SDL_GPUColorTargetDescription color_target[2];
+    EPI_CLEAR_MEMORY(color_target, SDL_GPUColorTargetDescription, 2);
 
-    color_target.format = pipeline_color_format;
+    color_target[0].format = pipeline_color_format;
 
-    if (pipeline_flags & kGpuPipelineBlend)
-        SetupBlendState(&color_target.blend_state, source_blend, destination_blend);
+    uint32_t color_target_count = 1;
+
+    if (shader_kind == kGpuPipelineShaderOit || shader_kind == kGpuPipelineShaderModelOit)
+    {
+        color_target[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+        color_target[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+
+        SetupBlendState(&color_target[0].blend_state, GL_ONE, GL_ONE);
+        SetupBlendState(&color_target[1].blend_state, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+
+        color_target_count = 2;
+    }
+    else if (pipeline_flags & kGpuPipelineBlend)
+        SetupBlendState(&color_target[0].blend_state, source_blend, destination_blend);
+
+    if (pipeline_flags & kGpuPipelineNoColorWrite)
+    {
+        for (uint32_t i = 0; i < color_target_count; i++)
+        {
+            color_target[i].blend_state.enable_color_write_mask = true;
+            color_target[i].blend_state.color_write_mask        = 0;
+        }
+    }
 
     SDL_GPUGraphicsPipelineCreateInfo info;
     EPI_CLEAR_MEMORY(&info, SDL_GPUGraphicsPipelineCreateInfo, 1);
 
-    if (shader_kind == kGpuPipelineShaderModel)
+    if (shader_kind == kGpuPipelineShaderOit)
+    {
+        info.vertex_shader   = WorldVertexShader();
+        info.fragment_shader = WorldOitFragmentShader();
+    }
+    else if (shader_kind == kGpuPipelineShaderModelOit)
+    {
+        info.vertex_shader   = ModelVertexShader();
+        info.fragment_shader = ModelOitFragmentShader();
+    }
+    else if (shader_kind == kGpuPipelineShaderModel)
     {
         info.vertex_shader   = ModelVertexShader();
         info.fragment_shader = ModelFragmentShader();
@@ -270,29 +307,31 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
     info.depth_stencil_state.enable_depth_write = (pipeline_flags & kGpuPipelineDepthWrite) ? true : false;
 
-    if (pipeline_flags & (kGpuPipelineStencilWrite | kGpuPipelineStencilTest))
+    uint32_t stencil_flags = pipeline_flags & (kGpuPipelineStencilWrite | kGpuPipelineStencilTest |
+                                              kGpuPipelineStencilIncrement | kGpuPipelineStencilDecrement);
+
+    if (stencil_flags)
     {
         SDL_GPUStencilOpState stencil_state;
         EPI_CLEAR_MEMORY(&stencil_state, SDL_GPUStencilOpState, 1);
 
+        stencil_state.compare_op =
+            (pipeline_flags & kGpuPipelineStencilTest) ? SDL_GPU_COMPAREOP_EQUAL : SDL_GPU_COMPAREOP_ALWAYS;
+
+        stencil_state.fail_op       = SDL_GPU_STENCILOP_KEEP;
+        stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+
         if (pipeline_flags & kGpuPipelineStencilWrite)
-        {
-            stencil_state.compare_op   = SDL_GPU_COMPAREOP_ALWAYS;
-            stencil_state.fail_op      = SDL_GPU_STENCILOP_KEEP;
-            stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
-            stencil_state.pass_op      = SDL_GPU_STENCILOP_REPLACE;
-
-            info.depth_stencil_state.write_mask = 0xFF;
-        }
+            stencil_state.pass_op = SDL_GPU_STENCILOP_REPLACE;
+        else if (pipeline_flags & kGpuPipelineStencilIncrement)
+            stencil_state.pass_op = SDL_GPU_STENCILOP_INCREMENT_AND_CLAMP;
+        else if (pipeline_flags & kGpuPipelineStencilDecrement)
+            stencil_state.pass_op = SDL_GPU_STENCILOP_DECREMENT_AND_CLAMP;
         else
-        {
-            stencil_state.compare_op   = SDL_GPU_COMPAREOP_EQUAL;
-            stencil_state.fail_op      = SDL_GPU_STENCILOP_KEEP;
-            stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
-            stencil_state.pass_op      = SDL_GPU_STENCILOP_KEEP;
+            stencil_state.pass_op = SDL_GPU_STENCILOP_KEEP;
 
-            info.depth_stencil_state.write_mask = 0x00;
-        }
+        info.depth_stencil_state.write_mask =
+            (stencil_state.pass_op == SDL_GPU_STENCILOP_KEEP) ? 0x00 : 0xFF;
 
         info.depth_stencil_state.enable_stencil_test = true;
         info.depth_stencil_state.compare_mask        = 0xFF;
@@ -300,8 +339,8 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         info.depth_stencil_state.back_stencil_state  = stencil_state;
     }
 
-    info.target_info.color_target_descriptions = &color_target;
-    info.target_info.num_color_targets         = 1;
+    info.target_info.color_target_descriptions = color_target;
+    info.target_info.num_color_targets         = color_target_count;
     info.target_info.depth_stencil_format      = pipeline_depth_format;
     info.target_info.has_depth_stencil_target  = true;
 
@@ -455,6 +494,54 @@ SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source
 
     SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend,
                                                        kGpuPrimitiveTriangleList, kGpuPipelineShaderModel);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}
+
+SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive)
+{
+    pipeline_flags &= ~(uint32_t)(kGpuPipelineBlend | kGpuPipelineBlendSourceSourceAlpha |
+                                  kGpuPipelineBlendSourceOneMinusDestinationColor |
+                                  kGpuPipelineBlendSourceDestinationColor | kGpuPipelineBlendSourceZero |
+                                  kGpuPipelineBlendDestinationOne | kGpuPipelineBlendDestinationOneMinusSourceAlpha |
+                                  kGpuPipelineBlendDestinationSourceColor | kGpuPipelineBlendDestinationZero);
+
+    uint32_t key = pipeline_flags | ((uint32_t)primitive << 16) | (3u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, GL_ONE, GL_ONE, primitive, kGpuPipelineShaderOit);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}
+
+SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags)
+{
+    if (!CreateModelShaders(pipeline_device))
+        FatalError("GpuPipeline: model shader creation failed\n");
+
+    pipeline_flags &= ~(uint32_t)(kGpuPipelineBlend | kGpuPipelineBlendSourceSourceAlpha |
+                                  kGpuPipelineBlendSourceOneMinusDestinationColor |
+                                  kGpuPipelineBlendSourceDestinationColor | kGpuPipelineBlendSourceZero |
+                                  kGpuPipelineBlendDestinationOne | kGpuPipelineBlendDestinationOneMinusSourceAlpha |
+                                  kGpuPipelineBlendDestinationSourceColor | kGpuPipelineBlendDestinationZero);
+
+    uint32_t key = pipeline_flags | (4u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline =
+        CreatePipeline(pipeline_flags, GL_ONE, GL_ONE, kGpuPrimitiveTriangleList, kGpuPipelineShaderModelOit);
 
     pipelines[key] = pipeline;
 

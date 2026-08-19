@@ -3709,6 +3709,8 @@ void LevelSetup(void)
     if (precache)
         PrecacheLevelGraphics();
 
+    SnapshotSurfaceBaseOffsets();
+
     BuildStaticMesh();
 
     ChangeMusic(current_map->music_, true); // start level music

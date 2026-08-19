@@ -127,18 +127,6 @@ class GpuRenderState : public RenderState
         case GL_STENCIL_TEST:
             enable_stencil_test_ = enabled;
             break;
-        case GL_CLIP_PLANE0:
-        case GL_CLIP_PLANE1:
-        case GL_CLIP_PLANE2:
-        case GL_CLIP_PLANE3:
-        case GL_CLIP_PLANE4:
-        case GL_CLIP_PLANE5:
-            if (clip_planes_[cap - GL_CLIP_PLANE0].enabled_ != enabled)
-            {
-                clip_planes_[cap - GL_CLIP_PLANE0].enabled_ = enabled;
-                clip_planes_[cap - GL_CLIP_PLANE0].dirty_   = true;
-            }
-            break;
         default:
             break;
         }
@@ -161,10 +149,7 @@ class GpuRenderState : public RenderState
 
     void ColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
     {
-        EPI_UNUSED(red);
-        EPI_UNUSED(green);
-        EPI_UNUSED(blue);
-        EPI_UNUSED(alpha);
+        color_write_enabled_ = (red || green || blue || alpha);
     }
 
     void StencilFunction(GLenum func, GLint ref, GLuint mask)
@@ -188,11 +173,6 @@ class GpuRenderState : public RenderState
         stencil_write_mask_ = mask;
     }
 
-    bool HasStencilBuffer()
-    {
-        return gpu_device.HasStencil();
-    }
-
     void CullFace(GLenum mode)
     {
         cull_face_ = mode;
@@ -214,16 +194,6 @@ class GpuRenderState : public RenderState
         bind_texture_2d_[active_texture_ - GL_TEXTURE0] = textureid;
     }
 
-    void ClipPlane(GLenum plane, GLdouble *equation)
-    {
-        int index = plane - GL_CLIP_PLANE0;
-
-        for (int i = 0; i < 4; i++)
-            clip_planes_[index].equation_[i] = equation[i];
-
-        clip_planes_[index].dirty_ = true;
-    }
-
     void PolygonOffset(GLfloat factor, GLfloat units)
     {
         polygon_offset_factor_ = factor;
@@ -235,7 +205,7 @@ class GpuRenderState : public RenderState
         if (mask & GL_DEPTH_BUFFER_BIT)
             gpu_immediate.ClearDepth();
 
-        if ((mask & GL_STENCIL_BUFFER_BIT) && gpu_device.HasStencil())
+        if (mask & GL_STENCIL_BUFFER_BIT)
             gpu_immediate.ClearStencil();
     }
 
@@ -518,6 +488,8 @@ class GpuRenderState : public RenderState
         enable_fog_          = false;
         enable_stencil_test_ = false;
 
+        color_write_enabled_ = true;
+
         depth_mask_     = true;
         depth_function_ = GL_LEQUAL;
 
@@ -535,15 +507,6 @@ class GpuRenderState : public RenderState
             enable_texture_2d_[i] = false;
             bind_texture_2d_[i]   = 0;
         }
-
-        for (int i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            clip_planes_[i].enabled_ = false;
-            clip_planes_[i].dirty_   = false;
-        }
-
-        scissor_.enabled_ = false;
-        scissor_.dirty_   = false;
     }
 
     void SetPipeline(uint32_t flags)
@@ -556,7 +519,7 @@ class GpuRenderState : public RenderState
         if (depth_function_ == GL_GREATER)
             pipeline_flags |= kGpuPipelineDepthGreater;
 
-        if (enable_depth_test_)
+        if (enable_depth_test_ && depth_function_ != GL_ALWAYS)
             pipeline_flags |= kGpuPipelineDepthTest;
 
         if (enable_blend_)
@@ -570,13 +533,24 @@ class GpuRenderState : public RenderState
                 pipeline_flags |= kGpuPipelineCullFront;
         }
 
-        if (enable_stencil_test_ && gpu_device.HasStencil())
+        if (enable_stencil_test_)
         {
-            if (stencil_write_mask_ != 0 && stencil_pass_operation_ == GL_REPLACE)
-                pipeline_flags |= kGpuPipelineStencilWrite;
-            else if (stencil_function_ == GL_EQUAL)
+            if (stencil_function_ == GL_EQUAL)
                 pipeline_flags |= kGpuPipelineStencilTest;
+
+            if (stencil_write_mask_ != 0)
+            {
+                if (stencil_pass_operation_ == GL_REPLACE)
+                    pipeline_flags |= kGpuPipelineStencilWrite;
+                else if (stencil_pass_operation_ == GL_INCR)
+                    pipeline_flags |= kGpuPipelineStencilIncrement;
+                else if (stencil_pass_operation_ == GL_DECR)
+                    pipeline_flags |= kGpuPipelineStencilDecrement;
+            }
         }
+
+        if (!color_write_enabled_)
+            pipeline_flags |= kGpuPipelineNoColorWrite;
 
         pipeline_flags |= flags;
 
@@ -613,17 +587,6 @@ class GpuRenderState : public RenderState
                 render_backend->GetPassInfo(pass_info);
                 gpu_immediate.ScissorRect(0, 0, pass_info.width_, pass_info.height_);
             }
-        }
-
-        for (int i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            if (!clip_planes_[i].dirty_)
-                continue;
-
-            clip_planes_[i].dirty_ = false;
-
-            gpu_immediate.SetClipPlaneEnabled(i, clip_planes_[i].enabled_);
-            gpu_immediate.SetClipPlane(i, clip_planes_[i].equation_);
         }
     }
 
@@ -663,6 +626,30 @@ class GpuRenderState : public RenderState
         if (info.handle == 0 || info.index_count <= 0)
             return;
 
+        int32_t oit_mode = render_backend->OitMode();
+
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass model_pass = kOitPassMasked;
+
+            if (info.additive_pass)
+                model_pass = kOitPassAdditive;
+            else if (info.alpha < 1.0f)
+                model_pass = kOitPassAccumulate;
+
+            if (model_pass != oit_mode)
+                return;
+        }
+
+        if (oit_mode == kOitPassAccumulate)
+        {
+            Enable(GL_BLEND);
+            BlendFunction(GL_ONE, GL_ONE);
+            DepthMask(false);
+
+            SetPipeline(0);
+        }
+
         ApplyTextureBindings();
 
         GpuModelVertexParameters vertex_parameters;
@@ -688,17 +675,6 @@ class GpuRenderState : public RenderState
         fragment_parameters.alpha         = info.alpha;
         fragment_parameters.alpha_test    = info.alpha_test;
         fragment_parameters.additive_pass = info.additive_pass ? 1.0f : 0.0f;
-
-        for (int32_t i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            if (!clip_planes_[i].enabled_)
-                continue;
-
-            fragment_parameters.clipplanes |= (1 << i);
-
-            for (int32_t e = 0; e < 4; e++)
-                vertex_parameters.clipplane[i][e] = (float)clip_planes_[i].equation_[e];
-        }
 
         if (enable_fog_)
         {
@@ -771,13 +747,6 @@ class GpuRenderState : public RenderState
         mip_levels_.clear();
     }
 
-    struct GpuClipPlane
-    {
-        bool     enabled_;
-        bool     dirty_;
-        GLdouble equation_[4];
-    };
-
     struct GpuScissor
     {
         bool    enabled_;
@@ -799,6 +768,8 @@ class GpuRenderState : public RenderState
     bool enable_depth_test_   = false;
     bool enable_stencil_test_ = false;
 
+    bool color_write_enabled_ = true;
+
     GLenum  stencil_function_       = GL_ALWAYS;
     GLenum  stencil_pass_operation_ = GL_KEEP;
     uint8_t stencil_reference_      = 0;
@@ -807,7 +778,6 @@ class GpuRenderState : public RenderState
 
     GLenum depth_function_ = GL_LEQUAL;
 
-    GpuClipPlane clip_planes_[kGpuMaximumClipPlanes] = {};
 
     GpuScissor scissor_ = {};
 

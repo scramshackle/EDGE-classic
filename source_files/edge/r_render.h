@@ -29,9 +29,10 @@ struct RenderItem
 
     DrawSubsector *subsector_;
 
-    Seg       *wallSeg_;
-    Subsector *wallPlane_;
-    Sector    *skyOwner_;
+    Seg        *wallSeg_;
+    Subsector  *wallPlane_;
+    Sector     *skyOwner_;
+    DrawMirror *mirror_;
 
     float height1_;
     float height2_;

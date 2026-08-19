@@ -7,8 +7,6 @@
 #include "HandmadeMath.h"
 #include "r_units.h"
 
-constexpr int32_t kGpuMaximumClipPlanes = 6;
-
 constexpr uint32_t kGpuAttributePosition        = 0;
 constexpr uint32_t kGpuAttributeTextureCoords   = 1;
 constexpr uint32_t kGpuAttributeColor           = 2;
@@ -48,7 +46,8 @@ enum GpuFragmentFlag
     kGpuFragmentFlagMultiTexture = (1 << 0),
     kGpuFragmentFlagLine         = (1 << 1),
     kGpuFragmentFlagSkipRGB      = (1 << 2),
-    kGpuFragmentFlagSkyPass      = (1 << 3)
+    kGpuFragmentFlagSkyPass      = (1 << 3),
+    kGpuFragmentFlagOitComposite = (1 << 4)
 };
 
 enum GpuFogMode
@@ -63,20 +62,21 @@ struct GpuVertexParameters
     HMM_Mat4 mvp;
     HMM_Mat4 tm;
     HMM_Mat4 mv;
-    float    clipplane[kGpuMaximumClipPlanes][4];
     float    sky_pass;
     float    sky_fog_depth;
     float    light_depth;
     float    sky_geometry;
     float    view_tint[4];
+    float    texture_offset[2];
+    float    liquid[2];
 };
 
 struct GpuFragmentParameters
 {
     int32_t flags;
     float   alpha_test;
-    int32_t clipplanes;
     int32_t fog_mode;
+    int32_t fragment_padding0;
     float   fog_color[4];
     float   fog_density;
     float   fog_start;
@@ -123,7 +123,6 @@ struct GpuModelVertexParameters
     HMM_Mat4 mvp;
     HMM_Mat4 mv;
     HMM_Mat4 model_transform;
-    float    clipplane[kGpuMaximumClipPlanes][4];
     float    lerp;
     float    vertex_padding0;
     float    texture_scale[2];
@@ -133,15 +132,16 @@ struct GpuModelVertexParameters
 
 struct GpuModelFragmentParameters
 {
-    int32_t clipplanes;
-    float   alpha;
-    float   alpha_test;
-    float   additive_pass;
+    float alpha;
+    float alpha_test;
+    float additive_pass;
 
     int32_t fog_mode;
     float   fog_density;
     float   fog_start;
     float   fog_end;
+
+    float model_fragment_padding0;
 
     float fog_color[4];
 };
@@ -168,41 +168,39 @@ static_assert(offsetof(GpuModelVertexParameters, mvp) == 0, "GpuModelVertexParam
 static_assert(offsetof(GpuModelVertexParameters, mv) == 64, "GpuModelVertexParameters::mv offset");
 static_assert(offsetof(GpuModelVertexParameters, model_transform) == 128,
               "GpuModelVertexParameters::model_transform offset");
-static_assert(offsetof(GpuModelVertexParameters, clipplane) == 192, "GpuModelVertexParameters::clipplane offset");
-static_assert(offsetof(GpuModelVertexParameters, lerp) == 288, "GpuModelVertexParameters::lerp offset");
-static_assert(offsetof(GpuModelVertexParameters, texture_scale) == 296,
+static_assert(offsetof(GpuModelVertexParameters, lerp) == 192, "GpuModelVertexParameters::lerp offset");
+static_assert(offsetof(GpuModelVertexParameters, texture_scale) == 200,
               "GpuModelVertexParameters::texture_scale offset");
-static_assert(offsetof(GpuModelVertexParameters, texture_offset) == 304,
+static_assert(offsetof(GpuModelVertexParameters, texture_offset) == 208,
               "GpuModelVertexParameters::texture_offset offset");
-static_assert(sizeof(GpuModelVertexParameters) == 320, "GpuModelVertexParameters size");
+static_assert(sizeof(GpuModelVertexParameters) == 224, "GpuModelVertexParameters size");
 
-static_assert(offsetof(GpuModelFragmentParameters, clipplanes) == 0, "GpuModelFragmentParameters::clipplanes offset");
-static_assert(offsetof(GpuModelFragmentParameters, alpha) == 4, "GpuModelFragmentParameters::alpha offset");
-static_assert(offsetof(GpuModelFragmentParameters, alpha_test) == 8, "GpuModelFragmentParameters::alpha_test offset");
-static_assert(offsetof(GpuModelFragmentParameters, additive_pass) == 12,
+static_assert(offsetof(GpuModelFragmentParameters, alpha) == 0, "GpuModelFragmentParameters::alpha offset");
+static_assert(offsetof(GpuModelFragmentParameters, alpha_test) == 4, "GpuModelFragmentParameters::alpha_test offset");
+static_assert(offsetof(GpuModelFragmentParameters, additive_pass) == 8,
               "GpuModelFragmentParameters::additive_pass offset");
-static_assert(offsetof(GpuModelFragmentParameters, fog_mode) == 16, "GpuModelFragmentParameters::fog_mode offset");
-static_assert(offsetof(GpuModelFragmentParameters, fog_density) == 20,
+static_assert(offsetof(GpuModelFragmentParameters, fog_mode) == 12, "GpuModelFragmentParameters::fog_mode offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_density) == 16,
               "GpuModelFragmentParameters::fog_density offset");
-static_assert(offsetof(GpuModelFragmentParameters, fog_start) == 24, "GpuModelFragmentParameters::fog_start offset");
-static_assert(offsetof(GpuModelFragmentParameters, fog_end) == 28, "GpuModelFragmentParameters::fog_end offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_start) == 20, "GpuModelFragmentParameters::fog_start offset");
+static_assert(offsetof(GpuModelFragmentParameters, fog_end) == 24, "GpuModelFragmentParameters::fog_end offset");
 static_assert(offsetof(GpuModelFragmentParameters, fog_color) == 32, "GpuModelFragmentParameters::fog_color offset");
 static_assert(sizeof(GpuModelFragmentParameters) == 48, "GpuModelFragmentParameters size");
 
 static_assert(offsetof(GpuVertexParameters, mvp) == 0, "GpuVertexParameters::mvp offset");
 static_assert(offsetof(GpuVertexParameters, tm) == 64, "GpuVertexParameters::tm offset");
 static_assert(offsetof(GpuVertexParameters, mv) == 128, "GpuVertexParameters::mv offset");
-static_assert(offsetof(GpuVertexParameters, clipplane) == 192, "GpuVertexParameters::clipplane offset");
-static_assert(offsetof(GpuVertexParameters, sky_pass) == 288, "GpuVertexParameters::sky_pass offset");
-static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 292, "GpuVertexParameters::sky_fog_depth offset");
-static_assert(offsetof(GpuVertexParameters, light_depth) == 296, "GpuVertexParameters::light_depth offset");
-static_assert(offsetof(GpuVertexParameters, view_tint) == 304, "GpuVertexParameters::view_tint offset");
-static_assert(sizeof(GpuVertexParameters) == 320, "GpuVertexParameters size");
+static_assert(offsetof(GpuVertexParameters, sky_pass) == 192, "GpuVertexParameters::sky_pass offset");
+static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 196, "GpuVertexParameters::sky_fog_depth offset");
+static_assert(offsetof(GpuVertexParameters, light_depth) == 200, "GpuVertexParameters::light_depth offset");
+static_assert(offsetof(GpuVertexParameters, view_tint) == 208, "GpuVertexParameters::view_tint offset");
+static_assert(offsetof(GpuVertexParameters, texture_offset) == 224, "GpuVertexParameters::texture_offset offset");
+static_assert(offsetof(GpuVertexParameters, liquid) == 232, "GpuVertexParameters::liquid offset");
+static_assert(sizeof(GpuVertexParameters) == 240, "GpuVertexParameters size");
 
 static_assert(offsetof(GpuFragmentParameters, flags) == 0, "GpuFragmentParameters::flags offset");
 static_assert(offsetof(GpuFragmentParameters, alpha_test) == 4, "GpuFragmentParameters::alpha_test offset");
-static_assert(offsetof(GpuFragmentParameters, clipplanes) == 8, "GpuFragmentParameters::clipplanes offset");
-static_assert(offsetof(GpuFragmentParameters, fog_mode) == 12, "GpuFragmentParameters::fog_mode offset");
+static_assert(offsetof(GpuFragmentParameters, fog_mode) == 8, "GpuFragmentParameters::fog_mode offset");
 static_assert(offsetof(GpuFragmentParameters, fog_color) == 16, "GpuFragmentParameters::fog_color offset");
 static_assert(offsetof(GpuFragmentParameters, fog_density) == 32, "GpuFragmentParameters::fog_density offset");
 static_assert(offsetof(GpuFragmentParameters, fog_start) == 36, "GpuFragmentParameters::fog_start offset");
@@ -227,6 +225,8 @@ SDL_GPUShader *ModelVertexShader();
 
 SDL_GPUShader *ModelFragmentShader();
 
+SDL_GPUShader *ModelOitFragmentShader();
+
 bool CreateLightShaders(SDL_GPUDevice *device);
 
 void DestroyLightShaders(SDL_GPUDevice *device);
@@ -250,3 +250,4 @@ void DestroyWorldShaders(SDL_GPUDevice *device);
 SDL_GPUShader *WorldVertexShader();
 
 SDL_GPUShader *WorldFragmentShader();
+SDL_GPUShader *WorldOitFragmentShader();

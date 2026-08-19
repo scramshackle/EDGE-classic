@@ -194,7 +194,7 @@ static struct BSPThread bsp_thread;
 std::list<DrawSubsector *> draw_subsector_list;
 
 
-MirrorSet bsp_mirror_set(kMirrorSetBSP);
+MirrorSet active_mirror_set;
 
 EDGE_DEFINE_CONSOLE_VARIABLE(debug_hall_of_mirrors, "0", kConsoleVariableFlagCheat)
 
@@ -240,7 +240,7 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     dsub->mirrors.push_back(mir);
 
     // push mirror (translation matrix)
-    bsp_mirror_set.Push(mir);
+    active_mirror_set.Push(mir);
 
     Subsector *save_sub = bsp_current_subsector;
 
@@ -262,7 +262,7 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     clip_scope = save_scope;
 
     // pop mirror
-    bsp_mirror_set.Pop();
+    active_mirror_set.Pop();
 }
 
 //
@@ -275,7 +275,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 {
 
     // ignore segs sitting on current mirror
-    if (bsp_mirror_set.SegOnPortal(seg))
+    if (active_mirror_set.SegOnPortal(seg))
     {
         return;
     }
@@ -289,15 +289,15 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     // when there are active mirror planes, segs not only need to
     // be flipped across them but also clipped across them.
 
-    int32_t active_mirrors = bsp_mirror_set.TotalActive();
+    int32_t active_mirrors = active_mirror_set.TotalActive();
     if (active_mirrors > 0)
     {
         for (int i = active_mirrors - 1; i >= 0; i--)
         {
-            bsp_mirror_set.Transform(i, sx1, sy1);
-            bsp_mirror_set.Transform(i, sx2, sy2);
+            active_mirror_set.Transform(i, sx1, sy1);
+            active_mirror_set.Transform(i, sx2, sy2);
 
-            if (!bsp_mirror_set.IsPortal(i))
+            if (!active_mirror_set.IsPortal(i))
             {
                 float tmp_x = sx1;
                 sx1         = sx2;
@@ -307,7 +307,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
                 sy2         = tmp_y;
             }
 
-            Seg *clipper = bsp_mirror_set.GetSeg(i);
+            Seg *clipper = active_mirror_set.GetSeg(i);
 
             DividingLine div;
 
@@ -527,7 +527,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, f_fh, b_fh, fsector, 0);
 #else
-            RenderSkyWall(seg, f_fh, b_fh, fsector, 0);
+            RenderSkyWall(seg, f_fh, b_fh, fsector, 0, active_mirror_set.InnermostMirror());
 #endif
         }
     }
@@ -539,7 +539,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, f_ch, fsector->sky_height, fsector, 1);
 #else
-            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector, 1);
+            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector, 1, active_mirror_set.InnermostMirror());
 #endif
         }
         else if (bsector && EDGE_IMAGE_IS_SKY(*b_ceil))
@@ -551,7 +551,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
                 #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, max_f, fsector->sky_height, fsector, 1);
 #else
-            RenderSkyWall(seg, max_f, fsector->sky_height, fsector, 1);
+            RenderSkyWall(seg, max_f, fsector->sky_height, fsector, 1, active_mirror_set.InnermostMirror());
 #endif
             }
         }
@@ -563,7 +563,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
         #ifdef EDGE_THREADED_BSP
             BSPQueueSkyWall(seg, b_ch, f_ch, bsector, 2);
 #else
-            RenderSkyWall(seg, b_ch, f_ch, bsector, 2);
+            RenderSkyWall(seg, b_ch, f_ch, bsector, 2, active_mirror_set.InnermostMirror());
 #endif
     }
 }
@@ -579,7 +579,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 //
 static bool BSPCheckBBox(const float *bspcoord)
 {
-    if (bsp_mirror_set.TotalActive() > 0)
+    if (active_mirror_set.TotalActive() > 0)
     {
         // a flipped bbox may no longer be axis aligned, hence we
         // need to find the bounding area of the transformed box.
@@ -592,7 +592,7 @@ static bool BSPCheckBBox(const float *bspcoord)
             float tx = bspcoord[(p & 1) ? kBoundingBoxLeft : kBoundingBoxRight];
             float ty = bspcoord[(p & 2) ? kBoundingBoxBottom : kBoundingBoxTop];
 
-            bsp_mirror_set.Coordinate(tx, ty);
+            active_mirror_set.Coordinate(tx, ty);
 
             BoundingBoxAddPoint(new_bbox, tx, ty);
         }
@@ -764,10 +764,10 @@ static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
     }
 
     // add drawsub to list (closest -> furthest)
-    int32_t active_mirrors = bsp_mirror_set.TotalActive();
+    int32_t active_mirrors = active_mirror_set.TotalActive();
     if (active_mirrors > 0)
     {
-        bsp_mirror_set.PushSubsector(active_mirrors - 1, K);
+        active_mirror_set.PushSubsector(active_mirrors - 1, K);
     }
     else
     {
@@ -816,7 +816,7 @@ static void BSPWalkSubsector(int num)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1);
 #else
-            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1);
+            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1, active_mirror_set.InnermostMirror());
 #endif
         }
 
@@ -825,7 +825,7 @@ static void BSPWalkSubsector(int num)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->sky_height, sub->sector, 0);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector, 0);
+            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector, 0, active_mirror_set.InnermostMirror());
 #endif
         }
     }
@@ -867,7 +867,7 @@ static void BSPWalkSubsector(int num)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, floor_h, sector->height_sector, 1);
 #else
-            RenderSkyPlane(sub, floor_h, sector->height_sector, 1);
+            RenderSkyPlane(sub, floor_h, sector->height_sector, 1, active_mirror_set.InnermostMirror());
 #endif
         }
         if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sub->sector->sky_height)
@@ -875,7 +875,7 @@ static void BSPWalkSubsector(int num)
             #ifdef EDGE_THREADED_BSP
             BSPQueueSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0);
 #else
-            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0);
+            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0, active_mirror_set.InnermostMirror());
 #endif
         }
     }
@@ -942,7 +942,7 @@ static void BSPWalkSubsector(int num)
 
         for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
         {
-            if (bsp_mirror_set.SegOnPortal(seg))
+            if (active_mirror_set.SegOnPortal(seg))
                 continue;
 
             float sx1 = seg->vertex_1->X;
@@ -999,10 +999,10 @@ void BSPWalkNode(unsigned int bspnum)
     nd_div.delta_x = node->divider.x + node->divider.delta_x;
     nd_div.delta_y = node->divider.y + node->divider.delta_y;
 
-    bsp_mirror_set.Coordinate(nd_div.x, nd_div.y);
-    bsp_mirror_set.Coordinate(nd_div.delta_x, nd_div.delta_y);
+    active_mirror_set.Coordinate(nd_div.x, nd_div.y);
+    active_mirror_set.Coordinate(nd_div.delta_x, nd_div.delta_y);
 
-    if (bsp_mirror_set.Reflective())
+    if (active_mirror_set.Reflective())
     {
         float tx       = nd_div.x;
         nd_div.x       = nd_div.delta_x;
@@ -1099,9 +1099,10 @@ static RenderItem *GetRenderItem()
 
 void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
 {
-    if (bsp_mirror_set.TotalActive() == 0 && SkyWallIsBaked(seg, part))
-        return;
+    DrawMirror *mirror = active_mirror_set.InnermostMirror();
 
+    if (!mirror && SkyWallIsBaked(seg, part))
+        return;
 
     RenderItem *item = GetRenderItem();
 
@@ -1111,13 +1112,15 @@ void BSPQueueSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part)
     item->wallSeg_  = seg;
     item->skyOwner_ = sky_owner;
     item->part_     = part;
+    item->mirror_   = mirror;
 }
 
 void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
 {
-    if (bsp_mirror_set.TotalActive() == 0 && SkyPlaneIsBaked(sub, face))
-        return;
+    DrawMirror *mirror = active_mirror_set.InnermostMirror();
 
+    if (!mirror && SkyPlaneIsBaked(sub, face))
+        return;
 
     RenderItem *item = GetRenderItem();
 
@@ -1126,6 +1129,7 @@ void BSPQueueSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face)
     item->wallPlane_ = sub;
     item->skyOwner_  = sky_owner;
     item->part_      = face;
+    item->mirror_    = mirror;
 }
 
 void BSPQueueDrawSubsector(DrawSubsector *subsector)

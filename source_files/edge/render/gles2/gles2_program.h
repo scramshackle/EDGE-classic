@@ -6,7 +6,6 @@
 #include "i_defs_gl.h"
 #include "r_units.h"
 
-constexpr int32_t kGles2MaximumClipPlanes = 6;
 
 constexpr GLuint kGles2AttributePosition           = 0;
 constexpr GLuint kGles2AttributeTextureCoordinates = 1;
@@ -46,10 +45,6 @@ class Gles2Program
 
     void SetModelView(const HMM_Mat4 &matrix);
 
-    void SetClipPlane(int32_t index, const double equation[4]);
-
-    void SetClipPlaneEnabled(int32_t index, bool enabled);
-
     void SetMultiTexture(bool enabled);
 
     void SetLineMode(bool enabled);
@@ -66,6 +61,19 @@ class Gles2Program
 
     void SetViewTint(float r, float g, float b);
 
+    void SetOit(float mode, float scale);
+
+    void SetTextureOffset(const HMM_Vec2 &offset);
+
+    void SetLiquid(const HMM_Vec2 &liquid);
+
+    float OitModeShadow() const
+    {
+        return shadow_oit_mode_;
+    }
+
+    void ForceOitReset();
+
     uint32_t UniformUpdateCount() const
     {
         return uniform_update_count_;
@@ -77,21 +85,12 @@ class Gles2Program
     }
 
   private:
-    struct Gles2ClipPlane
-    {
-        bool  enabled;
-        float equation[4];
-    };
-
-    void UploadClipPlane(int32_t index);
-
     void SetFloat(GLint location, float &shadow, float value);
 
     GLuint program_ = 0;
 
     GLint uniform_model_view_projection_ = -1;
     GLint uniform_model_view_            = -1;
-    GLint uniform_clip_plane_            = -1;
     GLint uniform_texture0_              = -1;
     GLint uniform_texture1_              = -1;
     GLint uniform_multi_texture_         = -1;
@@ -121,11 +120,14 @@ class Gles2Program
     GLint uniform_sky_is_box_ = -1;
     GLint uniform_sky_cube_    = -1;
     GLint uniform_sky_horizon_shift_      = -1;
+    GLint uniform_oit_mode_               = -1;
+    GLint uniform_oit_scale_              = -1;
+    GLint uniform_texture_offset_         = -1;
+    GLint uniform_liquid_                 = -1;
 
     HMM_Mat4 shadow_model_view_projection_ = {};
     HMM_Mat4 shadow_model_view_            = {};
 
-    Gles2ClipPlane clip_planes_[kGles2MaximumClipPlanes] = {};
 
     float shadow_multi_texture_ = -1.0f;
     float shadow_line_mode_     = -1.0f;
@@ -141,6 +143,12 @@ class Gles2Program
     float shadow_sky_pass_ = -1.0f;
     float shadow_light_depth_ = -1.0f;
     float shadow_view_tint_[3] = {-1.0f, -1.0f, -1.0f};
+
+    float shadow_oit_mode_  = -1.0f;
+    float shadow_oit_scale_ = -1.0f;
+
+    HMM_Vec2 shadow_texture_offset_ = {{-1.0e30f, -1.0e30f}};
+    HMM_Vec2 shadow_liquid_         = {{-1.0e30f, -1.0e30f}};
 
     uint32_t uniform_update_count_ = 0;
 };
@@ -170,9 +178,9 @@ class Gles2ModelProgram
 
     void SetAdditivePass(bool additive);
 
-    void SetClipPlane(int32_t index, bool enabled, const float equation[4]);
-
     void SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end);
+
+    void SetOit(float mode, float scale);
 
   private:
     void SetFloat(GLint location, float &shadow, float value);
@@ -189,12 +197,13 @@ class Gles2ModelProgram
     GLint uniform_alpha_                 = -1;
     GLint uniform_alpha_test_            = -1;
     GLint uniform_additive_pass_         = -1;
-    GLint uniform_clip_plane_            = -1;
     GLint uniform_fog_mode_              = -1;
     GLint uniform_fog_color_             = -1;
     GLint uniform_fog_density_           = -1;
     GLint uniform_fog_start_             = -1;
     GLint uniform_fog_end_               = -1;
+    GLint uniform_oit_mode_              = -1;
+    GLint uniform_oit_scale_             = -1;
 
     float shadow_lerp_          = -1.0f;
     float shadow_alpha_         = -1.0f;
@@ -206,6 +215,9 @@ class Gles2ModelProgram
     float shadow_fog_end_       = -1.0f;
 
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+
+    float shadow_oit_mode_  = -1.0f;
+    float shadow_oit_scale_ = -1.0f;
 };
 
 extern Gles2ModelProgram gles2_model_program;
@@ -282,3 +294,26 @@ class Gles2LightProgram
 };
 
 extern Gles2LightProgram gles2_light_program;
+
+class Gles2OitProgram
+{
+  public:
+    bool Init();
+
+    void Shutdown();
+
+    void Use();
+
+    void SetScale(float scale);
+
+  private:
+    GLuint program_ = 0;
+
+    GLint uniform_accumulation_ = -1;
+    GLint uniform_revealage_    = -1;
+    GLint uniform_scale_        = -1;
+
+    float shadow_scale_ = -1.0f;
+};
+
+extern Gles2OitProgram gles2_oit_program;

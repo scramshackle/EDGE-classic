@@ -358,11 +358,6 @@ void AddSpecialLine(Line *ld)
             return;
     }
 
-    if (ld->side[0])
-        DemoteSideToDynamic(ld->side[0]);
-    if (ld->side[1])
-        DemoteSideToDynamic(ld->side[1]);
-
     active_line_animations.push_back(ld);
 }
 
@@ -376,8 +371,6 @@ void AddSpecialSector(Sector *sec)
         if (*SI == sec)
             return;
     }
-
-    DemoteSectorToDynamic(sec);
 
     active_sector_animations.push_back(sec);
 }
@@ -400,16 +393,19 @@ static void AdjustScrollParts(Side *side, bool left, ScrollingPart parts, float 
     {
         side->top.scroll.X += x_speed * xmul;
         side->top.scroll.Y += y_speed * ymul;
+        side->top.scrolls = true;
     }
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
     {
         side->middle.scroll.X += x_speed * xmul;
         side->middle.scroll.Y += y_speed * ymul;
+        side->middle.scrolls = true;
     }
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
     {
         side->bottom.scroll.X += x_speed * xmul;
         side->bottom.scroll.Y += y_speed * ymul;
+        side->bottom.scrolls = true;
     }
 }
 
@@ -534,10 +530,22 @@ static void P_EFTransferTrans(Sector *ctrl, Sector *sec, Line *line, const Extra
     // floor and ceiling
 
     if (ctrl->floor.translucency > trans)
+    {
         ctrl->floor.translucency = trans;
 
+        if (StaticMeshBuilt())
+        {
+            DemoteSectorToDynamic(ctrl);
+        }
+    }
+
     if (ctrl->ceiling.translucency > trans)
+    {
         ctrl->ceiling.translucency = trans;
+
+        if (StaticMeshBuilt())
+            DemoteSectorToDynamic(ctrl);
+    }
 
     // sides
 
@@ -559,16 +567,27 @@ static void P_EFTransferTrans(Sector *ctrl, Sector *sec, Line *line, const Extra
             if (!S)
                 continue;
 
-            if (ef->type_ & kExtraFloorTypeSideUpper)
-                S->top.translucency = trans;
-            else // kExtraFloorTypeSideLower
-                S->bottom.translucency = trans;
+            MapSurface &side_surf = (ef->type_ & kExtraFloorTypeSideUpper) ? S->top : S->bottom;
+
+            if (!epi::AlmostEquals(side_surf.translucency, trans))
+            {
+                side_surf.translucency = trans;
+
+                if (StaticMeshBuilt())
+                    DemoteSideToDynamic(S);
+            }
         }
 
         return;
     }
 
-    line->side[0]->middle.translucency = trans;
+    if (!epi::AlmostEquals(line->side[0]->middle.translucency, trans))
+    {
+        line->side[0]->middle.translucency = trans;
+
+        if (StaticMeshBuilt())
+            DemoteSideToDynamic(line->side[0]);
+    }
 }
 
 //
@@ -661,8 +680,21 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
 
     if ((special->line_effect_ & kLineEffectTypeTranslucency) && (target->flags & kLineFlagTwoSided))
     {
-        target->side[0]->middle.translucency = 0.5f;
-        target->side[1]->middle.translucency = 0.5f;
+        if (!epi::AlmostEquals(target->side[0]->middle.translucency, 0.5f))
+        {
+            target->side[0]->middle.translucency = 0.5f;
+
+            if (StaticMeshBuilt())
+                DemoteSideToDynamic(target->side[0]);
+        }
+
+        if (!epi::AlmostEquals(target->side[1]->middle.translucency, 0.5f))
+        {
+            target->side[1]->middle.translucency = 0.5f;
+
+            if (StaticMeshBuilt())
+                DemoteSideToDynamic(target->side[1]);
+        }
     }
 
     if ((special->line_effect_ & kLineEffectTypeOffsetScroll) && target->side[0])
@@ -1012,7 +1044,10 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
     // support for drawn heights coming from different sector
     if (special->sector_effect_ & kSectorEffectTypeBoomHeights)
     {
-        DemoteSectorToDynamic(target);
+        if (source->side[0]->sector->bake_dynamic || source->side[0]->sector->movement_suppressed)
+        {
+            DemoteSectorToDynamic(target);
+        }
 
         target->height_sector      = source->side[0]->sector;
         target->height_sector_side = source->side[0];
@@ -2037,8 +2072,6 @@ void PlayerInSpecialSector(Player *player, Sector *sec, bool should_choke)
 void UpdateSpecials()
 {
     // For anim stuff
-    float factor = 1.0f;
-
     // LEVEL TIMER
     if (level_timer == true)
     {
@@ -2084,16 +2117,19 @@ void UpdateSpecials()
             {
                 if (ld->side[0]->top.image)
                 {
+                    ld->side[0]->top.scrolls = true;
                     ld->side[0]->top.net_scroll.X += line_animations[i].side_0_x_speed;
                     ld->side[0]->top.net_scroll.Y += line_animations[i].side_0_y_speed;
                 }
                 if (ld->side[0]->middle.image)
                 {
+                    ld->side[0]->middle.scrolls = true;
                     ld->side[0]->middle.net_scroll.X += line_animations[i].side_0_x_speed;
                     ld->side[0]->middle.net_scroll.Y += line_animations[i].side_0_y_speed;
                 }
                 if (ld->side[0]->bottom.image)
                 {
+                    ld->side[0]->bottom.scrolls = true;
                     ld->side[0]->bottom.net_scroll.X += line_animations[i].side_0_x_speed;
                     ld->side[0]->bottom.net_scroll.Y += line_animations[i].side_0_y_speed;
                 }
@@ -2102,16 +2138,19 @@ void UpdateSpecials()
             {
                 if (ld->side[1]->top.image)
                 {
+                    ld->side[1]->top.scrolls = true;
                     ld->side[1]->top.net_scroll.X += line_animations[i].side_1_x_speed;
                     ld->side[1]->top.net_scroll.Y += line_animations[i].side_1_y_speed;
                 }
                 if (ld->side[1]->middle.image)
                 {
+                    ld->side[1]->middle.scrolls = true;
                     ld->side[1]->middle.net_scroll.X += line_animations[i].side_1_x_speed;
                     ld->side[1]->middle.net_scroll.Y += line_animations[i].side_1_y_speed;
                 }
                 if (ld->side[1]->bottom.image)
                 {
+                    ld->side[1]->bottom.scrolls = true;
                     ld->side[1]->bottom.net_scroll.X += line_animations[i].side_1_x_speed;
                     ld->side[1]->bottom.net_scroll.Y += line_animations[i].side_1_y_speed;
                 }
@@ -2137,16 +2176,19 @@ void UpdateSpecials()
                 {
                     if (ld->side[0]->top.image)
                     {
+                        ld->side[0]->top.scrolls = true;
                         ld->side[0]->top.net_scroll.X += sx;
                         ld->side[0]->top.net_scroll.Y += sy;
                     }
                     if (ld->side[0]->middle.image)
                     {
+                        ld->side[0]->middle.scrolls = true;
                         ld->side[0]->middle.net_scroll.X += sx;
                         ld->side[0]->middle.net_scroll.Y += sy;
                     }
                     if (ld->side[0]->bottom.image)
                     {
+                        ld->side[0]->bottom.scrolls = true;
                         ld->side[0]->bottom.net_scroll.X += sx;
                         ld->side[0]->bottom.net_scroll.Y += sy;
                     }
@@ -2155,16 +2197,19 @@ void UpdateSpecials()
                 {
                     if (ld->side[1]->top.image)
                     {
+                        ld->side[1]->top.scrolls = true;
                         ld->side[1]->top.net_scroll.X += sx;
                         ld->side[1]->top.net_scroll.Y += sy;
                     }
                     if (ld->side[1]->middle.image)
                     {
+                        ld->side[1]->middle.scrolls = true;
                         ld->side[1]->middle.net_scroll.X += sx;
                         ld->side[1]->middle.net_scroll.Y += sy;
                     }
                     if (ld->side[1]->bottom.image)
                     {
+                        ld->side[1]->bottom.scrolls = true;
                         ld->side[1]->bottom.net_scroll.X += sx;
                         ld->side[1]->bottom.net_scroll.Y += sy;
                     }
@@ -2182,16 +2227,19 @@ void UpdateSpecials()
                 {
                     if (ld->side[0]->top.image)
                     {
+                        ld->side[0]->top.scrolls = true;
                         ld->side[0]->top.net_scroll.X += sx;
                         ld->side[0]->top.net_scroll.Y += sy;
                     }
                     if (ld->side[0]->middle.image)
                     {
+                        ld->side[0]->middle.scrolls = true;
                         ld->side[0]->middle.net_scroll.X += sx;
                         ld->side[0]->middle.net_scroll.Y += sy;
                     }
                     if (ld->side[0]->bottom.image)
                     {
+                        ld->side[0]->bottom.scrolls = true;
                         ld->side[0]->bottom.net_scroll.X += sx;
                         ld->side[0]->bottom.net_scroll.Y += sy;
                     }
@@ -2297,9 +2345,9 @@ void UpdateSpecials()
             {
                 ld->side[0]->top.old_offset = ld->side[0]->top.offset;
                 ld->side[0]->top.offset.X =
-                    ld->side[0]->top.offset.X + (ld->side[0]->top.scroll.X + ld->side[0]->top.net_scroll.X) * factor;
+                    ld->side[0]->top.offset.X + ld->side[0]->top.scroll.X + ld->side[0]->top.net_scroll.X;
                 ld->side[0]->top.offset.Y =
-                    ld->side[0]->top.offset.Y + (ld->side[0]->top.scroll.Y + ld->side[0]->top.net_scroll.Y) * factor;
+                    ld->side[0]->top.offset.Y + ld->side[0]->top.scroll.Y + ld->side[0]->top.net_scroll.Y;
                 ld->side[0]->top.net_scroll = {{0, 0}};
             }
             if (ld->side[0]->middle.image)
@@ -2307,10 +2355,10 @@ void UpdateSpecials()
                 ld->side[0]->middle.old_offset = ld->side[0]->middle.offset;
                 ld->side[0]->middle.offset.X =
                     ld->side[0]->middle.offset.X +
-                    (ld->side[0]->middle.scroll.X + ld->side[0]->middle.net_scroll.X) * factor;
+                    ld->side[0]->middle.scroll.X + ld->side[0]->middle.net_scroll.X;
                 ld->side[0]->middle.offset.Y =
                     ld->side[0]->middle.offset.Y +
-                    (ld->side[0]->middle.scroll.Y + ld->side[0]->middle.net_scroll.Y) * factor;
+                    ld->side[0]->middle.scroll.Y + ld->side[0]->middle.net_scroll.Y;
                 ld->side[0]->middle.net_scroll = {{0, 0}};
             }
             if (ld->side[0]->bottom.image)
@@ -2318,10 +2366,10 @@ void UpdateSpecials()
                 ld->side[0]->bottom.old_offset = ld->side[0]->bottom.offset;
                 ld->side[0]->bottom.offset.X =
                     ld->side[0]->bottom.offset.X +
-                    (ld->side[0]->bottom.scroll.X + ld->side[0]->bottom.net_scroll.X) * factor;
+                    ld->side[0]->bottom.scroll.X + ld->side[0]->bottom.net_scroll.X;
                 ld->side[0]->bottom.offset.Y =
                     ld->side[0]->bottom.offset.Y +
-                    (ld->side[0]->bottom.scroll.Y + ld->side[0]->bottom.net_scroll.Y) * factor;
+                    ld->side[0]->bottom.scroll.Y + ld->side[0]->bottom.net_scroll.Y;
                 ld->side[0]->bottom.net_scroll = {{0, 0}};
             }
         }
@@ -2332,9 +2380,9 @@ void UpdateSpecials()
             {
                 ld->side[1]->top.old_offset = ld->side[1]->top.offset;
                 ld->side[1]->top.offset.X =
-                    ld->side[1]->top.offset.X + (ld->side[1]->top.scroll.X + ld->side[1]->top.net_scroll.X) * factor;
+                    ld->side[1]->top.offset.X + ld->side[1]->top.scroll.X + ld->side[1]->top.net_scroll.X;
                 ld->side[1]->top.offset.Y =
-                    ld->side[1]->top.offset.Y + (ld->side[1]->top.scroll.Y + ld->side[1]->top.net_scroll.Y) * factor;
+                    ld->side[1]->top.offset.Y + ld->side[1]->top.scroll.Y + ld->side[1]->top.net_scroll.Y;
                 ld->side[1]->top.net_scroll = {{0, 0}};
             }
             if (ld->side[1]->middle.image)
@@ -2342,10 +2390,10 @@ void UpdateSpecials()
                 ld->side[1]->middle.old_offset = ld->side[1]->middle.offset;
                 ld->side[1]->middle.offset.X =
                     ld->side[1]->middle.offset.X +
-                    (ld->side[1]->middle.scroll.X + ld->side[1]->middle.net_scroll.X) * factor;
+                    ld->side[1]->middle.scroll.X + ld->side[1]->middle.net_scroll.X;
                 ld->side[1]->middle.offset.Y =
                     ld->side[1]->middle.offset.Y +
-                    (ld->side[1]->middle.scroll.Y + ld->side[1]->middle.net_scroll.Y) * factor;
+                    ld->side[1]->middle.scroll.Y + ld->side[1]->middle.net_scroll.Y;
                 ld->side[1]->middle.net_scroll = {{0, 0}};
             }
             if (ld->side[1]->bottom.image)
@@ -2353,10 +2401,10 @@ void UpdateSpecials()
                 ld->side[1]->bottom.old_offset = ld->side[1]->bottom.offset;
                 ld->side[1]->bottom.offset.X =
                     ld->side[1]->bottom.offset.X +
-                    (ld->side[1]->bottom.scroll.X + ld->side[1]->bottom.net_scroll.X) * factor;
+                    ld->side[1]->bottom.scroll.X + ld->side[1]->bottom.net_scroll.X;
                 ld->side[1]->bottom.offset.Y =
                     ld->side[1]->bottom.offset.Y +
-                    (ld->side[1]->bottom.scroll.Y + ld->side[1]->bottom.net_scroll.Y) * factor;
+                    ld->side[1]->bottom.scroll.Y + ld->side[1]->bottom.net_scroll.Y;
                 ld->side[1]->bottom.net_scroll = {{0, 0}};
             }
         }
@@ -2374,8 +2422,10 @@ void UpdateSpecials()
             // Add static values
             sec->properties.net_push.X += sector_animations[i].push.X;
             sec->properties.net_push.Y += sector_animations[i].push.Y;
+            sec->floor.scrolls = true;
             sec->floor.net_scroll.X += sector_animations[i].floor_scroll.X;
             sec->floor.net_scroll.Y += sector_animations[i].floor_scroll.Y;
+            sec->ceiling.scrolls = true;
             sec->ceiling.net_scroll.X += sector_animations[i].ceil_scroll.X;
             sec->ceiling.net_scroll.Y += sector_animations[i].ceil_scroll.Y;
 
@@ -2402,12 +2452,16 @@ void UpdateSpecials()
             }
             if (special_ref->sector_effect_ & kSectorEffectTypeScrollFloor)
             {
+                sec->floor.scrolls = true;
                 sec->floor.net_scroll.Y -= sy;
+                sec->floor.scrolls = true;
                 sec->floor.net_scroll.X -= sx;
             }
             if (special_ref->sector_effect_ & kSectorEffectTypeScrollCeiling)
             {
+                sec->ceiling.scrolls = true;
                 sec->ceiling.net_scroll.Y -= sy;
+                sec->ceiling.scrolls = true;
                 sec->ceiling.net_scroll.X -= sx;
             }
             sector_animations[i].last_height = sec_ref->floor_height + sec_ref->ceiling_height;
@@ -2423,10 +2477,10 @@ void UpdateSpecials()
 
         if (!sec->old_stored)
         {
-            sec->floor.old_scroll.X    = sec->floor.offset.X;
-            sec->floor.old_scroll.Y    = sec->floor.offset.Y;
-            sec->ceiling.old_scroll.X  = sec->ceiling.offset.X;
-            sec->ceiling.old_scroll.Y  = sec->ceiling.offset.Y;
+            sec->floor.old_scroll.X    = sec->floor.scroll.X;
+            sec->floor.old_scroll.Y    = sec->floor.scroll.Y;
+            sec->ceiling.old_scroll.X  = sec->ceiling.scroll.X;
+            sec->ceiling.old_scroll.Y  = sec->ceiling.scroll.Y;
             sec->properties.old_push.X = sec->properties.push.X;
             sec->properties.old_push.Y = sec->properties.push.Y;
             sec->properties.old_push.Z = sec->properties.push.Z;
@@ -2446,10 +2500,10 @@ void UpdateSpecials()
         sec->floor.old_offset   = sec->floor.offset;
         sec->ceiling.old_offset = sec->ceiling.offset;
 
-        sec->floor.offset.X    = sec->floor.offset.X + (sec->floor.scroll.X + sec->floor.net_scroll.X) * factor;
-        sec->floor.offset.Y    = sec->floor.offset.Y + (sec->floor.scroll.Y + sec->floor.net_scroll.Y) * factor;
-        sec->ceiling.offset.X  = sec->ceiling.offset.X + (sec->ceiling.scroll.X + sec->ceiling.net_scroll.X) * factor;
-        sec->ceiling.offset.Y  = sec->ceiling.offset.Y + (sec->ceiling.scroll.Y + sec->ceiling.net_scroll.Y) * factor;
+        sec->floor.offset.X    = sec->floor.offset.X + sec->floor.scroll.X + sec->floor.net_scroll.X;
+        sec->floor.offset.Y    = sec->floor.offset.Y + sec->floor.scroll.Y + sec->floor.net_scroll.Y;
+        sec->ceiling.offset.X  = sec->ceiling.offset.X + sec->ceiling.scroll.X + sec->ceiling.net_scroll.X;
+        sec->ceiling.offset.Y  = sec->ceiling.offset.Y + sec->ceiling.scroll.Y + sec->ceiling.net_scroll.Y;
         sec->properties.push.X = sec->properties.push.X + sec->properties.net_push.X;
         sec->properties.push.Y = sec->properties.push.Y + sec->properties.net_push.Y;
 
@@ -2852,28 +2906,6 @@ void PromoteSettledSectors(void)
     }
 }
 
-static bool SideUsesSwitchTexture(const Side *side)
-{
-    for (std::vector<SwitchDefinition *>::iterator iter = switchdefs.begin(), iter_end = switchdefs.end();
-         iter != iter_end; iter++)
-    {
-        SwitchDefinition *sw = *iter;
-
-        for (int k = 0; k < 2; k++)
-        {
-            const Image *image = sw->cache_.image[k];
-
-            if (!image)
-                continue;
-
-            if (side->top.image == image || side->middle.image == image || side->bottom.image == image)
-                return true;
-        }
-    }
-
-    return false;
-}
-
 void ClassifyStaticGeometry(void)
 {
     for (int i = 0; i < total_level_lines; i++)
@@ -2886,11 +2918,6 @@ void ClassifyStaticGeometry(void)
 
         if (special)
         {
-            if (special->s_xspeed_ || special->s_yspeed_ || special->scroll_type_ > BoomScrollerTypeNone ||
-                (special->line_effect_ &
-                 (kLineEffectTypeVectorScroll | kLineEffectTypeOffsetScroll | kLineEffectTypeTaggedOffsetScroll)))
-                side_dynamic = true;
-
             if (special->sector_effect_ & kSectorEffectTypeBoomHeights)
             {
                 if (!line->tag)
@@ -2898,21 +2925,35 @@ void ClassifyStaticGeometry(void)
                     Sector *target =
                         (special->special_flags_ & kLineSpecialBackSector) ? line->back_sector : line->front_sector;
 
-                    DemoteSectorToDynamic(target);
+                    if (target && target->height_sector &&
+                        (target->height_sector->bake_dynamic || target->height_sector->movement_suppressed))
+                    {
+                        DemoteSectorToDynamic(target);
+                    }
                 }
                 else
                 {
                     for (Sector *tsec = FindSectorFromTag(line->tag); tsec; tsec = tsec->tag_next)
-                        DemoteSectorToDynamic(tsec);
+                    {
+                        if (tsec->height_sector &&
+                            (tsec->height_sector->bake_dynamic || tsec->height_sector->movement_suppressed))
+                        {
+                            DemoteSectorToDynamic(tsec);
+                        }
+                    }
                 }
             }
         }
 
         if (line->slide_door)
+        {
             side_dynamic = true;
+        }
 
         if ((line->flags & kLineFlagMirror) || line->portal_pair)
+        {
             side_dynamic = true;
+        }
 
         for (int s = 0; s < 2; s++)
         {
@@ -2921,7 +2962,7 @@ void ClassifyStaticGeometry(void)
             if (!side)
                 continue;
 
-            if (side_dynamic || SideUsesSwitchTexture(side))
+            if (side_dynamic)
                 DemoteSideToDynamic(side);
         }
     }
@@ -2935,14 +2976,20 @@ void ClassifyStaticGeometry(void)
         if (sector_special)
         {
             if (sector_special->f_.scroll_speed_ > 0 || sector_special->c_.scroll_speed_ > 0)
+            {
                 DemoteSectorToDynamic(sec);
+            }
         }
 
         if (sec->bottom_extrafloor || sec->top_extrafloor)
+        {
             DemoteSectorToDynamic(sec);
+        }
 
-        if (sec->height_sector)
+        if (sec->height_sector && (sec->height_sector->bake_dynamic || sec->height_sector->movement_suppressed))
+        {
             DemoteSectorToDynamic(sec);
+        }
     }
 }
 

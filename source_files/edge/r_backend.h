@@ -5,6 +5,8 @@
 #include "HandmadeMath.h"
 #include "con_var.h"
 #include "dm_defs.h"
+#include "epi.h"
+#include "epi_math.h"
 #include "epi_color.h"
 
 extern ConsoleVariable fliplevels;
@@ -27,6 +29,69 @@ enum RenderLayer
     kRenderLayerMax,
     kRenderLayerInvalid
 };
+
+enum OitPass
+{
+    kOitPassNone = 0,
+    kOitPassAccumulate,
+    kOitPassRevealage,
+    kOitPassMasked,
+    kOitPassAdditive
+};
+
+enum ClipVolumeDepthRange
+{
+    kClipVolumeZeroToW = 0,
+    kClipVolumeNegativeWToW
+};
+
+inline HMM_Mat4 ObliqueNearPlaneProjection(const HMM_Mat4 &projection, const HMM_Vec4 &eye_plane,
+                                           ClipVolumeDepthRange range)
+{
+    if (epi::AlmostEquals(projection.Elements[0][0], 0.0f) ||
+        epi::AlmostEquals(projection.Elements[1][1], 0.0f) ||
+        epi::AlmostEquals(projection.Elements[3][2], 0.0f))
+        return projection;
+
+    float sign_x = (eye_plane.X > 0.0f) ? 1.0f : ((eye_plane.X < 0.0f) ? -1.0f : 0.0f);
+    float sign_y = (eye_plane.Y > 0.0f) ? 1.0f : ((eye_plane.Y < 0.0f) ? -1.0f : 0.0f);
+
+    HMM_Vec4 corner;
+
+    corner.X = (sign_x + projection.Elements[2][0]) / projection.Elements[0][0];
+    corner.Y = (sign_y + projection.Elements[2][1]) / projection.Elements[1][1];
+    corner.Z = -1.0f;
+    corner.W = (1.0f + projection.Elements[2][2]) / projection.Elements[3][2];
+
+    float denominator = HMM_DotV4(eye_plane, corner);
+
+    if (epi::AlmostEquals(denominator, 0.0f))
+        return projection;
+
+    float near_bias = (range == kClipVolumeNegativeWToW) ? 1.0f : 0.0f;
+    float scale     = (1.0f + near_bias) / denominator;
+
+    HMM_Mat4 result = projection;
+
+    result.Elements[0][2] = eye_plane.X * scale;
+    result.Elements[1][2] = eye_plane.Y * scale;
+    result.Elements[2][2] = eye_plane.Z * scale + near_bias;
+    result.Elements[3][2] = eye_plane.W * scale;
+
+    return result;
+}
+
+inline HMM_Vec4 EyeSpacePlane(const HMM_Mat4 &model_view, const HMM_Vec4 &plane)
+{
+    HMM_Mat4 inverse = HMM_InvGeneralM4(model_view);
+
+    HMM_Vec4 result;
+
+    for (int32_t i = 0; i < 4; i++)
+        result.Elements[i] = HMM_DotV4(inverse.Columns[i], plane);
+
+    return result;
+}
 
 typedef std::function<void()> FrameFinishedCallback;
 
@@ -65,6 +130,35 @@ class RenderBackend
     virtual void FinishWorldRender() = 0;
 
     virtual void SetRenderLayer(RenderLayer layer, bool clear_depth = false) = 0;
+
+    virtual void PushModelMatrix(const HMM_Mat4 &matrix) = 0;
+
+    virtual void PopModelMatrix() = 0;
+
+    virtual void SetObliqueNearPlane(bool enabled, const HMM_Vec4 &plane) = 0;
+
+    virtual bool OitSinglePass()
+    {
+        return false;
+    }
+
+    virtual void BeginOitPass()
+    {
+    }
+
+    virtual void SetOitPass(int32_t mode)
+    {
+        EPI_UNUSED(mode);
+    }
+
+    virtual void FinishOitPass()
+    {
+    }
+
+    int32_t OitMode() const
+    {
+        return oit_mode_;
+    }
 
     virtual RenderLayer GetRenderLayer() = 0;
 
@@ -162,6 +256,7 @@ class RenderBackend
     bool UpdateRenderTargetSize();
 
     int32_t max_texture_size_ = 0;
+    int32_t oit_mode_         = 0;
     int64_t frame_number_;
     bool    units_locked_ = false;
 

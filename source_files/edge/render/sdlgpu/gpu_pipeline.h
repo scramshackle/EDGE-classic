@@ -22,7 +22,10 @@ enum GpuPipelineFlag
     kGpuPipelineCullFront                           = 1 << 12,
     kGpuPipelineCullBack                            = 1 << 13,
     kGpuPipelineStencilWrite                        = 1 << 14,
-    kGpuPipelineStencilTest                         = 1 << 15
+    kGpuPipelineStencilTest                         = 1 << 15,
+    kGpuPipelineStencilIncrement                    = 1 << 16,
+    kGpuPipelineStencilDecrement                    = 1 << 17,
+    kGpuPipelineNoColorWrite                        = 1 << 18
 };
 
 enum GpuPrimitiveType
@@ -45,3 +48,7 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
 SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
 
 SDL_GPUGraphicsPipeline *GetLightPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
+
+SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive);
+
+SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags);

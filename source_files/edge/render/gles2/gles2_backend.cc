@@ -91,6 +91,18 @@ class Gles2RenderBackend : public RenderBackend
                                    view_forward.Z);
 
         gles2_immediate.Translate(-view_x, -view_y, -view_z);
+
+        if (world_model_matrix_total_ > 0)
+            gles2_immediate.MultiplyMatrix(world_model_matrix_);
+
+        if (oblique_near_plane_active_)
+        {
+            HMM_Vec4 eye_plane = EyeSpacePlane(gles2_immediate.ModelViewMatrix(), oblique_near_plane_);
+
+            gles2_immediate.MatrixModeProjection();
+            gles2_immediate.LoadMatrix(ObliqueNearPlaneProjection(gles2_immediate.ProjectionMatrix(), eye_plane, kClipVolumeNegativeWToW));
+            gles2_immediate.MatrixModeModelView();
+        }
     }
 
   public:
@@ -109,9 +121,7 @@ class Gles2RenderBackend : public RenderBackend
 
         LogPrint("OpenGL: Max Texture Size: %d\n", max_texture_size_);
 
-        Gles2DetectStencilBuffer();
 
-        LogPrint("OpenGL: Stencil Buffer: %s\n", render_state->HasStencilBuffer() ? "yes" : "no");
 
         int32_t varying_vectors = Gles2MaxVaryingVectors();
 
@@ -129,6 +139,9 @@ class Gles2RenderBackend : public RenderBackend
 
         if (!gles2_light_program.Init())
             FatalError("OpenGL: failed to create the light shader program.\n");
+
+        if (!gles2_oit_program.Init())
+            FatalError("OpenGL: failed to create the transparency composite shader program.\n");
 
         if (!gles2_immediate.Init())
             FatalError("OpenGL: failed to initialise the immediate renderer.\n");
@@ -155,52 +168,18 @@ class Gles2RenderBackend : public RenderBackend
         }
     }
 
-    void DisableRenderTarget(const char *reason)
-    {
-        gles2_immediate.DestroyRenderTarget();
-
-        render_target_width_   = current_screen_width;
-        render_target_height_  = current_screen_height;
-        render_target_scale_x_ = 1.0f;
-        render_target_scale_y_ = 1.0f;
-        render_target_scaled_  = false;
-
-        if (reason && !render_target_unsupported_)
-        {
-            render_target_unsupported_ = true;
-
-            LogPrint("OpenGL: %s, resolution scaling disabled\n", reason);
-        }
-    }
-
     void RefreshRenderTarget()
     {
         bool changed = UpdateRenderTargetSize();
 
-        if (render_target_unsupported_)
-        {
-            DisableRenderTarget(nullptr);
-            return;
-        }
-
-        bool target_matches = (render_target_scaled_ == gles2_immediate.RenderTargetReady());
-
-        if (!changed && render_target_applied_ && target_matches)
+        if (!changed && render_target_applied_ && gles2_immediate.RenderTargetReady())
             return;
 
         render_target_applied_ = true;
 
-        if (render_target_scaled_)
-        {
-            if (!gles2_immediate.EnsureRenderTarget(render_target_width_, render_target_height_))
-                DisableRenderTarget("render target unavailable");
-        }
-        else
-        {
-            gles2_immediate.DestroyRenderTarget();
-        }
+        if (!gles2_immediate.EnsureRenderTarget(render_target_width_, render_target_height_))
+            FatalError("OpenGL: the world render target is required but could not be created\n");
 
-        Gles2DetectStencilBuffer();
     }
 
     void StartFrame(int32_t width, int32_t height)
@@ -257,6 +236,7 @@ class Gles2RenderBackend : public RenderBackend
         gles2_model_program.Shutdown();
         gles2_movie_program.Shutdown();
         gles2_light_program.Shutdown();
+        gles2_oit_program.Shutdown();
     }
 
     void SetClearColor(RGBAColor color)
@@ -273,9 +253,6 @@ class Gles2RenderBackend : public RenderBackend
     void BeginWorldRender()
     {
         RefreshRenderTarget();
-
-        if (!render_target_scaled_ || !gles2_immediate.RenderTargetReady())
-            return;
 
         gles2_immediate.BindRenderTarget();
 
@@ -310,6 +287,66 @@ class Gles2RenderBackend : public RenderBackend
         }
 
         SetRenderLayer(kRenderLayerHUD);
+    }
+
+    void BeginOitPass()
+    {
+        gles2_immediate.ClearOitTargets();
+
+        Gles2InvalidateRenderState();
+    }
+
+    void SetOitPass(int32_t mode)
+    {
+        oit_mode_ = mode;
+
+        if (mode == kOitPassAccumulate || mode == kOitPassRevealage)
+            gles2_immediate.BindOitTarget(mode);
+        else
+            gles2_immediate.BindRenderTarget();
+    }
+
+    void FinishOitPass()
+    {
+        oit_mode_ = 0;
+
+        Gles2ResolveRect view;
+        view.x      = ScaleToRenderTargetX(view_window_x);
+        view.y      = ScaleToRenderTargetY(view_window_y);
+        view.width  = ScaleToRenderTargetX(view_window_width);
+        view.height = ScaleToRenderTargetY(view_window_height);
+
+        gles2_immediate.CompositeOit(view);
+
+        Gles2InvalidateRenderState();
+    }
+
+    void PushModelMatrix(const HMM_Mat4 &matrix)
+    {
+        EPI_ASSERT(world_model_matrix_total_ < kMaximumWorldModelMatrices);
+
+        world_model_matrix_stack_[world_model_matrix_total_++] = world_model_matrix_;
+
+        world_model_matrix_ = HMM_MulM4(world_model_matrix_, matrix);
+
+        SetupMatrices3D();
+    }
+
+    void PopModelMatrix()
+    {
+        EPI_ASSERT(world_model_matrix_total_ > 0);
+
+        world_model_matrix_ = world_model_matrix_stack_[--world_model_matrix_total_];
+
+        SetupMatrices3D();
+    }
+
+    void SetObliqueNearPlane(bool enabled, const HMM_Vec4 &plane)
+    {
+        oblique_near_plane_active_ = enabled;
+        oblique_near_plane_        = plane;
+
+        SetupMatrices3D();
     }
 
     void SetRenderLayer(RenderLayer layer, bool clear_depth = false)
@@ -356,12 +393,20 @@ class Gles2RenderBackend : public RenderBackend
     }
 
   private:
+    static constexpr int32_t kMaximumWorldModelMatrices = 8;
+
+    HMM_Mat4 world_model_matrix_                                     = HMM_M4D(1.0f);
+
+    bool     oblique_near_plane_active_ = false;
+    HMM_Vec4 oblique_near_plane_        = {};
+    HMM_Mat4 world_model_matrix_stack_[kMaximumWorldModelMatrices]   = {};
+    int32_t  world_model_matrix_total_                               = 0;
+
     RenderLayer render_layer_ = kRenderLayerInvalid;
 
     RGBAColor clear_color_ = kRGBABlack;
 
-    bool render_target_applied_     = false;
-    bool render_target_unsupported_ = false;
+    bool render_target_applied_ = false;
 };
 
 static Gles2RenderBackend gles2_render_backend;

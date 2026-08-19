@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model light)
+set(SHADER_NAMES world movie model light world_oit model_oit)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
@@ -31,14 +31,37 @@ string(SUBSTRING "${SHADER_NAME}" 1 -1 NAME_TAIL)
 string(TOUPPER "${NAME_HEAD}" NAME_HEAD)
 set(SYMBOL_BASE "${NAME_HEAD}${NAME_TAIL}")
 
+if (SHADER_NAME STREQUAL "world_oit")
+  set(SYMBOL_BASE "WorldOit")
+elseif (SHADER_NAME STREQUAL "model_oit")
+  set(SYMBOL_BASE "ModelOit")
+endif()
+
 set(GENERATED_BODY "")
 
 foreach(STAGE IN LISTS SHADER_STAGES)
-  set(SOURCE_FILE "${SHADER_DIR}/${SHADER_NAME}.${STAGE}.glsl")
+  set(SHADER_SOURCE_NAME "${SHADER_NAME}")
+  set(EXTRA_DEFINES "")
+
+  if (SHADER_NAME STREQUAL "world_oit" OR SHADER_NAME STREQUAL "model_oit")
+    if (STAGE STREQUAL "vert")
+      continue()
+    endif()
+
+    if (SHADER_NAME STREQUAL "world_oit")
+      set(SHADER_SOURCE_NAME "world")
+    else()
+      set(SHADER_SOURCE_NAME "model")
+    endif()
+
+    set(EXTRA_DEFINES "-DEDGE_OIT_PASS=1")
+  endif()
+
+  set(SOURCE_FILE "${SHADER_DIR}/${SHADER_SOURCE_NAME}.${STAGE}.glsl")
   set(BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.${STAGE}.spv")
 
   execute_process(
-    COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 -S ${STAGE} -o "${BINARY_FILE}" "${SOURCE_FILE}"
+    COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 ${EXTRA_DEFINES} -S ${STAGE} -o "${BINARY_FILE}" "${SOURCE_FILE}"
     RESULT_VARIABLE COMPILE_RESULT
     OUTPUT_VARIABLE COMPILE_OUTPUT
     ERROR_VARIABLE COMPILE_OUTPUT)

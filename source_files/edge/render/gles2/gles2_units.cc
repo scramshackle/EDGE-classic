@@ -45,6 +45,8 @@ struct RendererUnit
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
+    HMM_Vec2 texture_offset = {{0, 0}};
+    HMM_Vec2 liquid         = {{0, 0}};
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -68,6 +70,10 @@ static int current_render_unit;
 static bool batch_sort;
 
 RGBAColor culling_fog_color;
+
+HMM_Vec2 static_batch_texture_offset = {{0, 0}};
+HMM_Vec2 static_batch_liquid         = {{0, 0}};
+
 
 void StartUnitBatch(bool sort_em)
 {
@@ -144,6 +150,8 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->static_buffer       = handle;
     unit->static_first        = first;
     unit->count               = count;
+    unit->texture_offset      = static_batch_texture_offset;
+    unit->liquid              = static_batch_liquid;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -196,6 +204,8 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = light_depth;
+    unit->texture_offset      = {{0, 0}};
+    unit->liquid              = {{0, 0}};
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -381,6 +391,9 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
     if (a->pass != b->pass || a->texture[0] != b->texture[0] || a->texture[1] != b->texture[1] ||
         a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
         a->blending != b->blending || a->fog_color != b->fog_color || a->sky_pass_enabled || b->sky_pass_enabled ||
+        !epi::AlmostEquals(a->texture_offset.X, b->texture_offset.X) ||
+        !epi::AlmostEquals(a->texture_offset.Y, b->texture_offset.Y) ||
+        !epi::AlmostEquals(a->liquid.X, b->liquid.X) || !epi::AlmostEquals(a->liquid.Y, b->liquid.Y) ||
         a->light_depth_enabled != b->light_depth_enabled || a->static_buffer || b->static_buffer ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
         return false;
@@ -657,6 +670,8 @@ void RenderCurrentUnits(void)
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
 
+    int32_t oit_mode = render_backend->OitMode();
+
     ec_frame_stats.draw_render_units += current_render_unit;
 
     bool no_fog = (render_layer == kRenderLayerHUD) || (render_layer == kRenderLayerViewport);
@@ -740,7 +755,35 @@ void RenderCurrentUnits(void)
         else if (!culling || (unit->blending & kBlendingNoFog))
             render_state->Disable(GL_FOG);
 
-        if (unit->blending & kBlendingAdd)
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass unit_pass = kOitPassMasked;
+
+            if ((unit->blending & kBlendingAdd) || unit->pass > 0)
+                unit_pass = kOitPassAdditive;
+            else if (unit->blending & kBlendingAlpha)
+                unit_pass = kOitPassAccumulate;
+
+            bool wanted = (unit_pass == oit_mode) ||
+                          (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+
+            if (!wanted)
+            {
+                j = run_end;
+                continue;
+            }
+        }
+
+        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage)
+        {
+            render_state->Enable(GL_BLEND);
+
+            if (oit_mode == kOitPassRevealage)
+                render_state->BlendFunction(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+            else
+                render_state->BlendFunction(GL_ONE, GL_ONE);
+        }
+        else if (unit->blending & kBlendingAdd)
         {
             render_state->Enable(GL_BLEND);
             render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
@@ -776,7 +819,9 @@ void RenderCurrentUnits(void)
         else
             render_state->Disable(GL_CULL_FACE);
 
-        render_state->DepthMask((unit->blending & kBlendingNoZBuffer) ? false : true);
+        bool oit_blend_pass = (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage);
+
+        render_state->DepthMask((oit_blend_pass || (unit->blending & kBlendingNoZBuffer)) ? false : true);
 
         if (unit->blending & kBlendingLess)
         {
@@ -849,6 +894,9 @@ void RenderCurrentUnits(void)
 
         gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gles2_program.SetLightDepth(unit->light_depth_enabled);
+        gles2_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
+        gles2_program.SetTextureOffset(unit->texture_offset);
+        gles2_program.SetLiquid(unit->liquid);
 
         if (unit->light_depth_enabled)
             gles2_program.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);

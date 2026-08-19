@@ -9,7 +9,6 @@ layout(set = 3, binding = 0) uniform FragmentParameters
 {
     int   flags;
     float alpha_test;
-    int   clipplanes;
     int   fog_mode;
     vec4  fog_color;
     float fog_density;
@@ -49,12 +48,6 @@ layout(location = 0) out vec4 frag_color;
 layout(location = 0) in vec4 uv;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec3 vpos;
-layout(location = 3) in float clipvertex0;
-layout(location = 4) in float clipvertex1;
-layout(location = 5) in float clipvertex2;
-layout(location = 6) in float clipvertex3;
-layout(location = 7) in float clipvertex4;
-layout(location = 8) in float clipvertex5;
 
 float FogFactor(float fog_dist)
 {
@@ -164,8 +157,40 @@ vec4 SampleEquirectSky()
     return vec4(rgb, sampled.a * color.a);
 }
 
+#ifdef EDGE_OIT_PASS
+layout(location = 1) out vec4 frag_revealage;
+
+float OitWeight(float alpha, float view_depth)
+{
+    float a = min(1.0, alpha * 10.0) + 0.01;
+    float d = 1.0 - view_depth * 0.9;
+
+    return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
+}
+
+void OitEmit(vec4 fragment_color)
+{
+    float view_depth = clamp(-vpos.z * 0.000625, 0.0, 1.0);
+    float weight     = OitWeight(fragment_color.a, view_depth);
+
+    frag_color     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
+    frag_revealage = vec4(fragment_color.a);
+}
+#endif
+
 void main()
 {
+    if ((flags & 16) == 16)
+    {
+        vec4  accumulation = texture(tex0, uv.xy);
+        float revealage    = texture(tex1, uv.xy).a;
+
+        float weight = max(accumulation.a, 1e-5);
+
+        frag_color = vec4(accumulation.rgb / weight, 1.0 - revealage);
+        return;
+    }
+
     if ((flags & 8) == 8)
     {
         if (sky_is_box > 0.5)
@@ -173,37 +198,6 @@ void main()
         else
             frag_color = SampleEquirectSky();
         return;
-    }
-
-    float c = 0.0;
-    if ((clipplanes & 1) == 1)
-    {
-        c += min(0.0, clipvertex0);
-    }
-    if ((clipplanes & 2) == 2)
-    {
-        c += min(0.0, clipvertex1);
-    }
-    if ((clipplanes & 4) == 4)
-    {
-        c += min(0.0, clipvertex2);
-    }
-    if ((clipplanes & 8) == 8)
-    {
-        c += min(0.0, clipvertex3);
-    }
-    if ((clipplanes & 16) == 16)
-    {
-        c += min(0.0, clipvertex4);
-    }
-    if ((clipplanes & 32) == 32)
-    {
-        c += min(0.0, clipvertex5);
-    }
-
-    if (c < 0.0)
-    {
-        discard;
     }
 
     if ((flags & 2) == 2)
@@ -217,8 +211,13 @@ void main()
         float au = 1.0 - smoothstep(1.0 - ((3.0 * aa_radius) / line_width), 1.0, abs(u / line_width));
         float av = 1.0 - smoothstep(1.0 - ((3.0 * aa_radius) / line_length), 1.0, abs(v / line_length));
 
-        frag_color = color;
-        frag_color.a *= min(au, av);
+        vec4 line_color = color;
+        line_color.a *= min(au, av);
+#ifdef EDGE_OIT_PASS
+        OitEmit(line_color);
+#else
+        frag_color = line_color;
+#endif
         return;
     }
 
@@ -256,5 +255,9 @@ void main()
         }
     }
 
+#ifdef EDGE_OIT_PASS
+    OitEmit(fcolor);
+#else
     frag_color = fcolor;
+#endif
 }

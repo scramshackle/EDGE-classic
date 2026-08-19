@@ -3,16 +3,20 @@
 #include "epi.h"
 #include "i_system.h"
 #include "shaders/light_spirv.h"
+#include "shaders/model_oit_spirv.h"
 #include "shaders/model_spirv.h"
 #include "shaders/movie_spirv.h"
+#include "shaders/world_oit_spirv.h"
 #include "shaders/world_spirv.h"
 
 static SDL_GPUShader *world_vertex_shader   = nullptr;
+static SDL_GPUShader *world_oit_fragment_shader = nullptr;
 static SDL_GPUShader *world_fragment_shader = nullptr;
 static SDL_GPUShader *movie_vertex_shader    = nullptr;
 static SDL_GPUShader *movie_fragment_shader  = nullptr;
 static SDL_GPUShader *model_vertex_shader    = nullptr;
 static SDL_GPUShader *model_fragment_shader  = nullptr;
+static SDL_GPUShader *model_oit_fragment_shader = nullptr;
 static SDL_GPUShader *light_vertex_shader    = nullptr;
 static SDL_GPUShader *light_fragment_shader  = nullptr;
 
@@ -60,7 +64,11 @@ bool CreateWorldShaders(SDL_GPUDevice *device)
         CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kWorldFragmentShaderSpirv, sizeof(kWorldFragmentShaderSpirv),
                      kWorldFragmentShaderSamplerCount, kWorldFragmentShaderUniformBufferCount, "world.frag");
 
-    if (!world_vertex_shader || !world_fragment_shader)
+    world_oit_fragment_shader = CreateShader(
+        device, SDL_GPU_SHADERSTAGE_FRAGMENT, kWorldOitFragmentShaderSpirv, sizeof(kWorldOitFragmentShaderSpirv),
+        kWorldOitFragmentShaderSamplerCount, kWorldOitFragmentShaderUniformBufferCount, "world_oit.frag");
+
+    if (!world_vertex_shader || !world_fragment_shader || !world_oit_fragment_shader)
     {
         DestroyWorldShaders(device);
         return false;
@@ -82,6 +90,12 @@ void DestroyWorldShaders(SDL_GPUDevice *device)
         SDL_ReleaseGPUShader(device, world_fragment_shader);
         world_fragment_shader = nullptr;
     }
+
+    if (world_oit_fragment_shader)
+    {
+        SDL_ReleaseGPUShader(device, world_oit_fragment_shader);
+        world_oit_fragment_shader = nullptr;
+    }
 }
 
 SDL_GPUShader *WorldVertexShader()
@@ -92,6 +106,11 @@ SDL_GPUShader *WorldVertexShader()
 SDL_GPUShader *WorldFragmentShader()
 {
     return world_fragment_shader;
+}
+
+SDL_GPUShader *WorldOitFragmentShader()
+{
+    return world_oit_fragment_shader;
 }
 
 bool CreateLightShaders(SDL_GPUDevice *device)
@@ -154,7 +173,11 @@ bool CreateModelShaders(SDL_GPUDevice *device)
         CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kModelFragmentShaderSpirv, sizeof(kModelFragmentShaderSpirv),
                      kModelFragmentShaderSamplerCount, kModelFragmentShaderUniformBufferCount, "model.frag");
 
-    if (!model_vertex_shader || !model_fragment_shader)
+    model_oit_fragment_shader = CreateShader(
+        device, SDL_GPU_SHADERSTAGE_FRAGMENT, kModelOitFragmentShaderSpirv, sizeof(kModelOitFragmentShaderSpirv),
+        kModelOitFragmentShaderSamplerCount, kModelOitFragmentShaderUniformBufferCount, "model_oit.frag");
+
+    if (!model_vertex_shader || !model_fragment_shader || !model_oit_fragment_shader)
     {
         DestroyModelShaders(device);
         return false;
@@ -176,6 +199,12 @@ void DestroyModelShaders(SDL_GPUDevice *device)
         SDL_ReleaseGPUShader(device, model_fragment_shader);
         model_fragment_shader = nullptr;
     }
+
+    if (model_oit_fragment_shader)
+    {
+        SDL_ReleaseGPUShader(device, model_oit_fragment_shader);
+        model_oit_fragment_shader = nullptr;
+    }
 }
 
 SDL_GPUShader *ModelVertexShader()
@@ -186,6 +215,11 @@ SDL_GPUShader *ModelVertexShader()
 SDL_GPUShader *ModelFragmentShader()
 {
     return model_fragment_shader;
+}
+
+SDL_GPUShader *ModelOitFragmentShader()
+{
+    return model_oit_fragment_shader;
 }
 
 bool CreateMovieShaders(SDL_GPUDevice *device)

@@ -88,8 +88,6 @@ struct DrawThing
     // translated coords
     float translated_z;
     float floor_z;
-    float mir_scale;
-    float mir_zscale;
 
     // colourmap/lighting
     RegionProperties *properties;
@@ -140,6 +138,22 @@ struct DrawMirror
     BAMAngle left, right;
 
     bool is_portal = false;
+
+    HMM_Mat4 local_matrix;
+    HMM_Mat4 view_matrix;
+
+    HMM_Vec2 sprite_right;
+    HMM_Vec2 sprite_forward;
+
+    HMM_Vec3 view_position;
+    HMM_Vec3 view_plane;
+
+    float xy_scale;
+    float z_scale;
+
+    bool reflective;
+
+    HMM_Vec4 near_plane;
 
     std::list<DrawSubsector *> draw_subsectors;
 };

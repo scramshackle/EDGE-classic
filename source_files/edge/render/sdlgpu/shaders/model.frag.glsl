@@ -7,7 +7,6 @@
 
 layout(set = 3, binding = 0) uniform ModelFragmentParameters
 {
-    int   clipplanes;
     float alpha;
     float alpha_test;
     float additive_pass;
@@ -27,12 +26,27 @@ layout(location = 0) out vec4 frag_color;
 layout(location = 0) in vec2 uv;
 layout(location = 1) in vec3 color;
 layout(location = 2) in vec3 vpos;
-layout(location = 3) in float clipvertex0;
-layout(location = 4) in float clipvertex1;
-layout(location = 5) in float clipvertex2;
-layout(location = 6) in float clipvertex3;
-layout(location = 7) in float clipvertex4;
-layout(location = 8) in float clipvertex5;
+
+#ifdef EDGE_OIT_PASS
+layout(location = 1) out vec4 frag_revealage;
+
+float OitWeight(float a_alpha, float view_depth)
+{
+    float a = min(1.0, a_alpha * 10.0) + 0.01;
+    float d = 1.0 - view_depth * 0.9;
+
+    return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
+}
+
+void OitEmit(vec4 fragment_color)
+{
+    float view_depth = clamp(-vpos.z * 0.000625, 0.0, 1.0);
+    float weight     = OitWeight(fragment_color.a, view_depth);
+
+    frag_color     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
+    frag_revealage = vec4(fragment_color.a);
+}
+#endif
 
 float FogFactor(float fog_dist)
 {
@@ -51,38 +65,6 @@ float FogFactor(float fog_dist)
 
 void main()
 {
-    float c = 0.0;
-
-    if ((clipplanes & 1) == 1)
-    {
-        c += min(0.0, clipvertex0);
-    }
-    if ((clipplanes & 2) == 2)
-    {
-        c += min(0.0, clipvertex1);
-    }
-    if ((clipplanes & 4) == 4)
-    {
-        c += min(0.0, clipvertex2);
-    }
-    if ((clipplanes & 8) == 8)
-    {
-        c += min(0.0, clipvertex3);
-    }
-    if ((clipplanes & 16) == 16)
-    {
-        c += min(0.0, clipvertex4);
-    }
-    if ((clipplanes & 32) == 32)
-    {
-        c += min(0.0, clipvertex5);
-    }
-
-    if (c < 0.0)
-    {
-        discard;
-    }
-
     vec4 texel = texture(tex0, uv);
 
     if (alpha_test != 0.0 && texel.w < alpha_test)
@@ -99,5 +81,11 @@ void main()
         rgb = mix(rgb, fog_color.rgb, fogf);
     }
 
-    frag_color = vec4(rgb, texel.w * alpha);
+    vec4 fcolor = vec4(rgb, texel.w * alpha);
+
+#ifdef EDGE_OIT_PASS
+    OitEmit(fcolor);
+#else
+    frag_color = fcolor;
+#endif
 }

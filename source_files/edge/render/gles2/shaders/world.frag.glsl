@@ -4,7 +4,6 @@ const float kLog2      = 1.442695;
 uniform sampler2D u_texture0;
 uniform sampler2D u_texture1;
 
-uniform vec4 u_clip_plane[6];
 
 uniform float u_multi_texture;
 uniform float u_line_mode;
@@ -29,6 +28,9 @@ uniform float u_sky_v_offset;
 uniform float u_sky_vertical_fov_slope;
 uniform float u_sky_horizon_shift;
 uniform float u_sky_is_box;
+
+uniform float u_oit_mode;
+uniform float u_oit_scale;
 
 uniform samplerCube u_sky_cube;
 
@@ -156,6 +158,14 @@ vec4 SampleEquirectSky()
     return vec4(rgb, sampled.a * v_color.a);
 }
 
+float OitWeight(float alpha, float view_depth)
+{
+    float a = min(1.0, alpha * 10.0) + 0.01;
+    float d = 1.0 - view_depth * 0.9;
+
+    return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
+}
+
 void main()
 {
     if (u_sky_pass > 0.5)
@@ -165,20 +175,6 @@ void main()
         else
             gl_FragColor = SampleEquirectSky();
         return;
-    }
-
-    vec4 eye_position = vec4(v_eye_position, 1.0);
-
-    float clip_distance = 0.0;
-
-    for (int i = 0; i < 6; i++)
-    {
-        clip_distance += min(0.0, dot(eye_position, u_clip_plane[i]));
-    }
-
-    if (clip_distance < 0.0)
-    {
-        discard;
     }
 
     if (u_line_mode > 0.5)
@@ -227,6 +223,22 @@ void main()
         {
             fragment_color.rgb = mix(fragment_color, u_fog_color, fog_factor).rgb;
         }
+    }
+
+    if (u_oit_mode > 0.5)
+    {
+        float view_depth = clamp(-v_eye_position.z * 0.000625, 0.0, 1.0);
+
+        float weight = OitWeight(fragment_color.a, view_depth) * u_oit_scale;
+
+        if (u_oit_mode > 1.5)
+        {
+            gl_FragColor = vec4(fragment_color.a, 0.0, 0.0, fragment_color.a);
+            return;
+        }
+
+        gl_FragColor = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
+        return;
     }
 
     gl_FragColor = fragment_color;

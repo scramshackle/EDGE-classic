@@ -50,10 +50,14 @@ enum SkyboxFace
 void ComputeSkyHeights(void);
 
 void BeginSky(void);
+struct DrawMirror;
+
 void FinishSky(bool use_depth_mask);
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face);
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part);
+void FinishSkyForMirror(const DrawMirror *mir);
+
+void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMirror *mir);
+void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);
 
 void UpdateSkyboxTextures(void);
 

@@ -17,6 +17,8 @@ struct GpuImage
     int32_t levels;
 
     int64_t update_frame;
+
+    bool external;
 };
 
 struct GpuImageLevel
@@ -38,6 +40,14 @@ void DeleteGpuImage(GLuint id);
 void FlushDeletedGpuImages(SDL_GPUDevice *device);
 
 void ShutdownGpuImages(SDL_GPUDevice *device);
+
+constexpr GLuint kGpuImageOitAccumulation = 0xFFFFFF01u;
+constexpr GLuint kGpuImageOitRevealage    = 0xFFFFFF02u;
+
+bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *texture, int32_t width,
+                              int32_t height);
+
+void ForgetGpuExternalImage(SDL_GPUDevice *device, GLuint id);
 
 const GpuImage *GetGpuImage(GLuint id);
 

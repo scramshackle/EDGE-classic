@@ -41,6 +41,7 @@
 #include "m_argv.h"
 #include "r_gldefs.h"
 #include "r_image.h"
+#include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_shader.h"
@@ -573,9 +574,9 @@ class ColormapShader : public AbstractShader
   private:
     inline float DistanceFromViewPlane(float x, float y, float z)
     {
-        float dx = (x - view_x) * view_forward.X;
-        float dy = (y - view_y) * view_forward.Y;
-        float dz = (z - view_z) * view_forward.Z;
+        float dx = (x - mirror_view.view_position.X) * mirror_view.view_plane.X;
+        float dy = (y - mirror_view.view_position.Y) * mirror_view.view_plane.Y;
+        float dz = (z - mirror_view.view_position.Z) * mirror_view.view_plane.Z;
 
         return dx + dy + dz;
     }

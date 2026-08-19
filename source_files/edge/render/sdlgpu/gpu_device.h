@@ -14,7 +14,8 @@ enum GpuLoadOperation
 enum GpuPassTarget
 {
     kGpuPassTargetMain = 0,
-    kGpuPassTargetWorld
+    kGpuPassTargetWorld,
+    kGpuPassTargetOit
 };
 
 struct GpuBlitRectangle
@@ -47,12 +48,14 @@ class GpuDevice
 
     int32_t CurrentTargetWidth() const
     {
-        return (current_target_ == kGpuPassTargetWorld) ? world_width_ : target_width_;
+        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_width_
+                                                                                               : target_width_;
     }
 
     int32_t CurrentTargetHeight() const
     {
-        return (current_target_ == kGpuPassTargetWorld) ? world_height_ : target_height_;
+        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_height_
+                                                                                               : target_height_;
     }
 
     GpuPassTarget CurrentTarget() const
@@ -111,11 +114,6 @@ class GpuDevice
         return depth_format_;
     }
 
-    bool HasStencil() const
-    {
-        return has_stencil_;
-    }
-
     bool FrameAcquired() const
     {
         return command_buffer_ != nullptr && swapchain_texture_ != nullptr;
@@ -163,12 +161,16 @@ class GpuDevice
     int32_t world_width_  = 0;
     int32_t world_height_ = 0;
 
+    void ReleaseOitTextures(void);
+
     GpuPassTarget current_target_ = kGpuPassTargetMain;
+
+    SDL_GPUTexture *oit_accumulation_texture_ = nullptr;
+    SDL_GPUTexture *oit_revealage_texture_    = nullptr;
 
     RGBAColor clear_color_ = kRGBABlack;
 
     bool color_written_ = false;
-    bool has_stencil_   = false;
 };
 
 extern GpuDevice gpu_device;

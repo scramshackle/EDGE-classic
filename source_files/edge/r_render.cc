@@ -108,7 +108,6 @@ static bool thick_liquid = false;
 static float wave_now;    // value for doing wave table lookups
 static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
-MirrorSet render_mirror_set(kMirrorSetRender);
 
 extern std::list<DrawSubsector *> draw_subsector_list;
 
@@ -144,70 +143,104 @@ static float Slope_GetHeight(SlopePlane *slope, float x, float y)
     return slope->delta_z1 + along * (slope->delta_z2 - slope->delta_z1);
 }
 
-// Adapted from Quake 3 GPL release - Dasho
-static void CalcTurbulentTexCoords(HMM_Vec2 *texc, HMM_Vec3 *pos)
+static OitPass CaptureDrawPass(BlendingMode blending)
 {
-    float amplitude = 0.05;
-    float now       = wave_now * (thick_liquid ? 0.5 : 1.0);
+    if (solid_mode)
+        return kOitPassNone;
+
+    if (blending & kBlendingAdd)
+        return kOitPassAdditive;
+
+    if (blending & kBlendingAlpha)
+        return kOitPassAccumulate;
+
+    return kOitPassMasked;
+}
+
+static HMM_Vec3 PlaneGeometricNormal(const Sector *sec, int face_dir)
+{
+    HMM_Vec3 normal = {{0, 0, 1}};
+
+    if (sec)
+    {
+        if (face_dir > 0 && sec->floor_vertex_slope)
+            normal = sec->floor_vertex_slope_normal;
+        else if (face_dir < 0 && sec->ceiling_vertex_slope)
+            normal = sec->ceiling_vertex_slope_normal;
+        else
+        {
+            const SlopePlane *slope = (face_dir > 0) ? sec->floor_slope : sec->ceiling_slope;
+
+            if (slope)
+            {
+                float dx = slope->x2 - slope->x1;
+                float dy = slope->y2 - slope->y1;
+
+                float d_len = dx * dx + dy * dy;
+
+                if (d_len > 0.0f)
+                {
+                    float gradient = (slope->delta_z2 - slope->delta_z1) / HMM_SqrtF(d_len);
+
+                    HMM_Vec2 dir = {{dx, dy}};
+
+                    dir = HMM_NormV2(dir);
+
+                    normal = HMM_NormV3({{-gradient * dir.X, -gradient * dir.Y, 1.0f}});
+                }
+            }
+        }
+    }
+
+    if (normal.Z < 0.0f)
+        normal = {{-normal.X, -normal.Y, -normal.Z}};
+
+    if (face_dir < 0)
+        normal = {{-normal.X, -normal.Y, -normal.Z}};
+
+    return normal;
+}
+
+float LiquidTurbulenceAmplitude(void)
+{
+    if (swirl_pass == 0)
+        return 0.0f;
 
     if (swirling_flats == kLiquidSwirlParallax)
     {
         if (thick_liquid)
-        {
-            if (swirl_pass == 1)
-            {
-                texc->X = texc->X + sine_table[(int)(((pos->X + pos->Z) * kWavetableIncrement + now) * kSineTableSize) &
-                                               (kSineTableMask)] *
-                                        amplitude;
-                texc->Y = texc->Y +
-                          sine_table[(int)((pos->Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-                              amplitude;
-            }
-            else
-            {
-                amplitude = 0;
-                texc->X = texc->X - sine_table[(int)(((pos->X + pos->Z) * kWavetableIncrement + now) * kSineTableSize) &
-                                               (kSineTableMask)] *
-                                        amplitude;
-                texc->Y = texc->Y -
-                          sine_table[(int)((pos->Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-                              amplitude;
-            }
-        }
-        else
-        {
-            if (swirl_pass == 1)
-            {
-                amplitude = 0.025;
-                texc->X = texc->X + sine_table[(int)(((pos->X + pos->Z) * kWavetableIncrement + now) * kSineTableSize) &
-                                               (kSineTableMask)] *
-                                        amplitude;
-                texc->Y = texc->Y +
-                          sine_table[(int)((pos->Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-                              amplitude;
-            }
-            else
-            {
-                amplitude = 0.015;
-                texc->X = texc->X - sine_table[(int)(((pos->X + pos->Z) * kWavetableIncrement + now) * kSineTableSize) &
-                                               (kSineTableMask)] *
-                                        amplitude;
-                texc->Y = texc->Y -
-                          sine_table[(int)((pos->Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-                              amplitude;
-            }
-        }
+            return (swirl_pass == 1) ? 0.05f : 0.0f;
+
+        return (swirl_pass == 1) ? 0.025f : -0.015f;
     }
-    else
-    {
-        texc->X =
-            texc->X +
-            sine_table[(int)(((pos->X + pos->Z) * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-                amplitude;
-        texc->Y =
-            texc->Y +
-            sine_table[(int)((pos->Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-    }
+
+    return 0.05f;
+}
+
+float LiquidTurbulenceWave(void)
+{
+    return wave_now * (thick_liquid ? 0.5f : 1.0f);
+}
+
+void LiquidTurbulenceDelta(const HMM_Vec3 &pos, HMM_Vec2 *delta)
+{
+    float amplitude = LiquidTurbulenceAmplitude();
+    float now       = LiquidTurbulenceWave();
+
+    delta->X = sine_table[(int)(((pos.X + pos.Z) * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
+               amplitude;
+    delta->Y = sine_table[(int)((pos.Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
+}
+
+// Adapted from Quake 3 GPL release - Dasho
+static void CalcTurbulentTexCoords(HMM_Vec2 *texc, HMM_Vec3 *pos)
+{
+    HMM_Vec2 delta;
+
+    LiquidTurbulenceDelta(*pos, &delta);
+
+    texc->X += delta.X;
+    texc->Y += delta.Y;
 }
 
 struct WallCoordinateData
@@ -557,12 +590,7 @@ static void DLIT_Wall(MapObject *mo, void *dataptr)
     if (!mo->info_->dlight_.leaky_ && !data->mid_masked &&
         !(mo->subsector_->sector->floor_vertex_slope || mo->subsector_->sector->ceiling_vertex_slope))
     {
-        float mx = mo->x;
-        float my = mo->y;
-
-        render_mirror_set.Coordinate(mx, my);
-
-        float dist = (mx - data->div.x) * data->div.delta_y - (my - data->div.y) * data->div.delta_x;
+        float dist = (mo->x - data->div.x) * data->div.delta_y - (mo->y - data->div.y) * data->div.delta_x;
 
         if (dist < 0)
             return;
@@ -773,8 +801,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     // Note: tex_x1 and tex_x2 are in world coordinates.
     //       top, bottom and tex_top_h as well.
 
-
-    if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversWall(current_seg, surf))
+    if (StaticMeshCoversWall(current_seg, surf))
     {
         return;
     }
@@ -816,23 +843,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     BoundingBoxAddPoint(v_bbox, x1, y1);
     BoundingBoxAddPoint(v_bbox, x2, y2);
 
-    render_mirror_set.Coordinate(x1, y1);
-    render_mirror_set.Coordinate(x2, y2);
-
-    if (render_mirror_set.Reflective())
-    {
-        float tmp_x = x1;
-        x1          = x2;
-        x2          = tmp_x;
-        float tmp_y = y1;
-        y1          = y2;
-        y2          = tmp_y;
-
-        tmp_x  = tex_x1;
-        tex_x1 = tex_x2;
-        tex_x2 = tmp_x;
-    }
-
     EPI_ASSERT(current_map);
 
     int lit_adjust = 0;
@@ -857,9 +867,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     float tx0    = tex_x1;
     float tx_mul = tex_x2 - tex_x1;
 
-    render_mirror_set.Height(tex_top_h);
-
-    float ty_mul = surf->y_matrix.Y / (total_h * render_mirror_set.ZScale());
+    float ty_mul = surf->y_matrix.Y / total_h;
     float ty0    = 1.0f - tex_top_h * ty_mul;
 
 #if (DEBUG >= 3)
@@ -896,8 +904,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         vertices[v_count].Y = y1;
         vertices[v_count].Z = left_h[LI];
 
-        render_mirror_set.Height(vertices[v_count].Z);
-
         v_count++;
     }
 
@@ -906,8 +912,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         vertices[v_count].X = x2;
         vertices[v_count].Y = y2;
         vertices[v_count].Z = right_h[RI];
-
-        render_mirror_set.Height(vertices[v_count].Z);
 
         v_count++;
     }
@@ -953,12 +957,12 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_subsector->sector);
 
-    bool capture = render_mirror_set.TotalActive() == 0 && solid_mode &&
-                   StaticWallBakeEligible(current_seg, surf, mid_masked, blending);
+    bool capture = mirror_view.depth == 0 && StaticWallBakeEligible(current_seg, surf, mid_masked);
 
     if (capture)
         StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, blending, lit_adjust,
-                           data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked);
+                           data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
+                           CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}});
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
@@ -975,8 +979,18 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         float        old_dt    = data.trans;
         data.blending          = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
         data.trans             = 85;
+
+        if (capture)
+            StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, data.blending, lit_adjust,
+                               data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
+                               CaptureDrawPass(data.blending), {{surf->x_matrix.X / total_w, -ty_mul}});
+
         cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               WallCoordFunc);
+
+        if (capture)
+            StaticCaptureEnd();
+
         data.blending = old_blend;
         data.trans    = old_dt;
     }
@@ -1365,8 +1379,7 @@ static inline float SafeImageHeight(const Image *image)
         return 0;
 }
 
-static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_min, float c_max,
-                             bool mirror_sub = false)
+static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_min, float c_max)
 {
     Line       *ld = seg->linedef;
     Side       *sd = ld->side[sidenum];
@@ -1399,9 +1412,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         if (view_height_zone == kHeightZoneA && view_z > sec->height_sector->interpolated_ceiling_height)
         {
             slope_fh = sec->height_sector->interpolated_ceiling_height;
-        }
-        else if (view_height_zone == kHeightZoneC && view_z < sec->height_sector->interpolated_floor_height)
-        {
         }
         else
         {
@@ -1444,9 +1454,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
             if (view_height_zone == kHeightZoneA && view_z > other->height_sector->interpolated_ceiling_height)
             {
                 other_fh = other->height_sector->interpolated_ceiling_height;
-            }
-            else if (view_height_zone == kHeightZoneC && view_z < other->height_sector->interpolated_floor_height)
-            {
             }
             else
             {
@@ -1561,8 +1568,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         {
             float zv1 = seg->vertex_1->Z;
             float zv2 = seg->vertex_2->Z;
-            if (mirror_sub)
-                std::swap(zv1, zv2);
             AddWallTile2(seg, dfloor, sd->bottom.image ? &sd->bottom : &other->floor, sec->interpolated_floor_height,
                          (zv1 < 32767.0f && zv1 > -32768.0f) ? zv1 : sec->interpolated_floor_height,
                          sec->interpolated_floor_height,
@@ -1576,8 +1581,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         {
             float zv1 = seg->vertex_1->Z;
             float zv2 = seg->vertex_2->Z;
-            if (mirror_sub)
-                std::swap(zv1, zv2);
             AddWallTile2(seg, dfloor, sd->bottom.image ? &sd->bottom : &sec->floor,
                          (zv1 < 32767.0f && zv1 > -32768.0f) ? zv1 : other->interpolated_floor_height,
                          other->interpolated_floor_height,
@@ -1631,8 +1634,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         {
             float zv1 = seg->vertex_1->W;
             float zv2 = seg->vertex_2->W;
-            if (mirror_sub)
-                std::swap(zv1, zv2);
             AddWallTile2(seg, dfloor, sd->top.image ? &sd->top : &other->ceiling, sec->interpolated_ceiling_height,
                          (zv1 < 32767.0f && zv1 > -32768.0f) ? zv1 : sec->interpolated_ceiling_height,
                          sec->interpolated_ceiling_height,
@@ -1643,8 +1644,6 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         {
             float zv1 = seg->vertex_1->W;
             float zv2 = seg->vertex_2->W;
-            if (mirror_sub)
-                std::swap(zv1, zv2);
             AddWallTile2(seg, dfloor, sd->top.image ? &sd->top : &sec->ceiling, other->interpolated_ceiling_height,
                          (zv1 < 32767.0f && zv1 > -32768.0f) ? zv1 : other->interpolated_ceiling_height,
                          other->interpolated_ceiling_height,
@@ -1819,7 +1818,7 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
     }
 }
 
-static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
+static void RenderSeg(DrawFloor *dfloor, Seg *seg)
 {
     //
     // Analyses floor/ceiling heights, and add corresponding walls/floors
@@ -1856,7 +1855,7 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
         c_max = dfloor->extrafloor->top_height;
     }
 
-    ComputeWallTiles(seg, dfloor, seg->side, f_min, c_max, mirror_sub);
+    ComputeWallTiles(seg, dfloor, seg->side, f_min, c_max);
 
     if ((sd->bottom.image == nullptr || sd->top.image == nullptr) && back_sector)
     {
@@ -1918,17 +1917,13 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg, bool mirror_sub = false)
             EmulateFloodPlane(dfloor, current_seg->back_subsector->sector, -1, b_ch, f_ch);
         }
     }
-
 }
 
 static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_dir)
 {
     float orig_h = h;
 
-    render_mirror_set.Height(h);
-
     int num_vert, i;
-
 
     if (!surf->image)
         return;
@@ -1939,7 +1934,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         return;
     }
 
-    if (render_mirror_set.TotalActive() == 0 && StaticMeshCoversFlat(current_subsector, face_dir))
+    if (StaticMeshCoversFlat(current_subsector, face_dir))
     {
         Sector           *own_sec  = current_subsector->sector;
         const MapSurface *own_surf = (face_dir > 0) ? &own_sec->floor : &own_sec->ceiling;
@@ -2007,7 +2002,6 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         return;
     }
 
-
     // count number of actual vertices
     Seg *seg;
     for (seg = current_subsector->segs, num_vert = 0; seg; seg = seg->subsector_next, num_vert++)
@@ -2059,11 +2053,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
             if (slope)
             {
                 z = orig_h + Slope_GetHeight(slope, x, y);
-
-                render_mirror_set.Height(z);
             }
-
-            render_mirror_set.Coordinate(x, y);
 
             vertices[v_count].X = x;
             vertices[v_count].Y = y;
@@ -2092,12 +2082,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     data.image_h    = surf->image->ScaledHeight();
     data.x_mat      = surf->x_matrix;
     data.y_mat      = surf->y_matrix;
-    float mir_scale = render_mirror_set.XYScale();
-    data.x_mat.X /= mir_scale;
-    data.x_mat.Y /= mir_scale;
-    data.y_mat.X /= mir_scale;
-    data.y_mat.Y /= mir_scale;
-    data.normal   = {{0, 0, (view_z > h) ? 1.0f : -1.0f}};
+    data.normal   = PlaneGeometricNormal(current_subsector->sector, face_dir);
     data.tex_id   = tex_id;
     data.pass     = 0;
     data.blending = blending;
@@ -2123,7 +2108,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     AbstractShader *cmap_shader = GetColormapShader(props, 0, current_subsector->sector);
 
-    bool capture = render_mirror_set.TotalActive() == 0 && solid_mode &&
+    bool capture = mirror_view.depth == 0 &&
                    surf == ((face_dir > 0) ? &current_subsector->sector->floor : &current_subsector->sector->ceiling) &&
                    epi::AlmostEquals(h, (face_dir > 0) ? current_subsector->sector->floor_height
                                                        : current_subsector->sector->ceiling_height) &&
@@ -2131,7 +2116,8 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     if (capture)
         StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector, blending,
-                               data.normal);
+                               data.normal, CaptureDrawPass(blending), surf,
+                               {{1.0f / data.image_w, 1.0f / data.image_h}});
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, false /* masked */,
                           &data, PlaneCoordFunc);
@@ -2149,8 +2135,18 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         float        old_dt    = data.trans;
         data.blending          = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
         data.trans             = 0.33f;
+
+        if (capture)
+            StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector,
+                                   data.blending, data.normal, CaptureDrawPass(data.blending), surf,
+                                   {{1.0f / data.image_w, 1.0f / data.image_h}});
+
         cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               PlaneCoordFunc);
+
+        if (capture)
+            StaticCaptureEnd();
+
         data.blending = old_blend;
         data.trans    = old_dt;
     }
@@ -2169,7 +2165,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     swirl_pass = 0;
 }
 
-static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub = false);
+static void RenderSubsector(DrawSubsector *dsub);
 
 void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 {
@@ -2180,17 +2176,15 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 
         // draw all solid walls and planes
         solid_mode = true;
-        // if (!for_mirror)
         render_backend->SetRenderLayer(kRenderLayerSolid, false);
         StartUnitBatch(solid_mode);
 
-        if (!for_mirror)
-            DrawStaticMesh();
+        DrawStaticMesh(kOitPassNone, !for_mirror);
 
         std::list<DrawSubsector *>::iterator FI; // Forward Iterator
 
         for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
-            RenderSubsector(*FI, for_mirror);
+            RenderSubsector(*FI);
 
         FinishUnitBatch();
     }
@@ -2200,20 +2194,43 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 
         // draw all sprites and masked/translucent walls/planes
         solid_mode = false;
-        // if (!for_mirror)
         render_backend->SetRenderLayer(kRenderLayerTransparent, false);
-        StartUnitBatch(solid_mode);
 
         std::list<DrawSubsector *>::reverse_iterator RI;
 
-        for (RI = dsubs.rbegin(); RI != dsubs.rend(); RI++)
-            RenderSubsector(*RI, for_mirror);
+        static const OitPass oit_passes[4] = {kOitPassMasked, kOitPassAccumulate, kOitPassRevealage,
+                                              kOitPassAdditive};
 
-        FinishUnitBatch();
+        for (int32_t p = 0; p < 4; p++)
+        {
+            if (oit_passes[p] == kOitPassAccumulate)
+                render_backend->BeginOitPass();
+
+            if (oit_passes[p] == kOitPassAdditive)
+                render_backend->FinishOitPass();
+
+            if (oit_passes[p] == kOitPassRevealage && render_backend->OitSinglePass())
+                continue;
+
+            render_backend->SetOitPass(oit_passes[p]);
+
+            StartUnitBatch(solid_mode);
+
+            DrawStaticMesh(oit_passes[p], !for_mirror);
+
+            for (RI = dsubs.rbegin(); RI != dsubs.rend(); RI++)
+            {
+                RenderSubsector(*RI);
+            }
+
+            FinishUnitBatch();
+        }
+
+        render_backend->SetOitPass(kOitPassNone);
     }
 }
 
-static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub)
+static void RenderSubsector(DrawSubsector *dsub)
 {
     Subsector *sub = dsub->subsector;
 
@@ -2245,7 +2262,7 @@ static void RenderSubsector(DrawSubsector *dsub, bool mirror_sub)
         for (std::list<DrawSeg *>::iterator iter = dsub->segs.begin(), iter_end = dsub->segs.end(); iter != iter_end;
              iter++)
         {
-            RenderSeg(dfloor, (*iter)->seg, mirror_sub);
+            RenderSeg(dfloor, (*iter)->seg);
         }
 
         RenderPlane(dfloor, dfloor->ceiling_height, dfloor->ceiling, -1);
@@ -2367,6 +2384,8 @@ static void InitializeCamera(MapObject *mo, bool full_height, float expand_w)
     view_forward.Y = lk_cos * view_sine;
     view_forward.Z = lk_sin;
 
+    ResetMirrorView();
+
     view_up.X = -lk_sin * view_cosine;
     view_up.Y = -lk_sin * view_sine;
     view_up.Z = lk_cos;
@@ -2468,7 +2487,6 @@ void RenderTrueBSP(void)
 
     Player *v_player = view_camera_map_object->player_;
 
-
     {
         EDGE_ZoneScopedN("RenderTrueBSP setup");
 
@@ -2503,7 +2521,6 @@ void RenderTrueBSP(void)
         BeginSky();
     }
 
-
     {
         EDGE_ZoneScopedN("RenderTrueBSP BSP walk");
 
@@ -2512,14 +2529,12 @@ void RenderTrueBSP(void)
 
         while (BSPTraversing())
         {
-
             RenderBatch *batch = BSPReadRenderBatch();
 
             if (!batch)
             {
                 continue;
             }
-
 
             for (int32_t i = 0; i < batch->num_items_; i++)
             {
@@ -2531,10 +2546,11 @@ void RenderTrueBSP(void)
                     draw_subsector_list.push_back(item->subsector_);
                     break;
                 case kRenderSkyWall:
-                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_, item->part_);
+                    RenderSkyWall(item->wallSeg_, item->height1_, item->height2_, item->skyOwner_, item->part_,
+                                  item->mirror_);
                     break;
                 case kRenderSkyPlane:
-                    RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_, item->part_);
+                    RenderSkyPlane(item->wallPlane_, item->height1_, item->skyOwner_, item->part_, item->mirror_);
                     break;
                 }
             }
@@ -2545,17 +2561,13 @@ void RenderTrueBSP(void)
 #endif
     }
 
-
     {
         EDGE_ZoneScopedN("RenderTrueBSP FinishSky");
 
         FinishSky(true);
     }
 
-
     RenderSubList(draw_subsector_list);
-
-
 
     // Add lines seen during render to the automap
     if (!newly_seen_lines.empty())
@@ -2758,7 +2770,7 @@ void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int fac
 {
     EPI_UNUSED(dfloor);
 
-    if (render_mirror_set.TotalActive() > 0)
+    if (mirror_view.depth > 0)
         return;
 
     const MapSurface *surf = (face_dir > 0) ? &flood_ref->floor : &flood_ref->ceiling;

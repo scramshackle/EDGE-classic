@@ -140,8 +140,6 @@ class RenderState
 
     virtual void StencilWriteMask(GLuint mask) = 0;
 
-    virtual bool HasStencilBuffer() = 0;
-
     virtual void CullFace(GLenum mode) = 0;
 
     virtual void AlphaFunction(GLenum func, GLfloat ref) = 0;
@@ -149,8 +147,6 @@ class RenderState
     virtual void ActiveTexture(GLenum activeTexture) = 0;
 
     virtual void BindTexture(GLuint textureid) = 0;
-
-    virtual void ClipPlane(GLenum plane, GLdouble *equation) = 0;
 
     virtual void PolygonOffset(GLfloat factor, GLfloat units) = 0;
 

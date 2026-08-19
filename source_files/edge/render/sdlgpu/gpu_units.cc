@@ -44,6 +44,8 @@ struct RendererUnit
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
+    HMM_Vec2 texture_offset = {{0, 0}};
+    HMM_Vec2 liquid         = {{0, 0}};
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -64,6 +66,9 @@ static int current_render_unit;
 static bool batch_sort;
 
 RGBAColor culling_fog_color;
+
+HMM_Vec2 static_batch_texture_offset = {{0, 0}};
+HMM_Vec2 static_batch_liquid         = {{0, 0}};
 
 void StartUnitBatch(bool sort_em)
 {
@@ -135,6 +140,8 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->scissor_enabled     = false;
     unit->light_pass_enabled  = false;
     unit->static_buffer       = handle;
+    unit->texture_offset      = static_batch_texture_offset;
+    unit->liquid              = static_batch_liquid;
     unit->static_first        = first;
 
     if (sky_pass)
@@ -185,6 +192,8 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = light_depth;
+    unit->texture_offset      = {{0, 0}};
+    unit->liquid              = {{0, 0}};
     unit->static_buffer       = 0;
     unit->static_first        = 0;
 
@@ -415,6 +424,8 @@ void RenderCurrentUnits(void)
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
 
+    int32_t oit_mode = render_backend->OitMode();
+
     ec_frame_stats.draw_render_units += current_render_unit;
 
     bool no_fog = (render_layer == kRenderLayerHUD) || (render_layer == kRenderLayerViewport);
@@ -469,6 +480,19 @@ void RenderCurrentUnits(void)
 
         EPI_ASSERT(unit->count > 0);
 
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass unit_pass = kOitPassMasked;
+
+            if ((unit->blending & kBlendingAdd) || unit->pass > 0)
+                unit_pass = kOitPassAdditive;
+            else if (unit->blending & kBlendingAlpha)
+                unit_pass = kOitPassAccumulate;
+
+            if (unit_pass != oit_mode)
+                continue;
+        }
+
         if (unit->scissor_enabled)
         {
             render_state->Enable(GL_SCISSOR_TEST);
@@ -499,7 +523,14 @@ void RenderCurrentUnits(void)
         else if (!culling || (unit->blending & kBlendingNoFog))
             render_state->Disable(GL_FOG);
 
-        if (unit->blending & kBlendingAdd)
+        bool oit_blend_pass = (oit_mode == kOitPassAccumulate);
+
+        if (oit_blend_pass)
+        {
+            render_state->Enable(GL_BLEND);
+            render_state->BlendFunction(GL_ONE, GL_ONE);
+        }
+        else if (unit->blending & kBlendingAdd)
         {
             render_state->Enable(GL_BLEND);
             render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
@@ -535,7 +566,7 @@ void RenderCurrentUnits(void)
         else
             render_state->Disable(GL_CULL_FACE);
 
-        render_state->DepthMask((unit->blending & kBlendingNoZBuffer) ? false : true);
+        render_state->DepthMask((oit_blend_pass || (unit->blending & kBlendingNoZBuffer)) ? false : true);
 
         if (unit->blending & kBlendingLess)
         {
@@ -603,6 +634,8 @@ void RenderCurrentUnits(void)
 
         gpu_immediate.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gpu_immediate.SetLightDepth(unit->light_depth_enabled);
+        gpu_immediate.SetTextureOffset(unit->texture_offset);
+        gpu_immediate.SetLiquid(unit->liquid);
 
         if (unit->light_depth_enabled)
             gpu_immediate.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
