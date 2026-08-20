@@ -692,7 +692,8 @@ static bool BSPCheckBBox(const float *bspcoord)
 }
 
 static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float floor_height, float ceiling_height,
-                                   float top_h, MapSurface *floor, MapSurface *ceil, RegionProperties *props)
+                                   float top_h, MapSurface *floor, MapSurface *ceil, RegionProperties *props,
+                                   Extrafloor *floor_ef)
 {
     DrawFloor *dfloor;
 
@@ -706,6 +707,7 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
     dfloor->floor           = nullptr;
     dfloor->ceiling         = nullptr;
     dfloor->extrafloor      = nullptr;
+    dfloor->floor_extrafloor = nullptr;
     dfloor->properties      = nullptr;
     dfloor->things          = nullptr;
 
@@ -714,8 +716,9 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
     dfloor->top_height     = top_h;
     dfloor->floor          = floor;
     dfloor->ceiling        = ceil;
-    dfloor->extrafloor     = ef;
-    dfloor->properties     = props;
+    dfloor->extrafloor       = ef;
+    dfloor->floor_extrafloor = floor_ef;
+    dfloor->properties       = props;
 
     // link it in, height order
 
@@ -896,6 +899,8 @@ static void BSPWalkSubsector(int num)
 
     // add in each extrafloor, traversing strictly upwards
 
+    Extrafloor *floor_ef = nullptr;
+
     Extrafloor *S = sector->bottom_extrafloor;
     Extrafloor *L = sector->bottom_liquid;
 
@@ -922,13 +927,14 @@ static void BSPWalkSubsector(int num)
         if (C->bottom_height < floor_h || C->bottom_height > sector->interpolated_ceiling_height)
             continue;
 
-        AddNewDrawFloor(K, C, floor_h, C->bottom_height, C->top_height, floor_s, C->bottom, C->properties);
+        AddNewDrawFloor(K, C, floor_h, C->bottom_height, C->top_height, floor_s, C->bottom, C->properties, floor_ef);
 
-        floor_s = C->top;
-        floor_h = C->top_height;
+        floor_s  = C->top;
+        floor_h  = C->top_height;
+        floor_ef = C;
     }
 
-    AddNewDrawFloor(K, nullptr, floor_h, ceil_h, ceil_h, floor_s, ceil_s, props);
+    AddNewDrawFloor(K, nullptr, floor_h, ceil_h, ceil_h, floor_s, ceil_s, props, floor_ef);
 
     K->floors[0]->is_lowest                     = true;
     K->floors[K->floors.size() - 1]->is_highest = true;

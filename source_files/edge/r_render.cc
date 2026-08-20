@@ -76,6 +76,8 @@ extern ViewHeightZone view_height_zone;
 static Subsector     *current_subsector;
 static DrawSubsector *current_draw_subsector;
 static Seg           *current_seg;
+static Extrafloor *current_region_extrafloor  = nullptr;
+static Extrafloor *current_surface_extrafloor = nullptr;
 
 extern unsigned int root_node;
 
@@ -801,8 +803,12 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     // Note: tex_x1 and tex_x2 are in world coordinates.
     //       top, bottom and tex_top_h as well.
 
-    if (StaticMeshCoversWall(current_seg, surf))
+    if (StaticMeshCoversWall(current_seg, surf, current_region_extrafloor, current_surface_extrafloor))
     {
+        if (mirror_view.depth == 0)
+            StaticResidencyNoteWall(current_seg, surf, mid_masked, current_region_extrafloor,
+                                    current_surface_extrafloor, true);
+
         return;
     }
 
@@ -957,12 +963,21 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_subsector->sector);
 
-    bool capture = mirror_view.depth == 0 && StaticWallBakeEligible(current_seg, surf, mid_masked);
+    if (mirror_view.depth == 0)
+        StaticResidencyNoteWall(current_seg, surf, mid_masked, current_region_extrafloor,
+                                current_surface_extrafloor, false);
+
+    StaticResidencyNoteRegionProperties(current_subsector->sector, props);
+
+    bool capture = mirror_view.depth == 0 &&
+                   StaticWallBakeEligible(current_seg, surf, mid_masked, current_region_extrafloor,
+                                          current_surface_extrafloor);
 
     if (capture)
         StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, blending, lit_adjust,
                            data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
-                           CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}});
+                           CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}},
+                           current_region_extrafloor, current_surface_extrafloor);
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
@@ -983,7 +998,8 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         if (capture)
             StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, data.blending, lit_adjust,
                                data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
-                               CaptureDrawPass(data.blending), {{surf->x_matrix.X / total_w, -ty_mul}});
+                               CaptureDrawPass(data.blending), {{surf->x_matrix.X / total_w, -ty_mul}},
+                               current_region_extrafloor, current_surface_extrafloor);
 
         cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               WallCoordFunc);
@@ -1811,7 +1827,11 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
                         ? C->bottom_height + (SafeImageHeight(surf->image) / surf->y_matrix.Y)
                         : C->top_height;
 
+            current_surface_extrafloor = C;
+
             AddWallTile(seg, dfloor, surf, C->bottom_height, C->top_height, tex_z, flags, f_min, c_max);
+
+            current_surface_extrafloor = nullptr;
         }
 
         floor_h = C->top_height;
@@ -1824,7 +1844,9 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg)
     // Analyses floor/ceiling heights, and add corresponding walls/floors
     // to the drawfloor.  Returns true if the whole region was "solid".
     //
-    current_seg = seg;
+    current_seg                = seg;
+    current_region_extrafloor  = dfloor->extrafloor;
+    current_surface_extrafloor = nullptr;
 
     EPI_ASSERT(!seg->miniseg && seg->linedef);
 
@@ -1934,16 +1956,27 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         return;
     }
 
-    if (StaticMeshCoversFlat(current_subsector, face_dir))
-    {
-        Sector           *own_sec  = current_subsector->sector;
-        const MapSurface *own_surf = (face_dir > 0) ? &own_sec->floor : &own_sec->ceiling;
-        float             own_h    = (face_dir > 0) ? own_sec->floor_height : own_sec->ceiling_height;
+    Sector           *own_sec  = current_subsector->sector;
+    const MapSurface *own_surf = (face_dir > 0) ? &own_sec->floor : &own_sec->ceiling;
+    float             own_h    = (face_dir > 0) ? own_sec->floor_height : own_sec->ceiling_height;
 
-        if (surf == own_surf && epi::AlmostEquals(h, own_h))
-        {
-            return;
-        }
+    bool own_plane = (surf == own_surf && epi::AlmostEquals(h, own_h));
+
+    Extrafloor *plane_ef = (face_dir > 0) ? dfloor->floor_extrafloor : dfloor->extrafloor;
+
+    if (plane_ef && (surf != ((face_dir > 0) ? plane_ef->top : plane_ef->bottom) ||
+                     !epi::AlmostEquals(h, (face_dir > 0) ? plane_ef->top_height : plane_ef->bottom_height)))
+        plane_ef = nullptr;
+
+    if (plane_ef)
+        own_plane = false;
+
+    if ((own_plane || plane_ef) && StaticMeshCoversFlat(current_subsector, face_dir, plane_ef))
+    {
+        if (mirror_view.depth == 0)
+            StaticResidencyNoteFlat(current_subsector, face_dir, true, own_plane, plane_ef);
+
+        return;
     }
 
     ec_frame_stats.draw_planes++;
@@ -2108,16 +2141,25 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     AbstractShader *cmap_shader = GetColormapShader(props, 0, current_subsector->sector);
 
-    bool capture = mirror_view.depth == 0 &&
-                   surf == ((face_dir > 0) ? &current_subsector->sector->floor : &current_subsector->sector->ceiling) &&
-                   epi::AlmostEquals(h, (face_dir > 0) ? current_subsector->sector->floor_height
-                                                       : current_subsector->sector->ceiling_height) &&
-                   StaticFlatBakeEligible(current_subsector->sector, face_dir);
+    if (mirror_view.depth == 0)
+        StaticResidencyNoteFlat(current_subsector, face_dir, false, own_plane, plane_ef);
+
+    StaticResidencyNoteRegionProperties(current_subsector->sector, props);
+
+    bool capture = false;
+
+    if (mirror_view.depth == 0)
+    {
+        if (plane_ef)
+            capture = StaticExtrafloorPlaneEligible(current_subsector, plane_ef, face_dir);
+        else if (own_plane)
+            capture = StaticFlatBakeEligible(current_subsector->sector, face_dir);
+    }
 
     if (capture)
         StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector, blending,
                                data.normal, CaptureDrawPass(blending), surf,
-                               {{1.0f / data.image_w, 1.0f / data.image_h}});
+                               {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef);
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, false /* masked */,
                           &data, PlaneCoordFunc);
@@ -2139,7 +2181,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         if (capture)
             StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector,
                                    data.blending, data.normal, CaptureDrawPass(data.blending), surf,
-                                   {{1.0f / data.image_w, 1.0f / data.image_h}});
+                                   {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef);
 
         cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               PlaneCoordFunc);

@@ -82,6 +82,7 @@
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_render.h"
+#include "r_static.h"
 #include "r_texgl.h"
 #include "r_wipe.h"
 #include "rad_trig.h"
@@ -799,6 +800,8 @@ void EdgeDisplay(void)
 
         FinishUnitBatch();
     }
+
+    StaticResidencyTick();
 
     if (m_screenshot_required)
     {

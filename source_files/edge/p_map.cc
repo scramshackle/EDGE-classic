@@ -3103,6 +3103,7 @@ bool SolidSectorMove(Sector *sec, bool is_ceiling, float dh, int crush, bool noc
             ef->top_height = ef->bottom_height = sec->floor_height;
         }
 
+        SuppressSectorForMovement(ef->sector);
         RecomputeGapsAroundSector(ef->sector);
         FloodExtraFloors(ef->sector);
     }

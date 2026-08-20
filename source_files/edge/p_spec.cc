@@ -588,6 +588,9 @@ static void P_EFTransferTrans(Sector *ctrl, Sector *sec, Line *line, const Extra
         if (StaticMeshBuilt())
             DemoteSideToDynamic(line->side[0]);
     }
+
+    if (StaticMeshBuilt())
+        SuppressSectorForMovement(sec);
 }
 
 //
@@ -2979,11 +2982,6 @@ void ClassifyStaticGeometry(void)
             {
                 DemoteSectorToDynamic(sec);
             }
-        }
-
-        if (sec->bottom_extrafloor || sec->top_extrafloor)
-        {
-            DemoteSectorToDynamic(sec);
         }
 
         if (sec->height_sector && (sec->height_sector->bake_dynamic || sec->height_sector->movement_suppressed))

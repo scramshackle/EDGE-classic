@@ -47,6 +47,7 @@
 #include "p_local.h"
 #include "p_spec.h"
 #include "r_state.h"
+#include "r_static.h"
 
 extern unsigned int              root_node;
 extern std::vector<PlaneMover *> active_planes;
@@ -768,6 +769,9 @@ void AddExtraFloor(Sector *sec, Line *line)
         FatalError("Bad Extrafloor in sector #%d: "
                    "z range is %1.0f / %1.0f\n",
                    (int)(sec - level_sectors), newbie->bottom_height, newbie->top_height);
+
+    if (StaticMeshBuilt())
+        SuppressSectorForMovement(sec);
 
     newbie->sector = sec;
     newbie->top    = top;
