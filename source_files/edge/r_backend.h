@@ -93,6 +93,8 @@ inline HMM_Vec4 EyeSpacePlane(const HMM_Mat4 &model_view, const HMM_Vec4 &plane)
     return result;
 }
 
+struct LightGrid;
+
 typedef std::function<void()> FrameFinishedCallback;
 
 struct FrameStats
@@ -183,6 +185,12 @@ class RenderBackend
     virtual void GetPassInfo(PassInfo &info) = 0;
 
     virtual HMM_Mat4 WorldViewProjection() = 0;
+
+    virtual HMM_Mat4 WorldModelView() = 0;
+
+    virtual void UploadLightGrid(const LightGrid *grid) = 0;
+
+    virtual int LightGridBinningMode() = 0;
 
     virtual void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest) = 0;
 

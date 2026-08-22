@@ -47,6 +47,8 @@
 #include "r_image.h"
 #include "r_mdcommon.h"
 #include "r_mdl.h"
+
+#include "r_lightgrid.h"
 #include "r_mdmesh.h"
 #include "r_mirror.h"
 #include "r_misc.h"
@@ -264,9 +266,11 @@ static void MDLUploadMesh(MDLModel *md)
         return;
 
     std::vector<float> frame_positions;
+    std::vector<float> frame_normals;
     std::vector<float> texture_coordinates;
 
     frame_positions.resize((size_t)vertex_count * (size_t)md->total_frames_ * 3);
+    frame_normals.resize((size_t)vertex_count * (size_t)md->total_frames_ * 3);
     texture_coordinates.resize((size_t)vertex_count * 2);
 
     for (int f = 0; f < md->total_frames_; f++)
@@ -274,6 +278,7 @@ static void MDLUploadMesh(MDLModel *md)
         const MDLVertex *frame_vertices = md->frames_[f].vertices;
 
         float *destination = frame_positions.data() + (size_t)f * (size_t)vertex_count * 3;
+        float *normal_destination = frame_normals.data() + (size_t)f * (size_t)vertex_count * 3;
 
         for (int v = 0; v < vertex_count; v++)
         {
@@ -282,6 +287,12 @@ static void MDLUploadMesh(MDLModel *md)
             destination[v * 3 + 0] = vert->x;
             destination[v * 3 + 1] = vert->y;
             destination[v * 3 + 2] = vert->z;
+
+            const HMM_Vec3 &normal = md_normals[vert->normal_idx];
+
+            normal_destination[v * 3 + 0] = normal.X;
+            normal_destination[v * 3 + 1] = normal.Y;
+            normal_destination[v * 3 + 2] = normal.Z;
         }
     }
 
@@ -294,6 +305,7 @@ static void MDLUploadMesh(MDLModel *md)
     ModelMeshData data;
 
     data.frame_positions     = frame_positions.data();
+    data.frame_normals       = frame_normals.data();
     data.texture_coordinates = texture_coordinates.data();
     data.frame_count         = md->total_frames_;
     data.vertex_count        = vertex_count;
@@ -637,68 +649,6 @@ static void InitializeNormalColors(MDLCoordinateData *data)
     }
 }
 
-static void RotateUsedNormals(MDLCoordinateData *data)
-{
-    int count = 0;
-
-    for (short *n_list = data->used_normals_; *n_list >= 0; n_list++)
-        count++;
-
-    data->rotated_count_ = count;
-
-    epi::SimdF32x4 mouselook_x_x = epi::SplatF32x4(data->mouselook_x_vector_.X);
-    epi::SimdF32x4 mouselook_x_y = epi::SplatF32x4(data->mouselook_x_vector_.Y);
-    epi::SimdF32x4 mouselook_z_x = epi::SplatF32x4(data->mouselook_z_vector_.X);
-    epi::SimdF32x4 mouselook_z_y = epi::SplatF32x4(data->mouselook_z_vector_.Y);
-    epi::SimdF32x4 rotation_x_x  = epi::SplatF32x4(data->rotation_vector_x_.X);
-    epi::SimdF32x4 rotation_x_y  = epi::SplatF32x4(data->rotation_vector_x_.Y);
-    epi::SimdF32x4 rotation_y_x  = epi::SplatF32x4(data->rotation_vector_y_.X);
-    epi::SimdF32x4 rotation_y_y  = epi::SplatF32x4(data->rotation_vector_y_.Y);
-
-    const short *list = data->used_normals_;
-
-    int i = 0;
-
-    for (; i + 4 <= count; i += 4)
-    {
-        int n0 = list[i];
-        int n1 = list[i + 1];
-        int n2 = list[i + 2];
-        int n3 = list[i + 3];
-
-        epi::SimdF32x4 nx1 =
-            epi::SetF32x4(md_normals[n0].X, md_normals[n1].X, md_normals[n2].X, md_normals[n3].X);
-        epi::SimdF32x4 ny1 =
-            epi::SetF32x4(md_normals[n0].Y, md_normals[n1].Y, md_normals[n2].Y, md_normals[n3].Y);
-        epi::SimdF32x4 nz1 =
-            epi::SetF32x4(md_normals[n0].Z, md_normals[n1].Z, md_normals[n2].Z, md_normals[n3].Z);
-
-        epi::SimdF32x4 nx2 = epi::AddF32x4(epi::MulF32x4(nx1, mouselook_x_x), epi::MulF32x4(nz1, mouselook_x_y));
-        epi::SimdF32x4 nz2 = epi::AddF32x4(epi::MulF32x4(nx1, mouselook_z_x), epi::MulF32x4(nz1, mouselook_z_y));
-
-        epi::StoreF32x4(data->rotated_x_ + i,
-                        epi::AddF32x4(epi::MulF32x4(nx2, rotation_x_x), epi::MulF32x4(ny1, rotation_x_y)));
-        epi::StoreF32x4(data->rotated_y_ + i,
-                        epi::AddF32x4(epi::MulF32x4(nx2, rotation_y_x), epi::MulF32x4(ny1, rotation_y_y)));
-        epi::StoreF32x4(data->rotated_z_ + i, nz2);
-    }
-
-    for (; i < count; i++)
-    {
-        int n = list[i];
-
-        float nx1 = md_normals[n].X;
-        float ny1 = md_normals[n].Y;
-        float nz1 = md_normals[n].Z;
-
-        float nx2 = nx1 * data->mouselook_x_vector_.X + nz1 * data->mouselook_x_vector_.Y;
-        float nz2 = nx1 * data->mouselook_z_vector_.X + nz1 * data->mouselook_z_vector_.Y;
-
-        data->rotated_x_[i] = nx2 * data->rotation_vector_x_.X + ny1 * data->rotation_vector_x_.Y;
-        data->rotated_y_[i] = nx2 * data->rotation_vector_y_.X + ny1 * data->rotation_vector_y_.Y;
-        data->rotated_z_[i] = nz2;
-    }
-}
 
 static void ShadeNormals(AbstractShader *shader, MDLCoordinateData *data, bool skip_calc)
 {
@@ -719,18 +669,6 @@ static void ShadeNormals(AbstractShader *shader, MDLCoordinateData *data, bool s
     }
 }
 
-static void MDLDynamicLightCallback(MapObject *mo, void *dataptr)
-{
-    MDLCoordinateData *data = (MDLCoordinateData *)dataptr;
-
-    // dynamic lights do not light themselves up!
-    if (mo == data->map_object_)
-        return;
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    ShadeNormals(mo->dynamic_light_.shader, data, false);
-}
 
 static int MDLMulticolorMaximumRGB(MDLCoordinateData *data, bool additive)
 {
@@ -940,18 +878,6 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
         ShadeNormals(shader, &data, true);
 
-        if (use_dynamic_lights && render_view_extra_light < 250)
-        {
-            RotateUsedNormals(&data);
-
-            float r = mo->radius_;
-
-            DynamicLightIterator(mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r, mo->z + mo->height_,
-                                 MDLDynamicLightCallback, &data);
-
-            SectorGlowIterator(mo->subsector_->sector, mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r,
-                               mo->z + mo->height_, MDLDynamicLightCallback, &data);
-        }
     }
 
     /* draw the model */
@@ -1140,6 +1066,11 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
         ModelDrawInfo info;
 
         info.handle = mesh.gpu_handle_;
+
+
+        info.world_lit = use_dynamic_lights && render_view_extra_light < 250 && !data.is_fuzzy_;
+
+        info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->subsector_->sector) : -1;
 
         info.frame1 = frame1;
         info.frame2 = frame2;

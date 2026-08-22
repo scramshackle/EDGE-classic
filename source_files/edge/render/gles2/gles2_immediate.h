@@ -175,6 +175,7 @@ class Gles2Immediate
     struct Gles2ModelMesh
     {
         GLuint position_buffer;
+        GLuint normal_buffer;
         GLuint texture_coordinate_buffer;
         GLuint color_buffer;
         GLuint index_buffer;

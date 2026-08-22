@@ -4,6 +4,19 @@
 
 #include "epi.h"
 #include "i_system.h"
+#include "r_lightgrid.h"
+#include "stb_sprintf.h"
+
+static const char *Gles2ShaderDefines()
+{
+    static char defines[128];
+
+    stbsp_snprintf(defines, sizeof(defines), "#define EDGE_LIGHT_MAX_PER_TILE %d\n#define EDGE_LIGHT_MAX_GLOWS %d\n",
+                   kLightGridMaximumPerTile, kLightGridMaximumGlows);
+
+    return defines;
+}
+
 
 #ifdef EDGE_GLES2_DESKTOP_GL
 
@@ -55,7 +68,11 @@ const char *Gles2ShaderPreamble(bool fragment_stage)
 {
     EPI_UNUSED(fragment_stage);
 
-    return "#version 110\n";
+    static char preamble[256];
+
+    stbsp_snprintf(preamble, sizeof(preamble), "#version 110\n%s", Gles2ShaderDefines());
+
+    return preamble;
 }
 
 #else
@@ -80,17 +97,25 @@ int32_t Gles2MaxVaryingVectors()
 
 const char *Gles2ShaderPreamble(bool fragment_stage)
 {
+    static char preamble[256];
+
     if (fragment_stage)
     {
-        return "#version 100\n"
-               "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
-               "precision highp float;\n"
-               "#else\n"
-               "precision mediump float;\n"
-               "#endif\n";
+        stbsp_snprintf(preamble, sizeof(preamble),
+                       "#version 100\n%s"
+                       "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+                       "precision highp float;\n"
+                       "#else\n"
+                       "precision mediump float;\n"
+                       "#endif\n",
+                       Gles2ShaderDefines());
+
+        return preamble;
     }
 
-    return "#version 100\n";
+    stbsp_snprintf(preamble, sizeof(preamble), "#version 100\n%s", Gles2ShaderDefines());
+
+    return preamble;
 }
 
 #endif

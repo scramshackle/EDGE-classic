@@ -2,6 +2,7 @@
 
 #include "epi.h"
 #include "gles2_immediate.h"
+#include "gles2_lights.h"
 #include "gles2_program.h"
 #include "i_system.h"
 #include "r_backend.h"
@@ -557,6 +558,29 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetFog(fog_mode, epi::GetRGBARed(fog_color_) / 255.0f,
                                    epi::GetRGBAGreen(fog_color_) / 255.0f, epi::GetRGBABlue(fog_color_) / 255.0f,
                                    fog_density_, fog_start_, fog_end_);
+
+        const Gles2LightGridState *light_grid = Gles2CurrentLightGrid();
+
+        bool model_lit = info.world_lit && light_grid->active;
+
+        if (model_lit)
+        {
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightData);
+            glBindTexture(GL_TEXTURE_2D, light_grid->data_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightHeaders);
+            glBindTexture(GL_TEXTURE_2D, light_grid->header_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightIndices);
+            glBindTexture(GL_TEXTURE_2D, light_grid->list_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
+
+            gles2_model_program.SetLightGrid(light_grid);
+        }
+
+        gles2_model_program.SetWorldLit(model_lit);
+        gles2_model_program.SetGlowSet(model_lit ? info.glow_set : -1);
 
         gles2_immediate.DrawModelMesh(info);
 

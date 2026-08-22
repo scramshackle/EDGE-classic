@@ -6,6 +6,9 @@
 #include "gpu_device.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
+#include "gpu_lights.h"
+
+#include "r_lightgrid.h"
 #include "gpu_pipeline.h"
 #include "i_system.h"
 #include "r_backend.h"
@@ -689,6 +692,38 @@ class GpuRenderState : public RenderState
             fragment_parameters.fog_density = fog_density_;
             fragment_parameters.fog_start   = fog_start_;
             fragment_parameters.fog_end     = fog_end_;
+        }
+
+        int light_view_index = info.world_lit ? GpuCurrentLightView() : -1;
+
+        const GpuLightViewParameters *light_view = GpuLightView(light_view_index);
+
+        if (light_view)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                fragment_parameters.light_view[i]  = light_view->light_view[i];
+                fragment_parameters.light_range[i] = light_view->light_range[i];
+            }
+        }
+
+        const LightGridGlowSet *glow_set = info.world_lit ? LightGridGlowSetAt(info.glow_set) : nullptr;
+
+        fragment_parameters.glow_additive[3] = (glow_set && glow_set->count > 0) ? (float)glow_set->count : 0.0f;
+
+        for (int i = 0; i < 2; i++)
+        {
+            bool live = glow_set && i < glow_set->count;
+
+            for (int e = 0; e < 4; e++)
+                fragment_parameters.glow_plane[i][e] = live ? glow_set->glows[i].plane[e] : 0.0f;
+
+            fragment_parameters.glow_color[i][0] = live ? glow_set->glows[i].color[0] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][1] = live ? glow_set->glows[i].color[1] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][2] = live ? glow_set->glows[i].color[2] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][3] = live ? glow_set->glows[i].radius : 1.0f;
+
+            fragment_parameters.glow_additive[i] = live ? glow_set->glows[i].additive : 0.0f;
         }
 
         gpu_immediate.RecordModelDraw(info, vertex_parameters, fragment_parameters);

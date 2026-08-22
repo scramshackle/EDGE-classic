@@ -66,10 +66,6 @@ struct DrawSubsector;
 //
 struct DrawThing
 {
-    // link for list
-    DrawThing *next;
-    DrawThing *previous;
-
     // actual map object
     MapObject *map_object;
 
@@ -99,7 +95,6 @@ struct DrawThing
     float sink_mult;
 
     // Rendering order
-    DrawThing *render_left, *render_right, *render_previous, *render_next;
 };
 
 //
@@ -129,7 +124,6 @@ struct DrawFloor
 
     // list of things
     // (not sorted until RenderFloor is called).
-    DrawThing *things;
 };
 
 struct DrawMirror
@@ -157,6 +151,7 @@ struct DrawMirror
     HMM_Vec4 near_plane;
 
     std::list<DrawSubsector *> draw_subsectors;
+    std::list<DrawThing *>     draw_things;
 };
 
 struct DrawSeg // HOPEFULLY this can go away

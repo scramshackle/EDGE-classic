@@ -11,19 +11,21 @@ constexpr GLuint kGles2AttributePosition           = 0;
 constexpr GLuint kGles2AttributeTextureCoordinates = 1;
 constexpr GLuint kGles2AttributeColor              = 2;
 
-constexpr int32_t kGles2MaximumLightsPerPass = 4;
 
-constexpr GLuint kGles2AttributeLightPosition           = 0;
-constexpr GLuint kGles2AttributeLightTextureCoordinates = 1;
 
 constexpr GLuint kGles2AttributeModelPositionFrame1     = 0;
 constexpr GLuint kGles2AttributeModelPositionFrame2     = 1;
 constexpr GLuint kGles2AttributeModelTextureCoordinates = 2;
 constexpr GLuint kGles2AttributeModelColor              = 3;
+constexpr GLuint kGles2AttributeModelNormalFrame1       = 4;
+constexpr GLuint kGles2AttributeModelNormalFrame2       = 5;
 
 constexpr GLint kGles2TextureUnit0 = 0;
 constexpr GLint kGles2TextureUnit1 = 1;
 constexpr GLint kGles2TextureUnitSkyCube = 2;
+constexpr GLint kGles2TextureUnitLightData = 3;
+constexpr GLint kGles2TextureUnitLightHeaders = 4;
+constexpr GLint kGles2TextureUnitLightIndices = 5;
 
 enum Gles2FogMode
 {
@@ -46,6 +48,14 @@ class Gles2Program
     void SetModelView(const HMM_Mat4 &matrix);
 
     void SetMultiTexture(bool enabled);
+
+    void SetLightFalloff(bool enabled);
+
+    void SetWorldLit(bool enabled);
+
+    void SetLightGrid(const struct Gles2LightGridState *grid);
+
+    void SetGlowSet(int index);
 
     void SetLineMode(bool enabled);
 
@@ -82,6 +92,7 @@ class Gles2Program
     void ResetStatistics()
     {
         uniform_update_count_ = 0;
+        shadow_glow_set_      = -2;
     }
 
   private:
@@ -94,6 +105,21 @@ class Gles2Program
     GLint uniform_texture0_              = -1;
     GLint uniform_texture1_              = -1;
     GLint uniform_multi_texture_         = -1;
+    GLint uniform_light_falloff_         = -1;
+    GLint uniform_world_lit_             = -1;
+    GLint uniform_light_data_            = -1;
+    GLint uniform_light_headers_         = -1;
+    GLint uniform_light_indices_         = -1;
+    GLint uniform_light_list_            = -1;
+    GLint uniform_light_view_            = -1;
+    GLint uniform_light_bounds_min_      = -1;
+    GLint uniform_light_bounds_range_    = -1;
+    GLint uniform_light_radius_scale_    = -1;
+    GLint uniform_light_data_step_       = -1;
+    GLint uniform_glow_count_            = -1;
+    GLint uniform_glow_plane_            = -1;
+    GLint uniform_glow_color_            = -1;
+    GLint uniform_glow_additive_         = -1;
     GLint uniform_line_mode_             = -1;
     GLint uniform_skip_rgb_              = -1;
     GLint uniform_alpha_test_            = -1;
@@ -130,6 +156,10 @@ class Gles2Program
 
 
     float shadow_multi_texture_ = -1.0f;
+    float shadow_light_falloff_ = -1.0f;
+    float shadow_world_lit_     = -1.0f;
+    int   shadow_glow_set_      = -2;
+    uint32_t shadow_light_grid_serial_ = 0;
     float shadow_line_mode_     = -1.0f;
     float shadow_skip_rgb_      = -1.0f;
     float shadow_alpha_test_    = -1.0f;
@@ -182,6 +212,12 @@ class Gles2ModelProgram
 
     void SetOit(float mode, float scale);
 
+    void SetWorldLit(bool enabled);
+
+    void SetLightGrid(const struct Gles2LightGridState *grid);
+
+    void SetGlowSet(int index);
+
   private:
     void SetFloat(GLint location, float &shadow, float value);
 
@@ -190,6 +226,20 @@ class Gles2ModelProgram
     GLint uniform_model_view_projection_ = -1;
     GLint uniform_model_view_            = -1;
     GLint uniform_model_transform_       = -1;
+    GLint uniform_world_lit_             = -1;
+    GLint uniform_light_data_            = -1;
+    GLint uniform_light_headers_         = -1;
+    GLint uniform_light_indices_         = -1;
+    GLint uniform_light_view_            = -1;
+    GLint uniform_light_list_            = -1;
+    GLint uniform_light_bounds_min_      = -1;
+    GLint uniform_light_bounds_range_    = -1;
+    GLint uniform_light_radius_scale_    = -1;
+    GLint uniform_light_data_step_       = -1;
+    GLint uniform_glow_count_            = -1;
+    GLint uniform_glow_plane_            = -1;
+    GLint uniform_glow_color_            = -1;
+    GLint uniform_glow_additive_         = -1;
     GLint uniform_lerp_                  = -1;
     GLint uniform_texture_scale_         = -1;
     GLint uniform_texture_offset_        = -1;
@@ -218,6 +268,8 @@ class Gles2ModelProgram
 
     float shadow_oit_mode_  = -1.0f;
     float shadow_oit_scale_ = -1.0f;
+    float shadow_world_lit_ = -1.0f;
+    int   shadow_glow_set_  = -2;
 };
 
 extern Gles2ModelProgram gles2_model_program;
@@ -248,52 +300,6 @@ class Gles2MovieProgram
 };
 
 extern Gles2MovieProgram gles2_movie_program;
-
-class Gles2LightProgram
-{
-  public:
-    bool Init();
-
-    void Shutdown();
-
-    void Use();
-
-    void SetModelViewProjection(const HMM_Mat4 &matrix);
-
-    void SetSurfaceMode(float mode);
-
-    void SetAlpha(float alpha);
-
-    void SetAlphaTest(float reference);
-
-    void SetSurfaceNormal(float x, float y, float z, float radius_xy_divisor, bool normal_is_horizontal);
-
-    void SetLights(const float *position_radius, const float *color, int32_t count);
-
-  private:
-    void SetFloat(GLint location, float &shadow, float value);
-
-    GLuint program_ = 0;
-
-    GLint uniform_model_view_projection_ = -1;
-    GLint uniform_surface_texture_       = -1;
-    GLint uniform_light_texture_         = -1;
-    GLint uniform_surface_mode_          = -1;
-    GLint uniform_alpha_                 = -1;
-    GLint uniform_alpha_test_            = -1;
-    GLint uniform_surface_normal_        = -1;
-    GLint uniform_normal_horizontal_     = -1;
-    GLint uniform_light_count_           = -1;
-    GLint uniform_light_position_radius_ = -1;
-    GLint uniform_light_color_           = -1;
-
-    float shadow_surface_mode_      = -1.0f;
-    float shadow_alpha_             = -1.0f;
-    float shadow_alpha_test_        = -1.0f;
-    float shadow_normal_horizontal_ = -1.0f;
-};
-
-extern Gles2LightProgram gles2_light_program;
 
 class Gles2OitProgram
 {

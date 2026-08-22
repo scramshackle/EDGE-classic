@@ -38,6 +38,7 @@
 #include "m_misc.h"
 #include "n_network.h"
 #include "r_backend.h"
+#include "r_lightgrid.h"
 #include "r_modes.h"
 #include "r_render.h"
 #include "r_state.h"
@@ -51,6 +52,9 @@ int graphics_shutdown = 0;
 // I think grab_mouse should be an internal bool instead of a cvar...why would a
 // user need to adjust this on the fly? - Dasho
 EDGE_DEFINE_CONSOLE_VARIABLE(grab_mouse, "1", kConsoleVariableFlagArchive)
+EDGE_DEFINE_CONSOLE_VARIABLE(r_light_survey, "0", kConsoleVariableFlagNone)
+
+static int light_survey_frame = 0;
 EDGE_DEFINE_CONSOLE_VARIABLE(vsync, "1", kConsoleVariableFlagArchive)
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(gamma_correction, "0", kConsoleVariableFlagArchive, -1.0, 1.0)
 
@@ -443,6 +447,32 @@ static void SwapBuffers(void)
 void FinishFrame(void)
 {
     render_backend->FinishFrame();
+
+    if (r_light_survey.d_ && game_state == kGameStateLevel)
+    {
+        FrameStats stats;
+
+        render_backend->GetFrameStats(stats);
+
+        const LightGrid *grid = CurrentLightGrid();
+
+        LogPrint("Light survey %d: %d render units, %d dynamic-light, %d glow, %u backend draws, "
+                 "%d walls, %d planes, %d things | grid %d lights, tile max %d drop %d, "
+                 "cluster max %d drop %d.\n",
+                 light_survey_frame, ec_frame_stats.draw_render_units, ec_frame_stats.draw_light_dynamic,
+                 ec_frame_stats.draw_light_glow, stats.num_draw_, ec_frame_stats.draw_wall_parts,
+                 ec_frame_stats.draw_planes, ec_frame_stats.draw_things, (int)grid->lights.size(),
+                 grid->max_tile_count, grid->dropped_tile, grid->max_cluster_count, grid->dropped_cluster);
+
+        LogPrint("Light grid time: collect %llu us, bin %llu us, upload %llu us.\n",
+                 (unsigned long long)ec_frame_stats.light_grid_collect_us,
+                 (unsigned long long)ec_frame_stats.light_grid_bin_us,
+                 (unsigned long long)ec_frame_stats.light_grid_upload_us);
+
+        light_survey_frame++;
+
+        r_light_survey = r_light_survey.d_ - 1;
+    }
 
     SwapBuffers();
 

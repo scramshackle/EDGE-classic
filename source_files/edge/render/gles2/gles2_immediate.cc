@@ -521,7 +521,7 @@ void Gles2Immediate::DrawModelIndexed(int32_t index_offset, int32_t index_count)
 
 uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count)
 {
-    if (!data.frame_positions || !data.texture_coordinates || !indices)
+    if (!data.frame_positions || !data.frame_normals || !data.texture_coordinates || !indices)
         return 0;
 
     if (data.vertex_count <= 0 || data.frame_count <= 0 || index_count <= 0)
@@ -533,17 +533,22 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
     mesh.frame_count  = data.frame_count;
 
     glGenBuffers(1, &mesh.position_buffer);
+    glGenBuffers(1, &mesh.normal_buffer);
     glGenBuffers(1, &mesh.texture_coordinate_buffer);
     glGenBuffers(1, &mesh.color_buffer);
     glGenBuffers(1, &mesh.index_buffer);
 
-    if (!mesh.position_buffer || !mesh.texture_coordinate_buffer || !mesh.color_buffer || !mesh.index_buffer)
+    if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.color_buffer ||
+        !mesh.index_buffer)
         return 0;
 
     size_t position_bytes = (size_t)data.vertex_count * (size_t)data.frame_count * 3 * sizeof(float);
 
     glBindBuffer(GL_ARRAY_BUFFER, mesh.position_buffer);
     glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)position_bytes, data.frame_positions, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.normal_buffer);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)position_bytes, data.frame_normals, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, mesh.texture_coordinate_buffer);
     glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)data.vertex_count * 2 * sizeof(float)),
@@ -621,6 +626,14 @@ void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
     glVertexAttribPointer(kGles2AttributeModelPositionFrame2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                           (const void *)((size_t)info.frame2 * frame_stride + vertex_base));
 
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->normal_buffer);
+
+    glVertexAttribPointer(kGles2AttributeModelNormalFrame1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                          (const void *)((size_t)info.frame1 * frame_stride + vertex_base));
+
+    glVertexAttribPointer(kGles2AttributeModelNormalFrame2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                          (const void *)((size_t)info.frame2 * frame_stride + vertex_base));
+
     glBindBuffer(GL_ARRAY_BUFFER, mesh->texture_coordinate_buffer);
 
     glVertexAttribPointer(kGles2AttributeModelTextureCoordinates, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
@@ -647,12 +660,16 @@ void Gles2Immediate::DrawModelMesh(const ModelDrawInfo &info)
         return;
 
     glEnableVertexAttribArray(kGles2AttributeModelColor);
+    glEnableVertexAttribArray(kGles2AttributeModelNormalFrame1);
+    glEnableVertexAttribArray(kGles2AttributeModelNormalFrame2);
 
     BindModelMesh(info);
 
     glDrawElements(GL_TRIANGLES, info.index_count, GL_UNSIGNED_SHORT,
                    (const void *)((size_t)info.first_index * sizeof(uint16_t)));
 
+    glDisableVertexAttribArray(kGles2AttributeModelNormalFrame2);
+    glDisableVertexAttribArray(kGles2AttributeModelNormalFrame1);
     glDisableVertexAttribArray(kGles2AttributeModelColor);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);

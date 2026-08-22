@@ -89,11 +89,14 @@ enum CustomTextureEnvironment
     // output of the texture unit is the same as the input
     // for the RGB components.  The alpha component is treated
     // normally, i.e. passed on to next texture unit.
+
+    kTextureEnvironmentLightFalloff
 };
 
 struct ModelMeshData
 {
     const float *frame_positions    = nullptr;
+    const float *frame_normals      = nullptr;
     const float *texture_coordinates = nullptr;
 
     int frame_count  = 0;
@@ -121,24 +124,9 @@ struct ModelDrawInfo
     int vertex_count = 0;
     int first_index  = 0;
     int index_count  = 0;
-};
 
-constexpr int kMaximumLightsPerPass = 4;
-
-struct RendererLightPass
-{
-    float position_radius[kMaximumLightsPerPass * 4];
-    float color[kMaximumLightsPerPass * 4];
-
-    int count = 0;
-
-    float surface_normal[4];
-
-    bool normal_is_horizontal = false;
-
-    float surface_mode = 0.0f;
-    float alpha        = 1.0f;
-    float alpha_test   = 0.0f;
+    bool world_lit = false;
+    int  glow_set  = -1;
 };
 
 struct RendererScissor
@@ -171,15 +159,15 @@ struct SkyPassInfo
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
                                 float fog_density = 0, const SkyPassInfo *sky_pass = nullptr,
-                                const RendererScissor *scissor = nullptr,
-                                const RendererLightPass *light_pass = nullptr, bool light_depth = false);
+                                const RendererScissor *scissor = nullptr, bool light_depth = false,
+                                bool world_lit = false, int glow_set = -1);
 void            EndRenderUnit(int actual_vert);
 
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
 void     DeleteStaticVertexBuffer(uint32_t handle);
 void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                              GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                             const SkyPassInfo *sky_pass = nullptr);
+                             const SkyPassInfo *sky_pass = nullptr, bool world_lit = false, int glow_set = -1);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

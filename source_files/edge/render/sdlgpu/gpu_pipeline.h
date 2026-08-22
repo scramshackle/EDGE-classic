@@ -40,6 +40,8 @@ bool InitPipelines(SDL_GPUDevice *device, SDL_GPUTextureFormat color_format, SDL
 
 void ShutdownPipelines(SDL_GPUDevice *device);
 
+SDL_GPUComputePipeline *GetLightCullPipeline(void);
+
 SDL_GPUGraphicsPipeline *GetMoviePipeline(void);
 
 SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
@@ -47,7 +49,6 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
 
 SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
 
-SDL_GPUGraphicsPipeline *GetLightPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
 
 SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive);
 

@@ -101,27 +101,6 @@ void StaticMeshInvalidateSector(Sector *sec);
 
 void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertices);
 
-struct StaticSpanLighting
-{
-    const RendererVertex *vertices;
-    int                   count;
-
-    HMM_Vec3 normal;
-
-    float low[3];
-    float high[3];
-
-    float div_x, div_y, div_delta_x, div_delta_y;
-
-    bool    is_wall;
-    bool    mid_masked;
-    Sector *sector;
-
-    GLuint       tex_id;
-    BlendingMode blending;
-};
-
-void EmitStaticSpanLights(const StaticSpanLighting &info);
 
 void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *image, RegionProperties *props,
                             Sector *sector, BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass,

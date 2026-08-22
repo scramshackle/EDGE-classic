@@ -192,6 +192,7 @@ static struct BSPThread bsp_thread;
 #endif
 
 std::list<DrawSubsector *> draw_subsector_list;
+std::list<DrawThing *>     draw_thing_list;
 
 
 MirrorSet active_mirror_set;
@@ -231,6 +232,7 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     DrawMirror *mir = GetDrawMirror();
     mir->seg        = seg;
     mir->draw_subsectors.clear();
+    mir->draw_things.clear();
 
     mir->left      = view_angle + left;
     mir->right     = view_angle + right;
@@ -254,6 +256,8 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
 
     // perform another BSP walk
     BSPWalkNode(root_node);
+
+    EnumerateViewThings();
 
     bsp_current_subsector = save_sub;
 
@@ -709,7 +713,6 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
     dfloor->extrafloor      = nullptr;
     dfloor->floor_extrafloor = nullptr;
     dfloor->properties      = nullptr;
-    dfloor->things          = nullptr;
 
     dfloor->floor_height   = floor_height;
     dfloor->ceiling_height = ceiling_height;
@@ -755,11 +758,6 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
 
 static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
 {
-    for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
-    {
-        BSPWalkThing(K, mo);
-    }
-
     // clip 1D occlusion buffer.
     for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
     {

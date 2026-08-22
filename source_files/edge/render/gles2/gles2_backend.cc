@@ -5,6 +5,9 @@
 #include "epi_bam.h"
 #include "g_game.h"
 #include "gles2_immediate.h"
+#include "gles2_lights.h"
+
+#include "r_lightgrid.h"
 #include "gles2_program.h"
 #include "i_defs_gl.h"
 #include "r_colormap.h"
@@ -137,14 +140,13 @@ class Gles2RenderBackend : public RenderBackend
         if (!gles2_model_program.Init())
             FatalError("OpenGL: failed to create the model shader program.\n");
 
-        if (!gles2_light_program.Init())
-            FatalError("OpenGL: failed to create the light shader program.\n");
-
         if (!gles2_oit_program.Init())
             FatalError("OpenGL: failed to create the transparency composite shader program.\n");
 
         if (!gles2_immediate.Init())
             FatalError("OpenGL: failed to initialise the immediate renderer.\n");
+
+        Gles2CreateLightGridTextures();
 
         gles2_program.Use();
 
@@ -154,6 +156,21 @@ class Gles2RenderBackend : public RenderBackend
     HMM_Mat4 WorldViewProjection()
     {
         return gles2_immediate.ProjectionMatrix() * gles2_immediate.ModelViewMatrix();
+    }
+
+    HMM_Mat4 WorldModelView()
+    {
+        return gles2_immediate.ModelViewMatrix();
+    }
+
+    void UploadLightGrid(const LightGrid *grid)
+    {
+        Gles2UploadLightGrid(grid);
+    }
+
+    int LightGridBinningMode()
+    {
+        return kLightGridBinTiles;
     }
 
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
@@ -230,12 +247,13 @@ class Gles2RenderBackend : public RenderBackend
 
     void Shutdown()
     {
+        Gles2DestroyLightGridTextures();
+
         gles2_immediate.Shutdown();
 
         gles2_program.Shutdown();
         gles2_model_program.Shutdown();
         gles2_movie_program.Shutdown();
-        gles2_light_program.Shutdown();
         gles2_oit_program.Shutdown();
     }
 

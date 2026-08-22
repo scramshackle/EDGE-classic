@@ -21,6 +21,7 @@
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
+#include "r_lightgrid.h"
 #include "r_image.h"
 #include "r_misc.h"
 #include "r_shader.h"
@@ -1805,45 +1806,5 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         frame_time_span_runs += GetMicroseconds() - run_mark;
 
-        if (!use_dynamic_lights)
-            continue;
-
-        EDGE_ZoneScopedN("StaticMesh lights");
-
-        uint64_t light_mark = GetMicroseconds();
-
-        for (size_t k = 0; k < batch.spans.size(); k++)
-        {
-            const StaticSpan &span = batch.spans[k];
-
-            if (!span.live)
-                continue;
-
-            StaticSpanLighting info;
-
-            info.vertices = batch.vertices.data() + span.start;
-            info.count    = span.count;
-            info.normal   = span.normal;
-            info.is_wall    = span.is_wall;
-            info.mid_masked = span.mid_masked;
-            info.sector   = span.sector;
-            info.tex_id   = tex_id;
-            info.blending = batch.blending;
-
-            info.div_x       = span.div_x;
-            info.div_y       = span.div_y;
-            info.div_delta_x = span.div_delta_x;
-            info.div_delta_y = span.div_delta_y;
-
-            for (int axis = 0; axis < 3; axis++)
-            {
-                info.low[axis]  = span.low[axis];
-                info.high[axis] = span.high[axis];
-            }
-
-            EmitStaticSpanLights(info);
-        }
-
-        frame_time_span_lights += GetMicroseconds() - light_mark;
     }
 }

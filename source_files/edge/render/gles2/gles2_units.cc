@@ -7,6 +7,8 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "gles2_immediate.h"
+#include "gles2_lights.h"
+#include "gles2_program.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
 #include "r_gldefs.h"
@@ -42,6 +44,8 @@ struct RendererUnit
 
     bool        sky_pass_enabled = false;
     bool        light_depth_enabled = false;
+    bool        world_lit_enabled   = false;
+    int         glow_set            = -1;
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
@@ -52,8 +56,6 @@ struct RendererUnit
     bool            scissor_enabled = false;
     RendererScissor scissor;
 
-    bool              light_pass_enabled = false;
-    RendererLightPass light_pass;
 };
 
 static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
@@ -111,7 +113,7 @@ void DeleteStaticVertexBuffer(uint32_t handle)
 
 void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                          GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                         const SkyPassInfo *sky_pass)
+                         const SkyPassInfo *sky_pass, bool world_lit, int glow_set)
 {
     if (!handle || count <= 0)
         return;
@@ -143,8 +145,9 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->fog_density         = fog_density;
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = true;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
     unit->scissor_enabled     = false;
-    unit->light_pass_enabled  = false;
     unit->index_first         = 0;
     unit->index_count         = 0;
     unit->static_buffer       = handle;
@@ -162,7 +165,7 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
                                 const SkyPassInfo *sky_pass, const RendererScissor *scissor,
-                                const RendererLightPass *light_pass, bool light_depth)
+                                bool light_depth, bool world_lit, int glow_set)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -204,6 +207,8 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = light_depth;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
     unit->texture_offset      = {{0, 0}};
     unit->liquid              = {{0, 0}};
 
@@ -215,10 +220,7 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     if (scissor)
         unit->scissor = *scissor;
 
-    unit->light_pass_enabled = (light_pass != nullptr);
 
-    if (light_pass)
-        unit->light_pass = *light_pass;
 
     unit->static_buffer = 0;
     unit->static_first  = 0;
@@ -361,9 +363,6 @@ static int32_t ExpandUnitIndices(GLuint shape, int first, int count, uint16_t *o
 
 static void PromoteSecondTexture(RendererUnit *unit, RendererVertex *verts)
 {
-    if (unit->light_pass_enabled)
-        return;
-
     if ((unit->texture[0] && unit->environment_mode[0] != kTextureEnvironmentDisable) || !unit->texture[1] ||
         unit->environment_mode[1] == kTextureEnvironmentDisable)
         return;
@@ -394,11 +393,8 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
         !epi::AlmostEquals(a->texture_offset.X, b->texture_offset.X) ||
         !epi::AlmostEquals(a->texture_offset.Y, b->texture_offset.Y) ||
         !epi::AlmostEquals(a->liquid.X, b->liquid.X) || !epi::AlmostEquals(a->liquid.Y, b->liquid.Y) ||
-        a->light_depth_enabled != b->light_depth_enabled || a->static_buffer || b->static_buffer ||
+        a->light_depth_enabled != b->light_depth_enabled || a->world_lit_enabled != b->world_lit_enabled || a->glow_set != b->glow_set || a->static_buffer || b->static_buffer ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
-        return false;
-
-    if (a->light_pass_enabled || b->light_pass_enabled)
         return false;
 
     if (a->scissor_enabled != b->scissor_enabled)
@@ -435,40 +431,6 @@ static void ApplyUnitEnvironment(int32_t texture_unit, GLuint environment)
     }
 }
 
-static void DrawLightPassUnit(const RendererUnit *unit, int32_t run_index_count)
-{
-    const RendererLightPass &light_pass = unit->light_pass;
-
-    render_state->ActiveTexture(GL_TEXTURE1);
-    render_state->Enable(GL_TEXTURE_2D);
-    render_state->BindTexture(unit->texture[1]);
-    render_state->TextureWrapS(GL_CLAMP_TO_EDGE);
-    render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
-
-    render_state->ActiveTexture(GL_TEXTURE0);
-    render_state->Enable(GL_TEXTURE_2D);
-    render_state->BindTexture(unit->texture[0]);
-
-    Gles2ApplyRenderState();
-
-    gles2_light_program.Use();
-
-    gles2_light_program.SetModelViewProjection(render_backend->WorldViewProjection());
-
-    gles2_light_program.SetSurfaceMode(light_pass.surface_mode);
-    gles2_light_program.SetAlpha(light_pass.alpha);
-    gles2_light_program.SetAlphaTest(light_pass.alpha_test);
-
-    gles2_light_program.SetSurfaceNormal(light_pass.surface_normal[0], light_pass.surface_normal[1],
-                                         light_pass.surface_normal[2], light_pass.surface_normal[3],
-                                         light_pass.normal_is_horizontal);
-
-    gles2_light_program.SetLights(light_pass.position_radius, light_pass.color, light_pass.count);
-
-    gles2_immediate.DrawMergedWithoutMatrices(unit->index_first, run_index_count);
-
-    gles2_program.Use();
-}
 
 static void BindUnitTextures(const RendererUnit *unit)
 {
@@ -894,6 +856,30 @@ void RenderCurrentUnits(void)
 
         gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gles2_program.SetLightDepth(unit->light_depth_enabled);
+        gles2_program.SetLightFalloff(unit->environment_mode[1] == (GLuint)kTextureEnvironmentLightFalloff);
+
+        const Gles2LightGridState *light_grid = Gles2CurrentLightGrid();
+
+        bool world_lit = unit->world_lit_enabled && light_grid->active;
+
+        if (world_lit)
+        {
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightData);
+            glBindTexture(GL_TEXTURE_2D, light_grid->data_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightHeaders);
+            glBindTexture(GL_TEXTURE_2D, light_grid->header_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightIndices);
+            glBindTexture(GL_TEXTURE_2D, light_grid->list_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
+
+            gles2_program.SetLightGrid(light_grid);
+        }
+
+        gles2_program.SetWorldLit(world_lit);
+        gles2_program.SetGlowSet(unit->glow_set);
         gles2_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
         gles2_program.SetTextureOffset(unit->texture_offset);
         gles2_program.SetLiquid(unit->liquid);
@@ -907,8 +893,6 @@ void RenderCurrentUnits(void)
 
         if (unit->static_buffer)
             gles2_immediate.DrawStatic(unit->static_buffer, unit->shape, unit->static_first, unit->count);
-        else if (unit->light_pass_enabled)
-            DrawLightPassUnit(unit, run_index_count);
         else
             gles2_immediate.DrawMerged(unit->index_first, run_index_count);
 

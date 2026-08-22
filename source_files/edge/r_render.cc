@@ -54,6 +54,7 @@
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_occlude.h"
+#include "r_lightgrid.h"
 #include "r_shader.h"
 #include "r_sky.h"
 #include "r_state.h"
@@ -112,6 +113,7 @@ static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
 
 extern std::list<DrawSubsector *> draw_subsector_list;
+extern std::list<DrawThing *>     draw_thing_list;
 
 static void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int face_dir, float h1, float h2);
 
@@ -411,335 +413,6 @@ static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
     *lit_pos = *pos;
 }
 
-static constexpr int kMaximumSurfaceLights = 64;
-
-static MapObject *surface_light_list[kMaximumSurfaceLights];
-static int        surface_light_total = 0;
-
-static int surface_light_group_sizes[kMaximumSurfaceLights];
-static int surface_light_group_total = 0;
-
-static void EmitCollectedWallLights(WallCoordinateData *data);
-static void EmitCollectedPlaneLights(PlaneCoordinateData *data);
-
-static constexpr float kLightBatchOverlapFraction = 0.5f;
-
-static double RectangleArea(const RendererScissor &rect)
-{
-    return (double)rect.width * (double)rect.height;
-}
-
-static void UnionRectangle(RendererScissor *into, const RendererScissor &other)
-{
-    int32_t x1 = HMM_MIN(into->x, other.x);
-    int32_t y1 = HMM_MIN(into->y, other.y);
-    int32_t x2 = HMM_MAX(into->x + into->width, other.x + other.width);
-    int32_t y2 = HMM_MAX(into->y + into->height, other.y + other.height);
-
-    into->x      = x1;
-    into->y      = y1;
-    into->width  = x2 - x1;
-    into->height = y2 - y1;
-}
-
-static bool RectanglesOverlapEnough(const RendererScissor &a, const RendererScissor &b)
-{
-    int32_t x1 = HMM_MAX(a.x, b.x);
-    int32_t y1 = HMM_MAX(a.y, b.y);
-    int32_t x2 = HMM_MIN(a.x + a.width, b.x + b.width);
-    int32_t y2 = HMM_MIN(a.y + a.height, b.y + b.height);
-
-    if (x1 >= x2 || y1 >= y2)
-        return false;
-
-    double intersection = (double)(x2 - x1) * (double)(y2 - y1);
-
-    double smaller = HMM_MIN(RectangleArea(a), RectangleArea(b));
-
-    if (smaller <= 0.0)
-        return false;
-
-    return intersection >= smaller * (double)kLightBatchOverlapFraction;
-}
-
-static void GroupCollectedSurfaceLights()
-{
-    surface_light_group_total = 0;
-
-    if (surface_light_total < 2)
-    {
-        for (int i = 0; i < surface_light_total; i++)
-            surface_light_group_sizes[surface_light_group_total++] = 1;
-
-        return;
-    }
-
-    DynamicLightParameters parameters[kMaximumSurfaceLights];
-
-    int sortable = 0;
-
-    for (int i = 0; i < surface_light_total; i++)
-    {
-        if (!surface_light_list[i]->dynamic_light_.shader->GetLightParameters(&parameters[i]))
-        {
-            for (int k = 0; k < surface_light_total; k++)
-                surface_light_group_sizes[surface_light_group_total++] = 1;
-
-            return;
-        }
-
-        sortable++;
-    }
-
-    for (int i = 1; i < sortable; i++)
-    {
-        MapObject             *moved_light      = surface_light_list[i];
-        DynamicLightParameters moved_parameters = parameters[i];
-
-        int j = i - 1;
-
-        while (j >= 0 && (parameters[j].image_texture > moved_parameters.image_texture ||
-                          (parameters[j].image_texture == moved_parameters.image_texture &&
-                           (int)parameters[j].additive > (int)moved_parameters.additive)))
-        {
-            surface_light_list[j + 1] = surface_light_list[j];
-            parameters[j + 1]         = parameters[j];
-            j--;
-        }
-
-        surface_light_list[j + 1] = moved_light;
-        parameters[j + 1]         = moved_parameters;
-    }
-
-    RendererScissor rectangles[kMaximumSurfaceLights];
-    bool            rectangle_valid[kMaximumSurfaceLights];
-    bool            already_grouped[kMaximumSurfaceLights];
-
-    for (int i = 0; i < sortable; i++)
-    {
-        LightRectResult result =
-            GetDynamicLightScreenRect(surface_light_list[i]->dynamic_light_.shader, &rectangles[i]);
-
-        if (result == kLightRectFull)
-        {
-            rectangles[i].x      = view_window_x;
-            rectangles[i].y      = view_window_y;
-            rectangles[i].width  = view_window_width;
-            rectangles[i].height = view_window_height;
-        }
-
-        rectangle_valid[i] = (result != kLightRectCulled);
-        already_grouped[i] = false;
-    }
-
-    MapObject *ordered[kMaximumSurfaceLights];
-
-    int ordered_total = 0;
-
-    for (int i = 0; i < sortable; i++)
-    {
-        if (already_grouped[i])
-            continue;
-
-        already_grouped[i]       = true;
-        ordered[ordered_total++] = surface_light_list[i];
-
-        int emitted_group = 1;
-
-        if (!rectangle_valid[i])
-        {
-            surface_light_group_sizes[surface_light_group_total++] = emitted_group;
-            continue;
-        }
-
-        RendererScissor group_rectangle = rectangles[i];
-
-        int group_count = 1;
-
-        for (int j = i + 1; j < sortable && group_count < kMaximumLightsPerPass; j++)
-        {
-            if (already_grouped[j] || !rectangle_valid[j])
-                continue;
-
-            if (parameters[j].image_texture != parameters[i].image_texture ||
-                parameters[j].additive != parameters[i].additive)
-                continue;
-
-            if (!RectanglesOverlapEnough(group_rectangle, rectangles[j]))
-                continue;
-
-            already_grouped[j]       = true;
-            ordered[ordered_total++] = surface_light_list[j];
-
-            UnionRectangle(&group_rectangle, rectangles[j]);
-
-            group_count++;
-            emitted_group++;
-        }
-
-        surface_light_group_sizes[surface_light_group_total++] = emitted_group;
-    }
-
-    for (int i = 0; i < ordered_total; i++)
-        surface_light_list[i] = ordered[i];
-}
-
-static void DLIT_Wall(MapObject *mo, void *dataptr)
-{
-    WallCoordinateData *data = (WallCoordinateData *)dataptr;
-
-    // light behind the plane ?
-    if (!mo->info_->dlight_.leaky_ && !data->mid_masked &&
-        !(mo->subsector_->sector->floor_vertex_slope || mo->subsector_->sector->ceiling_vertex_slope))
-    {
-        float dist = (mo->x - data->div.x) * data->div.delta_y - (mo->y - data->div.y) * data->div.delta_x;
-
-        if (dist < 0)
-            return;
-    }
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    if (surface_light_total >= kMaximumSurfaceLights)
-        EmitCollectedWallLights(data);
-
-    surface_light_list[surface_light_total++] = mo;
-}
-
-static void EmitCollectedWallLights(WallCoordinateData *data)
-{
-    GroupCollectedSurfaceLights();
-
-    BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
-
-    int index = 0;
-
-    for (int g = 0; g < surface_light_group_total && index < surface_light_total; g++)
-    {
-        int group_size = surface_light_group_sizes[g];
-
-        if (group_size > 1)
-        {
-            AbstractShader *shaders[kMaximumLightsPerPass];
-
-            for (int k = 0; k < group_size; k++)
-                shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
-
-            if (EmitMultiLightPass(shaders, group_size, data->shape, data->v_count, data->tex_id, data->trans,
-                                   &data->pass, blending, data->mid_masked, data, WallCoordFunc))
-            {
-                index += group_size;
-                continue;
-            }
-        }
-
-        for (int k = 0; k < group_size; k++)
-        {
-            MapObject *mo = surface_light_list[index + k];
-
-            mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass,
-                                                blending, data->mid_masked, data, WallCoordFunc);
-        }
-
-        index += group_size;
-    }
-
-    surface_light_total       = 0;
-    surface_light_group_total = 0;
-}
-
-static void GLOWLIT_Wall(MapObject *mo, void *dataptr)
-{
-    WallCoordinateData *data = (WallCoordinateData *)dataptr;
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
-
-    mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass, blending,
-                                        data->mid_masked, data, WallCoordFunc);
-}
-
-static void DLIT_Plane(MapObject *mo, void *dataptr)
-{
-    PlaneCoordinateData *data = (PlaneCoordinateData *)dataptr;
-
-    // light behind the plane ?
-    if (!mo->info_->dlight_.leaky_ &&
-        !(mo->subsector_->sector->floor_vertex_slope || mo->subsector_->sector->ceiling_vertex_slope))
-    {
-        float z = data->baked ? data->baked[0].position.Z : data->vertices[0].Z;
-
-        if (data->slope)
-            z += Slope_GetHeight(data->slope, mo->x, mo->y);
-
-        if ((MapObjectMidZ(mo) > z) != (data->normal.Z > 0))
-            return;
-    }
-
-    // NOTE: distance already checked in DynamicLightIterator
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    if (surface_light_total >= kMaximumSurfaceLights)
-        EmitCollectedPlaneLights(data);
-
-    surface_light_list[surface_light_total++] = mo;
-}
-
-static void EmitCollectedPlaneLights(PlaneCoordinateData *data)
-{
-    GroupCollectedSurfaceLights();
-
-    BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
-
-    int index = 0;
-
-    for (int g = 0; g < surface_light_group_total && index < surface_light_total; g++)
-    {
-        int group_size = surface_light_group_sizes[g];
-
-        if (group_size > 1)
-        {
-            AbstractShader *shaders[kMaximumLightsPerPass];
-
-            for (int k = 0; k < group_size; k++)
-                shaders[k] = surface_light_list[index + k]->dynamic_light_.shader;
-
-            if (EmitMultiLightPass(shaders, group_size, data->shape, data->v_count, data->tex_id, data->trans,
-                                   &data->pass, blending, false, data, PlaneCoordFunc))
-            {
-                index += group_size;
-                continue;
-            }
-        }
-
-        for (int k = 0; k < group_size; k++)
-        {
-            MapObject *mo = surface_light_list[index + k];
-
-            mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass,
-                                                blending, false, data, PlaneCoordFunc);
-        }
-
-        index += group_size;
-    }
-
-    surface_light_total       = 0;
-    surface_light_group_total = 0;
-}
-
-static void GLOWLIT_Plane(MapObject *mo, void *dataptr)
-{
-    PlaneCoordinateData *data = (PlaneCoordinateData *)dataptr;
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    BlendingMode blending = (BlendingMode)((data->blending & ~kBlendingAlpha) | kBlendingAdd);
-
-    mo->dynamic_light_.shader->WorldMix(data->shape, data->v_count, data->tex_id, data->trans, &data->pass, blending,
-                                        false, data, PlaneCoordFunc);
-}
 
 static inline void GreetNeighbourSector(float *hts, int &num, VertexSectorList *seclist)
 {
@@ -1011,106 +684,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         data.trans    = old_dt;
     }
 
-    if (use_dynamic_lights && render_view_extra_light < 250)
-    {
-        float bottom = HMM_MIN(lz1, rz1);
-        float top    = HMM_MAX(lz2, rz2);
-
-        float surface_low[3];
-        float surface_high[3];
-
-        for (int axis = 0; axis < 3; axis++)
-        {
-            surface_low[axis]  = vertices[0].Elements[axis];
-            surface_high[axis] = vertices[0].Elements[axis];
-        }
-
-        for (int v_idx = 1; v_idx < v_count; v_idx++)
-        {
-            for (int axis = 0; axis < 3; axis++)
-            {
-                surface_low[axis]  = HMM_MIN(surface_low[axis], vertices[v_idx].Elements[axis]);
-                surface_high[axis] = HMM_MAX(surface_high[axis], vertices[v_idx].Elements[axis]);
-            }
-        }
-
-        SetSurfaceLightBounds(surface_low[0], surface_low[1], surface_low[2], surface_high[0], surface_high[1],
-                              surface_high[2]);
-
-        DynamicLightIterator(v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom, v_bbox[kBoundingBoxRight],
-                             v_bbox[kBoundingBoxTop], top, DLIT_Wall, &data);
-
-        EmitCollectedWallLights(&data);
-
-        SectorGlowIterator(current_seg->front_sector, v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], bottom,
-                           v_bbox[kBoundingBoxRight], v_bbox[kBoundingBoxTop], top, GLOWLIT_Wall, &data);
-
-        ClearSurfaceLightBounds();
-    }
-
     swirl_pass = 0;
-}
-
-void EmitStaticSpanLights(const StaticSpanLighting &info)
-{
-    if (!use_dynamic_lights || render_view_extra_light >= 250 || info.count < 3)
-        return;
-
-    SetSurfaceLightBounds(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2]);
-
-    if (info.is_wall)
-    {
-        WallCoordinateData data;
-
-        data.v_count    = info.count;
-        data.vertices   = nullptr;
-        data.baked      = info.vertices;
-        data.shape      = GL_TRIANGLES;
-        data.tex_id     = info.tex_id;
-        data.pass       = 1;
-        data.blending   = info.blending;
-        data.trans      = 1.0f;
-        data.mid_masked = info.mid_masked;
-        data.normal     = info.normal;
-
-        data.div.x       = info.div_x;
-        data.div.y       = info.div_y;
-        data.div.delta_x = info.div_delta_x;
-        data.div.delta_y = info.div_delta_y;
-
-        DynamicLightIterator(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2], DLIT_Wall,
-                             &data);
-
-        EmitCollectedWallLights(&data);
-
-        SectorGlowIterator(info.sector, info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2],
-                           GLOWLIT_Wall, &data);
-    }
-    else
-    {
-        PlaneCoordinateData data;
-
-        data.v_count  = info.count;
-        data.vertices = nullptr;
-        data.baked    = info.vertices;
-        data.shape    = GL_TRIANGLES;
-        data.tex_id   = info.tex_id;
-        data.pass     = 1;
-        data.blending = info.blending;
-        data.trans    = 1.0f;
-        data.normal   = info.normal;
-        data.slope    = nullptr;
-
-        DynamicLightIterator(info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2], DLIT_Plane,
-                             &data);
-
-        EmitCollectedPlaneLights(&data);
-
-        SectorGlowIterator(info.sector, info.low[0], info.low[1], info.low[2], info.high[0], info.high[1], info.high[2],
-                           GLOWLIT_Plane, &data);
-    }
-
-    ClearSurfaceLightBounds();
 }
 
 static void DrawSlidingDoor(DrawFloor *dfloor, float c, float f, float tex_top_h, MapSurface *surf, bool opaque,
@@ -1429,7 +1003,7 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
         {
             slope_fh = sec->height_sector->interpolated_ceiling_height;
         }
-        else
+        else if (!(view_height_zone == kHeightZoneC && view_z < sec->height_sector->interpolated_floor_height))
         {
             slope_fh = sec->height_sector->interpolated_floor_height;
         }
@@ -1471,7 +1045,7 @@ static void ComputeWallTiles(Seg *seg, DrawFloor *dfloor, int sidenum, float f_m
             {
                 other_fh = other->height_sector->interpolated_ceiling_height;
             }
-            else
+            else if (!(view_height_zone == kHeightZoneC && view_z < other->height_sector->interpolated_floor_height))
             {
                 other_fh = other->height_sector->interpolated_floor_height;
             }
@@ -2195,13 +1769,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     if (use_dynamic_lights && render_view_extra_light < 250)
     {
-        DynamicLightIterator(v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], h, v_bbox[kBoundingBoxRight],
-                             v_bbox[kBoundingBoxTop], h, DLIT_Plane, &data);
 
-        EmitCollectedPlaneLights(&data);
-
-        SectorGlowIterator(current_subsector->sector, v_bbox[kBoundingBoxLeft], v_bbox[kBoundingBoxBottom], h,
-                           v_bbox[kBoundingBoxRight], v_bbox[kBoundingBoxTop], h, GLOWLIT_Plane, &data);
     }
 
     swirl_pass = 0;
@@ -2209,7 +1777,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
 static void RenderSubsector(DrawSubsector *dsub);
 
-void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
+void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings, bool for_mirror)
 {
     EDGE_ZoneScoped;
 
@@ -2227,6 +1795,8 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
 
         for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
             RenderSubsector(*FI);
+
+        RenderThings(dthings, solid_mode);
 
         FinishUnitBatch();
     }
@@ -2264,6 +1834,8 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror)
             {
                 RenderSubsector(*RI);
             }
+
+            RenderThings(dthings, solid_mode);
 
             FinishUnitBatch();
         }
@@ -2309,12 +1881,8 @@ static void RenderSubsector(DrawSubsector *dsub)
 
         RenderPlane(dfloor, dfloor->ceiling_height, dfloor->ceiling, -1);
         RenderPlane(dfloor, dfloor->floor_height, dfloor->floor, +1);
-
-        if (!RenderThings(dfloor, solid_mode))
-        {
-            current_draw_subsector->solid = false;
-        }
     }
+
 }
 
 static void InitializeCamera(MapObject *mo, bool full_height, float expand_w)
@@ -2550,10 +2118,19 @@ void RenderTrueBSP(void)
         }
 
         draw_subsector_list.clear();
+        draw_thing_list.clear();
 
         render_backend->SetRenderLayer(kRenderLayerSolid, false);
         render_state->Clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         render_state->Enable(GL_DEPTH_TEST);
+
+        BuildLightGrid();
+
+        {
+            uint64_t upload_mark = GetMicroseconds();
+            render_backend->UploadLightGrid(CurrentLightGrid());
+            ec_frame_stats.light_grid_upload_us += GetMicroseconds() - upload_mark;
+        }
     }
 
     {
@@ -2609,7 +2186,13 @@ void RenderTrueBSP(void)
         FinishSky(true);
     }
 
-    RenderSubList(draw_subsector_list);
+    {
+        EDGE_ZoneScopedN("RenderTrueBSP things");
+
+        EnumerateViewThings();
+    }
+
+    RenderSubList(draw_subsector_list, draw_thing_list);
 
     // Add lines seen during render to the automap
     if (!newly_seen_lines.empty())
@@ -2761,52 +2344,6 @@ static void FloodCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
     texc->Y = rx * data->y_mat.X + ry * data->y_mat.Y;
 }
 
-static void DLIT_Flood(MapObject *mo, void *dataptr)
-{
-    FloodEmulationData *data = (FloodEmulationData *)dataptr;
-
-    // light behind the plane ?
-    if (!mo->info_->dlight_.leaky_ &&
-        !(mo->subsector_->sector->floor_vertex_slope || mo->subsector_->sector->ceiling_vertex_slope))
-    {
-        if ((MapObjectMidZ(mo) > data->plane_h) != (data->normal.Z > 0))
-            return;
-    }
-
-    // NOTE: distance already checked in DynamicLightIterator
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    float sx = current_seg->vertex_1->X;
-    float sy = current_seg->vertex_1->Y;
-
-    float dx = current_seg->vertex_2->X - sx;
-    float dy = current_seg->vertex_2->Y - sy;
-
-    BlendingMode blending = kBlendingAdd;
-
-    for (int row = 0; row < data->piece_row; row++)
-    {
-        float z = data->h1 + data->dh * row / (float)data->piece_row;
-
-        for (int col = 0; col <= data->piece_col; col++)
-        {
-            float x = sx + dx * col / (float)data->piece_col;
-            float y = sy + dy * col / (float)data->piece_col;
-
-            data->vertices[col * 2 + 0] = {{x, y, z}};
-            data->vertices[col * 2 + 1] = {{x, y, z + data->dh / data->piece_row}};
-        }
-
-        if (data->pass > 5)
-        {
-            break;
-        }
-
-        mo->dynamic_light_.shader->WorldMix(GL_QUAD_STRIP, data->v_count, data->tex_id, 1.0, &data->pass, blending,
-                                            false, data, FloodCoordFunc);
-    }
-}
 
 void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int face_dir, float h1, float h2)
 {
@@ -2921,34 +2458,4 @@ void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int fac
                               FloodCoordFunc);
     }
 
-    if (use_dynamic_lights && solid_mode && render_view_extra_light < 250)
-    {
-        // Note: dynamic lights could have been handled in the row-by-row
-        //       loop above (after the cmap_shader).  However it is more
-        //       efficient to handle them here, and duplicate the striping
-        //       code in the DLIT_Flood function.
-
-        float ex = current_seg->vertex_2->X;
-        float ey = current_seg->vertex_2->Y;
-
-        // compute bbox for finding dlights (use 'lit_pos' coords).
-        float other_h = (face_dir > 0) ? h1 : h2;
-
-        float along = (view_z - data.plane_h) / (view_z - other_h);
-
-        float sx2 = view_x + along * (sx - view_x);
-        float sy2 = view_y + along * (sy - view_y);
-        float ex2 = view_x + along * (ex - view_x);
-        float ey2 = view_y + along * (ey - view_y);
-
-        float lx1 = HMM_MIN(HMM_MIN(sx, sx2), HMM_MIN(ex, ex2));
-        float ly1 = HMM_MIN(HMM_MIN(sy, sy2), HMM_MIN(ey, ey2));
-        float lx2 = HMM_MAX(HMM_MAX(sx, sx2), HMM_MAX(ex, ex2));
-        float ly2 = HMM_MAX(HMM_MAX(sy, sy2), HMM_MAX(ey, ey2));
-
-        //		LogDebug("Flood BBox size: %1.0f x %1.0f\n", lx2-lx1,
-        // ly2-ly1);
-
-        DynamicLightIterator(lx1, ly1, data.plane_h, lx2, ly2, data.plane_h, DLIT_Flood, &data);
-    }
 }

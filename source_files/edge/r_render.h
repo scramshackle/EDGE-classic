@@ -6,7 +6,7 @@
 
 extern std::unordered_set<Line *> newly_seen_lines;
 
-void RenderSubList(std::list<DrawSubsector *> &dsubs, bool for_mirror = false);
+void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings, bool for_mirror = false);
 
 void BSPWalkNode(unsigned int);
 

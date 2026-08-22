@@ -1,4 +1,6 @@
 #version 100
+#define EDGE_LIGHT_MAX_PER_TILE 64
+#define EDGE_LIGHT_MAX_GLOWS 2
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else

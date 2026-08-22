@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model light world_oit model_oit)
+set(SHADER_NAMES world movie model world_oit model_oit)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
@@ -105,6 +105,15 @@ foreach(STAGE IN LISTS SHADER_STAGES)
   count_descriptor_set("${DISASSEMBLY}" ${SAMPLER_SET} SAMPLER_COUNT)
   count_descriptor_set("${DISASSEMBLY}" ${UNIFORM_SET} UNIFORM_BUFFER_COUNT)
 
+  string(REGEX MATCHALL "BufferBlock" STORAGE_MATCHES "${DISASSEMBLY}")
+  list(LENGTH STORAGE_MATCHES STORAGE_BUFFER_COUNT)
+
+  math(EXPR SAMPLER_COUNT "${SAMPLER_COUNT} - ${STORAGE_BUFFER_COUNT}")
+
+  if (SAMPLER_COUNT LESS 0)
+    message(FATAL_ERROR "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl storage-buffer count exceeds set ${SAMPLER_SET} total.")
+  endif()
+
   foreach(STRAY_SET RANGE 0 3)
     if (NOT STRAY_SET EQUAL SAMPLER_SET AND NOT STRAY_SET EQUAL UNIFORM_SET)
       count_descriptor_set("${DISASSEMBLY}" ${STRAY_SET} STRAY_COUNT)
@@ -132,7 +141,8 @@ foreach(STAGE IN LISTS SHADER_STAGES)
   math(EXPR LAST_WORD "${WORD_COUNT} - 1")
 
   string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}SamplerCount = ${SAMPLER_COUNT};\n")
-  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}UniformBufferCount = ${UNIFORM_BUFFER_COUNT};\n\n")
+  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}UniformBufferCount = ${UNIFORM_BUFFER_COUNT};\n")
+  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}StorageBufferCount = ${STORAGE_BUFFER_COUNT};\n\n")
   string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}Spirv[] = {")
 
   foreach(WORD_INDEX RANGE ${LAST_WORD})
@@ -158,8 +168,8 @@ foreach(STAGE IN LISTS SHADER_STAGES)
 
   string(APPEND GENERATED_BODY "\n};\n\n")
 
-  message(STATUS "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) in set "
-                 "${SAMPLER_SET}, ${UNIFORM_BUFFER_COUNT} uniform buffer(s) in set ${UNIFORM_SET}")
+  message(STATUS "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) and "
+                 "${STORAGE_BUFFER_COUNT} storage buffer(s) in set ${SAMPLER_SET}, ${UNIFORM_BUFFER_COUNT} uniform buffer(s) in set ${UNIFORM_SET}")
 endforeach()
 
 set(GENERATED_HEADER "#pragma once\n\n#include <stdint.h>\n\n${GENERATED_BODY}")
@@ -169,3 +179,76 @@ file(WRITE "${SHADER_DIR}/${SHADER_NAME}_spirv.h" "${GENERATED_HEADER}")
 message(STATUS "compile_shaders: wrote ${SHADER_DIR}/${SHADER_NAME}_spirv.h")
 
 endforeach()
+
+set(COMPUTE_NAME "light_cull")
+set(COMPUTE_SOURCE "${SHADER_DIR}/${COMPUTE_NAME}.comp.glsl")
+set(COMPUTE_BINARY "${CMAKE_CURRENT_BINARY_DIR}/${COMPUTE_NAME}.comp.spv")
+
+execute_process(
+  COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 -S comp -o "${COMPUTE_BINARY}" "${COMPUTE_SOURCE}"
+  RESULT_VARIABLE COMPILE_RESULT
+  OUTPUT_VARIABLE COMPILE_OUTPUT
+  ERROR_VARIABLE COMPILE_OUTPUT)
+
+if (NOT COMPILE_RESULT EQUAL 0)
+  message(FATAL_ERROR "compile_shaders: glslangValidator failed on ${COMPUTE_NAME}.comp.glsl\n${COMPILE_OUTPUT}")
+endif()
+
+if (SPIRV_VAL)
+  execute_process(COMMAND "${SPIRV_VAL}" "${COMPUTE_BINARY}" RESULT_VARIABLE VALIDATE_RESULT
+                  OUTPUT_VARIABLE VALIDATE_OUTPUT ERROR_VARIABLE VALIDATE_OUTPUT)
+  if (NOT VALIDATE_RESULT EQUAL 0)
+    message(FATAL_ERROR "compile_shaders: spirv-val rejected ${COMPUTE_NAME}.comp.spv\n${VALIDATE_OUTPUT}")
+  endif()
+endif()
+
+execute_process(COMMAND "${SPIRV_DIS}" --no-color "${COMPUTE_BINARY}" OUTPUT_VARIABLE DISASSEMBLY
+                ERROR_VARIABLE DISASSEMBLE_ERROR RESULT_VARIABLE DISASSEMBLE_RESULT)
+
+if (NOT DISASSEMBLE_RESULT EQUAL 0)
+  message(FATAL_ERROR "compile_shaders: spirv-dis failed on ${COMPUTE_NAME}.comp.spv\n${DISASSEMBLE_ERROR}")
+endif()
+
+count_descriptor_set("${DISASSEMBLY}" 0 COMPUTE_READONLY_COUNT)
+count_descriptor_set("${DISASSEMBLY}" 1 COMPUTE_READWRITE_COUNT)
+count_descriptor_set("${DISASSEMBLY}" 2 COMPUTE_UNIFORM_COUNT)
+count_descriptor_set("${DISASSEMBLY}" 3 COMPUTE_STRAY_COUNT)
+
+if (NOT COMPUTE_STRAY_COUNT EQUAL 0)
+  message(FATAL_ERROR "compile_shaders: ${COMPUTE_NAME}.comp.glsl declares resources in set 3, which SDL_GPU compute does not use.")
+endif()
+
+file(READ "${COMPUTE_BINARY}" HEX_BYTES HEX)
+string(LENGTH "${HEX_BYTES}" HEX_LENGTH)
+math(EXPR BYTE_COUNT "${HEX_LENGTH} / 2")
+math(EXPR WORD_COUNT "${BYTE_COUNT} / 4")
+math(EXPR LAST_WORD "${WORD_COUNT} - 1")
+
+set(COMPUTE_BODY "static const uint32_t kLightCullReadOnlyStorageBufferCount = ${COMPUTE_READONLY_COUNT};\n")
+string(APPEND COMPUTE_BODY "static const uint32_t kLightCullReadWriteStorageBufferCount = ${COMPUTE_READWRITE_COUNT};\n")
+string(APPEND COMPUTE_BODY "static const uint32_t kLightCullUniformBufferCount = ${COMPUTE_UNIFORM_COUNT};\n\n")
+string(APPEND COMPUTE_BODY "static const uint32_t kLightCullSpirv[] = {")
+
+foreach(WORD_INDEX RANGE ${LAST_WORD})
+  math(EXPR HEX_OFFSET "${WORD_INDEX} * 8")
+  string(SUBSTRING "${HEX_BYTES}" ${HEX_OFFSET} 2 BYTE_0)
+  math(EXPR HEX_OFFSET "${HEX_OFFSET} + 2")
+  string(SUBSTRING "${HEX_BYTES}" ${HEX_OFFSET} 2 BYTE_1)
+  math(EXPR HEX_OFFSET "${HEX_OFFSET} + 2")
+  string(SUBSTRING "${HEX_BYTES}" ${HEX_OFFSET} 2 BYTE_2)
+  math(EXPR HEX_OFFSET "${HEX_OFFSET} + 2")
+  string(SUBSTRING "${HEX_BYTES}" ${HEX_OFFSET} 2 BYTE_3)
+  math(EXPR COLUMN "${WORD_INDEX} % 6")
+  if (COLUMN EQUAL 0)
+    string(APPEND COMPUTE_BODY "\n    ")
+  else()
+    string(APPEND COMPUTE_BODY " ")
+  endif()
+  string(APPEND COMPUTE_BODY "0x${BYTE_3}${BYTE_2}${BYTE_1}${BYTE_0},")
+endforeach()
+
+string(APPEND COMPUTE_BODY "\n};\n\n")
+
+file(WRITE "${SHADER_DIR}/${COMPUTE_NAME}_spirv.h" "#pragma once\n\n#include <stdint.h>\n\n${COMPUTE_BODY}")
+
+message(STATUS "compile_shaders: ${COMPUTE_NAME}.comp.glsl -> ${WORD_COUNT} words, ${COMPUTE_READONLY_COUNT} read-only / ${COMPUTE_READWRITE_COUNT} read-write storage buffer(s), ${COMPUTE_UNIFORM_COUNT} uniform buffer(s)")

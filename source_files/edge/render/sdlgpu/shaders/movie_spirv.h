@@ -4,6 +4,7 @@
 
 static const uint32_t kMovieVertexShaderSamplerCount = 0;
 static const uint32_t kMovieVertexShaderUniformBufferCount = 1;
+static const uint32_t kMovieVertexShaderStorageBufferCount = 0;
 
 static const uint32_t kMovieVertexShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000002b, 0x00000000, 0x00020011,
@@ -68,6 +69,7 @@ static const uint32_t kMovieVertexShaderSpirv[] = {
 
 static const uint32_t kMovieFragmentShaderSamplerCount = 3;
 static const uint32_t kMovieFragmentShaderUniformBufferCount = 1;
+static const uint32_t kMovieFragmentShaderStorageBufferCount = 0;
 
 static const uint32_t kMovieFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000004c, 0x00000000, 0x00020011,

@@ -44,6 +44,7 @@
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
+#include "r_lightgrid.h"
 #include "r_shader.h"
 #include "r_static.h"
 #include "r_texgl.h"
@@ -651,8 +652,10 @@ class ColormapShader : public AbstractShader
             }
         }
 
-        RendererVertex *glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_,
-                                                 *pass_var, blending, fc_to_use, fd_to_use);
+        RendererVertex *glvert =
+            BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var, blending,
+                            fc_to_use, fd_to_use, nullptr, nullptr, false, true,
+                            LightGridGlowSetForSector(sector_));
 
         for (int v_idx = 0; v_idx < num_vert; v_idx++)
         {
@@ -696,7 +699,7 @@ class ColormapShader : public AbstractShader
         }
 
         AddStaticRenderUnit(handle, shape, first, count, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var,
-                            blending, fc_to_use, fd_to_use);
+                            blending, fc_to_use, fd_to_use, nullptr, true, LightGridGlowSetForSector(sector_));
 
         (*pass_var) += 1;
     }
@@ -727,7 +730,8 @@ class ColormapShader : public AbstractShader
             EDGE_ZoneScopedN("WorldBaked BeginRenderUnit");
 
             glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var, blending,
-                                     fc_to_use, fd_to_use, nullptr, nullptr, nullptr, true);
+                                     fc_to_use, fd_to_use, nullptr, nullptr, true, true,
+                                     LightGridGlowSetForSector(sector_));
         }
 
         RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));

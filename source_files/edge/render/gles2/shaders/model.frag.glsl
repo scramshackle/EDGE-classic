@@ -3,6 +3,23 @@ const float kLog2      = 1.442695;
 
 uniform sampler2D u_texture0;
 
+uniform sampler2D u_light_data;
+uniform sampler2D u_light_headers;
+uniform sampler2D u_light_indices;
+
+uniform float u_world_lit;
+uniform vec4  u_light_view;
+uniform vec4  u_light_list;
+uniform vec3  u_light_bounds_min;
+uniform vec3  u_light_bounds_range;
+uniform float u_light_radius_scale;
+uniform float u_light_data_step;
+
+uniform float u_glow_count;
+uniform vec4  u_glow_plane[EDGE_LIGHT_MAX_GLOWS];
+uniform vec4  u_glow_color[EDGE_LIGHT_MAX_GLOWS];
+uniform vec4  u_glow_additive;
+
 
 uniform float u_alpha;
 uniform float u_alpha_test;
@@ -17,9 +34,11 @@ uniform float u_fog_end;
 uniform float u_oit_mode;
 uniform float u_oit_scale;
 
-varying vec2 v_texture_coordinates;
-varying vec3 v_color;
-varying vec3 v_eye_position;
+varying vec4 v_color_and_u;
+varying vec4 v_eye_and_v;
+varying vec3 v_normal;
+
+EDGE_INCLUDE_LIGHT_COMMON
 
 float FogFactor()
 {
@@ -28,7 +47,7 @@ float FogFactor()
         return 0.0;
     }
 
-    float fog_distance = length(v_eye_position);
+    float fog_distance = length(v_eye_and_v.xyz);
 
     if (u_fog_mode < kFogLinear + 0.5)
     {
@@ -48,14 +67,27 @@ float OitWeight(float alpha, float view_depth)
 
 void main()
 {
-    vec4 texel = texture2D(u_texture0, v_texture_coordinates);
+    vec4 texel = texture2D(u_texture0, vec2(v_color_and_u.w, v_eye_and_v.w));
 
     if (u_alpha_test > 0.0 && texel.a < u_alpha_test)
     {
         discard;
     }
 
-    vec3 rgb = mix(texel.rgb * v_color, v_color, u_additive_pass);
+    vec3 modulate_sum = vec3(0.0, 0.0, 0.0);
+    vec3 additive_sum = vec3(0.0, 0.0, 0.0);
+
+    if (u_world_lit > 0.5)
+    {
+        AccumulateTileLights(v_eye_and_v.xyz, normalize(v_normal), 1.0, modulate_sum, additive_sum);
+    }
+
+    if (u_glow_count > 0.5)
+    {
+        AccumulateGlows(v_eye_and_v.xyz, modulate_sum, additive_sum);
+    }
+
+    vec3 rgb = mix(texel.rgb * v_color_and_u.rgb, v_color_and_u.rgb, u_additive_pass);
 
     float fog_factor = FogFactor();
 
@@ -64,11 +96,13 @@ void main()
         rgb = mix(rgb, u_fog_color.rgb, fog_factor);
     }
 
+    rgb += (texel.rgb * modulate_sum + additive_sum) * (1.0 - u_additive_pass);
+
     vec4 fragment_color = vec4(rgb, texel.a * u_alpha);
 
     if (u_oit_mode > 0.5)
     {
-        float view_depth = clamp(-v_eye_position.z * 0.000625, 0.0, 1.0);
+        float view_depth = clamp(-v_eye_and_v.z * 0.000625, 0.0, 1.0);
 
         float weight = OitWeight(fragment_color.a, view_depth) * u_oit_scale;
 

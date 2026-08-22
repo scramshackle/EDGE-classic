@@ -16,10 +16,13 @@ layout(location = 0) in vec3 position_frame1;
 layout(location = 1) in vec3 position_frame2;
 layout(location = 2) in vec2 texcoords;
 layout(location = 3) in vec3 color0;
+layout(location = 4) in vec3 normal_frame1;
+layout(location = 5) in vec3 normal_frame2;
 
 layout(location = 0) out vec2 uv;
 layout(location = 1) out vec3 color;
 layout(location = 2) out vec3 vpos;
+layout(location = 3) out vec3 vnormal;
 
 void main()
 {
@@ -30,6 +33,12 @@ void main()
 
     uv    = texcoords * texture_scale + texture_offset;
     color = color0;
+
+    vec3 blended_normal = mix(normal_frame1, normal_frame2, lerp);
+
+    vec3 model_normal = mat3(model_transform) * blended_normal;
+
+    vnormal = normalize(mat3(mv) * model_normal);
 
     gl_Position = mvp * model_position;
 

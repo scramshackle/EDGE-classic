@@ -29,8 +29,11 @@
 #include "r_defs.h"
 #include "r_gldefs.h"
 
-void BSPWalkThing(DrawSubsector *dsub, MapObject *mo);
-bool RenderThings(DrawFloor *dfloor, bool solid);
+extern std::list<DrawThing *> draw_thing_list;
+
+void BSPWalkThing(MapObject *mo);
+void EnumerateViewThings(void);
+void RenderThings(std::list<DrawThing *> &things, bool solid);
 
 void RenderWeaponSprites(Player *p);
 void RenderWeaponModel(Player *p);

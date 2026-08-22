@@ -1,5 +1,9 @@
 #include "gpu_pipeline.h"
 
+#include "shaders/light_cull_spirv.h"
+
+#include "r_lightgrid.h"
+
 #include <stddef.h>
 
 #include <unordered_map>
@@ -134,19 +138,19 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 {
     bool model = (shader_kind == kGpuPipelineShaderModel || shader_kind == kGpuPipelineShaderModelOit);
 
-    SDL_GPUVertexBufferDescription buffer_description[4];
-    EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 4);
+    SDL_GPUVertexBufferDescription buffer_description[6];
+    EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 6);
 
-    SDL_GPUVertexAttribute attributes[4];
-    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 4);
+    SDL_GPUVertexAttribute attributes[6];
+    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 6);
 
     uint32_t buffer_count    = 1;
     uint32_t attribute_count = 3;
 
     if (model)
     {
-        buffer_count    = 4;
-        attribute_count = 4;
+        buffer_count    = 6;
+        attribute_count = 6;
 
         buffer_description[0].slot       = kGpuModelBufferSlotPositionFrame1;
         buffer_description[0].pitch      = (uint32_t)(3 * sizeof(float));
@@ -183,6 +187,24 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         attributes[3].buffer_slot = kGpuModelBufferSlotColor;
         attributes[3].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
         attributes[3].offset      = 0;
+
+        buffer_description[4].slot       = kGpuModelBufferSlotNormalFrame1;
+        buffer_description[4].pitch      = (uint32_t)(3 * sizeof(float));
+        buffer_description[4].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        buffer_description[5].slot       = kGpuModelBufferSlotNormalFrame2;
+        buffer_description[5].pitch      = (uint32_t)(3 * sizeof(float));
+        buffer_description[5].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        attributes[4].location    = kGpuAttributeModelNormalFrame1;
+        attributes[4].buffer_slot = kGpuModelBufferSlotNormalFrame1;
+        attributes[4].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[4].offset      = 0;
+
+        attributes[5].location    = kGpuAttributeModelNormalFrame2;
+        attributes[5].buffer_slot = kGpuModelBufferSlotNormalFrame2;
+        attributes[5].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[5].offset      = 0;
     }
     else
     {
@@ -252,11 +274,6 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     {
         info.vertex_shader   = ModelVertexShader();
         info.fragment_shader = ModelFragmentShader();
-    }
-    else if (shader_kind == kGpuPipelineShaderLight)
-    {
-        info.vertex_shader   = LightVertexShader();
-        info.fragment_shader = LightFragmentShader();
     }
     else
     {
@@ -354,6 +371,40 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
 static SDL_GPUGraphicsPipeline *movie_pipeline = nullptr;
 
+static SDL_GPUComputePipeline *light_cull_pipeline = nullptr;
+
+static_assert(kLightGridMaximumPerTile == 64, "light_cull.comp.glsl hardcodes kMaximumPerCluster = 64");
+
+SDL_GPUComputePipeline *GetLightCullPipeline(void)
+{
+    if (light_cull_pipeline)
+        return light_cull_pipeline;
+
+    if (!pipeline_device)
+        return nullptr;
+
+    SDL_GPUComputePipelineCreateInfo info;
+    EPI_CLEAR_MEMORY(&info, SDL_GPUComputePipelineCreateInfo, 1);
+
+    info.code                          = (const uint8_t *)kLightCullSpirv;
+    info.code_size                     = sizeof(kLightCullSpirv);
+    info.entrypoint                    = "main";
+    info.format                        = SDL_GPU_SHADERFORMAT_SPIRV;
+    info.num_readonly_storage_buffers  = kLightCullReadOnlyStorageBufferCount;
+    info.num_readwrite_storage_buffers = kLightCullReadWriteStorageBufferCount;
+    info.num_uniform_buffers           = kLightCullUniformBufferCount;
+    info.threadcount_x                 = 64;
+    info.threadcount_y                 = 1;
+    info.threadcount_z                 = 1;
+
+    light_cull_pipeline = SDL_CreateGPUComputePipeline(pipeline_device, &info);
+
+    if (!light_cull_pipeline)
+        LogPrint("GpuPipeline: SDL_CreateGPUComputePipeline (light cull) failed: %s\n", SDL_GetError());
+
+    return light_cull_pipeline;
+}
+
 SDL_GPUGraphicsPipeline *GetMoviePipeline(void)
 {
     if (movie_pipeline)
@@ -446,6 +497,12 @@ void ShutdownPipelines(SDL_GPUDevice *device)
     }
 
     pipelines.clear();
+
+    if (light_cull_pipeline)
+    {
+        SDL_ReleaseGPUComputePipeline(device, light_cull_pipeline);
+        light_cull_pipeline = nullptr;
+    }
 
     if (movie_pipeline)
     {
@@ -548,24 +605,3 @@ SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags)
     return pipeline;
 }
 
-SDL_GPUGraphicsPipeline *GetLightPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend)
-{
-    if (!CreateLightShaders(pipeline_device))
-        FatalError("GpuPipeline: light shader creation failed\n");
-
-    pipeline_flags = EncodeBlendFlags(pipeline_flags, source_blend, destination_blend);
-
-    uint32_t key = pipeline_flags | (2u << 24);
-
-    auto itr = pipelines.find(key);
-
-    if (itr != pipelines.end())
-        return itr->second;
-
-    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend,
-                                                       kGpuPrimitiveTriangleList, kGpuPipelineShaderLight);
-
-    pipelines[key] = pipeline;
-
-    return pipeline;
-}

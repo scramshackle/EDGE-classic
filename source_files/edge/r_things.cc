@@ -29,6 +29,7 @@
 #include <map>
 
 #include "epi_math.h"
+#include "r_lightgrid.h"
 #include "coal.h"
 #include "dm_defs.h"
 #include "dm_state.h"
@@ -58,6 +59,7 @@
 #include "r_render.h"
 #include "r_shader.h"
 #include "r_texgl.h"
+#include "r_things.h"
 #include "r_units.h"
 #include "script/compat/lua_compat.h"
 #include "vm_coal.h"
@@ -519,9 +521,22 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
             float r = 96;
 
-            DynamicLightIterator(data.light_position.X - r, data.light_position.Y - r, player->map_object_->z,
-                                 data.light_position.X + r, data.light_position.Y + r,
-                                 player->map_object_->z + player->map_object_->height_, DLIT_PSprite, &data);
+            for (int index = 0; index < LightGridSampleTotal(); index++)
+            {
+                MapObject *light = LightGridSampleLight(index);
+
+                if (!light)
+                    continue;
+
+                float reach = light->dynamic_light_.r;
+
+                if (fabs(light->x - data.light_position.X) >= reach ||
+                    fabs(light->y - data.light_position.Y) >= reach ||
+                    fabs(MapObjectMidZ(light) - data.light_position.Z) >= reach)
+                    continue;
+
+                DLIT_PSprite(light, &data);
+            }
 
             SectorGlowIterator(player->map_object_->subsector_->sector, data.light_position.X - r,
                                data.light_position.Y - r, player->map_object_->z, data.light_position.X + r,
@@ -830,16 +845,14 @@ void RenderWeaponModel(Player *p)
 
 int sprite_kludge = 0;
 
-static inline void LinkDrawThingIntoDrawFloor(DrawFloor *dfloor, DrawThing *dthing)
+static inline void LinkDrawThingIntoView(DrawThing *dthing)
 {
-    dthing->properties = dfloor->properties;
-    dthing->next       = dfloor->things;
-    dthing->previous   = nullptr;
+    int32_t active_mirrors = active_mirror_set.TotalActive();
 
-    if (dfloor->things)
-        dfloor->things->previous = dthing;
-
-    dfloor->things = dthing;
+    if (active_mirrors > 0)
+        active_mirror_set.PushThing(active_mirrors - 1, dthing);
+    else
+        draw_thing_list.push_back(dthing);
 }
 
 static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, bool *flip)
@@ -924,32 +937,53 @@ const Image *GetOtherSprite(int spritenum, int framenum, bool *flip)
     return frame->images_[0];
 }
 
-static void RendererClipSpriteVertically(DrawSubsector *dsub, DrawThing *dthing)
+static void RendererClipSpriteVertically(DrawThing *dthing)
 {
-    DrawFloor *dfloor = nullptr;
-
-    // find the thing's nominal region.  This section is equivalent to
-    // the PointInVertRegion() code (but using drawfloors).
-
     float z = dthing->map_z + (dthing->map_object->height_ * 0.5f);
 
-    std::vector<DrawFloor *>::iterator DFI;
+    dthing->properties = GetPointProperties(dthing->map_object->subsector_, z);
 
-    for (DFI = dsub->floors.begin(); DFI != dsub->floors.end(); DFI++)
-    {
-        dfloor = *DFI;
-
-        if (z <= dfloor->top_height)
-            break;
-    }
-
-    EPI_ASSERT(dfloor);
-
-    // link in sprite.  We'll shrink it if it gets clipped.
-    LinkDrawThingIntoDrawFloor(dfloor, dthing);
+    LinkDrawThingIntoView(dthing);
 }
 
-void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
+EDGE_DEFINE_CONSOLE_VARIABLE(r_thing_stats, "0", kConsoleVariableFlagNone)
+
+void EnumerateViewThings(void)
+{
+    uint64_t mark = GetMicroseconds();
+
+    int scanned = 0;
+
+    for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
+    {
+        if (mo->IsRemoved() || !mo->subsector_)
+            continue;
+
+        scanned++;
+
+        BSPWalkThing(mo);
+    }
+
+    if (r_thing_stats.d_ != 0)
+    {
+        static uint64_t total_us = 0;
+        static int      total_scanned = 0;
+        static int      frames = 0;
+
+        total_us += GetMicroseconds() - mark;
+        total_scanned += scanned;
+
+        if (++frames >= 120)
+        {
+            LogPrint("THINGSCAN %d objects/view, %.1f us/view avg over %d views\n", total_scanned / frames,
+                     (double)total_us / (double)frames, frames);
+
+            total_us = total_scanned = frames = 0;
+        }
+    }
+}
+
+void BSPWalkThing(MapObject *mo)
 {
     /* Visit a single thing that exists in the current subsector */
 
@@ -1082,21 +1116,14 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
     // create new draw thing
 
     DrawThing *dthing       = GetDrawThing();
-    dthing->next            = nullptr;
-    dthing->previous        = nullptr;
     dthing->map_object      = nullptr;
     dthing->properties      = nullptr;
-    dthing->render_left     = nullptr;
-    dthing->render_next     = nullptr;
-    dthing->render_previous = nullptr;
-    dthing->render_right    = nullptr;
 
     dthing->map_object = mo;
     dthing->map_x      = mx;
     dthing->map_y      = my;
     dthing->map_z      = mz;
 
-    dthing->properties = dsub->floors[0]->properties;
     dthing->is_model   = is_model;
 
     dthing->image = image;
@@ -1107,7 +1134,7 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
     dthing->hover_dz     = hover_dz;
     dthing->sink_mult    = sink_mult;
 
-    RendererClipSpriteVertically(dsub, dthing);
+    RendererClipSpriteVertically(dthing);
 }
 
 static void RenderModel(DrawThing *dthing)
@@ -1162,22 +1189,6 @@ struct ThingCoordinateData
     ColorMixer colors[4];
 };
 
-static void DLIT_Thing(MapObject *mo, void *dataptr)
-{
-    ThingCoordinateData *data = (ThingCoordinateData *)dataptr;
-
-    // dynamic lights do not light themselves up!
-    if (mo == data->mo)
-        return;
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    for (int v = 0; v < 4; v++)
-    {
-        mo->dynamic_light_.shader->Sample(data->colors + v, data->vertices[v].X, data->vertices[v].Y,
-                                          data->vertices[v].Z);
-    }
-}
 
 static bool RenderThing(DrawThing *dthing, bool solid)
 {
@@ -1439,16 +1450,6 @@ static bool RenderThing(DrawThing *dthing, bool solid)
             shader->Sample(data.colors + v, data.vertices[v].X, data.vertices[v].Y, data.vertices[v].Z);
         }
 
-        if (use_dynamic_lights && render_view_extra_light < 250)
-        {
-            float r = mo->radius_ + 32;
-
-            DynamicLightIterator(mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r, mo->z + mo->height_, DLIT_Thing,
-                                 &data);
-
-            SectorGlowIterator(mo->subsector_->sector, mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r,
-                               mo->z + mo->height_, DLIT_Thing, &data);
-        }
     }
 
     /* draw the sprite */
@@ -1495,10 +1496,13 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
         GLuint fuzz_tex = is_fuzzy ? ImageCache(fuzz_image, false) : 0;
 
+        bool sprite_lit = !is_fuzzy && !is_additive && use_dynamic_lights && render_view_extra_light < 250;
+
         RendererVertex *glvert =
             BeginRenderUnit(GL_QUADS, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
                             is_fuzzy ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable, fuzz_tex, pass, blending,
-                            pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use);
+                            pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use, nullptr, nullptr, false, sprite_lit,
+                            sprite_lit ? LightGridGlowSetForSector(mo->subsector_->sector) : -1);
 
         for (int v_idx = 0; v_idx < 4; v_idx++)
         {
@@ -1543,134 +1547,12 @@ static bool RenderThing(DrawThing *dthing, bool solid)
     return solid;
 }
 
-bool RenderThings(DrawFloor *dfloor, bool solid)
+void RenderThings(std::list<DrawThing *> &things, bool solid)
 {
-    //
-    // As part my move to strip out Z_Zone usage and replace
-    // it with array classes and more standard new and delete
-    // calls, I've removed the EDGE_QSORT() here and the array.
-    // My main reason for doing that is that since I have to
-    // modify the code here anyway, it is prudent to re-evaluate
-    // their usage.
-    //
-    // The EDGE_QSORT() mechanism used does an
-    // allocation each time it is used and this is called
-    // for each floor drawn in each subsector drawn, it is
-    // reasonable to assume that removing it will give
-    // something of speed improvement.
-    //
-    // This comes at a cost since optimisation is always
-    // a balance between speed and size: drawthing_t now has
-    // to hold 4 additional pointers. Two for the binary tree
-    // (order building) and two for the the final linked list
-    // (avoiding recursive function calls that the parsing the
-    // binary tree would require).
-    //
-    // -ACB- 2004/08/17
-    //
-
-    DrawThing *head_dt;
-
-    // Check we have something to draw
-    head_dt = dfloor->things;
-    if (!head_dt)
-        return true;
-
-    bool all_solid = true;
-
-    if (solid)
+    for (std::list<DrawThing *>::iterator it = things.begin(); it != things.end(); it++)
     {
-        while (head_dt)
-        {
-            if (!RenderThing(head_dt, solid))
-            {
-                all_solid = false;
-            }
-            head_dt = head_dt->next;
-        }
-
-        return all_solid;
+        RenderThing(*it, solid);
     }
-
-    DrawThing *curr_dt, *dt, *next_dt;
-    float      cmp_val;
-
-    head_dt->render_left = head_dt->render_right = head_dt->render_previous = head_dt->render_next = nullptr;
-
-    dt = nullptr; // Warning removal: This will always have been set
-
-    curr_dt = head_dt->next;
-    while (curr_dt)
-    {
-        curr_dt->render_left = curr_dt->render_right = nullptr;
-
-        // Parse the tree to find our place
-        next_dt = head_dt;
-        do
-        {
-            dt = next_dt;
-
-            cmp_val = dt->translated_z - curr_dt->translated_z;
-            if (epi::AlmostEquals(cmp_val, 0.0f))
-            {
-                // Resolve Z fight by letting the mobj pointer values settle it
-                int offset = dt->map_object - curr_dt->map_object;
-                cmp_val    = (float)offset;
-            }
-
-            if (cmp_val < 0.0f)
-                next_dt = dt->render_left;
-            else
-                next_dt = dt->render_right;
-        } while (next_dt);
-
-        // Update our place
-        if (cmp_val < 0.0f)
-        {
-            // Update the binary tree
-            dt->render_left = curr_dt;
-
-            // Update the linked list (Insert behind node)
-            if (dt->render_previous)
-                dt->render_previous->render_next = curr_dt;
-
-            curr_dt->render_previous = dt->render_previous;
-            curr_dt->render_next     = dt;
-
-            dt->render_previous = curr_dt;
-        }
-        else
-        {
-            // Update the binary tree
-            dt->render_right = curr_dt;
-
-            // Update the linked list (Insert infront of node)
-            if (dt->render_next)
-                dt->render_next->render_previous = curr_dt;
-
-            curr_dt->render_next     = dt->render_next;
-            curr_dt->render_previous = dt;
-
-            dt->render_next = curr_dt;
-        }
-
-        curr_dt = curr_dt->next;
-    }
-
-    // Find the first to draw
-    while (head_dt->render_previous)
-        head_dt = head_dt->render_previous;
-
-    // Draw...
-    for (dt = head_dt; dt; dt = dt->render_next)
-    {
-        if (!RenderThing(dt, solid))
-        {
-            all_solid = false;
-        }
-    }
-
-    return all_solid;
 }
 
 //--- editor settings ---

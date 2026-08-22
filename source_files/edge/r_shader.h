@@ -96,8 +96,6 @@ struct DynamicLightParameters
 
     HMM_Vec3 color;
 
-    GLuint image_texture;
-
     bool additive;
 };
 
@@ -118,9 +116,19 @@ class AbstractShader
     // used for normal-based lighting (MD2 models)
     virtual void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon = false) = 0;
 
-    // used to render overlay textures (world polygons)
     virtual void WorldMix(GLuint shape, int num_vert, GLuint tex, float alpha, int *pass_var, BlendingMode blending,
-                          bool masked, void *data, ShaderCoordinateFunction func) = 0;
+                          bool masked, void *data, ShaderCoordinateFunction func)
+    {
+        EPI_UNUSED(shape);
+        EPI_UNUSED(num_vert);
+        EPI_UNUSED(tex);
+        EPI_UNUSED(alpha);
+        EPI_UNUSED(pass_var);
+        EPI_UNUSED(blending);
+        EPI_UNUSED(masked);
+        EPI_UNUSED(data);
+        EPI_UNUSED(func);
+    }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
                                     BlendingMode blending)
@@ -155,25 +163,6 @@ class AbstractShader
     }
 };
 
-// Delete all dynamic light "images"; cannot be done in the various shader
-// destructors as these images are shared amongst multiple instances - Dasho
-void DeleteAllLightImages();
-
-enum LightRectResult
-{
-    kLightRectFull,
-    kLightRectBounded,
-    kLightRectCulled
-};
-
-LightRectResult GetDynamicLightScreenRect(AbstractShader *shader, RendererScissor *out);
-
-bool EmitMultiLightPass(AbstractShader **shaders, int count, GLuint shape, int num_vert, GLuint tex, float alpha,
-                        int *pass_var, BlendingMode blending, bool masked, void *data, ShaderCoordinateFunction func);
-
-void SetSurfaceLightBounds(float min_x, float min_y, float min_z, float max_x, float max_y, float max_z);
-
-void ClearSurfaceLightBounds();
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

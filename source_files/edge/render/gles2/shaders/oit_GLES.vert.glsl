@@ -1,4 +1,6 @@
 #version 100
+#define EDGE_LIGHT_MAX_PER_TILE 64
+#define EDGE_LIGHT_MAX_GLOWS 2
 attribute vec3 a_position;
 attribute vec4 a_texture_coordinates;
 

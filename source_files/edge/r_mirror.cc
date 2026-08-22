@@ -3,7 +3,10 @@
 
 #include "epi_doomdefs.h"
 #include "r_backend.h"
+#include "i_system.h"
 #include "r_image.h"
+#include "r_lightgrid.h"
+#include "r_state.h"
 #include "r_render.h"
 #include "r_sky.h"
 #include "r_units.h"
@@ -296,11 +299,27 @@ void RenderMirror(DrawMirror *mir)
 
     render_backend->PushModelMatrix(mir->local_matrix);
 
+    BuildLightGrid();
+
+    {
+        uint64_t upload_mark = GetMicroseconds();
+        render_backend->UploadLightGrid(CurrentLightGrid());
+        ec_frame_stats.light_grid_upload_us += GetMicroseconds() - upload_mark;
+    }
+
     FinishSkyForMirror(mir);
 
-    RenderSubList(mir->draw_subsectors, true);
+    RenderSubList(mir->draw_subsectors, mir->draw_things, true);
 
     render_backend->PopModelMatrix();
+
+    BuildLightGrid();
+
+    {
+        uint64_t upload_mark = GetMicroseconds();
+        render_backend->UploadLightGrid(CurrentLightGrid());
+        ec_frame_stats.light_grid_upload_us += GetMicroseconds() - upload_mark;
+    }
 
     mirror_view = saved;
 

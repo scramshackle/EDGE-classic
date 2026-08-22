@@ -8,14 +8,38 @@ if (NOT GLSLANG_VALIDATOR)
   message(FATAL_ERROR "compile_shaders: glslangValidator not found. Install the Vulkan SDK or a glslang package.")
 endif()
 
-set(SHADER_NAMES world movie model light oit)
+set(SHADER_NAMES world movie model oit)
 
 set(SHADER_STAGES vert frag)
 set(STAGE_SYMBOLS Vertex Fragment)
 
-set(GLES_VERTEX_PREAMBLE "#version 100\n")
-set(GLES_FRAGMENT_PREAMBLE "#version 100\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n")
-set(GL_PREAMBLE "#version 110\n")
+file(READ "${SHADER_DIR}/../../../r_lightgrid.h" LIGHT_GRID_HEADER)
+
+string(REGEX MATCH "kLightGridMaximumPerTile[ \t]*=[ \t]*([0-9]+)" LIGHT_GRID_MATCH "${LIGHT_GRID_HEADER}")
+
+if (NOT LIGHT_GRID_MATCH)
+  message(FATAL_ERROR "compile_shaders: could not read kLightGridMaximumPerTile from r_lightgrid.h")
+endif()
+
+set(LIGHT_MAX_PER_TILE "${CMAKE_MATCH_1}")
+
+message(STATUS "compile_shaders: EDGE_LIGHT_MAX_PER_TILE = ${LIGHT_MAX_PER_TILE} (from r_lightgrid.h)")
+
+string(REGEX MATCH "kLightGridMaximumGlows[ \t]*=[ \t]*([0-9]+)" GLOW_MATCH "${LIGHT_GRID_HEADER}")
+
+if (NOT GLOW_MATCH)
+  message(FATAL_ERROR "compile_shaders: could not read kLightGridMaximumGlows from r_lightgrid.h")
+endif()
+
+set(LIGHT_MAX_GLOWS "${CMAKE_MATCH_1}")
+
+message(STATUS "compile_shaders: EDGE_LIGHT_MAX_GLOWS = ${LIGHT_MAX_GLOWS} (from r_lightgrid.h)")
+
+set(SHARED_DEFINES "#define EDGE_LIGHT_MAX_PER_TILE ${LIGHT_MAX_PER_TILE}\n#define EDGE_LIGHT_MAX_GLOWS ${LIGHT_MAX_GLOWS}\n")
+
+set(GLES_VERTEX_PREAMBLE "#version 100\n${SHARED_DEFINES}")
+set(GLES_FRAGMENT_PREAMBLE "#version 100\n${SHARED_DEFINES}#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n")
+set(GL_PREAMBLE "#version 110\n${SHARED_DEFINES}")
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
 
@@ -39,6 +63,11 @@ foreach(SHADER_NAME IN LISTS SHADER_NAMES)
     endif()
 
     file(READ "${SOURCE_FILE}" STAGE_BODY)
+
+    if (STAGE_BODY MATCHES "EDGE_INCLUDE_LIGHT_COMMON")
+      file(READ "${SHADER_DIR}/light_common.glsl" LIGHT_COMMON_BODY)
+      string(REPLACE "EDGE_INCLUDE_LIGHT_COMMON" "${LIGHT_COMMON_BODY}" STAGE_BODY "${STAGE_BODY}")
+    endif()
 
     if (STAGE STREQUAL "frag")
       set(GLES_PREAMBLE "${GLES_FRAGMENT_PREAMBLE}")
@@ -73,7 +102,13 @@ foreach(SHADER_NAME IN LISTS SHADER_NAMES)
       message(STATUS "compile_shaders: ${SHADER_NAME}_${DIALECT}.${STAGE}.glsl validated as ${DIALECT_NAME}")
     endforeach()
 
-    file(STRINGS "${SOURCE_FILE}" STAGE_LINES)
+    set(EXPANDED_FILE "${SHADER_DIR}/${SHADER_NAME}_expanded.${STAGE}.glsl")
+
+    file(WRITE "${EXPANDED_FILE}" "${STAGE_BODY}")
+
+    file(STRINGS "${EXPANDED_FILE}" STAGE_LINES)
+
+    file(REMOVE "${EXPANDED_FILE}")
 
     string(APPEND GENERATED_HEADER "static const char ${SYMBOL}[] =\n")
 

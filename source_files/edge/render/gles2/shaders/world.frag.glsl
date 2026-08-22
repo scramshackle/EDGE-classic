@@ -6,6 +6,24 @@ uniform sampler2D u_texture1;
 
 
 uniform float u_multi_texture;
+uniform float u_light_falloff;
+
+uniform sampler2D u_light_data;
+uniform sampler2D u_light_headers;
+uniform sampler2D u_light_indices;
+
+uniform float u_world_lit;
+uniform vec4  u_light_view;
+uniform vec4  u_light_list;
+
+uniform float u_glow_count;
+uniform vec4  u_glow_plane[EDGE_LIGHT_MAX_GLOWS];
+uniform vec4  u_glow_color[EDGE_LIGHT_MAX_GLOWS];
+uniform vec4  u_glow_additive;
+uniform vec3  u_light_bounds_min;
+uniform vec3  u_light_bounds_range;
+uniform float u_light_radius_scale;
+uniform float u_light_data_step;
 uniform float u_line_mode;
 uniform float u_skip_rgb;
 uniform float u_alpha_test;
@@ -158,6 +176,8 @@ vec4 SampleEquirectSky()
     return vec4(rgb, sampled.a * v_color.a);
 }
 
+EDGE_INCLUDE_LIGHT_COMMON
+
 float OitWeight(float alpha, float view_depth)
 {
     float a = min(1.0, alpha * 10.0) + 0.01;
@@ -205,10 +225,33 @@ void main()
 
     float fog_factor = FogFactor();
 
-    if (u_multi_texture > 0.5)
+    vec3 modulate_sum = vec3(0.0, 0.0, 0.0);
+    vec3 additive_sum = vec3(0.0, 0.0, 0.0);
+
+    if (u_world_lit > 0.5)
+    {
+        AccumulateTileLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, modulate_sum, additive_sum);
+    }
+
+    if (u_glow_count > 0.5)
+    {
+        AccumulateGlows(v_eye_position, modulate_sum, additive_sum);
+    }
+
+    if (u_multi_texture > 0.5 || u_light_falloff > 0.5)
     {
         fragment_color *= texel0;
-        fragment_color *= texture2D(u_texture1, v_texture_coordinates.zw);
+
+        if (u_light_falloff > 0.5)
+        {
+            vec2 falloff = v_texture_coordinates.zw * 2.0 - 1.0;
+
+            fragment_color.rgb *= exp(-5.44 * dot(falloff, falloff));
+        }
+        else
+        {
+            fragment_color *= texture2D(u_texture1, v_texture_coordinates.zw);
+        }
 
         if (fog_factor > 0.0)
         {
@@ -224,6 +267,8 @@ void main()
             fragment_color.rgb = mix(fragment_color, u_fog_color, fog_factor).rgb;
         }
     }
+
+    fragment_color.rgb += texel0.rgb * modulate_sum + additive_sum;
 
     if (u_oit_mode > 0.5)
     {

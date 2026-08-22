@@ -27,7 +27,15 @@ layout(set = 3, binding = 0) uniform FragmentParameters
     float sky_vertical_fov_slope;
     float sky_horizon_shift;
     float sky_is_box;
+
+    vec4 light_view;
+    vec4 light_range;
+
+    vec4 glow_plane[2];
+    vec4 glow_color[2];
+    vec4 glow_additive;
 };
+
 
 #define SKY_STRETCH_MIRROR 0.0
 #define SKY_STRETCH_REPEAT 1.0
@@ -48,6 +56,97 @@ layout(location = 0) out vec4 frag_color;
 layout(location = 0) in vec4 uv;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec3 vpos;
+
+struct GpuLight
+{
+    vec4 position_radius;
+    vec4 color_additive;
+};
+
+layout(set = 2, binding = 3) readonly buffer LightBuffer
+{
+    GpuLight gpu_lights[];
+};
+
+layout(set = 2, binding = 4) readonly buffer ClusterBuffer
+{
+    uint gpu_clusters[];
+};
+
+layout(set = 2, binding = 5) readonly buffer LightIndexBuffer
+{
+    uint gpu_light_indices[];
+};
+
+const float kLightTileSize = 16.0;
+const int   kLightSlices   = 8;
+
+void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
+{
+    float tile_x = floor((gl_FragCoord.x - light_view.x) / kLightTileSize);
+    float tile_y = floor((light_view.y - gl_FragCoord.y) / kLightTileSize);
+
+    if (tile_x < 0.0 || tile_y < 0.0 || tile_x >= light_view.z || tile_y >= light_view.w)
+        return;
+
+    float depth = max(-vpos.z, light_range.x);
+
+    float ratio = log(depth / light_range.x) / log(light_range.y / light_range.x);
+
+    int slice = clamp(int(ratio * float(kLightSlices)), 0, kLightSlices - 1);
+
+    int cluster = int(light_range.w) + (slice * int(light_view.w) + int(tile_y)) * int(light_view.z) + int(tile_x);
+
+    uint entry  = gpu_clusters[cluster];
+    uint offset = entry >> 8u;
+    uint count  = entry & 255u;
+
+    for (uint i = 0u; i < count; i++)
+    {
+        GpuLight light = gpu_lights[gpu_light_indices[offset + i]];
+
+        vec3 delta = light.position_radius.xyz - vpos;
+
+        float radius = light.position_radius.w;
+
+        float normalised = dot(delta, delta) / (radius * radius);
+
+        if (normalised >= 1.0)
+            continue;
+
+        vec3 contribution = light.color_additive.rgb * exp(-5.44 * normalised);
+
+        if (light.color_additive.a > 0.5)
+            additive_sum += contribution;
+        else
+            modulate_sum += contribution;
+    }
+}
+
+void AccumulateGlows(inout vec3 modulate_sum, inout vec3 additive_sum)
+{
+    for (int index = 0; index < 2; index++)
+    {
+        if (float(index) >= glow_additive.w)
+            break;
+
+        float plane_distance = dot(vec4(vpos, 1.0), glow_plane[index]);
+
+        float radius = glow_color[index].a;
+
+        float normalised = (plane_distance * plane_distance) / (radius * radius);
+
+        if (normalised >= 1.0)
+            continue;
+
+        vec3 contribution = glow_color[index].rgb * exp(-5.44 * normalised);
+
+        if (glow_additive[index] > 0.5)
+            additive_sum += contribution;
+        else
+            modulate_sum += contribution;
+    }
+}
 
 float FogFactor(float fog_dist)
 {
@@ -236,10 +335,33 @@ void main()
 
     float fogf = FogFactor(length(vpos));
 
-    if ((flags & 1) == 1)
+    vec3 modulate_sum = vec3(0.0);
+    vec3 additive_sum = vec3(0.0);
+
+    if (light_range.z > 0.5)
+    {
+        AccumulateClusterLights(modulate_sum, additive_sum);
+    }
+
+    if (glow_additive.w > 0.5)
+    {
+        AccumulateGlows(modulate_sum, additive_sum);
+    }
+
+    if ((flags & 1) == 1 || (flags & 32) == 32)
     {
         fcolor *= c0;
-        fcolor *= texture(tex1, uv.zw);
+
+        if ((flags & 32) == 32)
+        {
+            vec2 falloff = uv.zw * 2.0 - 1.0;
+
+            fcolor.rgb *= exp(-5.44 * dot(falloff, falloff));
+        }
+        else
+        {
+            fcolor *= texture(tex1, uv.zw);
+        }
 
         if (fogf > 0.0)
         {
@@ -254,6 +376,8 @@ void main()
             fcolor.rgb = mix(fcolor, fog_color, fogf).rgb;
         }
     }
+
+    fcolor.rgb += c0.rgb * modulate_sum + additive_sum;
 
 #ifdef EDGE_OIT_PASS
     OitEmit(fcolor);

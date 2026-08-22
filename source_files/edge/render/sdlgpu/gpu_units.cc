@@ -8,6 +8,7 @@
 #include "epi_math.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
+#include "gpu_lights.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
 #include "r_gldefs.h"
@@ -41,6 +42,9 @@ struct RendererUnit
 
     bool        sky_pass_enabled = false;
     bool        light_depth_enabled = false;
+    bool        world_lit_enabled   = false;
+    int         glow_set            = -1;
+    int         light_view_index    = -1;
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
@@ -51,8 +55,6 @@ struct RendererUnit
     bool            scissor_enabled = false;
     RendererScissor scissor;
 
-    bool              light_pass_enabled = false;
-    RendererLightPass light_pass;
 };
 
 static RendererVertex local_verts[kMaximumLocalVertices];
@@ -106,7 +108,7 @@ void DeleteStaticVertexBuffer(uint32_t handle)
 
 void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                          GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                         const SkyPassInfo *sky_pass)
+                         const SkyPassInfo *sky_pass, bool world_lit, int glow_set)
 {
     if (!handle || count <= 0)
         return;
@@ -137,8 +139,10 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->fog_density         = fog_density;
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = true;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->light_view_index    = GpuCurrentLightView();
     unit->scissor_enabled     = false;
-    unit->light_pass_enabled  = false;
     unit->static_buffer       = handle;
     unit->texture_offset      = static_batch_texture_offset;
     unit->liquid              = static_batch_liquid;
@@ -153,7 +157,7 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
                                 const SkyPassInfo *sky_pass, const RendererScissor *scissor,
-                                const RendererLightPass *light_pass, bool light_depth)
+                                bool light_depth, bool world_lit, int glow_set)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -192,6 +196,9 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = light_depth;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->light_view_index    = GpuCurrentLightView();
     unit->texture_offset      = {{0, 0}};
     unit->liquid              = {{0, 0}};
     unit->static_buffer       = 0;
@@ -208,10 +215,7 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     if (scissor)
         unit->scissor = *scissor;
 
-    unit->light_pass_enabled = (light_pass != nullptr);
 
-    if (light_pass)
-        unit->light_pass = *light_pass;
 
     return local_verts + current_render_vert;
 }
@@ -286,51 +290,7 @@ static void BindUnitTextures(const RendererUnit *unit)
                                   image1 ? image1->texture : nullptr, image1 ? image1->sampler : nullptr);
 }
 
-static void BindLightPassTextures(const RendererUnit *unit)
-{
-    const GpuImage *surface_image = GetGpuImage(unit->texture[0]);
-    const GpuImage *light_image   = GetGpuImage(unit->texture[1]);
 
-    gpu_immediate.SetMultiTexture(
-        surface_image ? surface_image->texture : nullptr, surface_image ? surface_image->sampler : nullptr,
-        light_image ? light_image->texture : nullptr, light_image ? light_image->sampler : nullptr);
-}
-
-static void DrawLightPassUnit(const RendererUnit *unit)
-{
-    const RendererLightPass &light_pass = unit->light_pass;
-
-    BindLightPassTextures(unit);
-
-    GpuLightVertexParameters vertex_parameters;
-    EPI_CLEAR_MEMORY(&vertex_parameters, GpuLightVertexParameters, 1);
-
-    vertex_parameters.mvp = render_backend->WorldViewProjection();
-
-    GpuLightFragmentParameters fragment_parameters;
-    EPI_CLEAR_MEMORY(&fragment_parameters, GpuLightFragmentParameters, 1);
-
-    for (int e = 0; e < 4; e++)
-        fragment_parameters.surface_normal[e] = light_pass.surface_normal[e];
-
-    for (int i = 0; i < kMaximumLightsPerPass; i++)
-    {
-        for (int e = 0; e < 4; e++)
-        {
-            fragment_parameters.light_position_radius[i][e] = light_pass.position_radius[i * 4 + e];
-            fragment_parameters.light_color[i][e]           = light_pass.color[i * 4 + e];
-        }
-    }
-
-    fragment_parameters.light_count       = light_pass.count;
-    fragment_parameters.normal_horizontal = light_pass.normal_is_horizontal ? 1.0f : 0.0f;
-    fragment_parameters.surface_mode      = light_pass.surface_mode;
-    fragment_parameters.alpha             = light_pass.alpha;
-    fragment_parameters.alpha_test        = light_pass.alpha_test;
-
-    gpu_immediate.RecordLightDraw(unit->shape, local_verts + unit->first, unit->count, vertex_parameters,
-                                  fragment_parameters);
-}
 
 static void DrawLineUnit(const RendererUnit *unit)
 {
@@ -606,12 +566,6 @@ void RenderCurrentUnits(void)
 
         render_state->SetPipeline(0);
 
-        if (unit->light_pass_enabled)
-        {
-            DrawLightPassUnit(unit);
-            continue;
-        }
-
         if (!unit->static_buffer && (!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
             (unit->texture[1] && unit->environment_mode[1] != kTextureEnvironmentDisable))
         {
@@ -634,6 +588,9 @@ void RenderCurrentUnits(void)
 
         gpu_immediate.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gpu_immediate.SetLightDepth(unit->light_depth_enabled);
+        gpu_immediate.SetLightFalloff(unit->environment_mode[1] == (GLuint)kTextureEnvironmentLightFalloff);
+        gpu_immediate.SetWorldLit(unit->world_lit_enabled, unit->light_view_index);
+        gpu_immediate.SetGlowSet(unit->glow_set);
         gpu_immediate.SetTextureOffset(unit->texture_offset);
         gpu_immediate.SetLiquid(unit->liquid);
 

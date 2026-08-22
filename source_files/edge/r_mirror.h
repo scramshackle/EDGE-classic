@@ -154,6 +154,11 @@ class MirrorSet
         active_mirrors_[index].draw_mirror_->draw_subsectors.push_back(subsector);
     }
 
+    void PushThing(int32_t index, DrawThing *thing)
+    {
+        active_mirrors_[index].draw_mirror_->draw_things.push_back(thing);
+    }
+
     void Push(DrawMirror *mir)
     {
         EPI_ASSERT(mir);

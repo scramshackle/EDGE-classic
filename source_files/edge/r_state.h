@@ -97,6 +97,11 @@ extern float view_x_slope, view_y_slope;
 struct ECFrameStats
 {
 	int draw_render_units;
+	uint64_t light_grid_collect_us;
+	uint64_t light_grid_bin_us;
+	uint64_t light_grid_upload_us;
+	int draw_light_dynamic;
+	int draw_light_glow;
 	int draw_planes;
 	int draw_wall_parts;
 	int draw_things;
@@ -104,6 +109,11 @@ struct ECFrameStats
 	void Clear()
 	{
 		draw_render_units = 0;
+		light_grid_collect_us = 0;
+		light_grid_bin_us = 0;
+		light_grid_upload_us = 0;
+		draw_light_dynamic = 0;
+		draw_light_glow = 0;
 		draw_wall_parts = 0;
 		draw_planes = 0;
 		draw_things = 0;

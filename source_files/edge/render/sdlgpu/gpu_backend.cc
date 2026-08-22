@@ -7,6 +7,9 @@
 #include "gpu_device.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
+#include "gpu_lights.h"
+
+#include "r_lightgrid.h"
 #include "gpu_pipeline.h"
 #include "gpu_shaders.h"
 #include "i_defs_gl.h"
@@ -124,12 +127,29 @@ class GpuRenderBackend : public RenderBackend
 
         EPI_CLEAR_MEMORY(world_state_, WorldState, kRenderWorldMax);
 
+        GpuCreateLightBuffers();
+
         RenderBackend::Init();
     }
 
     HMM_Mat4 WorldViewProjection()
     {
         return gpu_immediate.ProjectionMatrix() * gpu_immediate.ModelViewMatrix();
+    }
+
+    HMM_Mat4 WorldModelView()
+    {
+        return gpu_immediate.ModelViewMatrix();
+    }
+
+    void UploadLightGrid(const LightGrid *grid)
+    {
+        GpuUploadLightGrid(grid);
+    }
+
+    int LightGridBinningMode()
+    {
+        return kLightGridBinNone;
     }
 
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
@@ -141,6 +161,8 @@ class GpuRenderBackend : public RenderBackend
     void StartFrame(int32_t width, int32_t height)
     {
         frame_number_++;
+
+        GpuResetLightFrame();
 
         FlushDeletedGpuImages(gpu_device.Handle());
 
@@ -192,6 +214,8 @@ class GpuRenderBackend : public RenderBackend
 
     void Shutdown()
     {
+        GpuDestroyLightBuffers();
+
         gpu_immediate.Shutdown(gpu_device.Handle());
 
         ShutdownGpuImages(gpu_device.Handle());
@@ -200,7 +224,6 @@ class GpuRenderBackend : public RenderBackend
 
         DestroyWorldShaders(gpu_device.Handle());
         DestroyModelShaders(gpu_device.Handle());
-        DestroyLightShaders(gpu_device.Handle());
 
         gpu_device.Shutdown();
     }

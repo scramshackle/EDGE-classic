@@ -95,12 +95,14 @@ struct GpuModelDrawArguments
     SDL_GPUSampler *sampler;
 
     SDL_GPUBuffer *position_buffer;
+    SDL_GPUBuffer *normal_buffer;
     SDL_GPUBuffer *texture_coordinate_buffer;
-    SDL_GPUBuffer *color_buffer;
     SDL_GPUBuffer *index_buffer;
 
     uint32_t position_frame1_offset;
     uint32_t position_frame2_offset;
+    uint32_t normal_frame1_offset;
+    uint32_t normal_frame2_offset;
     uint32_t texture_coordinate_offset;
     uint32_t color_offset;
 
@@ -240,6 +242,14 @@ class GpuImmediate
 
     void SetSkipRGB(bool enabled);
 
+    void SetLightFalloff(bool enabled);
+
+    void SetWorldLit(bool enabled, int view_index);
+
+    void SetGlowSet(int index);
+
+    void UploadModelColors();
+
     void SetOitPipeline(bool enabled);
 
     void SetOitComposite(bool enabled);
@@ -297,9 +307,6 @@ class GpuImmediate
     void RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
                          const GpuModelFragmentParameters &fragment_parameters);
 
-    void RecordLightDraw(GLuint shape, const RendererVertex *vertices, int32_t count,
-                         const GpuLightVertexParameters   &vertex_parameters,
-                         const GpuLightFragmentParameters &fragment_parameters);
 
     uint32_t DrawCount() const
     {
@@ -381,11 +388,9 @@ class GpuImmediate
     struct GpuModelMesh
     {
         SDL_GPUBuffer *position_buffer;
+        SDL_GPUBuffer *normal_buffer;
         SDL_GPUBuffer *texture_coordinate_buffer;
-        SDL_GPUBuffer *color_buffer;
         SDL_GPUBuffer *index_buffer;
-
-        SDL_GPUTransferBuffer *color_transfer_buffer;
 
         int32_t vertex_count;
         int32_t frame_count;
@@ -393,11 +398,15 @@ class GpuImmediate
 
     std::vector<GpuModelMesh> model_meshes_;
 
+    std::vector<float>     model_color_data_;
+    SDL_GPUBuffer         *model_color_buffer_   = nullptr;
+    SDL_GPUTransferBuffer *model_color_transfer_ = nullptr;
+    size_t                 model_color_capacity_ = 0;
+    uint32_t               pending_color_base_   = 0;
+
     std::vector<GpuModelVertexParameters>   model_vertex_parameters_;
     std::vector<GpuModelFragmentParameters> model_fragment_parameters_;
 
-    std::vector<GpuLightVertexParameters>   light_vertex_parameters_;
-    std::vector<GpuLightFragmentParameters> light_fragment_parameters_;
 
     std::vector<RendererVertex>        vertices_;
     int32_t                            vertex_count_ = 0;

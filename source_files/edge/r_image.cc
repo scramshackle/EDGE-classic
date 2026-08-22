@@ -2026,7 +2026,6 @@ void DeleteAllImages(bool shutdown)
     // Delete images that should otherwise persist for the program lifetime
     if (shutdown)
     {
-        DeleteAllLightImages();
         for (Font *font : hud_fonts)
         {
             if (font->definition_->type_ == kFontTypeTrueType)

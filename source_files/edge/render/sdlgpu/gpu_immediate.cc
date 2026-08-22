@@ -1,5 +1,9 @@
 #include "gpu_immediate.h"
 
+#include "gpu_lights.h"
+
+#include "r_lightgrid.h"
+
 #include "gpu_images.h"
 
 #include <math.h>
@@ -323,6 +327,20 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     dynamic_index_capacity_ = 0;
 
+    if (model_color_buffer_)
+    {
+        SDL_ReleaseGPUBuffer(device, model_color_buffer_);
+        model_color_buffer_ = nullptr;
+    }
+
+    if (model_color_transfer_)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, model_color_transfer_);
+        model_color_transfer_ = nullptr;
+    }
+
+    model_color_capacity_ = 0;
+
     if (default_texture_)
     {
         SDL_ReleaseGPUTexture(device, default_texture_);
@@ -348,10 +366,11 @@ void GpuImmediate::BeginFrame()
     FlushDeletedStaticBuffers();
     vertex_parameters_.clear();
     fragment_parameters_.clear();
+    model_color_data_.clear();
+    pending_color_base_ = 0;
+
     model_vertex_parameters_.clear();
     model_fragment_parameters_.clear();
-    light_vertex_parameters_.clear();
-    light_fragment_parameters_.clear();
 
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
@@ -819,6 +838,99 @@ void GpuImmediate::SetSkipRGB(bool enabled)
     fragment_parameters_dirty_ = true;
 }
 
+void GpuImmediate::SetWorldLit(bool enabled, int view_index)
+{
+    const GpuLightViewParameters *view = enabled ? GpuLightView(view_index) : nullptr;
+
+    float wanted[8];
+
+    if (view)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            wanted[i]     = view->light_view[i];
+            wanted[4 + i] = view->light_range[i];
+        }
+    }
+    else
+    {
+        for (int i = 0; i < 8; i++)
+            wanted[i] = 0.0f;
+    }
+
+    bool changed = false;
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (!epi::AlmostEquals(current_fragment_parameters_.light_view[i], wanted[i]) ||
+            !epi::AlmostEquals(current_fragment_parameters_.light_range[i], wanted[4 + i]))
+            changed = true;
+    }
+
+    if (!changed)
+        return;
+
+    for (int i = 0; i < 4; i++)
+    {
+        current_fragment_parameters_.light_view[i]  = wanted[i];
+        current_fragment_parameters_.light_range[i] = wanted[4 + i];
+    }
+
+    fragment_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetGlowSet(int index)
+{
+    const LightGridGlowSet *set = LightGridGlowSetAt(index);
+
+    float count = (set && set->count > 0) ? (float)set->count : 0.0f;
+
+    if (epi::AlmostEquals(current_fragment_parameters_.glow_additive[3], count) && count == 0.0f)
+        return;
+
+    for (int i = 0; i < 2; i++)
+    {
+        bool live = set && i < set->count;
+
+        for (int e = 0; e < 4; e++)
+        {
+            current_fragment_parameters_.glow_plane[i][e] = live ? set->glows[i].plane[e] : 0.0f;
+            current_fragment_parameters_.glow_color[i][e] = 0.0f;
+        }
+
+        if (live)
+        {
+            current_fragment_parameters_.glow_color[i][0] = set->glows[i].color[0] / 255.0f;
+            current_fragment_parameters_.glow_color[i][1] = set->glows[i].color[1] / 255.0f;
+            current_fragment_parameters_.glow_color[i][2] = set->glows[i].color[2] / 255.0f;
+            current_fragment_parameters_.glow_color[i][3] = set->glows[i].radius;
+        }
+        else
+            current_fragment_parameters_.glow_color[i][3] = 1.0f;
+
+        current_fragment_parameters_.glow_additive[i] = live ? set->glows[i].additive : 0.0f;
+    }
+
+    current_fragment_parameters_.glow_additive[3] = count;
+
+    fragment_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetLightFalloff(bool enabled)
+{
+    bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagLightFalloff) != 0;
+
+    if (current == enabled)
+        return;
+
+    if (enabled)
+        current_fragment_parameters_.flags |= kGpuFragmentFlagLightFalloff;
+    else
+        current_fragment_parameters_.flags &= ~kGpuFragmentFlagLightFalloff;
+
+    fragment_parameters_dirty_ = true;
+}
+
 void GpuImmediate::Viewport(int32_t x, int32_t y, int32_t width, int32_t height)
 {
     GpuCommand command;
@@ -1222,11 +1334,15 @@ uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, const uint16_t
 
     size_t position_bytes = (size_t)data.vertex_count * (size_t)data.frame_count * 3 * sizeof(float);
     size_t texture_bytes  = (size_t)data.vertex_count * 2 * sizeof(float);
-    size_t color_bytes    = (size_t)data.vertex_count * 6 * sizeof(float);
     size_t index_bytes    = (size_t)index_count * sizeof(uint16_t);
 
     mesh.position_buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, data.frame_positions,
                                                    position_bytes, "model positions");
+
+    mesh.normal_buffer = data.frame_normals ? CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX,
+                                                                      data.frame_normals, position_bytes,
+                                                                      "model normals")
+                                            : nullptr;
 
     mesh.texture_coordinate_buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX,
                                                              data.texture_coordinates, texture_bytes, "model texcoords");
@@ -1234,24 +1350,7 @@ uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, const uint16_t
     mesh.index_buffer =
         CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_INDEX, indices, index_bytes, "model indices");
 
-    SDL_GPUBufferCreateInfo color_info;
-    EPI_CLEAR_MEMORY(&color_info, SDL_GPUBufferCreateInfo, 1);
-
-    color_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-    color_info.size  = (uint32_t)color_bytes;
-
-    mesh.color_buffer = SDL_CreateGPUBuffer(device_, &color_info);
-
-    SDL_GPUTransferBufferCreateInfo color_transfer_info;
-    EPI_CLEAR_MEMORY(&color_transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
-
-    color_transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    color_transfer_info.size  = (uint32_t)color_bytes;
-
-    mesh.color_transfer_buffer = SDL_CreateGPUTransferBuffer(device_, &color_transfer_info);
-
-    if (!mesh.position_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer || !mesh.color_buffer ||
-        !mesh.color_transfer_buffer)
+    if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer)
     {
         LogPrint("GpuImmediate: model mesh creation failed\n");
 
@@ -1276,63 +1375,106 @@ void GpuImmediate::DeleteModelMesh(uint32_t handle)
     if (mesh->position_buffer)
         SDL_ReleaseGPUBuffer(device_, mesh->position_buffer);
 
+    if (mesh->normal_buffer)
+        SDL_ReleaseGPUBuffer(device_, mesh->normal_buffer);
+
     if (mesh->texture_coordinate_buffer)
         SDL_ReleaseGPUBuffer(device_, mesh->texture_coordinate_buffer);
 
-    if (mesh->color_buffer)
-        SDL_ReleaseGPUBuffer(device_, mesh->color_buffer);
-
     if (mesh->index_buffer)
         SDL_ReleaseGPUBuffer(device_, mesh->index_buffer);
-
-    if (mesh->color_transfer_buffer)
-        SDL_ReleaseGPUTransferBuffer(device_, mesh->color_transfer_buffer);
 
     EPI_CLEAR_MEMORY(mesh, GpuModelMesh, 1);
 }
 
 void GpuImmediate::UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count)
 {
+    pending_color_base_ = 0;
+
     if (handle == 0 || handle > model_meshes_.size() || !colors || vertex_count <= 0 || !device_)
         return;
 
     GpuModelMesh *mesh = &model_meshes_[handle - 1];
 
-    if (!mesh->color_buffer || !mesh->color_transfer_buffer || vertex_count > mesh->vertex_count)
+    if (vertex_count > mesh->vertex_count)
         return;
 
-    size_t bytes = (size_t)vertex_count * 6 * sizeof(float);
+    size_t floats = (size_t)vertex_count * 6;
 
-    void *mapped = SDL_MapGPUTransferBuffer(device_, mesh->color_transfer_buffer, true);
+    pending_color_base_ = (uint32_t)(model_color_data_.size() * sizeof(float));
+
+    model_color_data_.insert(model_color_data_.end(), colors, colors + floats);
+}
+
+void GpuImmediate::UploadModelColors()
+{
+    if (model_color_data_.empty())
+        return;
+
+    size_t bytes = model_color_data_.size() * sizeof(float);
+
+    if (bytes > model_color_capacity_ || !model_color_buffer_ || !model_color_transfer_)
+    {
+        size_t wanted = 65536;
+
+        while (wanted < bytes)
+            wanted *= 2;
+
+        if (model_color_buffer_)
+            SDL_ReleaseGPUBuffer(device_, model_color_buffer_);
+
+        if (model_color_transfer_)
+            SDL_ReleaseGPUTransferBuffer(device_, model_color_transfer_);
+
+        SDL_GPUBufferCreateInfo buffer_info;
+        EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+
+        buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+        buffer_info.size  = (uint32_t)wanted;
+
+        model_color_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
+
+        SDL_GPUTransferBufferCreateInfo transfer_info;
+        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+        transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transfer_info.size  = (uint32_t)wanted;
+
+        model_color_transfer_ = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
+
+        if (!model_color_buffer_ || !model_color_transfer_)
+        {
+            LogPrint("GpuImmediate: model colour buffer allocation failed: %s\n", SDL_GetError());
+            model_color_capacity_ = 0;
+            return;
+        }
+
+        model_color_capacity_ = wanted;
+    }
+
+    void *mapped = SDL_MapGPUTransferBuffer(device_, model_color_transfer_, true);
 
     if (!mapped)
         return;
 
-    memcpy(mapped, colors, bytes);
+    memcpy(mapped, model_color_data_.data(), bytes);
 
-    SDL_UnmapGPUTransferBuffer(device_, mesh->color_transfer_buffer);
+    SDL_UnmapGPUTransferBuffer(device_, model_color_transfer_);
 
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(device_);
-
-    if (!command_buffer)
-        return;
-
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(gpu_device.CommandBuffer());
 
     SDL_GPUTransferBufferLocation source;
-    SDL_GPUBufferRegion           destination;
-
-    source.transfer_buffer = mesh->color_transfer_buffer;
+    source.transfer_buffer = model_color_transfer_;
     source.offset          = 0;
 
-    destination.buffer = mesh->color_buffer;
+    SDL_GPUBufferRegion destination;
+    destination.buffer = model_color_buffer_;
     destination.offset = 0;
     destination.size   = (uint32_t)bytes;
 
     SDL_UploadToGPUBuffer(copy_pass, &source, &destination, true);
 
     SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
 
     uploaded_bytes_ += bytes;
 }
@@ -1367,8 +1509,8 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     draw->sampler = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
 
     draw->position_buffer           = mesh->position_buffer;
+    draw->normal_buffer             = mesh->normal_buffer;
     draw->texture_coordinate_buffer = mesh->texture_coordinate_buffer;
-    draw->color_buffer              = mesh->color_buffer;
     draw->index_buffer              = mesh->index_buffer;
 
     uint32_t frame_stride = (uint32_t)((size_t)mesh->vertex_count * 3 * sizeof(float));
@@ -1377,10 +1519,14 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     draw->position_frame1_offset = (uint32_t)info.frame1 * frame_stride + vertex_base;
     draw->position_frame2_offset = (uint32_t)info.frame2 * frame_stride + vertex_base;
 
+    draw->normal_frame1_offset = draw->position_frame1_offset;
+    draw->normal_frame2_offset = draw->position_frame2_offset;
+
     draw->texture_coordinate_offset = (uint32_t)((size_t)info.first_vertex * 2 * sizeof(float));
 
-    draw->color_offset =
-        (uint32_t)((size_t)info.first_vertex * 6 * sizeof(float) + (info.additive_pass ? 3 * sizeof(float) : 0));
+    draw->color_offset = pending_color_base_ +
+                         (uint32_t)((size_t)info.first_vertex * 6 * sizeof(float) +
+                                    (info.additive_pass ? 3 * sizeof(float) : 0));
 
     draw->index_first = info.first_index;
     draw->index_count = info.index_count;
@@ -1393,72 +1539,6 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     commands_.push_back(command);
 }
 
-void GpuImmediate::RecordLightDraw(GLuint shape, const RendererVertex *vertices, int32_t count,
-                                   const GpuLightVertexParameters   &vertex_parameters,
-                                   const GpuLightFragmentParameters &fragment_parameters)
-{
-    if (count <= 0)
-        return;
-
-    switch (shape)
-    {
-    case GL_QUADS:
-        count -= count % 4;
-        if (count < 4)
-            return;
-        break;
-
-    case GL_TRIANGLES:
-        count -= count % 3;
-        if (count < 3)
-            return;
-        break;
-
-    case GL_POLYGON:
-    case GL_TRIANGLE_FAN:
-    case GL_QUAD_STRIP:
-    case GL_TRIANGLE_STRIP:
-        if (count < 3)
-            return;
-        break;
-
-    default:
-        FatalError("GpuImmediate: unsupported light pass shape 0x%04X\n", shape);
-    }
-
-    SDL_GPUGraphicsPipeline *pipeline = GetLightPipeline(pipeline_flags_, source_blend_, destination_blend_);
-
-    RendererVertex *destination = ReserveVertices(count);
-
-    memcpy(destination, vertices, (size_t)count * sizeof(RendererVertex));
-
-    light_vertex_parameters_.push_back(vertex_parameters);
-    light_fragment_parameters_.push_back(fragment_parameters);
-
-    GpuCommand command;
-
-    command.type = kGpuCommandLightDraw;
-
-    GpuLightDrawArguments *draw = &command.arguments.light_draw;
-
-    draw->pipeline = pipeline;
-
-    draw->texture[0] = current_texture_[0];
-    draw->sampler[0] = current_sampler_[0];
-    draw->texture[1] = current_texture_[1];
-    draw->sampler[1] = current_sampler_[1];
-
-    draw->base_vertex = pending_base_;
-    draw->index_first = (int32_t)dynamic_indices_.size();
-    draw->index_count = AppendDynamicIndices(shape, count, 0);
-
-    draw->vertex_parameter_index   = (int32_t)light_vertex_parameters_.size() - 1;
-    draw->fragment_parameter_index = (int32_t)light_fragment_parameters_.size() - 1;
-
-    draw->stencil_reference = stencil_reference_;
-
-    commands_.push_back(command);
-}
 
 void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_count, const uint16_t *indices,
                                int32_t index_count)
@@ -1779,6 +1859,8 @@ void GpuImmediate::ApplyPassState()
 {
     SDL_GPURenderPass *pass = gpu_device.RenderPass();
 
+    GpuBindLightBuffers(pass);
+
     bound_pipeline_                 = nullptr;
     bound_texture_[0]               = nullptr;
     bound_texture_[1]               = nullptr;
@@ -1852,6 +1934,8 @@ void GpuImmediate::Replay()
 
     UploadVertices();
     UploadIndices();
+    UploadModelColors();
+    GpuFlushLightBuffers();
 
     gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear);
 
@@ -1968,7 +2052,7 @@ void GpuImmediate::Replay()
             bound_sampler_[0] = nullptr;
             bound_sampler_[1] = nullptr;
 
-            SDL_GPUBufferBinding vertex_bindings[4];
+            SDL_GPUBufferBinding vertex_bindings[6];
 
             vertex_bindings[kGpuModelBufferSlotPositionFrame1].buffer = model->position_buffer;
             vertex_bindings[kGpuModelBufferSlotPositionFrame1].offset = model->position_frame1_offset;
@@ -1979,10 +2063,16 @@ void GpuImmediate::Replay()
             vertex_bindings[kGpuModelBufferSlotTextureCoordinates].buffer = model->texture_coordinate_buffer;
             vertex_bindings[kGpuModelBufferSlotTextureCoordinates].offset = model->texture_coordinate_offset;
 
-            vertex_bindings[kGpuModelBufferSlotColor].buffer = model->color_buffer;
+            vertex_bindings[kGpuModelBufferSlotColor].buffer = model_color_buffer_;
             vertex_bindings[kGpuModelBufferSlotColor].offset = model->color_offset;
 
-            SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 4);
+            vertex_bindings[kGpuModelBufferSlotNormalFrame1].buffer = model->normal_buffer;
+            vertex_bindings[kGpuModelBufferSlotNormalFrame1].offset = model->normal_frame1_offset;
+
+            vertex_bindings[kGpuModelBufferSlotNormalFrame2].buffer = model->normal_buffer;
+            vertex_bindings[kGpuModelBufferSlotNormalFrame2].offset = model->normal_frame2_offset;
+
+            SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 6);
             binding_count_++;
 
             SDL_GPUBufferBinding model_index_binding;
@@ -2024,89 +2114,6 @@ void GpuImmediate::Replay()
             continue;
         }
 
-        if (command->type == kGpuCommandLightDraw)
-        {
-            const GpuLightDrawArguments *light = &command->arguments.light_draw;
-
-            SDL_GPURenderPass *pass = gpu_device.RenderPass();
-
-            if (!pass)
-            {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
-                                     gpu_device.CurrentTarget());
-                ApplyPassState();
-                pass = gpu_device.RenderPass();
-            }
-
-            if (!pass || !vertex_buffer_)
-                continue;
-
-            if (bound_pipeline_ != light->pipeline)
-            {
-                SDL_BindGPUGraphicsPipeline(pass, light->pipeline);
-                bound_pipeline_ = light->pipeline;
-                pipeline_bind_count_++;
-            }
-
-            if (bound_stencil_reference_ != light->stencil_reference)
-            {
-                SDL_SetGPUStencilReference(pass, light->stencil_reference);
-                bound_stencil_reference_ = light->stencil_reference;
-            }
-
-            if (bound_texture_[0] != light->texture[0] || bound_sampler_[0] != light->sampler[0] ||
-                bound_texture_[1] != light->texture[1] || bound_sampler_[1] != light->sampler[1])
-            {
-                SDL_GPUTextureSamplerBinding bindings[2];
-
-                bindings[0].texture = light->texture[0];
-                bindings[0].sampler = light->sampler[0];
-                bindings[1].texture = light->texture[1];
-                bindings[1].sampler = light->sampler[1];
-
-                SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
-
-                bound_texture_[0] = light->texture[0];
-                bound_sampler_[0] = light->sampler[0];
-                bound_texture_[1] = light->texture[1];
-                bound_sampler_[1] = light->sampler[1];
-
-                binding_count_++;
-            }
-
-            SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuVertexUniformSlot,
-                                         &light_vertex_parameters_[(size_t)light->vertex_parameter_index],
-                                         (uint32_t)sizeof(GpuLightVertexParameters));
-
-            SDL_PushGPUFragmentUniformData(gpu_device.CommandBuffer(), kGpuFragmentUniformSlot,
-                                           &light_fragment_parameters_[(size_t)light->fragment_parameter_index],
-                                           (uint32_t)sizeof(GpuLightFragmentParameters));
-
-            uniform_push_count_ += 2;
-            uniform_bytes_ += sizeof(GpuLightVertexParameters) + sizeof(GpuLightFragmentParameters);
-
-            bound_vertex_parameter_index_   = -1;
-            bound_fragment_parameter_index_ = -1;
-
-            if (bound_index_buffer_ != dynamic_index_buffer_)
-            {
-                SDL_GPUBufferBinding binding;
-                binding.buffer = dynamic_index_buffer_;
-                binding.offset = 0;
-
-                SDL_BindGPUIndexBuffer(pass, &binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
-
-                bound_index_buffer_ = dynamic_index_buffer_;
-                binding_count_++;
-            }
-
-            SDL_DrawGPUIndexedPrimitives(pass, (uint32_t)light->index_count, 1, (uint32_t)light->index_first,
-                                         light->base_vertex, 0);
-
-            draw_count_++;
-
-            continue;
-        }
 
         if (command->type != kGpuCommandDraw)
         {
