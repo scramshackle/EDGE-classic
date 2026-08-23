@@ -6,9 +6,20 @@
 
 extern std::unordered_set<Line *> newly_seen_lines;
 
-void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings, bool for_mirror = false);
+void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings,
+                   std::list<DrawMirror *> &dmirrors, bool for_mirror = false);
 
 void BSPWalkNode(unsigned int);
+
+void EnumerateViewSky(void);
+
+void EnumerateViewMirrorsDryRun(void);
+void EnumerateViewMirrors(void);
+bool MirrorEnumerateEnabled(void);
+void MirrorStatsBeginFrame(void);
+
+void SkyDecideSeg(Seg *seg, DrawMirror *mir, bool queue);
+void SkyDecideSubsector(Subsector *sub, DrawMirror *mir, bool queue);
 
 void UpdateSectorInterpolation(Sector *sector);
 

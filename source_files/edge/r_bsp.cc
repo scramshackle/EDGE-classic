@@ -193,6 +193,10 @@ static struct BSPThread bsp_thread;
 
 std::list<DrawSubsector *> draw_subsector_list;
 std::list<DrawThing *>     draw_thing_list;
+std::list<DrawMirror *>    draw_mirror_list;
+
+static bool     bsp_walk_direct       = false;
+static uint64_t mirror_nested_walk_us = 0;
 
 
 MirrorSet active_mirror_set;
@@ -227,19 +231,69 @@ ViewHeightZone view_height_zone;
 
 static Subsector *bsp_current_subsector;
 
+EDGE_DEFINE_CONSOLE_VARIABLE(r_mirror_stats, "0", kConsoleVariableFlagNone)
+EDGE_DEFINE_CONSOLE_VARIABLE(r_mirror_enumerate, "0", kConsoleVariableFlagNone)
+
+bool MirrorEnumerateEnabled(void)
+{
+    return r_mirror_enumerate.d_ != 0;
+}
+
+
+static std::vector<uint8_t> mirror_seen_walk;
+static std::vector<uint8_t> mirror_seen_enumerate;
+
+static void MirrorStatsMark(std::vector<uint8_t> &marks, const Seg *seg)
+{
+    if (!r_mirror_stats.d_ || !seg)
+        return;
+
+    size_t index = (size_t)(seg - level_segs);
+
+    if (index < marks.size())
+        marks[index] = 1;
+}
+
+void MirrorStatsBeginFrame(void)
+{
+    if (!r_mirror_stats.d_)
+        return;
+
+    if (mirror_seen_walk.size() != (size_t)total_level_segs)
+    {
+        mirror_seen_walk.assign((size_t)total_level_segs, 0);
+        mirror_seen_enumerate.assign((size_t)total_level_segs, 0);
+        return;
+    }
+
+    EPI_CLEAR_MEMORY(mirror_seen_walk.data(), uint8_t, mirror_seen_walk.size());
+    EPI_CLEAR_MEMORY(mirror_seen_enumerate.data(), uint8_t, mirror_seen_enumerate.size());
+}
+
 static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle right, bool is_portal)
 {
+    if (active_mirror_set.TotalActive() == 0)
+        MirrorStatsMark(mirror_seen_walk, seg);
+
     DrawMirror *mir = GetDrawMirror();
     mir->seg        = seg;
     mir->draw_subsectors.clear();
     mir->draw_things.clear();
+    mir->draw_mirrors.clear();
 
     mir->left      = view_angle + left;
     mir->right     = view_angle + right;
     mir->is_portal = is_portal;
 
 
-    dsub->mirrors.push_back(mir);
+    EPI_UNUSED(dsub);
+
+    int32_t enclosing = active_mirror_set.TotalActive();
+
+    if (enclosing > 0)
+        active_mirror_set.PushMirror(enclosing - 1, mir);
+    else
+        draw_mirror_list.push_back(mir);
 
     // push mirror (translation matrix)
     active_mirror_set.Push(mir);
@@ -269,185 +323,30 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     active_mirror_set.Pop();
 }
 
-//
-// BSPWalkSeg
-//
-// Visit a single seg of the subsector, and for one-sided lines update
-// the 1D occlusion buffer.
-//
-static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
+static void EmitSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir, bool from_walk)
 {
-
-    // ignore segs sitting on current mirror
-    if (active_mirror_set.SegOnPortal(seg))
-    {
+    if (!mir && SkyResidentEnabled() && from_walk == SkyWallBakeable(seg, sky_owner))
         return;
-    }
 
-    float sx1 = seg->vertex_1->X;
-    float sy1 = seg->vertex_1->Y;
-
-    float sx2 = seg->vertex_2->X;
-    float sy2 = seg->vertex_2->Y;
-
-    // when there are active mirror planes, segs not only need to
-    // be flipped across them but also clipped across them.
-
-    int32_t active_mirrors = active_mirror_set.TotalActive();
-    if (active_mirrors > 0)
+#ifdef EDGE_THREADED_BSP
+    if (from_walk && !bsp_walk_direct)
     {
-        for (int i = active_mirrors - 1; i >= 0; i--)
-        {
-            active_mirror_set.Transform(i, sx1, sy1);
-            active_mirror_set.Transform(i, sx2, sy2);
-
-            if (!active_mirror_set.IsPortal(i))
-            {
-                float tmp_x = sx1;
-                sx1         = sx2;
-                sx2         = tmp_x;
-                float tmp_y = sy1;
-                sy1         = sy2;
-                sy2         = tmp_y;
-            }
-
-            Seg *clipper = active_mirror_set.GetSeg(i);
-
-            DividingLine div;
-
-            div.x       = clipper->vertex_1->X;
-            div.y       = clipper->vertex_1->Y;
-            div.delta_x = clipper->vertex_2->X - div.x;
-            div.delta_y = clipper->vertex_2->Y - div.y;
-
-            int s1 = PointOnDividingLineSide(sx1, sy1, &div);
-            int s2 = PointOnDividingLineSide(sx2, sy2, &div);
-
-            // seg lies completely in front of clipper?
-            if (s1 == 0 && s2 == 0)
-                return;
-
-            if (s1 != s2)
-            {
-                // seg crosses clipper, need to split it
-                float ix, iy;
-
-                ComputeIntersection(&div, sx1, sy1, sx2, sy2, &ix, &iy);
-
-                if (s2 == 0)
-                    sx2 = ix, sy2 = iy;
-                else
-                    sx1 = ix, sy1 = iy;
-            }
-        }
-    }
-
-    bool precise = active_mirrors > 0;
-    if (!precise && seg->linedef)
-    {
-        precise = (seg->linedef->flags & kLineFlagMirror) || (seg->linedef->portal_pair);
-    }
-
-    BAMAngle angle_L = PointToAngle(view_x, view_y, sx1, sy1, precise);
-    BAMAngle angle_R = PointToAngle(view_x, view_y, sx2, sy2, precise);
-
-    // Clip to view edges.
-
-    BAMAngle span = angle_L - angle_R;
-
-    // back side ?
-    if (span >= kBAMAngle180)
-    {
-        return;
-    }
-
-    angle_L -= view_angle;
-    angle_R -= view_angle;
-
-    if (clip_scope != kBAMAngle180)
-    {
-        BAMAngle tspan1 = angle_L - clip_right;
-        BAMAngle tspan2 = clip_left - angle_R;
-
-        if (tspan1 > clip_scope)
-        {
-            // Totally off the left edge?
-            if (tspan2 >= kBAMAngle180)
-            {
-                return;
-            }
-
-            angle_L = clip_left;
-        }
-
-        if (tspan2 > clip_scope)
-        {
-            // Totally off the left edge?
-            if (tspan1 >= kBAMAngle180)
-            {
-                return;
-            }
-
-            angle_R = clip_right;
-        }
-
-        span = angle_L - angle_R;
-    }
-
-    // The seg is in the view range,
-    // but not necessarily visible.
-
-#if 1
-    // check if visible
-    if (span > (kBAMAngle1 / 4) && OcclusionTest(angle_R, angle_L))
-    {
+        BSPQueueSkyWall(seg, h1, h2, sky_owner, part);
         return;
     }
 #endif
 
-    dsub->visible = true;
+    RenderSkyWall(seg, h1, h2, sky_owner, part, mir);
+}
 
-    if (seg->miniseg || span == 0)
-    {
-        return;
-    }
-
-
-    if (active_mirrors < kMaximumMirrors)
-    {
-        if (seg->linedef->flags & kLineFlagMirror)
-        {
-            BSPWalkMirror(dsub, seg, angle_L, angle_R, false);
-            OcclusionSet(angle_R, angle_L);
-            return;
-        }
-        else if (seg->linedef->portal_pair)
-        {
-            BSPWalkMirror(dsub, seg, angle_L, angle_R, true);
-            OcclusionSet(angle_R, angle_L);
-            return;
-        }
-    }
-
-    DrawSeg *dseg = GetDrawSeg();
-    dseg->seg     = seg;
-
-    dsub->segs.push_back(dseg);
-
+void SkyDecideSeg(Seg *seg, DrawMirror *mir, bool from_walk)
+{
     Sector *fsector = seg->front_subsector->sector;
     Sector *bsector = nullptr;
 
     if (seg->back_subsector)
         bsector = seg->back_subsector->sector;
 
-    // only 1 sided walls affect the 1D occlusion buffer
-
-    if (seg->linedef->blocked)
-    {
-        OcclusionSet(angle_R, angle_L);
-    }
-
-    // --- handle sky (using the depth buffer) ---
     float             f_fh    = 0;
     float             f_ch    = 0;
     float             b_fh    = 0;
@@ -528,11 +427,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     {
         if (f_fh < b_fh)
         {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_fh, b_fh, fsector, 0);
-#else
-            RenderSkyWall(seg, f_fh, b_fh, fsector, 0, active_mirror_set.InnermostMirror());
-#endif
+            EmitSkyWall(seg, f_fh, b_fh, fsector, 0, mir, from_walk);
         }
     }
 
@@ -540,11 +435,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     {
         if (f_ch < fsector->sky_height && (!bsector || !EDGE_IMAGE_IS_SKY(*b_ceil) || b_fh >= f_ch))
         {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, f_ch, fsector->sky_height, fsector, 1);
-#else
-            RenderSkyWall(seg, f_ch, fsector->sky_height, fsector, 1, active_mirror_set.InnermostMirror());
-#endif
+            EmitSkyWall(seg, f_ch, fsector->sky_height, fsector, 1, mir, from_walk);
         }
         else if (bsector && EDGE_IMAGE_IS_SKY(*b_ceil))
         {
@@ -552,11 +443,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 
             if (b_ch <= max_f && max_f < fsector->sky_height)
             {
-                #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, max_f, fsector->sky_height, fsector, 1);
-#else
-            RenderSkyWall(seg, max_f, fsector->sky_height, fsector, 1, active_mirror_set.InnermostMirror());
-#endif
+                EmitSkyWall(seg, max_f, fsector->sky_height, fsector, 1, mir, from_walk);
             }
         }
     }
@@ -564,12 +451,205 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     else if (!debug_hall_of_mirrors.d_ && bsector && EDGE_IMAGE_IS_SKY(*b_ceil) && seg->sidedef->top.image == nullptr &&
              b_ch < f_ch)
     {
-        #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyWall(seg, b_ch, f_ch, bsector, 2);
-#else
-            RenderSkyWall(seg, b_ch, f_ch, bsector, 2, active_mirror_set.InnermostMirror());
-#endif
+        EmitSkyWall(seg, b_ch, f_ch, bsector, 2, mir, from_walk);
     }
+}
+
+//
+// BSPWalkSeg
+//
+// Visit a single seg of the subsector, and for one-sided lines update
+// the 1D occlusion buffer.
+//
+static bool SegViewAngles(const Seg *seg, BAMAngle *out_left, BAMAngle *out_right)
+{
+    float sx1 = seg->vertex_1->X;
+    float sy1 = seg->vertex_1->Y;
+
+    float sx2 = seg->vertex_2->X;
+    float sy2 = seg->vertex_2->Y;
+
+    // when there are active mirror planes, segs not only need to
+    // be flipped across them but also clipped across them.
+
+    int32_t active_mirrors = active_mirror_set.TotalActive();
+    if (active_mirrors > 0)
+    {
+        for (int i = active_mirrors - 1; i >= 0; i--)
+        {
+            active_mirror_set.Transform(i, sx1, sy1);
+            active_mirror_set.Transform(i, sx2, sy2);
+
+            if (!active_mirror_set.IsPortal(i))
+            {
+                float tmp_x = sx1;
+                sx1         = sx2;
+                sx2         = tmp_x;
+                float tmp_y = sy1;
+                sy1         = sy2;
+                sy2         = tmp_y;
+            }
+
+            Seg *clipper = active_mirror_set.GetSeg(i);
+
+            DividingLine div;
+
+            div.x       = clipper->vertex_1->X;
+            div.y       = clipper->vertex_1->Y;
+            div.delta_x = clipper->vertex_2->X - div.x;
+            div.delta_y = clipper->vertex_2->Y - div.y;
+
+            int s1 = PointOnDividingLineSide(sx1, sy1, &div);
+            int s2 = PointOnDividingLineSide(sx2, sy2, &div);
+
+            // seg lies completely in front of clipper?
+            if (s1 == 0 && s2 == 0)
+                return false;
+
+            if (s1 != s2)
+            {
+                // seg crosses clipper, need to split it
+                float ix, iy;
+
+                ComputeIntersection(&div, sx1, sy1, sx2, sy2, &ix, &iy);
+
+                if (s2 == 0)
+                    sx2 = ix, sy2 = iy;
+                else
+                    sx1 = ix, sy1 = iy;
+            }
+        }
+    }
+
+    bool precise = active_mirrors > 0;
+    if (!precise && seg->linedef)
+    {
+        precise = (seg->linedef->flags & kLineFlagMirror) || (seg->linedef->portal_pair);
+    }
+
+    BAMAngle angle_L = PointToAngle(view_x, view_y, sx1, sy1, precise);
+    BAMAngle angle_R = PointToAngle(view_x, view_y, sx2, sy2, precise);
+
+    // Clip to view edges.
+
+    BAMAngle span = angle_L - angle_R;
+
+    // back side ?
+    if (span >= kBAMAngle180)
+    {
+        return false;
+    }
+
+    angle_L -= view_angle;
+    angle_R -= view_angle;
+
+    if (clip_scope != kBAMAngle180)
+    {
+        BAMAngle tspan1 = angle_L - clip_right;
+        BAMAngle tspan2 = clip_left - angle_R;
+
+        if (tspan1 > clip_scope)
+        {
+            // Totally off the left edge?
+            if (tspan2 >= kBAMAngle180)
+            {
+                return false;
+            }
+
+            angle_L = clip_left;
+        }
+
+        if (tspan2 > clip_scope)
+        {
+            // Totally off the left edge?
+            if (tspan1 >= kBAMAngle180)
+            {
+                return false;
+            }
+
+            angle_R = clip_right;
+        }
+
+        span = angle_L - angle_R;
+    }
+
+    *out_left  = angle_L;
+    *out_right = angle_R;
+
+    return true;
+}
+
+static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
+{
+
+    // ignore segs sitting on current mirror
+    if (active_mirror_set.SegOnPortal(seg))
+    {
+        return;
+    }
+
+    BAMAngle angle_L = 0;
+    BAMAngle angle_R = 0;
+
+    if (!SegViewAngles(seg, &angle_L, &angle_R))
+    {
+        return;
+    }
+
+    BAMAngle span = angle_L - angle_R;
+
+    // The seg is in the view range,
+    // but not necessarily visible.
+
+#if 1
+    // check if visible
+    if (span > (kBAMAngle1 / 4) && OcclusionTest(angle_R, angle_L))
+    {
+        return;
+    }
+#endif
+
+    dsub->visible = true;
+
+    if (seg->miniseg || span == 0)
+    {
+        return;
+    }
+
+
+    if (active_mirror_set.TotalActive() < kMaximumMirrors)
+    {
+        if (seg->linedef->flags & kLineFlagMirror)
+        {
+            if (!MirrorEnumerateEnabled())
+                BSPWalkMirror(dsub, seg, angle_L, angle_R, false);
+
+            OcclusionSet(angle_R, angle_L);
+            return;
+        }
+        else if (seg->linedef->portal_pair)
+        {
+            if (!MirrorEnumerateEnabled())
+                BSPWalkMirror(dsub, seg, angle_L, angle_R, true);
+
+            OcclusionSet(angle_R, angle_L);
+            return;
+        }
+    }
+
+    DrawSeg *dseg = GetDrawSeg();
+    dseg->seg     = seg;
+
+    dsub->segs.push_back(dseg);
+
+    // only 1 sided walls affect the 1D occlusion buffer
+
+    if (seg->linedef->blocked)
+    {
+        OcclusionSet(angle_R, angle_L);
+    }
+
+    SkyDecideSeg(seg, active_mirror_set.InnermostMirror(), true);
 }
 
 //
@@ -780,6 +860,354 @@ static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
     }
 }
 
+static void EmitSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMirror *mir, bool from_walk)
+{
+    if (!mir && SkyResidentEnabled() && from_walk)
+        return;
+
+#ifdef EDGE_THREADED_BSP
+    if (from_walk && !bsp_walk_direct)
+    {
+        BSPQueueSkyPlane(sub, h, sky_owner, face);
+        return;
+    }
+#endif
+
+    RenderSkyPlane(sub, h, sky_owner, face, mir);
+}
+
+void SkyDecideSubsector(Subsector *sub, DrawMirror *mir, bool from_walk)
+{
+    Sector *sector = sub->sector;
+
+    if (!sector->height_sector)
+    {
+        if (EDGE_IMAGE_IS_SKY(sector->floor) && view_z > sector->interpolated_floor_height)
+        {
+            EmitSkyPlane(sub, sector->interpolated_floor_height, sector, 1, mir, from_walk);
+        }
+
+        if (EDGE_IMAGE_IS_SKY(sector->ceiling) && view_z < sector->sky_height)
+        {
+            EmitSkyPlane(sub, sector->sky_height, sector, 0, mir, from_walk);
+        }
+
+        return;
+    }
+
+    float floor_h = sector->interpolated_floor_height;
+
+    MapSurface *floor_s = &sector->floor;
+    MapSurface *ceil_s  = &sector->ceiling;
+
+    if (view_height_zone == kHeightZoneA && view_z > sector->height_sector->interpolated_ceiling_height)
+    {
+        floor_h = sector->height_sector->interpolated_ceiling_height;
+        floor_s = &sector->height_sector->floor;
+        ceil_s  = &sector->height_sector->ceiling;
+    }
+    else if (view_height_zone == kHeightZoneC && view_z < sector->height_sector->interpolated_floor_height)
+    {
+        floor_h = sector->interpolated_floor_height;
+        floor_s = &sector->height_sector->floor;
+        ceil_s  = &sector->height_sector->ceiling;
+    }
+    else
+    {
+        floor_h = sector->height_sector->interpolated_floor_height;
+    }
+
+    if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
+    {
+        EmitSkyPlane(sub, floor_h, sector->height_sector, 1, mir, from_walk);
+    }
+
+    if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sector->sky_height)
+    {
+        EmitSkyPlane(sub, sector->sky_height, sector->height_sector, 0, mir, from_walk);
+    }
+}
+
+static bool SegIsMirrorCandidate(const Seg *seg)
+{
+    if (seg->miniseg || !seg->linedef)
+        return false;
+
+    return (seg->linedef->flags & kLineFlagMirror) || seg->linedef->portal_pair;
+}
+
+static std::vector<int32_t> mirror_candidates;
+static const Seg           *mirror_candidate_base  = nullptr;
+static int                  mirror_candidate_count = 0;
+
+static void RefreshMirrorCandidates(void)
+{
+    if (mirror_candidate_base == level_segs && mirror_candidate_count == total_level_segs)
+        return;
+
+    mirror_candidate_base  = level_segs;
+    mirror_candidate_count = total_level_segs;
+
+    mirror_candidates.clear();
+
+    for (int i = 0; i < total_level_segs; i++)
+    {
+        if (SegIsMirrorCandidate(&level_segs[i]))
+            mirror_candidates.push_back(i);
+    }
+}
+
+void EnumerateViewMirrors(void)
+{
+    EDGE_ZoneScoped;
+
+    if (!MirrorEnumerateEnabled())
+        return;
+
+    if (active_mirror_set.TotalActive() >= kMaximumMirrors)
+        return;
+
+    RefreshMirrorCandidates();
+
+    for (size_t c = 0; c < mirror_candidates.size(); c++)
+    {
+        Seg *seg = &level_segs[mirror_candidates[c]];
+
+        if (active_mirror_set.SegOnPortal(seg))
+            continue;
+
+        BAMAngle left  = 0;
+        BAMAngle right = 0;
+
+        if (!SegViewAngles(seg, &left, &right))
+            continue;
+
+        if (left - right == 0)
+            continue;
+
+        bool is_portal = (seg->linedef->flags & kLineFlagMirror) ? false : true;
+
+        DrawMirror *mir = GetDrawMirror();
+
+        mir->seg = seg;
+        mir->draw_subsectors.clear();
+        mir->draw_things.clear();
+        mir->draw_mirrors.clear();
+
+        mir->left      = view_angle + left;
+        mir->right     = view_angle + right;
+        mir->is_portal = is_portal;
+
+        int32_t enclosing = active_mirror_set.TotalActive();
+
+        if (enclosing > 0)
+            active_mirror_set.PushMirror(enclosing - 1, mir);
+        else
+            draw_mirror_list.push_back(mir);
+
+        active_mirror_set.Push(mir);
+
+        Subsector *save_sub = bsp_current_subsector;
+
+        BAMAngle save_clip_L = clip_left;
+        BAMAngle save_clip_R = clip_right;
+        BAMAngle save_scope  = clip_scope;
+
+        clip_left  = left;
+        clip_right = right;
+        clip_scope = left - right;
+
+        bool save_direct = bsp_walk_direct;
+
+        bsp_walk_direct = true;
+
+        OcclusionState save_occlusion;
+
+        OcclusionPush(&save_occlusion);
+
+        uint64_t walk_mark = GetMicroseconds();
+
+        BSPWalkNode(root_node);
+
+        mirror_nested_walk_us += GetMicroseconds() - walk_mark;
+
+        EnumerateViewThings();
+
+        EnumerateViewMirrors();
+
+        OcclusionPop(&save_occlusion);
+
+        bsp_walk_direct = save_direct;
+
+        bsp_current_subsector = save_sub;
+
+        clip_left  = save_clip_L;
+        clip_right = save_clip_R;
+        clip_scope = save_scope;
+
+        active_mirror_set.Pop();
+    }
+}
+
+void EnumerateViewMirrorsDryRun(void)
+{
+    if (!r_mirror_stats.d_)
+        return;
+
+    EDGE_ZoneScoped;
+
+    uint64_t mark = GetMicroseconds();
+
+    for (int i = 0; i < total_level_segs; i++)
+    {
+        Seg *seg = &level_segs[i];
+
+        if (!SegIsMirrorCandidate(seg))
+            continue;
+
+        BAMAngle left  = 0;
+        BAMAngle right = 0;
+
+        if (!SegViewAngles(seg, &left, &right))
+            continue;
+
+        MirrorStatsMark(mirror_seen_enumerate, seg);
+    }
+
+    int candidates = 0;
+    int walk_found = 0;
+    int enum_found = 0;
+    int enum_only  = 0;
+    int walk_only  = 0;
+
+    for (int i = 0; i < total_level_segs; i++)
+    {
+        if (!SegIsMirrorCandidate(&level_segs[i]))
+            continue;
+
+        candidates++;
+
+        bool w = (size_t)i < mirror_seen_walk.size() && mirror_seen_walk[i];
+        bool e = (size_t)i < mirror_seen_enumerate.size() && mirror_seen_enumerate[i];
+
+        if (w)
+            walk_found++;
+
+        if (e)
+            enum_found++;
+
+        if (e && !w)
+            enum_only++;
+
+        if (w && !e)
+            walk_only++;
+    }
+
+    int      render_count     = 0;
+    int      render_top_count = 0;
+    uint64_t render_top_us    = 0;
+
+    MirrorRenderStatsRead(&render_count, &render_top_count, &render_top_us);
+    MirrorRenderStatsBeginFrame();
+
+    uint64_t nested_walk_us = mirror_nested_walk_us;
+
+    mirror_nested_walk_us = 0;
+
+    static uint64_t total_us         = 0;
+    static int      total_walk       = 0;
+    static int      total_enum       = 0;
+    static int      total_enum_only  = 0;
+    static int      total_walk_only  = 0;
+    static int      total_render     = 0;
+    static int      total_render_top = 0;
+    static uint64_t total_render_us  = 0;
+    static uint64_t total_walk_us    = 0;
+    static int      frames           = 0;
+
+    total_us += GetMicroseconds() - mark;
+    total_walk += walk_found;
+    total_enum += enum_found;
+    total_enum_only += enum_only;
+    total_walk_only += walk_only;
+    total_render += render_count;
+    total_render_top += render_top_count;
+    total_render_us += render_top_us;
+    total_walk_us += nested_walk_us;
+
+    if (++frames >= 120)
+    {
+        LogPrint("MIRRORSCAN %d candidate segs | walk %.2f  enum %.2f  enum-only %.2f  walk-only %d | %.1f us/view\n",
+                 candidates, (double)total_walk / (double)frames, (double)total_enum / (double)frames,
+                 (double)total_enum_only / (double)frames, total_walk_only, (double)total_us / (double)frames);
+
+        double views = (double)total_render_top;
+
+        LogPrint("MIRRORCOST %.2f views/frame (%.2f incl nested) | %.1f us/frame | %.1f us/view | "
+                 "enum-only would add %.1f us/frame\n",
+                 views / (double)frames, (double)total_render / (double)frames,
+                 (double)total_render_us / (double)frames, views > 0 ? (double)total_render_us / views : 0.0,
+                 views > 0 ? ((double)total_render_us / views) * ((double)total_enum_only / (double)frames) : 0.0);
+
+        LogPrint("MIRRORWALK nested BSP walk %.1f us/frame (%.0f%% of mirror cost)\n",
+                 (double)total_walk_us / (double)frames,
+                 total_render_us > 0 ? 100.0 * (double)total_walk_us / (double)total_render_us : 0.0);
+
+        total_us = 0;
+        total_walk_us = 0;
+        total_render_us = 0;
+        total_walk = total_enum = total_enum_only = total_walk_only = 0;
+        total_render = total_render_top = frames = 0;
+    }
+}
+
+EDGE_DEFINE_CONSOLE_VARIABLE(r_sky_stats, "0", kConsoleVariableFlagNone)
+
+void EnumerateViewSky(void)
+{
+    EDGE_ZoneScoped;
+
+    if (!SkyResidentEnabled())
+        return;
+
+    uint64_t mark = GetMicroseconds();
+
+    for (int i = 0; i < total_level_subsectors; i++)
+    {
+        SkyDecideSubsector(&level_subsectors[i], nullptr, false);
+    }
+
+    for (int i = 0; i < total_level_segs; i++)
+    {
+        Seg *seg = &level_segs[i];
+
+        if (seg->miniseg || !seg->linedef || !seg->front_subsector)
+            continue;
+
+        if ((seg->linedef->flags & kLineFlagMirror) || seg->linedef->portal_pair)
+            continue;
+
+        SkyDecideSeg(seg, nullptr, false);
+    }
+
+    if (r_sky_stats.d_ != 0)
+    {
+        static uint64_t total_us = 0;
+        static int      frames   = 0;
+
+        total_us += GetMicroseconds() - mark;
+
+        if (++frames >= 120)
+        {
+            LogPrint("SKYSCAN %d subsectors + %d segs, %.1f us/view avg over %d views\n", total_level_subsectors,
+                     total_level_segs, (double)total_us / (double)frames, frames);
+
+            total_us = 0;
+            frames   = 0;
+        }
+    }
+}
+
 //
 // BSPWalkSubsector
 //
@@ -806,30 +1234,8 @@ static void BSPWalkSubsector(int num)
 
     K->floors.clear();
     K->segs.clear();
-    K->mirrors.clear();
 
-    // --- handle sky (using the depth buffer) ---
-
-    if (!sector->height_sector)
-    {
-        if (EDGE_IMAGE_IS_SKY(sub->sector->floor) && view_z > sub->sector->interpolated_floor_height)
-        {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1);
-#else
-            RenderSkyPlane(sub, sub->sector->interpolated_floor_height, sub->sector, 1, active_mirror_set.InnermostMirror());
-#endif
-        }
-
-        if (EDGE_IMAGE_IS_SKY(sub->sector->ceiling) && view_z < sub->sector->sky_height)
-        {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height, sub->sector, 0);
-#else
-            RenderSkyPlane(sub, sub->sector->sky_height, sub->sector, 0, active_mirror_set.InnermostMirror());
-#endif
-        }
-    }
+    SkyDecideSubsector(sub, active_mirror_set.InnermostMirror(), true);
 
     float floor_h = sector->interpolated_floor_height;
     float ceil_h  = sector->interpolated_ceiling_height;
@@ -862,22 +1268,6 @@ static void BSPWalkSubsector(int num)
         {
             floor_h = sector->height_sector->interpolated_floor_height;
             ceil_h  = sector->height_sector->interpolated_ceiling_height;
-        }
-        if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
-        {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, floor_h, sector->height_sector, 1);
-#else
-            RenderSkyPlane(sub, floor_h, sector->height_sector, 1, active_mirror_set.InnermostMirror());
-#endif
-        }
-        if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sub->sector->sky_height)
-        {
-            #ifdef EDGE_THREADED_BSP
-            BSPQueueSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0);
-#else
-            RenderSkyPlane(sub, sub->sector->sky_height, sector->height_sector, 0, active_mirror_set.InnermostMirror());
-#endif
         }
     }
     // -AJA- 2004/04/22: emulate the Deep-Water TRICK

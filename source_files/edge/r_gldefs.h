@@ -152,6 +152,7 @@ struct DrawMirror
 
     std::list<DrawSubsector *> draw_subsectors;
     std::list<DrawThing *>     draw_things;
+    std::list<DrawMirror *>    draw_mirrors;
 };
 
 struct DrawSeg // HOPEFULLY this can go away
@@ -171,7 +172,6 @@ struct DrawSubsector
 
     std::list<DrawSeg *> segs;
 
-    std::list<DrawMirror *> mirrors;
 
     bool visible;
     bool sorted;

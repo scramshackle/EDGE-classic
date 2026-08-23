@@ -34,6 +34,9 @@ void InstallMirrorNearPlane(const DrawMirror *mir);
 
 void RenderMirror(DrawMirror *mir);
 
+void MirrorRenderStatsBeginFrame(void);
+void MirrorRenderStatsRead(int *count, int *top_count, uint64_t *top_us);
+
 inline void ClipPlaneHorizontalLine(GLdouble *p, const HMM_Vec2 &s, const HMM_Vec2 &e)
 {
     p[0] = e.Y - s.Y;
@@ -157,6 +160,11 @@ class MirrorSet
     void PushThing(int32_t index, DrawThing *thing)
     {
         active_mirrors_[index].draw_mirror_->draw_things.push_back(thing);
+    }
+
+    void PushMirror(int32_t index, DrawMirror *mirror)
+    {
+        active_mirrors_[index].draw_mirror_->draw_mirrors.push_back(mirror);
     }
 
     void Push(DrawMirror *mir)

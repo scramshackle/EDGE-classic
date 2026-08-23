@@ -72,6 +72,10 @@ void ShutdownSky(void);
 
 void SkyResidentInvalidateSector(Sector *sec);
 
+bool SkyResidentEnabled(void);
+
+bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner);
+
 bool SkyPlaneIsBaked(const Subsector *sub, int face);
 bool SkyWallIsBaked(const Seg *seg, int part);
 

@@ -92,6 +92,23 @@ void OcclusionClear(void)
 #endif
 }
 
+void OcclusionPush(OcclusionState *saved)
+{
+    saved->head = occlusion_buffer_head;
+    saved->tail = occlusion_buffer_tail;
+
+    occlusion_buffer_head = nullptr;
+    occlusion_buffer_tail = nullptr;
+}
+
+void OcclusionPop(const OcclusionState *saved)
+{
+    OcclusionClear();
+
+    occlusion_buffer_head = (AngleRange *)saved->head;
+    occlusion_buffer_tail = (AngleRange *)saved->tail;
+}
+
 static inline AngleRange *GetNewRange(BAMAngle low, BAMAngle high)
 {
     AngleRange *R;

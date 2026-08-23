@@ -21,6 +21,15 @@
 #include "epi_bam.h"
 
 void OcclusionClear(void);
+
+struct OcclusionState
+{
+    void *head;
+    void *tail;
+};
+
+void OcclusionPush(OcclusionState *saved);
+void OcclusionPop(const OcclusionState *saved);
 void OcclusionSet(BAMAngle low, BAMAngle high);
 bool OcclusionTest(BAMAngle low, BAMAngle high);
 

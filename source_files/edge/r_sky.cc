@@ -18,6 +18,7 @@
 
 #include "r_sky.h"
 
+#include <float.h>
 #include <math.h>
 
 #include "dm_state.h"
@@ -36,6 +37,7 @@
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_sky.h"
+#include "r_static.h"
 #include "r_texgl.h"
 #include "r_units.h"
 #include "stb_sprintf.h"
@@ -253,11 +255,16 @@ EDGE_DEFINE_CONSOLE_VARIABLE(r_sky_resident, "1", kConsoleVariableFlagArchive)
 
 struct SkySpan
 {
-    int  start;
-    int  count;
-    int  flag_slot;
-    bool is_wall;
-    bool live;
+    int           start;
+    int           count;
+    int           flag_slot;
+    int           height_key;
+    const Sector *height_front;
+    const Sector *height_back;
+    float         view_z_minimum;
+    float         view_z_maximum;
+    bool          is_wall;
+    bool          live;
 };
 
 struct SkySpanReference
@@ -328,10 +335,15 @@ static constexpr size_t kMaximumSkyRun = 3 * 4096;
 static bool sky_capture_active  = false;
 static int  sky_current_section = 0;
 
-static int sky_capture_section   = -1;
-static int sky_capture_start     = 0;
-static int sky_capture_flag_slot = -1;
-static bool sky_capture_is_wall  = false;
+static int           sky_capture_section        = -1;
+static int           sky_capture_start          = 0;
+static int           sky_capture_flag_slot      = -1;
+static int           sky_capture_height_key     = 0;
+static const Sector *sky_capture_height_front   = nullptr;
+static const Sector *sky_capture_height_back    = nullptr;
+static float         sky_capture_view_z_minimum = -FLT_MAX;
+static float         sky_capture_view_z_maximum = FLT_MAX;
+static bool          sky_capture_is_wall        = false;
 
 static constexpr int kMaximumSkyDependencies = 8;
 
@@ -348,8 +360,8 @@ static void SkyResidentReset(void)
 
     sky_sections.clear();
 
-    sky_plane_baked.assign((size_t)total_level_subsectors * 2, 0);
-    sky_wall_baked.assign((size_t)total_level_segs * 3, 0);
+    sky_plane_baked.assign((size_t)total_level_subsectors * 2 * kHeightKeyTotal, 0);
+    sky_wall_baked.assign((size_t)total_level_segs * 3 * kHeightKeyTotal, 0);
     sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
 
     sky_capture_active = false;
@@ -374,10 +386,34 @@ static void SkyAddCaptureDependency(const Sector *sec)
     sky_capture_dependencies[sky_capture_dependency_count++] = index;
 }
 
-static void SkyCaptureBegin(int section, int flag_slot, bool is_wall)
+static int SkyHeightKey(const Sector *front, const Sector *back)
+{
+    return SectorHeightState(front) * kHeightStateTotal + SectorHeightState(back);
+}
+
+static size_t SkyPlaneSlot(const Subsector *sub, int face, int height_key)
+{
+    return ((size_t)(sub - level_subsectors) * 2 + (size_t)(face ? 1 : 0)) * (size_t)kHeightKeyTotal +
+           (size_t)height_key;
+}
+
+static size_t SkyWallSlot(const Seg *seg, int part, int height_key)
+{
+    int clamped = (part < 0) ? 0 : ((part > 2) ? 2 : part);
+
+    return ((size_t)(seg - level_segs) * 3 + (size_t)clamped) * (size_t)kHeightKeyTotal + (size_t)height_key;
+}
+
+static void SkyCaptureBegin(int section, int flag_slot, int height_key, const Sector *height_front,
+                            const Sector *height_back, float view_z_minimum, float view_z_maximum, bool is_wall)
 {
     sky_capture_active           = true;
     sky_capture_section          = section;
+    sky_capture_height_key       = height_key;
+    sky_capture_height_front     = height_front;
+    sky_capture_height_back      = height_back;
+    sky_capture_view_z_minimum   = view_z_minimum;
+    sky_capture_view_z_maximum   = view_z_maximum;
     sky_capture_start            = (int)sky_sections[section].resident_vertices.size();
     sky_capture_flag_slot        = flag_slot;
     sky_capture_is_wall          = is_wall;
@@ -400,11 +436,16 @@ static void SkyCaptureEnd(void)
 
     SkySpan span;
 
-    span.start     = sky_capture_start;
-    span.count     = count;
-    span.flag_slot = sky_capture_flag_slot;
-    span.is_wall   = sky_capture_is_wall;
-    span.live      = true;
+    span.start          = sky_capture_start;
+    span.count          = count;
+    span.flag_slot      = sky_capture_flag_slot;
+    span.height_key     = sky_capture_height_key;
+    span.height_front   = sky_capture_height_front;
+    span.height_back    = sky_capture_height_back;
+    span.view_z_minimum = sky_capture_view_z_minimum;
+    span.view_z_maximum = sky_capture_view_z_maximum;
+    span.is_wall        = sky_capture_is_wall;
+    span.live           = true;
 
     section.spans.push_back(span);
 
@@ -560,6 +601,17 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
             for (size_t k = 0; k <= resident.spans.size(); k++)
             {
                 bool live = (k < resident.spans.size()) && resident.spans[k].live;
+
+                if (live && resident.spans[k].height_key !=
+                                SkyHeightKey(resident.spans[k].height_front, resident.spans[k].height_back))
+                {
+                    live = false;
+                }
+
+                if (live && (view_z <= resident.spans[k].view_z_minimum || view_z >= resident.spans[k].view_z_maximum))
+                {
+                    live = false;
+                }
 
                 bool contiguous = live && run_start >= 0 && resident.spans[k].start == run_end &&
                                   (size_t)(run_end + resident.spans[k].count - run_start) <= kMaximumSkyRun;
@@ -900,12 +952,30 @@ void FinishSkyForMirror(const DrawMirror *mir)
     sky_ref   = saved_sky_ref;
 }
 
+bool SkyResidentEnabled(void)
+{
+    return r_sky_resident.d_ != 0;
+}
+
+bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner)
+{
+    if (!seg || !seg->back_sector || !seg->front_sector)
+        return true;
+
+    const Sector *other = (sky_owner == seg->front_sector) ? seg->back_sector : seg->front_sector;
+
+    const Image *owner_sky = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
+    const Image *other_sky = (other && other->sky_image) ? other->sky_image : sky_image;
+
+    return owner_sky == other_sky;
+}
+
 bool SkyPlaneIsBaked(const Subsector *sub, int face)
 {
     if (!r_sky_resident.d_ || !sub || face < 0 || face > 1)
         return false;
 
-    size_t slot = (size_t)(sub - level_subsectors) * 2 + (size_t)face;
+    size_t slot = SkyPlaneSlot(sub, face, SkyHeightKey(sub->sector, nullptr));
 
     if (slot >= sky_plane_baked.size())
         return false;
@@ -918,7 +988,7 @@ bool SkyWallIsBaked(const Seg *seg, int part)
     if (!r_sky_resident.d_ || !seg || part < 0 || part > 2)
         return false;
 
-    size_t slot = (size_t)(seg - level_segs) * 3 + (size_t)part;
+    size_t slot = SkyWallSlot(seg, part, SkyHeightKey(seg->front_sector, seg->back_sector));
 
     if (slot >= sky_wall_baked.size())
         return false;
@@ -937,7 +1007,8 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMi
     if (!seg)
         return;
 
-    size_t plane_slot = (size_t)(sub - level_subsectors) * 2 + (size_t)(face ? 1 : 0);
+    int    plane_key  = SkyHeightKey(sub->sector, nullptr);
+    size_t plane_slot = SkyPlaneSlot(sub, face, plane_key);
 
     bool bake = !mir && r_sky_resident.d_ && plane_slot < sky_plane_baked.size();
 
@@ -960,7 +1031,8 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMi
 
     if (bake)
     {
-        SkyCaptureBegin(group, (int)plane_slot, false);
+        SkyCaptureBegin(group, (int)plane_slot, plane_key, sub->sector, nullptr, face ? h : -FLT_MAX,
+                        face ? FLT_MAX : h, false);
 
         SkyAddCaptureDependency(sub->sector);
         SkyAddCaptureDependency(sky_owner);
@@ -992,20 +1064,10 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, Dr
     if (!mir)
         need_to_draw_sky = true;
 
-    size_t wall_slot = (size_t)(seg - level_segs) * 3 + (size_t)(part < 0 ? 0 : (part > 2 ? 2 : part));
+    int    wall_key  = SkyHeightKey(seg->front_sector, seg->back_sector);
+    size_t wall_slot = SkyWallSlot(seg, part, wall_key);
 
-    bool bake = !mir && r_sky_resident.d_ && wall_slot < sky_wall_baked.size();
-
-    if (bake && seg->back_sector && seg->front_sector)
-    {
-        const Sector *other = (sky_owner == seg->front_sector) ? seg->back_sector : seg->front_sector;
-
-        const Image *owner_sky = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
-        const Image *other_sky = (other && other->sky_image) ? other->sky_image : sky_image;
-
-        if (owner_sky != other_sky)
-            bake = false;
-    }
+    bool bake = !mir && r_sky_resident.d_ && wall_slot < sky_wall_baked.size() && SkyWallBakeable(seg, sky_owner);
 
     if (bake && sky_wall_baked[wall_slot])
         return;
@@ -1014,7 +1076,8 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, Dr
 
     if (bake)
     {
-        SkyCaptureBegin(group, (int)wall_slot, true);
+        SkyCaptureBegin(group, (int)wall_slot, wall_key, seg->front_sector, seg->back_sector, -FLT_MAX, FLT_MAX,
+                        true);
 
         SkyAddCaptureDependency(sky_owner);
         SkyAddCaptureDependency(seg->front_sector);

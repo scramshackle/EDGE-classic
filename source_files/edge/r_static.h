@@ -43,6 +43,9 @@ bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_mas
                             const Extrafloor *surface_ef);
 
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir);
+bool StaticFlatBakeEligibleSurface(const Sector *sec, const MapSurface *surf, const Sector *surf_owner, int face_dir);
+int  StaticFlatBakeDeclineSurface(const Sector *sec, const MapSurface *surf, const Sector *surf_owner, int face_dir);
+bool StaticPropertiesResolvable(const Sector *sec, const RegionProperties *props);
 
 enum StaticBakeDecline
 {
@@ -94,10 +97,15 @@ void StaticResidencyNoteWall(const Seg *seg, const MapSurface *surf, bool mid_ma
                              const Extrafloor *surface_ef, bool resident);
 void StaticResidencyNoteRegionProperties(Sector *sec, RegionProperties *props);
 void StaticResidencyReport(void);
+void StaticResidencyNoteExtraPlane(bool same_surface, const Subsector *sub, const MapSurface *surf);
 void StaticResidencyTick(void);
 void StaticResidencySurvey(void);
 
 void StaticMeshInvalidateSector(Sector *sec);
+
+void    StaticPruneDynamicSectors(void);
+int     StaticDynamicSectorCount(void);
+Sector *StaticDynamicSector(int index);
 
 void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertices);
 

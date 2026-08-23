@@ -266,8 +266,31 @@ static void DrawPortalPolygon(DrawMirror *mir)
     EndRenderUnit(4);
 }
 
+static int      mirror_render_count    = 0;
+static int      mirror_render_top_count = 0;
+static uint64_t mirror_render_top_us   = 0;
+
+void MirrorRenderStatsBeginFrame(void)
+{
+    mirror_render_count     = 0;
+    mirror_render_top_count = 0;
+    mirror_render_top_us    = 0;
+}
+
+void MirrorRenderStatsRead(int *count, int *top_count, uint64_t *top_us)
+{
+    *count     = mirror_render_count;
+    *top_count = mirror_render_top_count;
+    *top_us    = mirror_render_top_us;
+}
+
 void RenderMirror(DrawMirror *mir)
 {
+    mirror_render_count++;
+
+    bool     top_level = (mirror_view.depth == 0);
+    uint64_t mark      = top_level ? GetMicroseconds() : 0;
+
     // mark the line on the automap
     if (!(mir->seg->linedef->flags & kLineFlagMapped))
         newly_seen_lines.emplace(mir->seg->linedef);
@@ -309,7 +332,7 @@ void RenderMirror(DrawMirror *mir)
 
     FinishSkyForMirror(mir);
 
-    RenderSubList(mir->draw_subsectors, mir->draw_things, true);
+    RenderSubList(mir->draw_subsectors, mir->draw_things, mir->draw_mirrors, true);
 
     render_backend->PopModelMatrix();
 
@@ -338,4 +361,10 @@ void RenderMirror(DrawMirror *mir)
 
     solid_mode = true;
     StartUnitBatch(solid_mode);
+
+    if (top_level)
+    {
+        mirror_render_top_count++;
+        mirror_render_top_us += GetMicroseconds() - mark;
+    }
 }

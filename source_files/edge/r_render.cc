@@ -114,6 +114,7 @@ static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
 extern std::list<DrawSubsector *> draw_subsector_list;
 extern std::list<DrawThing *>     draw_thing_list;
+extern std::list<DrawMirror *>    draw_mirror_list;
 
 static void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int face_dir, float h1, float h2);
 
@@ -1536,6 +1537,20 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     bool own_plane = (surf == own_surf && epi::AlmostEquals(h, own_h));
 
+    Sector *height_sec = own_sec->height_sector;
+
+    const MapSurface *height_surf =
+        height_sec ? ((face_dir > 0) ? &height_sec->floor : &height_sec->ceiling) : nullptr;
+
+    bool height_plane = (height_surf && surf == height_surf);
+
+    Sector *deep_sec = current_subsector->deep_water_reference;
+
+    const MapSurface *deep_surf = deep_sec ? ((face_dir > 0) ? &deep_sec->floor : &deep_sec->ceiling) : nullptr;
+
+    bool deep_plane = (!height_plane && deep_surf && surf == deep_surf);
+
+
     Extrafloor *plane_ef = (face_dir > 0) ? dfloor->floor_extrafloor : dfloor->extrafloor;
 
     if (plane_ef && (surf != ((face_dir > 0) ? plane_ef->top : plane_ef->bottom) ||
@@ -1543,12 +1558,18 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         plane_ef = nullptr;
 
     if (plane_ef)
-        own_plane = false;
+    {
+        own_plane    = false;
+        height_plane = false;
+        deep_plane   = false;
+    }
 
-    if ((own_plane || plane_ef) && StaticMeshCoversFlat(current_subsector, face_dir, plane_ef))
+    if ((own_plane || height_plane || deep_plane || plane_ef) &&
+        StaticMeshCoversFlat(current_subsector, face_dir, plane_ef))
     {
         if (mirror_view.depth == 0)
-            StaticResidencyNoteFlat(current_subsector, face_dir, true, own_plane, plane_ef);
+            StaticResidencyNoteFlat(current_subsector, face_dir, true, own_plane || height_plane || deep_plane,
+                                    plane_ef);
 
         return;
     }
@@ -1716,7 +1737,13 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     AbstractShader *cmap_shader = GetColormapShader(props, 0, current_subsector->sector);
 
     if (mirror_view.depth == 0)
-        StaticResidencyNoteFlat(current_subsector, face_dir, false, own_plane, plane_ef);
+    {
+        if (!own_plane && !height_plane && !deep_plane && !plane_ef)
+            StaticResidencyNoteExtraPlane(surf == own_surf, current_subsector, surf);
+
+        StaticResidencyNoteFlat(current_subsector, face_dir, false, own_plane || height_plane || deep_plane,
+                                plane_ef);
+    }
 
     StaticResidencyNoteRegionProperties(current_subsector->sector, props);
 
@@ -1728,6 +1755,10 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
             capture = StaticExtrafloorPlaneEligible(current_subsector, plane_ef, face_dir);
         else if (own_plane)
             capture = StaticFlatBakeEligible(current_subsector->sector, face_dir);
+        else if (height_plane)
+            capture = StaticFlatBakeEligibleSurface(current_subsector->sector, surf, height_sec, face_dir);
+        else if (deep_plane)
+            capture = StaticFlatBakeEligibleSurface(current_subsector->sector, surf, deep_sec, face_dir);
     }
 
     if (capture)
@@ -1777,7 +1808,8 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
 static void RenderSubsector(DrawSubsector *dsub);
 
-void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings, bool for_mirror)
+void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dthings,
+                   std::list<DrawMirror *> &dmirrors, bool for_mirror)
 {
     EDGE_ZoneScoped;
 
@@ -1795,6 +1827,9 @@ void RenderSubList(std::list<DrawSubsector *> &dsubs, std::list<DrawThing *> &dt
 
         for (FI = dsubs.begin(); FI != dsubs.end(); FI++)
             RenderSubsector(*FI);
+
+        for (std::list<DrawMirror *>::iterator MRI = dmirrors.begin(); MRI != dmirrors.end(); MRI++)
+            RenderMirror(*MRI);
 
         RenderThings(dthings, solid_mode);
 
@@ -1851,19 +1886,6 @@ static void RenderSubsector(DrawSubsector *dsub)
 #if (DEBUG >= 1)
     LogDebug("\nREVISITING SUBSEC %d\n\n", (int)(sub - subsectors));
 #endif
-
-    current_subsector      = sub;
-    current_draw_subsector = dsub;
-
-    if (solid_mode)
-    {
-        std::list<DrawMirror *>::iterator MRI;
-
-        for (MRI = dsub->mirrors.begin(); MRI != dsub->mirrors.end(); MRI++)
-        {
-            RenderMirror(*MRI);
-        }
-    }
 
     current_subsector      = sub;
     current_draw_subsector = dsub;
@@ -2119,6 +2141,7 @@ void RenderTrueBSP(void)
 
         draw_subsector_list.clear();
         draw_thing_list.clear();
+        draw_mirror_list.clear();
 
         render_backend->SetRenderLayer(kRenderLayerSolid, false);
         render_state->Clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -2139,6 +2162,8 @@ void RenderTrueBSP(void)
         // needed for drawing the sky
         BeginSky();
     }
+
+    MirrorStatsBeginFrame();
 
     {
         EDGE_ZoneScopedN("RenderTrueBSP BSP walk");
@@ -2181,6 +2206,16 @@ void RenderTrueBSP(void)
     }
 
     {
+        EDGE_ZoneScopedN("RenderTrueBSP sky");
+
+        EnumerateViewSky();
+    }
+
+    EnumerateViewMirrors();
+
+    EnumerateViewMirrorsDryRun();
+
+    {
         EDGE_ZoneScopedN("RenderTrueBSP FinishSky");
 
         FinishSky(true);
@@ -2192,7 +2227,7 @@ void RenderTrueBSP(void)
         EnumerateViewThings();
     }
 
-    RenderSubList(draw_subsector_list, draw_thing_list);
+    RenderSubList(draw_subsector_list, draw_thing_list, draw_mirror_list);
 
     // Add lines seen during render to the automap
     if (!newly_seen_lines.empty())
