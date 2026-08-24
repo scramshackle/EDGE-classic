@@ -112,11 +112,12 @@ void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertic
 
 void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *image, RegionProperties *props,
                             Sector *sector, BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass,
-                            const MapSurface *surf, const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef);
+                            const MapSurface *surf, const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef,
+                            bool covers_sector);
 void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
                         float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked,
                         OitPass draw_pass, const HMM_Vec2 &uv_scale, const Extrafloor *region_ef,
                         const Extrafloor *surface_ef);
-void StaticCaptureVertices(const RendererVertex *verts, int count);
+void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count);
 void StaticCaptureEnd(void);

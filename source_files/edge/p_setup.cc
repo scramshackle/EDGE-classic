@@ -59,6 +59,7 @@
 #include "r_gldefs.h"
 #include "r_image.h"
 #include "r_misc.h"
+#include "r_polygon.h"
 #include "r_sky.h"
 #include "r_static.h"
 #include "rad_trig.h" // MUSINFO changers
@@ -3710,6 +3711,8 @@ void LevelSetup(void)
         PrecacheLevelGraphics();
 
     SnapshotSurfaceBaseOffsets();
+
+    BuildSectorPolygons();
 
     BuildStaticMesh();
 

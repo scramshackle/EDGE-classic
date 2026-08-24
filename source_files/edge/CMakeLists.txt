@@ -73,6 +73,7 @@ set (EDGE_SOURCE_FILES
   r_mdmesh.cc
   r_mirror.cc
   r_occlude.cc
+  r_polygon.cc
   r_things.cc
   r_units.cc
   r_wipe.cc
@@ -197,6 +198,7 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ddf
   dr_libs
+  earcut
   edge_tracy
   edgetracker
   epi

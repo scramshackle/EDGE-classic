@@ -70,6 +70,7 @@ struct StaticSpan
     bool    is_wall;
     bool    mid_masked;
     bool    live;
+    bool    covers_sector;
 
     HMM_Vec3 normal;
     float    low[3];
@@ -265,8 +266,9 @@ static void AddCaptureDependencyList(const VertexSectorList *seclist)
 static int  capture_batch      = -1;
 static int      capture_flag_slot = -1;
 static uint64_t capture_hash_key  = 0;
-static bool capture_is_wall    = false;
-static bool capture_mid_masked = false;
+static bool capture_is_wall       = false;
+static bool capture_mid_masked    = false;
+static bool capture_covers_sector = false;
 static HMM_Vec3 capture_normal = {{0, 0, 1}};
 static float capture_div[4]    = {0, 0, 0, 0};
 static int  capture_light      = 0;
@@ -1458,7 +1460,8 @@ void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *ima
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
-    capture_mid_masked = mid_masked;
+    capture_mid_masked    = mid_masked;
+    capture_covers_sector = false;
 
     capture_normal = normal;
     capture_div[0] = div_x;
@@ -1519,7 +1522,8 @@ void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *ima
 
 void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *image, RegionProperties *props,
                             Sector *sector, BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass,
-                            const MapSurface *surf, const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef)
+                            const MapSurface *surf, const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef,
+                            bool covers_sector)
 {
     capture_flat_surface = surf;
 
@@ -1540,14 +1544,16 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
     capture_light_sector = ResolvePropertiesOwner(sector, props);
     capture_light        = capture_light_sector->properties.light_level;
 
-    capture_is_wall    = false;
-    capture_mid_masked = false;
+    capture_is_wall       = false;
+    capture_mid_masked    = false;
+    capture_covers_sector = covers_sector;
     capture_flag_slot = (int)((sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1));
     capture_hash_key  = 0;
 
     if (plane_ef)
     {
-        capture_flag_slot = -1;
+        capture_flag_slot     = -1;
+        capture_covers_sector = false;
 
         if (!BuildRegionFlatKey(sub, face_dir, plane_ef, capture_height_key, &capture_hash_key))
             capture_hash_key = 0;
@@ -1562,7 +1568,28 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
     AddCaptureDependency(ExtrafloorControlSector(plane_ef));
 }
 
-void StaticCaptureVertices(const RendererVertex *verts, int count)
+static void MarkSectorFlatSlots(const StaticSpan &span, uint8_t value)
+{
+    if (span.flag_slot < 0 || !span.sector)
+        return;
+
+    size_t parity = (size_t)(span.flag_slot & 1);
+
+    size_t own = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
+
+    if (own < subsector_flat_baked.size())
+        subsector_flat_baked[own] = value;
+
+    for (const Subsector *sub = span.sector->subsectors; sub; sub = sub->sector_next)
+    {
+        size_t slot = ((size_t)(sub - level_subsectors) * 2 + parity) * kHeightKeyTotal + (size_t)span.height_key;
+
+        if (slot < subsector_flat_baked.size())
+            subsector_flat_baked[slot] = value;
+    }
+}
+
+void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 {
     if (capture_batch < 0 || count < 3)
         return;
@@ -1580,9 +1607,10 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
     span.light_adjust = capture_adjust;
     span.flag_slot    = capture_flag_slot;
     span.hash_key     = capture_hash_key;
-    span.is_wall      = capture_is_wall;
-    span.mid_masked   = capture_mid_masked;
-    span.live         = true;
+    span.is_wall       = capture_is_wall;
+    span.mid_masked    = capture_mid_masked;
+    span.covers_sector = capture_covers_sector;
+    span.live          = true;
     span.normal       = capture_normal;
     span.div_x        = capture_div[0];
     span.div_y        = capture_div[1];
@@ -1604,11 +1632,19 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
         }
     }
 
-    for (int t = 1; t < count - 1; t++)
+    if (shape == GL_TRIANGLES)
     {
-        batch.vertices.push_back(verts[0]);
-        batch.vertices.push_back(verts[t]);
-        batch.vertices.push_back(verts[t + 1]);
+        for (int v = 0, total = (count / 3) * 3; v < total; v++)
+            batch.vertices.push_back(verts[v]);
+    }
+    else
+    {
+        for (int t = 1; t < count - 1; t++)
+        {
+            batch.vertices.push_back(verts[0]);
+            batch.vertices.push_back(verts[t]);
+            batch.vertices.push_back(verts[t + 1]);
+        }
     }
 
     for (int v = span.start; v < (int)batch.vertices.size(); v++)
@@ -1658,6 +1694,8 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
             if (slot < seg_wall_baked.size())
                 seg_wall_baked[slot] = 1;
         }
+        else if (span.covers_sector)
+            MarkSectorFlatSlots(span, 1);
         else if (slot < subsector_flat_baked.size())
             subsector_flat_baked[slot] = 1;
     }
@@ -1755,6 +1793,8 @@ void StaticMeshInvalidateSector(Sector *sec)
             if (slot < seg_wall_baked.size())
                 seg_wall_baked[slot] = 0;
         }
+        else if (span.covers_sector)
+            MarkSectorFlatSlots(span, 0);
         else if (slot < subsector_flat_baked.size())
             subsector_flat_baked[slot] = 0;
     }

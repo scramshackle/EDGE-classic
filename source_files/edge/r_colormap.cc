@@ -671,7 +671,7 @@ class ColormapShader : public AbstractShader
             TextureCoordinates(dest, 1, &lit_pos);
         }
 
-        StaticCaptureVertices(glvert, num_vert);
+        StaticCaptureVertices(shape, glvert, num_vert);
 
         EndRenderUnit(num_vert);
 

@@ -55,6 +55,7 @@
 #include "r_modes.h"
 #include "r_occlude.h"
 #include "r_lightgrid.h"
+#include "r_polygon.h"
 #include "r_shader.h"
 #include "r_sky.h"
 #include "r_state.h"
@@ -1516,6 +1517,22 @@ static void RenderSeg(DrawFloor *dfloor, Seg *seg)
     }
 }
 
+static std::vector<HMM_Vec3> sector_polygon_vertices;
+
+static bool SectorPolygonUsable(const Sector *sec)
+{
+    if (!sec->subsectors)
+        return false;
+
+    for (const Subsector *sub = sec->subsectors; sub; sub = sub->sector_next)
+    {
+        if (sub->deep_water_reference)
+            return false;
+    }
+
+    return true;
+}
+
 static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_dir)
 {
     float orig_h = h;
@@ -1761,12 +1778,59 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
             capture = StaticFlatBakeEligibleSurface(current_subsector->sector, surf, deep_sec, face_dir);
     }
 
+    GLuint plane_shape = GL_POLYGON;
+
+    const SectorPolygon *sector_polygon = nullptr;
+
+    if (capture && own_plane && !plane_ef && SectorPolygonsEnabled() &&
+        SectorPolygonUsable(current_subsector->sector))
+        sector_polygon = SectorPolygonForSector((int)(current_subsector->sector - level_sectors));
+
+    if (sector_polygon && (sector_polygon->status != kSectorPolygonOk || sector_polygon->indices.size() < 3 ||
+                           sector_polygon->indices.size() > kMaximumSectorPolygonVertices))
+        sector_polygon = nullptr;
+
+    if (sector_polygon)
+    {
+        sector_polygon_vertices.clear();
+        sector_polygon_vertices.reserve(sector_polygon->indices.size());
+
+        for (size_t pv = 0; pv < sector_polygon->indices.size(); pv++)
+        {
+            const Vertex *point = sector_polygon->points[sector_polygon->indices[pv]];
+
+            HMM_Vec3 place;
+
+            place.X = point->X;
+            place.Y = point->Y;
+            place.Z = h;
+
+            if (current_subsector->sector->floor_vertex_slope && face_dir > 0 && point->Z < 32767.0f &&
+                point->Z > -32768.0f)
+                place.Z = point->Z;
+
+            if (current_subsector->sector->ceiling_vertex_slope && face_dir < 0 && point->W < 32767.0f &&
+                point->W > -32768.0f)
+                place.Z = point->W;
+
+            if (slope)
+                place.Z = orig_h + Slope_GetHeight(slope, place.X, place.Y);
+
+            sector_polygon_vertices.push_back(place);
+        }
+
+        data.v_count  = (int)sector_polygon_vertices.size();
+        data.vertices = sector_polygon_vertices.data();
+
+        plane_shape = GL_TRIANGLES;
+    }
+
     if (capture)
         StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector, blending,
                                data.normal, CaptureDrawPass(blending), surf,
-                               {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef);
+                               {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef, sector_polygon != nullptr);
 
-    cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, false /* masked */,
+    cmap_shader->WorldMix(plane_shape, data.v_count, data.tex_id, trans, &data.pass, data.blending, false /* masked */,
                           &data, PlaneCoordFunc);
 
     if (capture)
@@ -1786,9 +1850,9 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         if (capture)
             StaticCaptureBeginFlat(current_subsector, face_dir, surf->image, props, current_subsector->sector,
                                    data.blending, data.normal, CaptureDrawPass(data.blending), surf,
-                                   {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef);
+                                   {{1.0f / data.image_w, 1.0f / data.image_h}}, plane_ef, sector_polygon != nullptr);
 
-        cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
+        cmap_shader->WorldMix(plane_shape, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               PlaneCoordFunc);
 
         if (capture)
@@ -2080,6 +2144,7 @@ void RendererShutdownLevel()
 {
     ShutdownSky();
     DestroyStaticMesh();
+    DestroySectorPolygons();
 }
 
 void UpdateSectorInterpolation(Sector *sector)
