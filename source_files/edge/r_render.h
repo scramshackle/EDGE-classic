@@ -13,10 +13,10 @@ void BSPWalkNode(unsigned int);
 
 void EnumerateViewSky(void);
 
-void EnumerateViewMirrorsDryRun(void);
 void EnumerateViewMirrors(void);
+void EnumerateViewSubsectors(void);
+bool SubsectorEnumerateEnabled(void);
 bool MirrorEnumerateEnabled(void);
-void MirrorStatsBeginFrame(void);
 
 void SkyDecideSeg(Seg *seg, DrawMirror *mir, bool queue);
 void SkyDecideSubsector(Subsector *sub, DrawMirror *mir, bool queue);

@@ -205,12 +205,19 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     int wanted_header_width  = NextPowerOfTwo(grid->tiles_x);
     int wanted_header_height = NextPowerOfTwo(grid->tiles_y);
 
-    if (wanted_header_width != header_texture_width || wanted_header_height != header_texture_height)
+    bool header_resized = (wanted_header_width != header_texture_width) ||
+                          (wanted_header_height != header_texture_height);
+
+    if (header_resized)
     {
         header_texture_width  = wanted_header_width;
         header_texture_height = wanted_header_height;
 
         header_pixels.assign((size_t)header_texture_width * header_texture_height * 4, 0);
+
+        glBindTexture(GL_TEXTURE_2D, light_grid_state.header_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header_texture_width, header_texture_height, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, nullptr);
     }
     else
         memset(header_pixels.data(), 0, header_pixels.size());
@@ -234,20 +241,26 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     }
 
     glBindTexture(GL_TEXTURE_2D, light_grid_state.header_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header_texture_width, header_texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 header_pixels.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, header_texture_width, header_texture_height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    header_pixels.data());
 
     size_t entry_total = grid->tile_list.size();
 
     int wanted_list_width  = 256;
     int wanted_list_height = NextPowerOfTwo((int)((entry_total + 255) / 256) + 1);
 
-    if (wanted_list_width != list_texture_width || wanted_list_height != list_texture_height)
+    bool list_resized = (wanted_list_width != list_texture_width) || (wanted_list_height != list_texture_height);
+
+    if (list_resized)
     {
         list_texture_width  = wanted_list_width;
         list_texture_height = wanted_list_height;
 
-        list_pixels.assign((size_t)list_texture_width * list_texture_height * 4, 0);
+        list_pixels.assign((size_t)list_texture_width * list_texture_height, 0);
+
+        glBindTexture(GL_TEXTURE_2D, light_grid_state.list_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, list_texture_width, list_texture_height, 0, GL_LUMINANCE,
+                     GL_UNSIGNED_BYTE, nullptr);
     }
     else
         memset(list_pixels.data(), 0, list_pixels.size());
@@ -255,11 +268,11 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     size_t list_capacity = (size_t)list_texture_width * list_texture_height;
 
     for (size_t entry = 0; entry < entry_total && entry < list_capacity; entry++)
-        list_pixels[entry * 4] = grid->tile_list[entry];
+        list_pixels[entry] = grid->tile_list[entry];
 
     glBindTexture(GL_TEXTURE_2D, light_grid_state.list_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, list_texture_width, list_texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 list_pixels.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, list_texture_width, list_texture_height, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+                    list_pixels.data());
 
     glBindTexture(GL_TEXTURE_2D, 0);
 

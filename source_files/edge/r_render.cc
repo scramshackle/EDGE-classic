@@ -471,6 +471,8 @@ enum WallTileFlag
     kWallTileMidMask = (1 << 4), // the mid-masked part (gratings etc)
 };
 
+static bool wall_covers_line = false;
+
 static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float lz2, float x2, float y2, float rz1,
                          float rz2, float tex_top_h, MapSurface *surf, const Image *image, bool mid_masked, bool opaque,
                          float tex_x1, float tex_x2, RegionProperties *props = nullptr)
@@ -480,10 +482,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     if (StaticMeshCoversWall(current_seg, surf, current_region_extrafloor, current_surface_extrafloor))
     {
-        if (mirror_view.depth == 0)
-            StaticResidencyNoteWall(current_seg, surf, mid_masked, current_region_extrafloor,
-                                    current_surface_extrafloor, true);
-
         return;
     }
 
@@ -638,12 +636,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_subsector->sector);
 
-    if (mirror_view.depth == 0)
-        StaticResidencyNoteWall(current_seg, surf, mid_masked, current_region_extrafloor,
-                                current_surface_extrafloor, false);
-
-    StaticResidencyNoteRegionProperties(current_subsector->sector, props);
-
     bool capture = mirror_view.depth == 0 &&
                    StaticWallBakeEligible(current_seg, surf, mid_masked, current_region_extrafloor,
                                           current_surface_extrafloor);
@@ -652,7 +644,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, blending, lit_adjust,
                            data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
                            CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}},
-                           current_region_extrafloor, current_surface_extrafloor);
+                           current_region_extrafloor, current_surface_extrafloor, wall_covers_line);
 
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
@@ -674,7 +666,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
             StaticCaptureBegin(current_seg, surf, image, props, current_subsector->sector, data.blending, lit_adjust,
                                data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
                                CaptureDrawPass(data.blending), {{surf->x_matrix.X / total_w, -ty_mul}},
-                               current_region_extrafloor, current_surface_extrafloor);
+                               current_region_extrafloor, current_surface_extrafloor, wall_covers_line);
 
         cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
                               WallCoordFunc);
@@ -917,6 +909,10 @@ static void DrawTile(Seg *seg, DrawFloor *dfloor, float lz1, float lz2, float rz
         }
     }
 
+    wall_covers_line = (mirror_view.depth == 0) &&
+                       StaticWallCoversLine(seg, surf, (flags & kWallTileMidMask) ? true : false,
+                                            current_region_extrafloor, current_surface_extrafloor);
+
     float x1 = seg->vertex_1->X;
     float y1 = seg->vertex_1->Y;
     float x2 = seg->vertex_2->X;
@@ -924,6 +920,22 @@ static void DrawTile(Seg *seg, DrawFloor *dfloor, float lz1, float lz2, float rz
 
     float tex_x1 = seg->offset;
     float tex_x2 = tex_x1 + seg->length;
+
+    if (wall_covers_line)
+    {
+        const Line *ld = seg->linedef;
+
+        const Vertex *start = (seg->side == 0) ? ld->vertex_1 : ld->vertex_2;
+        const Vertex *end   = (seg->side == 0) ? ld->vertex_2 : ld->vertex_1;
+
+        x1 = start->X;
+        y1 = start->Y;
+        x2 = end->X;
+        y2 = end->Y;
+
+        tex_x1 = 0.0f;
+        tex_x2 = ld->length;
+    }
 
     tex_x1 += x_offset;
     tex_x2 += x_offset;
@@ -1584,10 +1596,6 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     if ((own_plane || height_plane || deep_plane || plane_ef) &&
         StaticMeshCoversFlat(current_subsector, face_dir, plane_ef))
     {
-        if (mirror_view.depth == 0)
-            StaticResidencyNoteFlat(current_subsector, face_dir, true, own_plane || height_plane || deep_plane,
-                                    plane_ef);
-
         return;
     }
 
@@ -1752,17 +1760,6 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         swirl_pass = 1;
 
     AbstractShader *cmap_shader = GetColormapShader(props, 0, current_subsector->sector);
-
-    if (mirror_view.depth == 0)
-    {
-        if (!own_plane && !height_plane && !deep_plane && !plane_ef)
-            StaticResidencyNoteExtraPlane(surf == own_surf, current_subsector, surf);
-
-        StaticResidencyNoteFlat(current_subsector, face_dir, false, own_plane || height_plane || deep_plane,
-                                plane_ef);
-    }
-
-    StaticResidencyNoteRegionProperties(current_subsector->sector, props);
 
     bool capture = false;
 
@@ -2228,11 +2225,16 @@ void RenderTrueBSP(void)
         BeginSky();
     }
 
-    MirrorStatsBeginFrame();
 
     {
         EDGE_ZoneScopedN("RenderTrueBSP BSP walk");
 
+        if (SubsectorEnumerateEnabled())
+        {
+            EnumerateViewSubsectors();
+        }
+        else
+        {
 #ifdef EDGE_THREADED_BSP
         BSPTraverse();
 
@@ -2268,6 +2270,7 @@ void RenderTrueBSP(void)
         // walk the bsp tree
         BSPWalkNode(root_node);
 #endif
+        }
     }
 
     {
@@ -2278,7 +2281,6 @@ void RenderTrueBSP(void)
 
     EnumerateViewMirrors();
 
-    EnumerateViewMirrorsDryRun();
 
     {
         EDGE_ZoneScopedN("RenderTrueBSP FinishSky");

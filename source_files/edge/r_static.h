@@ -17,9 +17,9 @@ void DestroyStaticMesh(void);
 void DrawStaticMesh(OitPass draw_pass, bool refresh = true);
 
 bool StaticMeshCoversFlat(const Subsector *sub, int face_dir, const Extrafloor *plane_ef);
+bool StaticMeshCoversSubsector(const Subsector *sub);
 bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf, const Extrafloor *region_ef,
                           const Extrafloor *surface_ef);
-bool StaticMeshEnabled(void);
 bool StaticMeshBuilt(void);
 
 enum HeightRenderState
@@ -41,6 +41,9 @@ int StaticHeightKey(const Sector *front, const Sector *back);
 
 bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
                             const Extrafloor *surface_ef);
+
+bool StaticWallCoversLine(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
+                          const Extrafloor *surface_ef);
 
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir);
 bool StaticFlatBakeEligibleSurface(const Sector *sec, const MapSurface *surf, const Sector *surf_owner, int face_dir);
@@ -91,15 +94,6 @@ int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_maske
 int  StaticExtrafloorPlaneDecline(const Subsector *sub, const Extrafloor *plane_ef, int face_dir);
 bool StaticExtrafloorPlaneEligible(const Subsector *sub, const Extrafloor *plane_ef, int face_dir);
 
-void StaticResidencyNoteFlat(const Subsector *sub, int face_dir, bool resident, bool own_plane,
-                             const Extrafloor *plane_ef);
-void StaticResidencyNoteWall(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
-                             const Extrafloor *surface_ef, bool resident);
-void StaticResidencyNoteRegionProperties(Sector *sec, RegionProperties *props);
-void StaticResidencyReport(void);
-void StaticResidencyNoteExtraPlane(bool same_surface, const Subsector *sub, const MapSurface *surf);
-void StaticResidencyTick(void);
-void StaticResidencySurvey(void);
 
 void StaticMeshInvalidateSector(Sector *sec);
 
@@ -118,6 +112,6 @@ void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *ima
                         Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
                         float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked,
                         OitPass draw_pass, const HMM_Vec2 &uv_scale, const Extrafloor *region_ef,
-                        const Extrafloor *surface_ef);
+                        const Extrafloor *surface_ef, bool covers_line);
 void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count);
 void StaticCaptureEnd(void);

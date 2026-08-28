@@ -801,7 +801,6 @@ void EdgeDisplay(void)
         FinishUnitBatch();
     }
 
-    StaticResidencyTick();
 
     if (m_screenshot_required)
     {

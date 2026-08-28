@@ -25,6 +25,8 @@
 
 #include <math.h>
 
+#include <algorithm>
+
 #include <unordered_map>
 #include <unordered_set>
 
@@ -55,6 +57,8 @@
 #include "r_render.h"
 #include "r_shader.h"
 #include "r_sky.h"
+#include "r_state.h"
+#include "r_static.h"
 #include "r_things.h"
 #include "r_units.h"
 
@@ -196,7 +200,6 @@ std::list<DrawThing *>     draw_thing_list;
 std::list<DrawMirror *>    draw_mirror_list;
 
 static bool     bsp_walk_direct       = false;
-static uint64_t mirror_nested_walk_us = 0;
 
 
 MirrorSet active_mirror_set;
@@ -231,50 +234,19 @@ ViewHeightZone view_height_zone;
 
 static Subsector *bsp_current_subsector;
 
-EDGE_DEFINE_CONSOLE_VARIABLE(r_mirror_stats, "0", kConsoleVariableFlagNone)
-EDGE_DEFINE_CONSOLE_VARIABLE(r_mirror_enumerate, "0", kConsoleVariableFlagNone)
+static std::unordered_set<Line *> automap_sweep_seen;
 
 bool MirrorEnumerateEnabled(void)
 {
-    return r_mirror_enumerate.d_ != 0;
+    return true;
 }
 
 
-static std::vector<uint8_t> mirror_seen_walk;
-static std::vector<uint8_t> mirror_seen_enumerate;
 
-static void MirrorStatsMark(std::vector<uint8_t> &marks, const Seg *seg)
-{
-    if (!r_mirror_stats.d_ || !seg)
-        return;
 
-    size_t index = (size_t)(seg - level_segs);
-
-    if (index < marks.size())
-        marks[index] = 1;
-}
-
-void MirrorStatsBeginFrame(void)
-{
-    if (!r_mirror_stats.d_)
-        return;
-
-    if (mirror_seen_walk.size() != (size_t)total_level_segs)
-    {
-        mirror_seen_walk.assign((size_t)total_level_segs, 0);
-        mirror_seen_enumerate.assign((size_t)total_level_segs, 0);
-        return;
-    }
-
-    EPI_CLEAR_MEMORY(mirror_seen_walk.data(), uint8_t, mirror_seen_walk.size());
-    EPI_CLEAR_MEMORY(mirror_seen_enumerate.data(), uint8_t, mirror_seen_enumerate.size());
-}
 
 static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle right, bool is_portal)
 {
-    if (active_mirror_set.TotalActive() == 0)
-        MirrorStatsMark(mirror_seen_walk, seg);
-
     DrawMirror *mir = GetDrawMirror();
     mir->seg        = seg;
     mir->draw_subsectors.clear();
@@ -308,8 +280,10 @@ static void BSPWalkMirror(DrawSubsector *dsub, Seg *seg, BAMAngle left, BAMAngle
     clip_right = right;
     clip_scope = left - right;
 
-    // perform another BSP walk
-    BSPWalkNode(root_node);
+    if (SubsectorEnumerateEnabled())
+        EnumerateViewSubsectors();
+    else
+        BSPWalkNode(root_node);
 
     EnumerateViewThings();
 
@@ -461,6 +435,9 @@ void SkyDecideSeg(Seg *seg, DrawMirror *mir, bool from_walk)
 // Visit a single seg of the subsector, and for one-sided lines update
 // the 1D occlusion buffer.
 //
+static bool PointPairViewAngles(float sx1, float sy1, float sx2, float sy2, bool precise,
+                                BAMAngle *out_left, BAMAngle *out_right);
+
 static bool SegViewAngles(const Seg *seg, BAMAngle *out_left, BAMAngle *out_right)
 {
     float sx1 = seg->vertex_1->X;
@@ -527,6 +504,12 @@ static bool SegViewAngles(const Seg *seg, BAMAngle *out_left, BAMAngle *out_righ
         precise = (seg->linedef->flags & kLineFlagMirror) || (seg->linedef->portal_pair);
     }
 
+    return PointPairViewAngles(sx1, sy1, sx2, sy2, precise, out_left, out_right);
+}
+
+static bool PointPairViewAngles(float sx1, float sy1, float sx2, float sy2, bool precise, BAMAngle *out_left,
+                                BAMAngle *out_right)
+{
     BAMAngle angle_L = PointToAngle(view_x, view_y, sx1, sy1, precise);
     BAMAngle angle_R = PointToAngle(view_x, view_y, sx2, sy2, precise);
 
@@ -579,7 +562,8 @@ static bool SegViewAngles(const Seg *seg, BAMAngle *out_left, BAMAngle *out_righ
     return true;
 }
 
-static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
+
+static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg, bool from_walk)
 {
 
     // ignore segs sitting on current mirror
@@ -601,13 +585,10 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     // The seg is in the view range,
     // but not necessarily visible.
 
-#if 1
-    // check if visible
-    if (span > (kBAMAngle1 / 4) && OcclusionTest(angle_R, angle_L))
+    if (from_walk && span > (kBAMAngle1 / 4) && OcclusionTest(angle_R, angle_L))
     {
         return;
     }
-#endif
 
     dsub->visible = true;
 
@@ -621,18 +602,22 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
     {
         if (seg->linedef->flags & kLineFlagMirror)
         {
-            if (!MirrorEnumerateEnabled())
+            if (from_walk && !MirrorEnumerateEnabled())
                 BSPWalkMirror(dsub, seg, angle_L, angle_R, false);
 
-            OcclusionSet(angle_R, angle_L);
+            if (from_walk)
+                OcclusionSet(angle_R, angle_L);
+
             return;
         }
         else if (seg->linedef->portal_pair)
         {
-            if (!MirrorEnumerateEnabled())
+            if (from_walk && !MirrorEnumerateEnabled())
                 BSPWalkMirror(dsub, seg, angle_L, angle_R, true);
 
-            OcclusionSet(angle_R, angle_L);
+            if (from_walk)
+                OcclusionSet(angle_R, angle_L);
+
             return;
         }
     }
@@ -644,7 +629,7 @@ static void BSPWalkSeg(DrawSubsector *dsub, Seg *seg)
 
     // only 1 sided walls affect the 1D occlusion buffer
 
-    if (seg->linedef->blocked)
+    if (from_walk && seg->linedef->blocked)
     {
         OcclusionSet(angle_R, angle_L);
     }
@@ -836,12 +821,12 @@ static inline void AddNewDrawFloor(DrawSubsector *dsub, Extrafloor *ef, float fl
     }
 }
 
-static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
+static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub, bool from_walk)
 {
     // clip 1D occlusion buffer.
     for (Seg *seg = sub->segs; seg; seg = seg->subsector_next)
     {
-        BSPWalkSeg(K, seg);
+        BSPWalkSeg(K, seg, from_walk);
     }
 
     // add drawsub to list (closest -> furthest)
@@ -853,7 +838,10 @@ static void BSPWalkSubsectorContents(DrawSubsector *K, Subsector *sub)
     else
     {
 #ifdef EDGE_THREADED_BSP
-        BSPQueueDrawSubsector(K);
+        if (bsp_walk_direct)
+            draw_subsector_list.push_back(K);
+        else
+            BSPQueueDrawSubsector(K);
 #else
         draw_subsector_list.push_back(K);
 #endif
@@ -1025,11 +1013,12 @@ void EnumerateViewMirrors(void)
 
         OcclusionPush(&save_occlusion);
 
-        uint64_t walk_mark = GetMicroseconds();
 
-        BSPWalkNode(root_node);
+        if (SubsectorEnumerateEnabled())
+            EnumerateViewSubsectors();
+        else
+            BSPWalkNode(root_node);
 
-        mirror_nested_walk_us += GetMicroseconds() - walk_mark;
 
         EnumerateViewThings();
 
@@ -1049,128 +1038,10 @@ void EnumerateViewMirrors(void)
     }
 }
 
-void EnumerateViewMirrorsDryRun(void)
-{
-    if (!r_mirror_stats.d_)
-        return;
-
-    EDGE_ZoneScoped;
-
-    uint64_t mark = GetMicroseconds();
-
-    for (int i = 0; i < total_level_segs; i++)
-    {
-        Seg *seg = &level_segs[i];
-
-        if (!SegIsMirrorCandidate(seg))
-            continue;
-
-        BAMAngle left  = 0;
-        BAMAngle right = 0;
-
-        if (!SegViewAngles(seg, &left, &right))
-            continue;
-
-        MirrorStatsMark(mirror_seen_enumerate, seg);
-    }
-
-    int candidates = 0;
-    int walk_found = 0;
-    int enum_found = 0;
-    int enum_only  = 0;
-    int walk_only  = 0;
-
-    for (int i = 0; i < total_level_segs; i++)
-    {
-        if (!SegIsMirrorCandidate(&level_segs[i]))
-            continue;
-
-        candidates++;
-
-        bool w = (size_t)i < mirror_seen_walk.size() && mirror_seen_walk[i];
-        bool e = (size_t)i < mirror_seen_enumerate.size() && mirror_seen_enumerate[i];
-
-        if (w)
-            walk_found++;
-
-        if (e)
-            enum_found++;
-
-        if (e && !w)
-            enum_only++;
-
-        if (w && !e)
-            walk_only++;
-    }
-
-    int      render_count     = 0;
-    int      render_top_count = 0;
-    uint64_t render_top_us    = 0;
-
-    MirrorRenderStatsRead(&render_count, &render_top_count, &render_top_us);
-    MirrorRenderStatsBeginFrame();
-
-    uint64_t nested_walk_us = mirror_nested_walk_us;
-
-    mirror_nested_walk_us = 0;
-
-    static uint64_t total_us         = 0;
-    static int      total_walk       = 0;
-    static int      total_enum       = 0;
-    static int      total_enum_only  = 0;
-    static int      total_walk_only  = 0;
-    static int      total_render     = 0;
-    static int      total_render_top = 0;
-    static uint64_t total_render_us  = 0;
-    static uint64_t total_walk_us    = 0;
-    static int      frames           = 0;
-
-    total_us += GetMicroseconds() - mark;
-    total_walk += walk_found;
-    total_enum += enum_found;
-    total_enum_only += enum_only;
-    total_walk_only += walk_only;
-    total_render += render_count;
-    total_render_top += render_top_count;
-    total_render_us += render_top_us;
-    total_walk_us += nested_walk_us;
-
-    if (++frames >= 120)
-    {
-        LogPrint("MIRRORSCAN %d candidate segs | walk %.2f  enum %.2f  enum-only %.2f  walk-only %d | %.1f us/view\n",
-                 candidates, (double)total_walk / (double)frames, (double)total_enum / (double)frames,
-                 (double)total_enum_only / (double)frames, total_walk_only, (double)total_us / (double)frames);
-
-        double views = (double)total_render_top;
-
-        LogPrint("MIRRORCOST %.2f views/frame (%.2f incl nested) | %.1f us/frame | %.1f us/view | "
-                 "enum-only would add %.1f us/frame\n",
-                 views / (double)frames, (double)total_render / (double)frames,
-                 (double)total_render_us / (double)frames, views > 0 ? (double)total_render_us / views : 0.0,
-                 views > 0 ? ((double)total_render_us / views) * ((double)total_enum_only / (double)frames) : 0.0);
-
-        LogPrint("MIRRORWALK nested BSP walk %.1f us/frame (%.0f%% of mirror cost)\n",
-                 (double)total_walk_us / (double)frames,
-                 total_render_us > 0 ? 100.0 * (double)total_walk_us / (double)total_render_us : 0.0);
-
-        total_us = 0;
-        total_walk_us = 0;
-        total_render_us = 0;
-        total_walk = total_enum = total_enum_only = total_walk_only = 0;
-        total_render = total_render_top = frames = 0;
-    }
-}
-
-EDGE_DEFINE_CONSOLE_VARIABLE(r_sky_stats, "0", kConsoleVariableFlagNone)
 
 void EnumerateViewSky(void)
 {
     EDGE_ZoneScoped;
-
-    if (!SkyResidentEnabled())
-        return;
-
-    uint64_t mark = GetMicroseconds();
 
     for (int i = 0; i < total_level_subsectors; i++)
     {
@@ -1189,23 +1060,6 @@ void EnumerateViewSky(void)
 
         SkyDecideSeg(seg, nullptr, false);
     }
-
-    if (r_sky_stats.d_ != 0)
-    {
-        static uint64_t total_us = 0;
-        static int      frames   = 0;
-
-        total_us += GetMicroseconds() - mark;
-
-        if (++frames >= 120)
-        {
-            LogPrint("SKYSCAN %d subsectors + %d segs, %.1f us/view avg over %d views\n", total_level_subsectors,
-                     total_level_segs, (double)total_us / (double)frames, frames);
-
-            total_us = 0;
-            frames   = 0;
-        }
-    }
 }
 
 //
@@ -1214,7 +1068,7 @@ void EnumerateViewSky(void)
 // Visit a subsector, and collect information, such as where the
 // walls, planes (ceilings & floors) and things need to be drawn.
 //
-static void BSPWalkSubsector(int num)
+static void BSPWalkSubsector(int num, bool from_walk)
 {
     Subsector *sub    = &level_subsectors[num];
     Sector    *sector = sub->sector;
@@ -1354,13 +1208,33 @@ static void BSPWalkSubsector(int num)
 
         if (!skip)
         {
-            BSPWalkSubsectorContents(K, sub);
+            BSPWalkSubsectorContents(K, sub, from_walk);
         }
     }
     else
     {
-        BSPWalkSubsectorContents(K, sub);
+        BSPWalkSubsectorContents(K, sub, from_walk);
     }
+}
+
+bool SubsectorEnumerateEnabled(void)
+{
+    return true;
+}
+
+void EnumerateViewSubsectors(void)
+{
+    bool save_direct = bsp_walk_direct;
+
+    bsp_walk_direct = true;
+
+    for (int i = 0; i < total_level_subsectors; i++)
+    {
+        BSPWalkSubsector(i, false);
+    }
+
+    bsp_walk_direct = save_direct;
+
 }
 
 //
@@ -1377,7 +1251,7 @@ void BSPWalkNode(unsigned int bspnum)
     // Found a subsector?
     if (bspnum & kLeafSubsector)
     {
-        BSPWalkSubsector(bspnum & (~kLeafSubsector));
+        BSPWalkSubsector(bspnum & (~kLeafSubsector), true);
         return;
     }
 

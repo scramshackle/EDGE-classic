@@ -946,40 +946,14 @@ static void RendererClipSpriteVertically(DrawThing *dthing)
     LinkDrawThingIntoView(dthing);
 }
 
-EDGE_DEFINE_CONSOLE_VARIABLE(r_thing_stats, "0", kConsoleVariableFlagNone)
-
 void EnumerateViewThings(void)
 {
-    uint64_t mark = GetMicroseconds();
-
-    int scanned = 0;
-
     for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {
         if (mo->IsRemoved() || !mo->subsector_)
             continue;
 
-        scanned++;
-
         BSPWalkThing(mo);
-    }
-
-    if (r_thing_stats.d_ != 0)
-    {
-        static uint64_t total_us = 0;
-        static int      total_scanned = 0;
-        static int      frames = 0;
-
-        total_us += GetMicroseconds() - mark;
-        total_scanned += scanned;
-
-        if (++frames >= 120)
-        {
-            LogPrint("THINGSCAN %d objects/view, %.1f us/view avg over %d views\n", total_scanned / frames,
-                     (double)total_us / (double)frames, frames);
-
-            total_us = total_scanned = frames = 0;
-        }
     }
 }
 

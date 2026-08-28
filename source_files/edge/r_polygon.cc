@@ -16,9 +16,8 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
+#include "r_misc.h"
 #include "r_state.h"
-
-EDGE_DEFINE_CONSOLE_VARIABLE(r_sector_polygons, "0", kConsoleVariableFlagNone)
 
 struct PolygonEdge
 {
@@ -54,6 +53,10 @@ static int polygon_self_reference_attached = 0;
 static int polygon_self_reference_covered  = 0;
 static int polygon_self_reference_orphan   = 0;
 static int polygon_self_reference_open     = 0;
+
+static int polygon_locate_agree    = 0;
+static int polygon_locate_disagree = 0;
+static int polygon_locate_missing  = 0;
 
 static std::vector<int> grid_starts;
 static std::vector<int> grid_sectors;
@@ -1061,12 +1064,53 @@ void DestroySectorPolygons(void)
     sector_polygons_built = false;
 }
 
+static void PolygonSurveyPointLocation(void)
+{
+    std::vector<int> loop;
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        const SectorPolygon *poly = &sector_polygons[i];
+
+        if (poly->status != kSectorPolygonOk || PolygonStoredLoops(poly) == 0)
+            continue;
+
+        PolygonReadLoop(poly, 0, &loop);
+
+        if (loop.size() < 3)
+            continue;
+
+        float probe_x = 0.0f;
+        float probe_y = 0.0f;
+
+        PolygonLoopProbe(loop, PolygonLoopArea(loop), &probe_x, &probe_y);
+
+        if (!PolygonSectorContains(poly, probe_x, probe_y))
+            continue;
+
+        int found = SectorPolygonAtPoint(probe_x, probe_y, -1);
+
+        if (found < 0)
+        {
+            polygon_locate_missing++;
+            continue;
+        }
+
+        Subsector *sub = PointInSubsector(probe_x, probe_y);
+
+        if (sub && (sub->sector - level_sectors) == found)
+            polygon_locate_agree++;
+        else
+        {
+            polygon_locate_disagree++;
+
+        }
+    }
+}
+
 void BuildSectorPolygons(void)
 {
     DestroySectorPolygons();
-
-    if (r_sector_polygons.d_ == 0)
-        return;
 
     if (total_level_sectors <= 0 || total_level_vertexes <= 0)
         return;
@@ -1101,6 +1145,9 @@ void BuildSectorPolygons(void)
     polygon_self_reference_covered  = 0;
     polygon_self_reference_orphan   = 0;
     polygon_self_reference_open     = 0;
+    polygon_locate_agree            = 0;
+    polygon_locate_disagree         = 0;
+    polygon_locate_missing          = 0;
 
     for (int i = 0; i < total_level_sectors; i++)
         PolygonTraceSector(i);
@@ -1163,13 +1210,10 @@ void BuildSectorPolygons(void)
         if (fabs(sector_triangles - sector_subsectors) / scale > 0.001)
         {
             polygon_area_mismatch_subs++;
-
-            if (r_sector_polygons.d_ > 1)
-                LogPrint("      footprint gap: sector %d, polygons %.1f, subsectors %.1f (%d loops, %d holes%s)\n", i,
-                         sector_triangles, sector_subsectors, poly->loop_count, poly->hole_count,
-                         deep_water ? ", deep water" : "");
         }
     }
+
+    PolygonSurveyPointLocation();
 
     polygon_self_reference_ring.clear();
     polygon_self_reference_probe.clear();
@@ -1189,7 +1233,7 @@ bool SectorPolygonsBuilt(void)
 
 bool SectorPolygonsEnabled(void)
 {
-    return sector_polygons_built && r_sector_polygons.d_ != 0;
+    return sector_polygons_built;
 }
 
 const SectorPolygon *SectorPolygonForSector(int sector_index)
@@ -1204,7 +1248,7 @@ void SectorPolygonReport(void)
 {
     if (!sector_polygons_built)
     {
-        LogPrint("Sector polygons: not built (set r_sector_polygons 1 and reload the level).\n");
+        LogPrint("Sector polygons: not built.\n");
         return;
     }
 
@@ -1230,6 +1274,9 @@ void SectorPolygonReport(void)
 
     LogPrint("      %-32s %6d deep-water, %d over the vertex cap\n", "sectors the render path rejects",
              polygon_deep_water_sectors, polygon_oversized_sectors);
+
+    LogPrint("      %-32s %6d agree with the node descent, %d disagree, %d not found\n", "grid point location",
+             polygon_locate_agree, polygon_locate_disagree, polygon_locate_missing);
 
     LogPrint("      %-32s %6d loops, %d subtracted from a container, %d already covered, %d orphan, %d open\n",
              "self-referencing sectors", polygon_self_reference_loops, polygon_self_reference_attached,

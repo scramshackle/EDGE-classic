@@ -251,7 +251,6 @@ void DeleteSkyTextures(void)
     current_fake_box = nullptr;
 }
 
-EDGE_DEFINE_CONSOLE_VARIABLE(r_sky_resident, "1", kConsoleVariableFlagArchive)
 
 struct SkySpan
 {
@@ -954,7 +953,7 @@ void FinishSkyForMirror(const DrawMirror *mir)
 
 bool SkyResidentEnabled(void)
 {
-    return r_sky_resident.d_ != 0;
+    return true;
 }
 
 bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner)
@@ -972,7 +971,7 @@ bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner)
 
 bool SkyPlaneIsBaked(const Subsector *sub, int face)
 {
-    if (!r_sky_resident.d_ || !sub || face < 0 || face > 1)
+    if (!sub || face < 0 || face > 1)
         return false;
 
     size_t slot = SkyPlaneSlot(sub, face, SkyHeightKey(sub->sector, nullptr));
@@ -985,7 +984,7 @@ bool SkyPlaneIsBaked(const Subsector *sub, int face)
 
 bool SkyWallIsBaked(const Seg *seg, int part)
 {
-    if (!r_sky_resident.d_ || !seg || part < 0 || part > 2)
+    if (!seg || part < 0 || part > 2)
         return false;
 
     size_t slot = SkyWallSlot(seg, part, SkyHeightKey(seg->front_sector, seg->back_sector));
@@ -1010,7 +1009,7 @@ void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMi
     int    plane_key  = SkyHeightKey(sub->sector, nullptr);
     size_t plane_slot = SkyPlaneSlot(sub, face, plane_key);
 
-    bool bake = !mir && r_sky_resident.d_ && plane_slot < sky_plane_baked.size();
+    bool bake = !mir && plane_slot < sky_plane_baked.size();
 
     if (bake && sky_plane_baked[plane_slot])
         return;
@@ -1067,7 +1066,7 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, Dr
     int    wall_key  = SkyHeightKey(seg->front_sector, seg->back_sector);
     size_t wall_slot = SkyWallSlot(seg, part, wall_key);
 
-    bool bake = !mir && r_sky_resident.d_ && wall_slot < sky_wall_baked.size() && SkyWallBakeable(seg, sky_owner);
+    bool bake = !mir && wall_slot < sky_wall_baked.size() && SkyWallBakeable(seg, sky_owner);
 
     if (bake && sky_wall_baked[wall_slot])
         return;
