@@ -14,14 +14,13 @@ bool GpuDevice::Init(SDL_Window *window)
 
     SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, "vulkan");
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true);
-
+#if (SDL_MINOR_VERSION >= 4)
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN, false);
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_DEPTH_CLAMPING_BOOLEAN, false);
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_INDIRECT_DRAW_FIRST_INSTANCE_BOOLEAN, false);
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_ANISOTROPY_BOOLEAN, false);
-
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_REQUIRE_HARDWARE_ACCELERATION_BOOLEAN, false);
-
+#endif
 #ifdef EDGE_EXTRA_CHECKS
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, true);
 #endif
@@ -55,14 +54,15 @@ bool GpuDevice::Init(SDL_Window *window)
     else
         FatalError("SDL_GPU: no depth-stencil format is supported by this device\n");
 
-    SDL_PropertiesID device_props = SDL_GetGPUDeviceProperties(device_);
 
     LogPrint("SDL_GPU: driver '%s'\n", SDL_GetGPUDeviceDriver(device_));
+#if (SDL_MINOR_VERSION >= 4)
+    SDL_PropertiesID device_props = SDL_GetGPUDeviceProperties(device_);
     LogPrint("SDL_GPU: device '%s'\n", SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_NAME_STRING, "unknown"));
     LogPrint("SDL_GPU: driver name '%s' version '%s'\n",
              SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING, "unknown"),
              SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING, "unknown"));
-
+#endif
     return true;
 }
 

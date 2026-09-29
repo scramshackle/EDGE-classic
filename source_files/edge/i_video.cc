@@ -549,10 +549,6 @@ void ShutdownGraphics(void)
 
     graphics_shutdown = 1;
 
-#ifdef EDGE_THREADED_BSP
-    BSPStopThread();
-#endif
-
     render_backend->Shutdown();
 
 #ifndef EDGE_SDL_GPU

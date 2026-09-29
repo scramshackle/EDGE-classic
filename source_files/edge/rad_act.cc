@@ -725,7 +725,7 @@ void ScriptPlaySound(RADScriptTrigger *R, void *param)
     R->sound_effects_origin.y = ambient->y;
 
     if (epi::AlmostEquals(ambient->z, kOnFloorZ))
-        R->sound_effects_origin.z = PointInSubsector(ambient->x, ambient->y)->sector->floor_height;
+        R->sound_effects_origin.z = PointInSector(ambient->x, ambient->y)->floor_height;
     else
         R->sound_effects_origin.z = ambient->z;
 

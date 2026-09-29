@@ -42,7 +42,6 @@
 #include <vector>
 
 #include "am_map.h"
-#include "bsp.h"
 #include "con_gui.h"
 #include "con_main.h"
 #include "con_var.h"
@@ -587,9 +586,6 @@ static void DoSystemStartup(void)
 
     render_backend->Init();
 
-#ifdef EDGE_THREADED_BSP
-    BSPStartThread();
-#endif
     SoftInitializeResolution();
 
     LogDebug("- System startup done.\n");
@@ -1341,9 +1337,7 @@ static void PurgeCache(void)
             {
                 std::string ext = epi::GetExtension(fsd[i].name);
                 epi::StringLowerASCII(ext);
-                if (ext == ".gwa" || ext == ".hwa" || ext == ".xwa")
-                    epi::FileDelete(fsd[i].name);
-                else if (ext == ".ecn" && !ajbsp::IsNodeCacheCurrent(fsd[i].name))
+                if (ext == ".gwa" || ext == ".hwa" || ext == ".xwa" || ext == ".ecn")
                     epi::FileDelete(fsd[i].name);
             }
         }
@@ -2203,7 +2197,6 @@ static void EdgeStartup(void)
     ConsoleStart();
     CreateQuitScreen();
     SpecialWadVerify();
-    BuildLevelNodes();
     ShowNotice();
 
     InitializeSaveSystem();

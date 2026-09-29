@@ -1637,7 +1637,7 @@ void ConsoleShowPosition(void)
     else
         y = current_screen_height - FNSZ * 15;
 
-    SolidBox(x, y - FNSZ * 11, XMUL * 16, FNSZ * 11 + 2, kRGBABlack, 0.5);
+    SolidBox(x, y - FNSZ * 10, XMUL * 16, FNSZ * 10 + 2, kRGBABlack, 0.5);
 
     RendererVertex *console_glvert = StartText();
     uint16_t        console_verts  = 0;
@@ -1676,11 +1676,7 @@ void ConsoleShowPosition(void)
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "  sec: %d", (int)(p->map_object_->subsector_->sector - level_sectors));
-    console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
-
-    y -= FNSZ;
-    stbsp_sprintf(textbuf, "  sub: %d", (int)(p->map_object_->subsector_ - level_subsectors));
+    stbsp_sprintf(textbuf, "  sec: %d", (int)(p->map_object_->sector_ - level_sectors));
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     EndRenderUnit(console_verts);

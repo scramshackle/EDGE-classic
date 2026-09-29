@@ -25,7 +25,6 @@
 
 #include "p_setup.h"
 
-#include "bsp.h"
 #include "epi_filesystem.h"
 
 #include <map>
@@ -70,11 +69,6 @@
 #include "w_texture.h"
 #include "w_wad.h"
 
-#define EDGE_SEG_INVALID       ((Seg *)-3)
-#define EDGE_SUBSECTOR_INVALID ((Subsector *)-3)
-
-extern unsigned int root_node;
-
 static bool level_active  = false;
 static bool id_arg0_split = false;
 
@@ -87,19 +81,13 @@ EDGE_DEFINE_CONSOLE_VARIABLE(udmf_strict_namespace, "1", kConsoleVariableFlagArc
 
 int                 total_level_vertexes;
 Vertex             *level_vertexes = nullptr;
-Vertex             *level_gl_vertexes;
-int                 total_level_segs;
-Seg                *level_segs;
 int                 total_level_sectors;
 Sector             *level_sectors;
-int                 total_level_subsectors;
-Subsector          *level_subsectors;
 int                 total_level_extrafloors;
 Extrafloor         *level_extrafloors;
-int                 total_level_nodes;
-BSPNode            *level_nodes;
 int                 total_level_lines;
 Line               *level_lines;
+LineSide           *level_line_sides;
 float              *level_line_alphas; // UDMF processing
 int                 total_level_sides;
 Side               *level_sides;
@@ -110,8 +98,6 @@ VertexSectorList *level_vertex_sector_lists;
 
 static Line **level_line_buffer = nullptr;
 
-// bbox used
-static float dummy_bounding_box[4];
 
 epi::CRC32 map_sectors_crc;
 epi::CRC32 map_lines_crc;
@@ -483,30 +469,6 @@ static void LoadSectors(int lump)
     delete[] data;
 }
 
-static void SetupRootNode(void)
-{
-    if (total_level_nodes > 0)
-    {
-        root_node = total_level_nodes - 1;
-    }
-    else
-    {
-        root_node = kLeafSubsector | 0;
-
-        // compute bbox for the single subsector
-        BoundingBoxClear(dummy_bounding_box);
-
-        int  i;
-        Seg *seg;
-
-        for (i = 0, seg = level_segs; i < total_level_segs; i++, seg++)
-        {
-            BoundingBoxAddPoint(dummy_bounding_box, seg->vertex_1->X, seg->vertex_1->Y);
-            BoundingBoxAddPoint(dummy_bounding_box, seg->vertex_2->X, seg->vertex_2->Y);
-        }
-    }
-}
-
 static std::map<int, int> unknown_thing_map;
 
 static void UnknownThingWarning(int type, float x, float y)
@@ -720,7 +682,7 @@ static void LoadThings(int lump)
             continue;
         }
 
-        Sector *sec = PointInSubsector(x, y)->sector;
+        Sector *sec = PointInSector(x, y);
 
         if ((objtype->hyper_flags_ & kHyperFlagMusicChanger) && !musinfo_tracks[current_map->name_].processed)
         {
@@ -943,105 +905,6 @@ static void LoadLineDefs(int lump)
 
     delete[] data;
 }
-
-static Sector *DetermineSubsectorSector(Subsector *ss, int pass)
-{
-    const Seg *seg;
-
-    for (seg = ss->segs; seg != nullptr; seg = seg->subsector_next)
-    {
-        if (seg->miniseg)
-            continue;
-
-        // ignore self-referencing linedefs
-        if (seg->front_sector == seg->back_sector)
-            continue;
-
-        return seg->front_sector;
-    }
-
-    for (seg = ss->segs; seg != nullptr; seg = seg->subsector_next)
-    {
-        if (seg->partner == nullptr)
-            continue;
-
-        // only do this for self-referencing linedefs if the original sector
-        // isn't tagged, otherwise save it for the next pass
-        if (seg->front_sector == seg->back_sector && seg->front_sector && seg->front_sector->tag == 0)
-            return seg->front_sector;
-
-        if (seg->front_sector != seg->back_sector && seg->partner->front_subsector->sector != nullptr)
-            return seg->partner->front_subsector->sector;
-    }
-
-    if (pass == 1)
-    {
-        for (seg = ss->segs; seg != nullptr; seg = seg->subsector_next)
-        {
-            if (!seg->miniseg)
-                return seg->front_sector;
-        }
-    }
-
-    if (pass == 2)
-        return &level_sectors[0];
-
-    return nullptr;
-}
-
-static bool AssignSubsectorsPass(int pass)
-{
-    // pass 0 : ignore self-ref lines.
-    // pass 1 : use them.
-    // pass 2 : handle extreme brokenness.
-    //
-    // returns true if progress was made.
-
-    bool progress = false;
-
-    for (int i = 0; i < total_level_subsectors; i++)
-    {
-        Subsector *ss = &level_subsectors[i];
-
-        if (ss->sector == nullptr)
-        {
-            ss->sector = DetermineSubsectorSector(ss, pass);
-
-            if (ss->sector != nullptr)
-            {
-                progress = true;
-
-                // link subsector into parent sector's list.
-                // order is not important, so add it to the head of the list.
-                ss->sector_next        = ss->sector->subsectors;
-                ss->sector->subsectors = ss;
-            }
-        }
-    }
-
-    return progress;
-}
-
-static void AssignSubsectorsToSectors()
-{
-    // AJA 2022: this attempts to improve handling of self-referencing lines
-    //           (i.e. ones with the same sector on both sides).  Subsectors
-    //           touching such lines should NOT be assigned to that line's
-    //           sector, but rather to the "outer" sector.
-
-    while (AssignSubsectorsPass(0))
-    {
-    }
-
-    while (AssignSubsectorsPass(1))
-    {
-    }
-
-    // the above *should* handle everything, so this pass is only needed
-    // for extremely broken nodes or maps.
-    AssignSubsectorsPass(2);
-}
-
 
 static void LoadUDMFVertexes()
 {
@@ -2103,7 +1966,7 @@ static void LoadUDMFThings()
                 continue;
             }
 
-            Sector *sec = PointInSubsector(x, y)->sector;
+            Sector *sec = PointInSector(x, y);
 
             if ((objtype->hyper_flags_ & kHyperFlagMusicChanger) && !musinfo_tracks[current_map->name_].processed)
             {
@@ -2554,78 +2417,6 @@ static void SetupVertGaps(void)
     EPI_ASSERT(cur_gap == (level_vertical_gaps + total_level_vertical_gaps));
 }
 
-static void DetectDeepWaterTrick(void)
-{
-    uint8_t *self_subs = new uint8_t[total_level_subsectors];
-
-    EPI_CLEAR_MEMORY(self_subs, uint8_t, total_level_subsectors);
-
-    for (int i = 0; i < total_level_segs; i++)
-    {
-        const Seg *seg = level_segs + i;
-
-        if (seg->miniseg)
-            continue;
-
-        EPI_ASSERT(seg->front_subsector);
-
-        if (seg->linedef->back_sector && seg->linedef->front_sector == seg->linedef->back_sector)
-        {
-            self_subs[seg->front_subsector - level_subsectors] |= 1;
-        }
-        else
-        {
-            self_subs[seg->front_subsector - level_subsectors] |= 2;
-        }
-    }
-
-    int count;
-    int pass = 0;
-
-    do
-    {
-        pass++;
-
-        count = 0;
-
-        for (int j = 0; j < total_level_subsectors; j++)
-        {
-            Subsector *sub = level_subsectors + j;
-            const Seg *seg;
-
-            if (self_subs[j] != 1)
-                continue;
-
-            const Seg *Xseg = 0;
-
-            for (seg = sub->segs; seg; seg = seg->subsector_next)
-            {
-                EPI_ASSERT(seg->back_subsector);
-
-                int k = seg->back_subsector - level_subsectors;
-
-                if (self_subs[k] & 2)
-                {
-                    if (!Xseg)
-                        Xseg = seg;
-                }
-            }
-
-            if (Xseg)
-            {
-                sub->deep_water_reference = Xseg->back_subsector->deep_water_reference
-                                                ? Xseg->back_subsector->deep_water_reference
-                                                : Xseg->back_subsector->sector;
-                self_subs[j]              = 3;
-
-                count++;
-            }
-        }
-    } while (count > 0 && pass < 100);
-
-    delete[] self_subs;
-}
-
 //
 // GroupLines
 //
@@ -2638,20 +2429,6 @@ void GroupLines(void)
     int     total;
     Line   *li;
     Sector *sector;
-    Seg    *seg;
-
-    // setup remaining seg information
-    for (i = 0, seg = level_segs; i < total_level_segs; i++, seg++)
-    {
-        if (seg->partner)
-            seg->back_subsector = seg->partner->front_subsector;
-
-        if (!seg->front_sector)
-            seg->front_sector = seg->front_subsector->sector;
-
-        if (!seg->back_sector && seg->back_subsector)
-            seg->back_sector = seg->back_subsector->sector;
-    }
 
     // count number of lines in each sector
     li    = level_lines;
@@ -2922,6 +2699,37 @@ void GroupLines(void)
     delete[] sector_bboxes;
 }
 
+static void CreateLineSides(void)
+{
+    level_line_sides = new LineSide[total_level_lines * 2];
+
+    EPI_CLEAR_MEMORY(level_line_sides, LineSide, total_level_lines * 2);
+
+    for (int i = 0; i < total_level_lines; i++)
+    {
+        Line *ld = level_lines + i;
+
+        for (int side = 0; side < 2; side++)
+        {
+            LineSide *ls = level_line_sides + i * 2 + side;
+
+            ls->linedef  = ld;
+            ls->side     = side;
+            ls->sidedef  = ld->side[side];
+            ls->vertex_1 = side ? ld->vertex_2 : ld->vertex_1;
+            ls->vertex_2 = side ? ld->vertex_1 : ld->vertex_2;
+            ls->length   = ld->length;
+            ls->angle    = PointToAngle(ls->vertex_1->X, ls->vertex_1->Y, ls->vertex_2->X, ls->vertex_2->Y);
+
+            ls->front_sector = side ? ld->back_sector : ld->front_sector;
+            ls->back_sector  = side ? ld->front_sector : ld->back_sector;
+
+            if (!ls->sidedef)
+                ls->front_sector = ls->back_sector = nullptr;
+        }
+    }
+}
+
 static inline void AddSectorToVertices(int *branches, Line *ld, Sector *sec)
 {
     if (!sec)
@@ -3046,22 +2854,21 @@ static void CreateVertexSeclists(void)
     }
 
     // step 4: finally, update the segs that touch those vertices
-    for (i = 0; i < total_level_segs; i++)
+    for (i = 0; i < total_level_lines * 2; i++)
     {
-        Seg *sg = level_segs + i;
+        LineSide *ls = level_line_sides + i;
 
         for (int vert = 0; vert < 2; vert++)
         {
-            int v_idx = (vert ? sg->vertex_2 : sg->vertex_1) - level_vertexes;
+            int v_idx = (vert ? ls->vertex_2 : ls->vertex_1) - level_vertexes;
 
-            // skip GL vertices
             if (v_idx < 0 || v_idx >= total_level_vertexes)
                 continue;
 
             if (branches[v_idx] < 0)
                 continue;
 
-            sg->vertex_sectors[vert] = level_vertex_sector_lists + branches[v_idx];
+            ls->vertex_sectors[vert] = level_vertex_sector_lists + branches[v_idx];
         }
     }
 
@@ -3108,16 +2915,14 @@ void ShutdownLevel(void)
 
     DDFBoomClearGeneralizedTypes();
 
-    delete[] level_segs;
-    level_segs = nullptr;
-    delete[] level_nodes;
-    level_nodes = nullptr;
     delete[] level_vertexes;
     level_vertexes = nullptr;
     delete[] level_sides;
     level_sides = nullptr;
     delete[] level_lines;
     level_lines = nullptr;
+    delete[] level_line_sides;
+    level_line_sides = nullptr;
     for (int i = 0; i < total_level_sectors; i++)
     {
         Sector *sec = &level_sectors[i];
@@ -3134,11 +2939,6 @@ void ShutdownLevel(void)
     }
     delete[] level_sectors;
     level_sectors = nullptr;
-    delete[] level_subsectors;
-    level_subsectors = nullptr;
-
-    delete[] level_gl_vertexes;
-    level_gl_vertexes = nullptr;
     delete[] level_extrafloors;
     level_extrafloors = nullptr;
     delete[] level_vertical_gaps;
@@ -3151,417 +2951,6 @@ void ShutdownLevel(void)
     DestroyBlockmap();
 
     RemoveAllMapObjects(false);
-}
-
-struct LevelGeometryLumps
-{
-    bool udmf;
-    int  textmap;
-    int  vertexes;
-    int  sectors;
-    int  sidedefs;
-    int  linedefs;
-};
-
-static const char *known_level_lumps[] = {"THINGS",  "LINEDEFS", "SIDEDEFS", "VERTEXES", "SEGS",    "SSECTORS",
-                                          "NODES",   "SECTORS",  "REJECT",   "BLOCKMAP", "BEHAVIOR"};
-
-static int FindLevelSubLump(int marker_lump, const char *name)
-{
-    for (int i = 1; i <= (int)(sizeof(known_level_lumps) / sizeof(known_level_lumps[0])); i++)
-    {
-        int lump = marker_lump + i;
-
-        if (!IsLumpIndexValid(lump))
-            break;
-
-        if (VerifyLump(lump, name))
-            return lump;
-
-        bool known = false;
-
-        for (size_t k = 0; k < sizeof(known_level_lumps) / sizeof(known_level_lumps[0]); k++)
-        {
-            if (VerifyLump(lump, known_level_lumps[k]))
-            {
-                known = true;
-                break;
-            }
-        }
-
-        if (!known)
-            break;
-    }
-
-    return -1;
-}
-
-static bool FindLevelGeometryLumps(int marker_lump, LevelGeometryLumps &lumps)
-{
-    lumps.udmf     = false;
-    lumps.textmap  = -1;
-    lumps.vertexes = -1;
-    lumps.sectors  = -1;
-    lumps.sidedefs = -1;
-    lumps.linedefs = -1;
-
-    if (!IsLumpIndexValid(marker_lump))
-        return false;
-
-    if (IsLumpIndexValid(marker_lump + 1) && VerifyLump(marker_lump + 1, "TEXTMAP"))
-    {
-        lumps.udmf    = true;
-        lumps.textmap = marker_lump + 1;
-        return GetLumpLength(lumps.textmap) > 0;
-    }
-
-    if (FindLevelSubLump(marker_lump, "BEHAVIOR") >= 0)
-        return false;
-
-    lumps.vertexes = FindLevelSubLump(marker_lump, "VERTEXES");
-    lumps.sectors  = FindLevelSubLump(marker_lump, "SECTORS");
-    lumps.sidedefs = FindLevelSubLump(marker_lump, "SIDEDEFS");
-    lumps.linedefs = FindLevelSubLump(marker_lump, "LINEDEFS");
-
-    if (lumps.vertexes < 0 || lumps.sectors < 0 || lumps.sidedefs < 0 || lumps.linedefs < 0)
-        return false;
-
-    if (GetLumpLength(lumps.vertexes) < (int)sizeof(RawVertex) ||
-        GetLumpLength(lumps.sectors) < (int)sizeof(RawSector) ||
-        GetLumpLength(lumps.sidedefs) < (int)sizeof(RawSidedef) ||
-        GetLumpLength(lumps.linedefs) < (int)sizeof(RawLinedef))
-        return false;
-
-    return true;
-}
-
-static uint32_t HashLevelGeometryLumps(const LevelGeometryLumps &lumps)
-{
-    epi::CRC32 crc;
-    crc.Reset();
-
-    const int hashed[4] = {lumps.udmf ? lumps.textmap : lumps.vertexes, lumps.udmf ? -1 : lumps.sectors,
-                           lumps.udmf ? -1 : lumps.sidedefs, lumps.udmf ? -1 : lumps.linedefs};
-
-    for (int i = 0; i < 4; i++)
-    {
-        if (hashed[i] < 0)
-            continue;
-
-        int            length = GetLumpLength(hashed[i]);
-        const uint8_t *data   = LoadLumpIntoMemory(hashed[i]);
-
-        crc.AddBlock(data, length);
-
-        delete[] data;
-    }
-
-    return crc.GetCRC();
-}
-
-static bool ReadBinaryLevelGeometry(const LevelGeometryLumps &lumps, ajbsp::InputLevel &input)
-{
-    int vertex_count  = GetLumpLength(lumps.vertexes) / (int)sizeof(RawVertex);
-    int sector_count  = GetLumpLength(lumps.sectors) / (int)sizeof(RawSector);
-    int sidedef_count = GetLumpLength(lumps.sidedefs) / (int)sizeof(RawSidedef);
-    int linedef_count = GetLumpLength(lumps.linedefs) / (int)sizeof(RawLinedef);
-
-    if (vertex_count <= 0 || sector_count <= 0 || sidedef_count <= 0 || linedef_count <= 0)
-        return false;
-
-    input.sector_count = sector_count;
-
-    input.vertexes.resize(vertex_count);
-    {
-        const uint8_t   *data = LoadLumpIntoMemory(lumps.vertexes);
-        const RawVertex *rv   = (const RawVertex *)data;
-
-        for (int i = 0; i < vertex_count; i++, rv++)
-        {
-            input.vertexes[i].x = (float)AlignedLittleEndianS16(rv->x);
-            input.vertexes[i].y = (float)AlignedLittleEndianS16(rv->y);
-        }
-
-        delete[] data;
-    }
-
-    input.sidedef_sectors.resize(sidedef_count);
-    {
-        const uint8_t    *data = LoadLumpIntoMemory(lumps.sidedefs);
-        const RawSidedef *rs   = (const RawSidedef *)data;
-
-        for (int i = 0; i < sidedef_count; i++, rs++)
-        {
-            int sector = AlignedLittleEndianU16(rs->sector);
-
-            input.sidedef_sectors[i] = (sector < sector_count) ? sector : -1;
-        }
-
-        delete[] data;
-    }
-
-    input.linedefs.resize(linedef_count);
-    {
-        const uint8_t    *data = LoadLumpIntoMemory(lumps.linedefs);
-        const RawLinedef *rl   = (const RawLinedef *)data;
-
-        for (int i = 0; i < linedef_count; i++, rl++)
-        {
-            ajbsp::InputLinedef &line = input.linedefs[i];
-
-            line.vertex_1 = AlignedLittleEndianU16(rl->start);
-            line.vertex_2 = AlignedLittleEndianU16(rl->end);
-            line.tag      = HMM_MAX(0, AlignedLittleEndianS16(rl->tag));
-
-            int side0 = AlignedLittleEndianU16(rl->right);
-            int side1 = AlignedLittleEndianU16(rl->left);
-
-            line.right_side = (side0 == 0xFFFF || side0 >= sidedef_count) ? -1 : side0;
-            line.left_side  = (side1 == 0xFFFF || side1 >= sidedef_count) ? -1 : side1;
-        }
-
-        delete[] data;
-    }
-
-    return true;
-}
-
-static bool ReadUDMFLevelGeometry(const LevelGeometryLumps &lumps, ajbsp::InputLevel &input)
-{
-    int            textmap_length = GetLumpLength(lumps.textmap);
-    const uint8_t *textmap_data   = LoadLumpIntoMemory(lumps.textmap);
-
-    std::string textmap;
-    textmap.assign((const char *)textmap_data, (size_t)textmap_length);
-
-    delete[] textmap_data;
-
-    epi::Scanner lex(textmap);
-
-    input.sector_count = 0;
-
-    while (lex.TokensLeft())
-    {
-        if (!lex.GetNextToken())
-            break;
-
-        if (lex.state_.token != epi::Scanner::kIdentifier)
-            return false;
-
-        std::string section = lex.state_.string;
-
-        if (lex.CheckToken('='))
-        {
-            lex.GetNextToken();
-
-            if (!lex.CheckToken(';'))
-                return false;
-
-            continue;
-        }
-
-        if (!lex.CheckToken('{'))
-            return false;
-
-        epi::StringHash section_hash(section);
-
-        float x = 0.0f, y = 0.0f;
-        int   sector = -1;
-        int   v1 = 0, v2 = 0, side0 = -1, side1 = -1, tag = -1;
-
-        for (;;)
-        {
-            if (lex.CheckToken('}'))
-                break;
-
-            if (!lex.GetNextToken())
-                return false;
-
-            if (lex.state_.token != epi::Scanner::kIdentifier)
-                return false;
-
-            epi::StringHash key_hash(lex.state_.string);
-
-            if (!lex.CheckToken('='))
-                return false;
-
-            if (!lex.GetNextToken() || lex.state_.token == '}')
-                return false;
-
-            switch (key_hash.Value())
-            {
-            case udmf::kX:
-                x = lex.state_.decimal;
-                break;
-            case udmf::kY:
-                y = lex.state_.decimal;
-                break;
-            case udmf::kSector:
-                sector = lex.state_.number;
-                break;
-            case udmf::kV1:
-                v1 = lex.state_.number;
-                break;
-            case udmf::kV2:
-                v2 = lex.state_.number;
-                break;
-            case udmf::kSideFront:
-                side0 = lex.state_.number;
-                break;
-            case udmf::kSideBack:
-                side1 = lex.state_.number;
-                break;
-            case udmf::kID:
-                tag = lex.state_.number;
-                break;
-            default:
-                break;
-            }
-
-            if (!lex.CheckToken(';'))
-                return false;
-        }
-
-        switch (section_hash.Value())
-        {
-        case udmf::kVertex: {
-            ajbsp::InputVertex vertex;
-            vertex.x = x;
-            vertex.y = y;
-            input.vertexes.push_back(vertex);
-            break;
-        }
-        case udmf::kSector:
-            input.sector_count++;
-            break;
-        case udmf::kSidedef:
-            input.sidedef_sectors.push_back(sector);
-            break;
-        case udmf::kLinedef: {
-            ajbsp::InputLinedef line;
-            line.vertex_1   = v1;
-            line.vertex_2   = v2;
-            line.right_side = side0;
-            line.left_side  = side1;
-            line.tag        = HMM_MAX(0, tag);
-            input.linedefs.push_back(line);
-            break;
-        }
-        default:
-            break;
-        }
-    }
-
-    if (input.vertexes.empty() || input.linedefs.empty() || input.sidedef_sectors.empty() || input.sector_count <= 0)
-        return false;
-
-    for (size_t i = 0; i < input.sidedef_sectors.size(); i++)
-    {
-        if (input.sidedef_sectors[i] >= input.sector_count)
-            input.sidedef_sectors[i] = -1;
-    }
-
-    for (size_t i = 0; i < input.linedefs.size(); i++)
-    {
-        ajbsp::InputLinedef &line = input.linedefs[i];
-
-        if (line.right_side >= (int32_t)input.sidedef_sectors.size())
-            line.right_side = -1;
-        if (line.left_side >= (int32_t)input.sidedef_sectors.size())
-            line.left_side = -1;
-    }
-
-    return true;
-}
-
-static bool ComputeLevelGeometryCRC(int marker_lump, uint32_t *geometry_crc)
-{
-    LevelGeometryLumps lumps;
-
-    if (!FindLevelGeometryLumps(marker_lump, lumps))
-        return false;
-
-    *geometry_crc = HashLevelGeometryLumps(lumps);
-
-    return true;
-}
-
-bool ReadLevelGeometry(int marker_lump, ajbsp::InputLevel &input, uint32_t *geometry_crc)
-{
-    LevelGeometryLumps lumps;
-
-    if (!FindLevelGeometryLumps(marker_lump, lumps))
-        return false;
-
-    if (geometry_crc != nullptr)
-        *geometry_crc = HashLevelGeometryLumps(lumps);
-
-    input.vertexes.clear();
-    input.sidedef_sectors.clear();
-    input.linedefs.clear();
-    input.sector_count = 0;
-
-    if (lumps.udmf)
-    {
-        if (!ReadUDMFLevelGeometry(lumps, input))
-            return false;
-    }
-    else
-    {
-        if (!ReadBinaryLevelGeometry(lumps, input))
-            return false;
-    }
-
-    int real_lines = 0;
-
-    for (size_t i = 0; i < input.linedefs.size(); i++)
-    {
-        ajbsp::InputLinedef &line = input.linedefs[i];
-
-        if (line.vertex_1 < 0 || line.vertex_1 >= (int32_t)input.vertexes.size() || line.vertex_2 < 0 ||
-            line.vertex_2 >= (int32_t)input.vertexes.size())
-            return false;
-
-        if (line.right_side < 0 && line.left_side >= 0)
-            line.right_side = 0;
-
-        if (line.right_side >= 0 || line.left_side >= 0)
-            real_lines++;
-    }
-
-    if (real_lines == 0)
-        return false;
-
-    return true;
-}
-
-static void LoadLevelNodes(int marker_lump)
-{
-    const char *level_name = GetLumpNameFromIndex(marker_lump);
-
-    uint32_t geometry_crc = 0;
-
-    if (!ComputeLevelGeometryCRC(marker_lump, &geometry_crc))
-        FatalError("Bad WAD: level %s has invalid or unsupported geometry.\n", level_name);
-
-    const std::string &cache_path = GetNodeCachePathForLump(marker_lump);
-
-    if (cache_path.empty())
-        FatalError("Internal error: no node cache for level %s.\n", level_name);
-
-    ajbsp::NodeCacheResult result = ajbsp::LoadNodeCacheLevel(cache_path, level_name, geometry_crc);
-
-    if (result == ajbsp::kNodeCacheOK)
-        return;
-
-    if (result == ajbsp::kNodeCacheLevelMissing)
-        FatalError("Level %s has no cached nodes.\n", level_name);
-
-    if (epi::FileDelete(cache_path))
-        FatalError("Stale or corrupt nodes for level %s.\nThe node cache has been removed; restart to rebuild it.\n",
-                   level_name);
-
-    FatalError("Stale or corrupt nodes for level %s.\nDelete '%s' and restart.\n", level_name, cache_path.c_str());
 }
 
 void LevelSetup(void)
@@ -3649,14 +3038,9 @@ void LevelSetup(void)
 
     delete[] temp_line_sides;
 
-    LoadLevelNodes(lumpnum);
-
-    AssignSubsectorsToSectors();
-    SetupRootNode();
-
     GroupLines();
 
-    DetectDeepWaterTrick();
+    BuildSectorPolygons();
 
     for (int j = 0; j < total_level_sectors; j++)
     {
@@ -3696,6 +3080,8 @@ void LevelSetup(void)
     LogDebug("MAP CRCS: S=%08x L=%08x T=%08x\n", map_sectors_crc.crc, map_lines_crc.crc, map_things_crc.crc);
 #endif
 
+    CreateLineSides();
+
     CreateVertexSeclists();
 
     SpawnMapSpecials2(current_map->autotag_);
@@ -3711,8 +3097,6 @@ void LevelSetup(void)
         PrecacheLevelGraphics();
 
     SnapshotSurfaceBaseOffsets();
-
-    BuildSectorPolygons();
 
     BuildStaticMesh();
 

@@ -328,29 +328,29 @@ static bool CorpseShouldSlide(MapObject *mo)
     float ceiling_slope_z = 0;
 
     // Vertex slope check here?
-    if (mo->subsector_->sector->floor_vertex_slope)
+    if (mo->sector_->floor_vertex_slope)
     {
         HMM_Vec3 line_a{{mo->x, mo->y, -40000}};
         HMM_Vec3 line_b{{mo->x, mo->y, 40000}};
-        float    z_test = LinePlaneIntersection(line_a, line_b, mo->subsector_->sector->floor_z_vertices[2],
-                                                mo->subsector_->sector->floor_vertex_slope_normal)
+        float    z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->floor_z_vertices[2],
+                                                mo->sector_->floor_vertex_slope_normal)
                            .Z;
         if (isfinite(z_test))
-            floor_slope_z = z_test - mo->subsector_->sector->floor_height;
+            floor_slope_z = z_test - mo->sector_->floor_height;
     }
 
-    if (mo->subsector_->sector->ceiling_vertex_slope)
+    if (mo->sector_->ceiling_vertex_slope)
     {
         HMM_Vec3 line_a{{mo->x, mo->y, -40000}};
         HMM_Vec3 line_b{{mo->x, mo->y, 40000}};
-        float    z_test = LinePlaneIntersection(line_a, line_b, mo->subsector_->sector->ceiling_z_vertices[2],
-                                                mo->subsector_->sector->ceiling_vertex_slope_normal)
+        float    z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->ceiling_z_vertices[2],
+                                                mo->sector_->ceiling_vertex_slope_normal)
                            .Z;
         if (isfinite(z_test))
-            ceiling_slope_z = mo->subsector_->sector->ceiling_height - z_test;
+            ceiling_slope_z = mo->sector_->ceiling_height - z_test;
     }
 
-    ComputeThingGap(mo, mo->subsector_->sector, mo->z, &floor, &ceil, floor_slope_z, ceiling_slope_z);
+    ComputeThingGap(mo, mo->sector_, mo->z, &floor, &ceil, floor_slope_z, ceiling_slope_z);
 
     return (!epi::AlmostEquals(mo->floor_z_, floor));
 }
@@ -699,7 +699,7 @@ static inline void AddRegionProperties(const MapObject *mo, float bz, float tz, 
             if (tn->sector)
             {
                 RegionProperties tn_props = tn->sector->properties;
-                float            sec_fh   = (tn->sector->floor_vertex_slope && mo->subsector_->sector == tn->sector)
+                float            sec_fh   = (tn->sector->floor_vertex_slope && mo->sector_ == tn->sector)
                                                 ? mo->floor_z_
                                                 : tn->sector->floor_height;
                 if (bz <= sec_fh)
@@ -775,7 +775,7 @@ static inline void AddRegionProperties(const MapObject *mo, float bz, float tz, 
 //
 void CalculateFullRegionProperties(const MapObject *mo, RegionProperties *new_p)
 {
-    Sector *sector = mo->subsector_->sector;
+    Sector *sector = mo->sector_;
 
     Extrafloor *S, *L, *C;
     float       floor_h;
@@ -1394,8 +1394,8 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
             }
 
             // if the floor is sky, don't explode missile -ACB- 1998/07/31
-            if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->floor) &&
-                mo->subsector_->sector->floor_height >= mo->floor_z_)
+            if (EDGE_IMAGE_IS_SKY(mo->sector_->floor) &&
+                mo->sector_->floor_height >= mo->floor_z_)
             {
                 RemoveMissile(mo);
             }
@@ -1480,8 +1480,8 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
             }
 
             // if the ceiling is sky, don't explode missile -ACB- 1998/07/31
-            if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling) &&
-                mo->subsector_->sector->ceiling_height <= mo->ceiling_z_)
+            if (EDGE_IMAGE_IS_SKY(mo->sector_->ceiling) &&
+                mo->sector_->ceiling_height <= mo->ceiling_z_)
             {
                 RemoveMissile(mo);
             }
@@ -1636,7 +1636,7 @@ static void P_MobjThinker(MapObject *mobj)
             if (tn->sector)
             {
                 RegionProperties tn_props = tn->sector->properties;
-                float            sec_fh   = (tn->sector->floor_vertex_slope && mobj->subsector_->sector == tn->sector)
+                float            sec_fh   = (tn->sector->floor_vertex_slope && mobj->sector_ == tn->sector)
                                                 ? mobj->floor_z_
                                                 : tn->sector->floor_height;
                 if (mobj->z <= sec_fh)
@@ -1693,7 +1693,7 @@ static void P_MobjThinker(MapObject *mobj)
         }
     }
 
-    if (mobj->subsector_->sector->floor_vertex_slope)
+    if (mobj->sector_->floor_vertex_slope)
     {
         if (epi::AlmostEquals(mobj->old_z_, mobj->old_floor_z_))
             mobj->on_slope_ = true;
@@ -2346,20 +2346,20 @@ FlatDefinition *P_IsThingOnLiquidFloor(MapObject *thing)
         return current_flatdef;
 
     // If no 3D floors, just return the flat
-    if (thing->subsector_->sector->extrafloor_used == 0)
+    if (thing->sector_->extrafloor_used == 0)
     {
         if (thing->z > thing->floor_z_) // are we actually touching the floor
             return current_flatdef;
 
-        current_flatdef = flatdefs.Find(thing->subsector_->sector->floor.image->name_.c_str());
+        current_flatdef = flatdefs.Find(thing->sector_->floor.image->name_.c_str());
     }
     // Start from the lowest exfloor and check if the player is standing on it,
     // then return the control sector's flat
     else
     {
         float       player_floor_height = thing->floor_z_;
-        Extrafloor *floor_checker       = thing->subsector_->sector->bottom_extrafloor;
-        Extrafloor *liquid_checker      = thing->subsector_->sector->bottom_liquid;
+        Extrafloor *floor_checker       = thing->sector_->bottom_extrafloor;
+        Extrafloor *liquid_checker      = thing->sector_->bottom_liquid;
         for (Extrafloor *ef = floor_checker; ef; ef = ef->higher)
         {
             if (epi::AlmostEquals(player_floor_height, ef->top_height))
@@ -2393,9 +2393,9 @@ bool HitLiquidFloor(MapObject *thing)
         return false;
 
     // don't splash if landing on the edge above water/lava/etc....
-    if (thing->subsector_->sector->floor_vertex_slope && thing->z > thing->floor_z_)
+    if (thing->sector_->floor_vertex_slope && thing->z > thing->floor_z_)
         return false;
-    else if (!epi::AlmostEquals(thing->floor_z_, thing->subsector_->sector->floor_height))
+    else if (!epi::AlmostEquals(thing->floor_z_, thing->sector_->floor_height))
         return false;
 
     FlatDefinition *current_flatdef = P_IsThingOnLiquidFloor(thing);
@@ -2621,7 +2621,7 @@ MapObject *CreateMapObject(float x, float y, float z, const MapObjectDefinition 
 
     // -AJA- 1999/07/30: Updated for extra floors.
 
-    Sector *sec = mobj->subsector_->sector;
+    Sector *sec = mobj->sector_;
 
     float floor_slope_z   = 0;
     float ceiling_slope_z = 0;

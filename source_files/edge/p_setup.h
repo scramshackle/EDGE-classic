@@ -27,7 +27,6 @@
 
 #include <stdint.h>
 
-#include "bsp.h"
 #include "epi_crc.h"
 
 extern epi::CRC32 map_sectors_crc;
@@ -42,8 +41,6 @@ void PlayerStateInit(void);
 void LevelSetup(void);
 
 void LevelShutdown(void);
-
-bool ReadLevelGeometry(int marker_lump, ajbsp::InputLevel &input, uint32_t *geometry_crc);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

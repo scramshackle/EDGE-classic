@@ -48,7 +48,7 @@ extern float    view_sine;
 extern BAMAngle view_vertical_angle;
 extern float    view_rotation;
 
-extern Subsector        *view_subsector;
+extern Sector           *view_sector;
 extern RegionProperties *view_properties;
 extern ViewHeightZone    view_height_zone;
 
@@ -88,8 +88,8 @@ extern float sine_table[kSineTableSize];
 // Utility functions.
 BAMAngle          PointToAngle(float x1, float y1, float x2, float y2, bool precise = false);
 float             PointToDistance(float x1, float y1, float x2, float y2);
-Subsector        *PointInSubsector(float x, float y);
-RegionProperties *GetPointProperties(Subsector *sub, float z);
+Sector           *PointInSector(float x, float y);
+RegionProperties *GetPointProperties(Sector *sector, float z);
 
 //
 // REFRESH - the actual rendering functions.

@@ -146,7 +146,7 @@ void NoiseAlert(Player *p)
 {
     valid_count++;
 
-    RecurseSound(p->map_object_->subsector_->sector, 0, p->player_number_);
+    RecurseSound(p->map_object_->sector_, 0, p->player_number_);
 }
 
 // MBF21
@@ -156,7 +156,7 @@ void WA_NoiseAlert(MapObject *actor)
 
     valid_count++;
 
-    RecurseSound(actor->subsector_->sector, 0, actor->player_->player_number_);
+    RecurseSound(actor->sector_, 0, actor->player_->player_number_);
 }
 
 // Called by new NOISE_ALERT ddf action
@@ -169,7 +169,7 @@ void A_NoiseAlert(MapObject *actor)
     if (actor->last_heard_ != -1)
         WhatPlayer = actor->last_heard_;
 
-    RecurseSound(actor->subsector_->sector, 0, WhatPlayer);
+    RecurseSound(actor->sector_, 0, WhatPlayer);
 }
 
 //
@@ -185,7 +185,7 @@ bool DoMove(MapObject *actor, bool path)
 
     float   fric   = -1.0f;
     float   factor = -1.0f;
-    Sector *sector = actor->subsector_->sector;
+    Sector *sector = actor->sector_;
     float   speed  = actor->speed_;
 
     for (TouchNode *tn = actor->touch_sectors_; tn; tn = tn->map_object_next)

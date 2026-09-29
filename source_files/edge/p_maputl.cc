@@ -46,10 +46,10 @@
 #include "m_bbox.h"
 #include "p_local.h"
 #include "p_spec.h"
+#include "r_polygon.h"
 #include "r_state.h"
 #include "r_static.h"
 
-extern unsigned int              root_node;
 extern std::vector<PlaneMover *> active_planes;
 
 //
@@ -958,60 +958,33 @@ static inline bool CheckBoundingBoxOverlap(float *bspcoord, float *test)
                : true;
 }
 
-static bool TraverseSubsector(unsigned int bspnum, float *bbox, bool (*func)(MapObject *mo))
+static bool SectorThingIterator(float *bbox, bool (*func)(MapObject *mo))
 {
-    Subsector *sub;
-    BSPNode   *node;
-    MapObject *obj;
-
-    // just a normal node ?
-    if (!(bspnum & kLeafSubsector))
+    for (int i = 0; i < total_level_sectors; i++)
     {
-        node = level_nodes + bspnum;
+        const SectorPolygon *poly = SectorPolygonForSector(i);
 
-        // recursively check the children nodes
-        // OPTIMISE: check against partition lines instead of bboxes.
-
-        if (CheckBoundingBoxOverlap(node->bounding_boxes[0], bbox))
+        if (poly && poly->bounds[0] <= poly->bounds[2] && poly->bounds[1] <= poly->bounds[3])
         {
-            if (!TraverseSubsector(node->children[0], bbox, func))
-                return false;
+            float sector_bbox[4];
+
+            sector_bbox[kBoundingBoxLeft]   = poly->bounds[0];
+            sector_bbox[kBoundingBoxBottom] = poly->bounds[1];
+            sector_bbox[kBoundingBoxRight]  = poly->bounds[2];
+            sector_bbox[kBoundingBoxTop]    = poly->bounds[3];
+
+            if (!CheckBoundingBoxOverlap(sector_bbox, bbox))
+                continue;
         }
 
-        if (CheckBoundingBoxOverlap(node->bounding_boxes[1], bbox))
+        for (MapObject *obj = level_sectors[i].thing_list; obj; obj = obj->sector_next_)
         {
-            if (!TraverseSubsector(node->children[1], bbox, func))
+            if (!(*func)(obj))
                 return false;
         }
-
-        return true;
-    }
-
-    // the sharp end: check all things in the subsector
-
-    sub = level_subsectors + (bspnum & ~kLeafSubsector);
-
-    for (obj = sub->thing_list; obj; obj = obj->subsector_next_)
-    {
-        if (!(*func)(obj))
-            return false;
     }
 
     return true;
-}
-
-//
-// SubsectorThingIterator
-//
-// Iterate over all things that touch a certain rectangle on the map,
-// using the BSP tree.
-//
-// If any function returns false, then this routine returns false and
-// nothing else is checked.  Otherwise true is returned.
-//
-bool SubsectorThingIterator(float *bbox, bool (*func)(MapObject *mo))
-{
-    return TraverseSubsector(root_node, bbox, func);
 }
 
 static float checkempty_bbox[4];
@@ -1078,7 +1051,7 @@ bool CheckAreaForThings(float *bbox)
     checkempty_bbox[kBoundingBoxBottom] = bbox[kBoundingBoxBottom];
     checkempty_bbox[kBoundingBoxTop]    = bbox[kBoundingBoxTop];
 
-    return !SubsectorThingIterator(bbox, CheckThingInArea);
+    return !SectorThingIterator(bbox, CheckThingInArea);
 }
 
 //
@@ -1096,7 +1069,7 @@ bool CheckSliderPathForThings(Line *ld)
 
     checkempty_line = temp_line;
 
-    bool slider_check = SubsectorThingIterator(temp_line->bounding_box, CheckThingOnLine);
+    bool slider_check = SectorThingIterator(temp_line->bounding_box, CheckThingOnLine);
 
     delete temp_line;
     temp_line = nullptr;

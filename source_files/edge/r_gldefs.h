@@ -57,7 +57,7 @@ inline float FastApproximateDistance(float delta_x, float delta_y)
 
 struct DrawFloor;
 
-struct DrawSubsector;
+struct DrawSector;
 
 //
 // DrawThing
@@ -128,7 +128,7 @@ struct DrawFloor
 
 struct DrawMirror
 {
-    Seg *seg = nullptr;
+    LineSide *line_side = nullptr;
 
     BAMAngle left, right;
 
@@ -150,19 +150,14 @@ struct DrawMirror
 
     HMM_Vec4 near_plane;
 
-    std::list<DrawSubsector *> draw_subsectors;
-    std::list<DrawThing *>     draw_things;
-    std::list<DrawMirror *>    draw_mirrors;
+    std::list<DrawSector *> draw_sectors;
+    std::list<DrawThing *>  draw_things;
+    std::list<DrawMirror *> draw_mirrors;
 };
 
-struct DrawSeg // HOPEFULLY this can go away
+struct DrawSector
 {
-    Seg *seg;
-};
-
-struct DrawSubsector
-{
-    Subsector *subsector = nullptr;
+    Sector *sector = nullptr;
 
     // floors, sorted in height order (lowest to highest).
     std::vector<DrawFloor *> floors;
@@ -170,12 +165,7 @@ struct DrawSubsector
     // link list of floors, render order (furthest to closest)
     DrawFloor *render_floors;
 
-    std::list<DrawSeg *> segs;
-
-
-    bool visible;
-    bool sorted;
-    bool solid;
+    std::vector<LineSide *> line_sides;
 };
 
 extern int detail_level;
@@ -191,11 +181,10 @@ const Image *GetOtherSprite(int sprite, int frame, bool *flip);
 void AllocateDrawStructs(void);
 void ClearBSP(void);
 
-DrawThing     *GetDrawThing();
-DrawFloor     *GetDrawFloor();
-DrawSeg       *GetDrawSeg();
-DrawSubsector *GetDrawSub();
-DrawMirror    *GetDrawMirror();
+DrawThing  *GetDrawThing();
+DrawFloor  *GetDrawFloor();
+DrawSector *GetDrawSector();
+DrawMirror *GetDrawMirror();
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

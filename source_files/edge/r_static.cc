@@ -64,8 +64,6 @@ struct StaticSpan
     bool    is_wall;
     bool    mid_masked;
     bool    live;
-    bool    covers_sector;
-    bool    covers_line;
 
     HMM_Vec3 normal;
     float    low[3];
@@ -100,8 +98,8 @@ struct StaticBatch
 };
 
 static std::vector<StaticBatch> static_batches;
-static std::vector<uint8_t>     subsector_flat_baked;
-static std::vector<uint8_t>     seg_wall_baked;
+static std::vector<uint8_t>     sector_flat_baked;
+static std::vector<uint8_t>     line_side_wall_baked;
 static std::unordered_map<uint64_t, uint8_t> region_surface_baked;
 static bool                     static_mesh_built = false;
 
@@ -263,30 +261,26 @@ static int      capture_flag_slot = -1;
 static uint64_t capture_hash_key  = 0;
 static bool capture_is_wall       = false;
 static bool capture_mid_masked    = false;
-static bool capture_covers_sector = false;
-static bool capture_covers_line   = false;
 
-static std::vector<int> line_side_starts;
-static std::vector<int> line_side_segs;
 static HMM_Vec3 capture_normal = {{0, 0, 1}};
 static float capture_div[4]    = {0, 0, 0, 0};
 static int  capture_light      = 0;
 static Sector *capture_light_sector = nullptr;
 static int  capture_adjust     = 0;
 static Sector *capture_sector  = nullptr;
-static const Seg        *capture_seg  = nullptr;
+static const LineSide   *capture_line_side = nullptr;
 static const MapSurface *capture_surf = nullptr;
 
-static int WallPartIndex(const Seg *seg, const MapSurface *surf)
+static int WallPartIndex(const LineSide *line_side, const MapSurface *surf)
 {
-    if (!seg || !seg->sidedef || !surf)
+    if (!line_side || !line_side->sidedef || !surf)
         return -1;
 
-    if (surf == &seg->sidedef->bottom)
+    if (surf == &line_side->sidedef->bottom)
         return 0;
-    if (surf == &seg->sidedef->middle)
+    if (surf == &line_side->sidedef->middle)
         return 1;
-    if (surf == &seg->sidedef->top)
+    if (surf == &line_side->sidedef->top)
         return 2;
 
     return -1;
@@ -300,10 +294,10 @@ static int ExtrafloorIndex(const Extrafloor *ef)
     return (int)(ef - level_extrafloors);
 }
 
-static bool BuildRegionWallKey(const Seg *seg, int part, const Extrafloor *region_ef, const Extrafloor *surface_ef,
-                               int height_key, uint64_t *out)
+static bool BuildRegionWallKey(const LineSide *line_side, int part, const Extrafloor *region_ef,
+                               const Extrafloor *surface_ef, int height_key, uint64_t *out)
 {
-    uint64_t index = (uint64_t)(seg - level_segs);
+    uint64_t index = (uint64_t)(line_side - level_line_sides);
 
     if (index >= ((uint64_t)1 << 24))
         return false;
@@ -321,10 +315,10 @@ static bool BuildRegionWallKey(const Seg *seg, int part, const Extrafloor *regio
     return true;
 }
 
-static bool BuildRegionFlatKey(const Subsector *sub, int face_dir, const Extrafloor *plane_ef, int height_key,
+static bool BuildRegionFlatKey(const Sector *sec, int face_dir, const Extrafloor *plane_ef, int height_key,
                                uint64_t *out)
 {
-    uint64_t index = (uint64_t)(sub - level_subsectors);
+    uint64_t index = (uint64_t)(sec - level_sectors);
 
     if (index >= ((uint64_t)1 << 24))
         return false;
@@ -523,19 +517,19 @@ static Sector *ExtrafloorControlSector(const Extrafloor *ef)
     return ef->extrafloor_line->front_sector;
 }
 
-int StaticExtrafloorPlaneDecline(const Subsector *sub, const Extrafloor *plane_ef, int face_dir)
+int StaticExtrafloorPlaneDecline(const Sector *sec, const Extrafloor *plane_ef, int face_dir)
 {
     if (!static_mesh_built)
     {
         return kStaticBakeMeshDisabled;
     }
 
-    if (!sub || !plane_ef)
+    if (!sec || !plane_ef)
     {
         return kStaticBakeNoSurface;
     }
 
-    int sector_reason = SectorDeclineReason(sub->sector, false);
+    int sector_reason = SectorDeclineReason(sec, false);
 
     if (sector_reason != kStaticBakeAccepted)
     {
@@ -572,7 +566,7 @@ int StaticExtrafloorPlaneDecline(const Subsector *sub, const Extrafloor *plane_e
 
     uint64_t key;
 
-    if (!BuildRegionFlatKey(sub, face_dir, plane_ef, LiveHeightKey(sub->sector, nullptr), &key))
+    if (!BuildRegionFlatKey(sec, face_dir, plane_ef, LiveHeightKey(sec, nullptr), &key))
     {
         return kStaticBakeKeyOverflow;
     }
@@ -580,38 +574,38 @@ int StaticExtrafloorPlaneDecline(const Subsector *sub, const Extrafloor *plane_e
     return kStaticBakeAccepted;
 }
 
-bool StaticExtrafloorPlaneEligible(const Subsector *sub, const Extrafloor *plane_ef, int face_dir)
+bool StaticExtrafloorPlaneEligible(const Sector *sec, const Extrafloor *plane_ef, int face_dir)
 {
-    return StaticExtrafloorPlaneDecline(sub, plane_ef, face_dir) == kStaticBakeAccepted;
+    return StaticExtrafloorPlaneDecline(sec, plane_ef, face_dir) == kStaticBakeAccepted;
 }
 bool StaticFlatBakeEligible(const Sector *sec, int face_dir)
 {
     return StaticFlatBakeDecline(sec, face_dir) == kStaticBakeAccepted;
 }
 
-bool StaticMeshCoversFlat(const Subsector *sub, int face_dir, const Extrafloor *plane_ef)
+bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *plane_ef)
 {
-    if (!static_mesh_built || !sub)
+    if (!static_mesh_built || !sec)
         return false;
 
-    int key = LiveHeightKey(sub->sector, nullptr);
+    int key = LiveHeightKey(sec, nullptr);
 
     if (plane_ef)
     {
         uint64_t hash_key;
 
-        if (!BuildRegionFlatKey(sub, face_dir, plane_ef, key, &hash_key))
+        if (!BuildRegionFlatKey(sec, face_dir, plane_ef, key, &hash_key))
             return false;
 
         return region_surface_baked.find(hash_key) != region_surface_baked.end();
     }
 
-    size_t slot = ((size_t)(sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1)) * kHeightKeyTotal + (size_t)key;
+    size_t slot = ((size_t)(sec - level_sectors) * 2 + (face_dir > 0 ? 0 : 1)) * kHeightKeyTotal + (size_t)key;
 
-    if (slot >= subsector_flat_baked.size())
+    if (slot >= sector_flat_baked.size())
         return false;
 
-    return subsector_flat_baked[slot] != 0;
+    return sector_flat_baked[slot] != 0;
 }
 
 static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
@@ -664,58 +658,58 @@ static bool SectorListStatic(const VertexSectorList *seclist)
     return true;
 }
 
-int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
-                          const Extrafloor *surface_ef)
+int StaticWallBakeDecline(const LineSide *line_side, const MapSurface *surf, bool mid_masked,
+                          const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
     if (!static_mesh_built)
     {
         return kStaticBakeMeshDisabled;
     }
 
-    if (!seg || !surf)
+    if (!line_side || !surf)
     {
         return kStaticBakeNoSurface;
     }
 
-    if (seg->miniseg || !seg->sidedef)
+    if (!line_side->sidedef)
     {
-        return kStaticBakeMiniseg;
+        return kStaticBakeNoSidedef;
     }
 
-    if (mid_masked && seg->linedef && seg->linedef->special && seg->linedef->special->glass_)
+    if (mid_masked && line_side->linedef->special && line_side->linedef->special->glass_)
     {
         return kStaticBakeGlass;
     }
 
-    if (WallPartIndex(seg, surf) < 0 && !surface_ef)
+    if (WallPartIndex(line_side, surf) < 0 && !surface_ef)
     {
         return kStaticBakeNotSidedefPart;
     }
 
-    if (seg->linedef && (seg->linedef->flags & kLineFlagMirror))
+    if ((line_side->linedef->flags & kLineFlagMirror))
     {
         return kStaticBakeMirrorLine;
     }
 
-    if (seg->linedef && seg->linedef->portal_pair)
+    if (line_side->linedef->portal_pair)
     {
         return kStaticBakePortalLine;
     }
 
-    if (seg->linedef && seg->linedef->slide_door)
+    if (line_side->linedef->slide_door)
     {
         return kStaticBakeSlideDoor;
     }
 
-    const Side *side = seg->sidedef;
+    const Side *side = line_side->sidedef;
 
     if (side->bake_dynamic)
     {
         return kStaticBakeSideDynamic;
     }
 
-    const Sector *front = seg->front_sector;
-    const Sector *back  = seg->back_sector;
+    const Sector *front = line_side->front_sector;
+    const Sector *back  = line_side->back_sector;
 
     if (!front)
     {
@@ -739,7 +733,7 @@ int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_maske
         }
     }
 
-    if (!SectorListStatic(seg->vertex_sectors[0]) || !SectorListStatic(seg->vertex_sectors[1]))
+    if (!SectorListStatic(line_side->vertex_sectors[0]) || !SectorListStatic(line_side->vertex_sectors[1]))
     {
         return kStaticBakeVertexSector;
     }
@@ -761,7 +755,7 @@ int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_maske
         }
     }
 
-    if (surf->override_properties && !StaticPropertiesResolvable(seg->front_sector, surf->override_properties))
+    if (surf->override_properties && !StaticPropertiesResolvable(line_side->front_sector, surf->override_properties))
     {
         return kStaticBakeOverrideProperties;
     }
@@ -790,7 +784,8 @@ int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_maske
     {
         uint64_t key;
 
-        if (!BuildRegionWallKey(seg, WallPartIndex(seg, surf), region_ef, surface_ef, LiveHeightKey(front, back), &key))
+        if (!BuildRegionWallKey(line_side, WallPartIndex(line_side, surf), region_ef, surface_ef,
+                                LiveHeightKey(front, back), &key))
         {
             return kStaticBakeKeyOverflow;
         }
@@ -799,16 +794,16 @@ int StaticWallBakeDecline(const Seg *seg, const MapSurface *surf, bool mid_maske
     return kStaticBakeAccepted;
 }
 
-bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
-                            const Extrafloor *surface_ef)
+bool StaticWallBakeEligible(const LineSide *line_side, const MapSurface *surf, bool mid_masked,
+                            const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
-    return StaticWallBakeDecline(seg, surf, mid_masked, region_ef, surface_ef) == kStaticBakeAccepted;
+    return StaticWallBakeDecline(line_side, surf, mid_masked, region_ef, surface_ef) == kStaticBakeAccepted;
 }
 
 static const char *const static_bake_decline_names[kStaticBakeDeclineTotal] = {"resident",
                                                                               "mesh disabled",
                                                                               "no surface",
-                                                                              "miniseg",
+                                                                              "no sidedef",
                                                                               "not a sidedef part",
                                                                               "glass linedef",
                                                                               "side is dynamic",
@@ -846,192 +841,46 @@ const char *StaticBakeDeclineName(int reason)
 
 
 
-bool StaticMeshCoversSubsector(const Subsector *sub)
-{
-    if (!static_mesh_built || !sub)
-        return false;
-
-    const Sector *sec = sub->sector;
-
-    if (!sec || sec->extrafloor_used > 0 || sec->height_sector || sub->deep_water_reference)
-        return false;
-
-    if (EDGE_IMAGE_IS_SKY(sec->ceiling) || EDGE_IMAGE_IS_SKY(sec->floor))
-        return false;
-
-    int key = LiveHeightKey(sec, nullptr);
-
-    size_t base = (size_t)(sub - level_subsectors) * 2;
-
-    for (size_t face = 0; face < 2; face++)
-    {
-        size_t slot = (base + face) * kHeightKeyTotal + (size_t)key;
-
-        if (slot >= subsector_flat_baked.size() || !subsector_flat_baked[slot])
-            return false;
-    }
-
-    for (const Seg *seg = sub->segs; seg; seg = seg->subsector_next)
-    {
-        if (seg->miniseg || !seg->sidedef || !seg->linedef)
-            continue;
-
-        const Sector *front = seg->front_sector;
-        const Sector *back  = seg->back_sector;
-
-        if (!front)
-            return false;
-
-        if (back && (back->extrafloor_used > 0 || back->height_sector))
-            return false;
-
-        if (EDGE_IMAGE_IS_SKY(front->ceiling) || EDGE_IMAGE_IS_SKY(front->floor))
-            return false;
-
-        if (back && (EDGE_IMAGE_IS_SKY(back->ceiling) || EDGE_IMAGE_IS_SKY(back->floor)))
-            return false;
-
-        int wall_key = LiveHeightKey(front, back);
-
-        const MapSurface *parts[3] = {&seg->sidedef->bottom, &seg->sidedef->middle, &seg->sidedef->top};
-
-        for (size_t part = 0; part < 3; part++)
-        {
-            if (!parts[part]->image)
-                continue;
-
-            size_t slot = ((size_t)(seg - level_segs) * 3 + part) * kHeightKeyTotal + (size_t)wall_key;
-
-            if (slot >= seg_wall_baked.size() || !seg_wall_baked[slot])
-                return false;
-        }
-    }
-
-    return true;
-}
-
-bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf, const Extrafloor *region_ef,
+bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, const Extrafloor *region_ef,
                           const Extrafloor *surface_ef)
 {
-    if (!static_mesh_built || !seg)
+    if (!static_mesh_built || !line_side)
         return false;
 
-    int part = WallPartIndex(seg, surf);
+    int part = WallPartIndex(line_side, surf);
 
     if (part < 0 && !surface_ef)
         return false;
 
-    int key = LiveHeightKey(seg->front_sector, seg->back_sector);
+    int key = LiveHeightKey(line_side->front_sector, line_side->back_sector);
 
     if (region_ef || surface_ef)
     {
         uint64_t hash_key;
 
-        if (!BuildRegionWallKey(seg, part, region_ef, surface_ef, key, &hash_key))
+        if (!BuildRegionWallKey(line_side, part, region_ef, surface_ef, key, &hash_key))
             return false;
 
         return region_surface_baked.find(hash_key) != region_surface_baked.end();
     }
 
-    size_t slot = ((size_t)(seg - level_segs) * 3 + (size_t)part) * kHeightKeyTotal + (size_t)key;
+    size_t slot = ((size_t)(line_side - level_line_sides) * 3 + (size_t)part) * kHeightKeyTotal + (size_t)key;
 
-    if (slot >= seg_wall_baked.size())
+    if (slot >= line_side_wall_baked.size())
         return false;
 
-    return seg_wall_baked[slot] != 0;
+    return line_side_wall_baked[slot] != 0;
 }
 
-static void BuildLineSegIndex(void)
-{
-    line_side_starts.clear();
-    line_side_segs.clear();
-
-    if (total_level_lines <= 0)
-        return;
-
-    size_t keys = (size_t)total_level_lines * 2;
-
-    line_side_starts.assign(keys + 1, 0);
-
-    for (int i = 0; i < total_level_segs; i++)
-    {
-        const Seg *seg = level_segs + i;
-
-        if (seg->miniseg || !seg->linedef)
-            continue;
-
-        size_t key = (size_t)(seg->linedef - level_lines) * 2 + (size_t)seg->side;
-
-        if (key < keys)
-            line_side_starts[key + 1]++;
-    }
-
-    for (size_t i = 1; i < line_side_starts.size(); i++)
-        line_side_starts[i] += line_side_starts[i - 1];
-
-    line_side_segs.assign((size_t)line_side_starts.back(), 0);
-
-    std::vector<int> cursor(line_side_starts.begin(), line_side_starts.end() - 1);
-
-    for (int i = 0; i < total_level_segs; i++)
-    {
-        const Seg *seg = level_segs + i;
-
-        if (seg->miniseg || !seg->linedef)
-            continue;
-
-        size_t key = (size_t)(seg->linedef - level_lines) * 2 + (size_t)seg->side;
-
-        if (key < keys)
-            line_side_segs[(size_t)cursor[key]++] = i;
-    }
-}
-
-bool StaticWallCoversLine(const Seg *seg, const MapSurface *surf, bool mid_masked, const Extrafloor *region_ef,
-                          const Extrafloor *surface_ef)
-{
-    if (!static_mesh_built)
-        return false;
-
-    if (region_ef || surface_ef)
-        return false;
-
-    if (!seg || seg->miniseg || !seg->linedef || !seg->sidedef)
-        return false;
-
-    size_t key = (size_t)(seg->linedef - level_lines) * 2 + (size_t)seg->side;
-
-    if (key + 1 >= line_side_starts.size())
-        return false;
-
-    int first = line_side_starts[key];
-    int last  = line_side_starts[key + 1];
-
-    if (last - first < 1)
-        return false;
-
-    for (int i = first; i < last; i++)
-    {
-        const Seg *other = level_segs + line_side_segs[i];
-
-        if (!StaticWallBakeEligible(other, surf, mid_masked, region_ef, surface_ef))
-            return false;
-    }
-
-    return true;
-}
-
-void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *image, RegionProperties *props,
+void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
                         float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked,
                         OitPass draw_pass, const HMM_Vec2 &uv_scale, const Extrafloor *region_ef,
-                        const Extrafloor *surface_ef, bool covers_line)
+                        const Extrafloor *surface_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
-    capture_mid_masked    = mid_masked;
-    capture_covers_sector = false;
-    capture_covers_line   = covers_line;
+    capture_mid_masked = mid_masked;
 
     capture_normal = normal;
     capture_div[0] = div_x;
@@ -1039,14 +888,14 @@ void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *ima
     capture_div[2] = div_delta_x;
     capture_div[3] = div_delta_y;
 
-    capture_back_sector = seg ? seg->back_sector : nullptr;
-    capture_height_key  = LiveHeightKey(seg ? seg->front_sector : sector, capture_back_sector);
+    capture_back_sector = line_side ? line_side->back_sector : nullptr;
+    capture_height_key  = LiveHeightKey(line_side ? line_side->front_sector : sector, capture_back_sector);
 
-    capture_batch  = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, surf);
-    capture_seg    = seg;
-    capture_surf   = surf;
-    capture_sector = sector;
-    capture_adjust = light_adjust;
+    capture_batch     = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, surf);
+    capture_line_side = line_side;
+    capture_surf      = surf;
+    capture_sector    = sector;
+    capture_adjust    = light_adjust;
 
     capture_light_sector = ResolvePropertiesOwner(sector, props);
     capture_light        = capture_light_sector->properties.light_level;
@@ -1057,43 +906,42 @@ void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *ima
     AddCaptureDependency(sector->height_sector);
     AddCaptureDependency(capture_light_sector);
 
-    if (seg)
+    if (line_side)
     {
         capture_is_wall = true;
 
-        int part = WallPartIndex(seg, surf);
+        int part = WallPartIndex(line_side, surf);
 
-        capture_flag_slot = (part < 0) ? -1 : (int)((seg - level_segs) * 3 + part);
+        capture_flag_slot = (part < 0) ? -1 : (int)((line_side - level_line_sides) * 3 + part);
         capture_hash_key  = 0;
 
         if (region_ef || surface_ef)
         {
             capture_flag_slot = -1;
 
-            if (!BuildRegionWallKey(seg, part, region_ef, surface_ef, capture_height_key, &capture_hash_key))
+            if (!BuildRegionWallKey(line_side, part, region_ef, surface_ef, capture_height_key, &capture_hash_key))
                 capture_hash_key = 0;
         }
 
         AddCaptureDependency(ExtrafloorControlSector(region_ef));
         AddCaptureDependency(ExtrafloorControlSector(surface_ef));
 
-        AddCaptureDependency(seg->front_sector);
-        AddCaptureDependency(seg->back_sector);
+        AddCaptureDependency(line_side->front_sector);
+        AddCaptureDependency(line_side->back_sector);
 
-        if (seg->front_sector)
-            AddCaptureDependency(seg->front_sector->height_sector);
+        if (line_side->front_sector)
+            AddCaptureDependency(line_side->front_sector->height_sector);
 
-        if (seg->back_sector)
-            AddCaptureDependency(seg->back_sector->height_sector);
-        AddCaptureDependencyList(seg->vertex_sectors[0]);
-        AddCaptureDependencyList(seg->vertex_sectors[1]);
+        if (line_side->back_sector)
+            AddCaptureDependency(line_side->back_sector->height_sector);
+        AddCaptureDependencyList(line_side->vertex_sectors[0]);
+        AddCaptureDependencyList(line_side->vertex_sectors[1]);
     }
 }
 
-void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *image, RegionProperties *props,
-                            Sector *sector, BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass,
-                            const MapSurface *surf, const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef,
-                            bool covers_sector)
+void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
+                            BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass, const MapSurface *surf,
+                            const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef)
 {
     capture_flat_surface = surf;
 
@@ -1105,28 +953,25 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
     capture_back_sector = nullptr;
     capture_height_key  = LiveHeightKey(sector, nullptr);
 
-    capture_batch  = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_flat_surface);
-    capture_seg    = nullptr;
-    capture_surf   = nullptr;
-    capture_sector = sector;
-    capture_adjust = 0;
+    capture_batch     = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_flat_surface);
+    capture_line_side = nullptr;
+    capture_surf      = nullptr;
+    capture_sector    = sector;
+    capture_adjust    = 0;
 
     capture_light_sector = ResolvePropertiesOwner(sector, props);
     capture_light        = capture_light_sector->properties.light_level;
 
-    capture_is_wall       = false;
-    capture_mid_masked    = false;
-    capture_covers_line   = false;
-    capture_covers_sector = covers_sector;
-    capture_flag_slot = (int)((sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1));
-    capture_hash_key  = 0;
+    capture_is_wall    = false;
+    capture_mid_masked = false;
+    capture_flag_slot  = (int)((sector - level_sectors) * 2 + (face_dir > 0 ? 0 : 1));
+    capture_hash_key   = 0;
 
     if (plane_ef)
     {
-        capture_flag_slot     = -1;
-        capture_covers_sector = false;
+        capture_flag_slot = -1;
 
-        if (!BuildRegionFlatKey(sub, face_dir, plane_ef, capture_height_key, &capture_hash_key))
+        if (!BuildRegionFlatKey(sector, face_dir, plane_ef, capture_height_key, &capture_hash_key))
             capture_hash_key = 0;
     }
 
@@ -1134,60 +979,22 @@ void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *ima
 
     AddCaptureDependency(sector);
     AddCaptureDependency(sector->height_sector);
-    AddCaptureDependency(sub->deep_water_reference);
+    AddCaptureDependency(sector->deep_water_reference);
     AddCaptureDependency(capture_light_sector);
     AddCaptureDependency(ExtrafloorControlSector(plane_ef));
 }
 
-static void MarkLineWallSlots(const StaticSpan &span, uint8_t value)
+static void MarkBakedSlot(const StaticSpan &span, uint8_t value)
 {
     if (span.flag_slot < 0)
         return;
 
-    int part      = span.flag_slot % 3;
-    int seg_index = span.flag_slot / 3;
+    size_t slot = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
 
-    if (seg_index < 0 || seg_index >= total_level_segs)
-        return;
+    std::vector<uint8_t> &baked = span.is_wall ? line_side_wall_baked : sector_flat_baked;
 
-    const Seg *seg = level_segs + seg_index;
-
-    if (!seg->linedef)
-        return;
-
-    size_t key = (size_t)(seg->linedef - level_lines) * 2 + (size_t)seg->side;
-
-    if (key + 1 >= line_side_starts.size())
-        return;
-
-    for (int i = line_side_starts[key]; i < line_side_starts[key + 1]; i++)
-    {
-        size_t slot = ((size_t)line_side_segs[i] * 3 + (size_t)part) * kHeightKeyTotal + (size_t)span.height_key;
-
-        if (slot < seg_wall_baked.size())
-            seg_wall_baked[slot] = value;
-    }
-}
-
-static void MarkSectorFlatSlots(const StaticSpan &span, uint8_t value)
-{
-    if (span.flag_slot < 0 || !span.sector)
-        return;
-
-    size_t parity = (size_t)(span.flag_slot & 1);
-
-    size_t own = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
-
-    if (own < subsector_flat_baked.size())
-        subsector_flat_baked[own] = value;
-
-    for (const Subsector *sub = span.sector->subsectors; sub; sub = sub->sector_next)
-    {
-        size_t slot = ((size_t)(sub - level_subsectors) * 2 + parity) * kHeightKeyTotal + (size_t)span.height_key;
-
-        if (slot < subsector_flat_baked.size())
-            subsector_flat_baked[slot] = value;
-    }
+    if (slot < baked.size())
+        baked[slot] = value;
 }
 
 void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
@@ -1208,11 +1015,9 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
     span.light_adjust = capture_adjust;
     span.flag_slot    = capture_flag_slot;
     span.hash_key     = capture_hash_key;
-    span.is_wall       = capture_is_wall;
-    span.mid_masked    = capture_mid_masked;
-    span.covers_sector = capture_covers_sector;
-    span.covers_line   = capture_covers_line;
-    span.live          = true;
+    span.is_wall      = capture_is_wall;
+    span.mid_masked   = capture_mid_masked;
+    span.live         = true;
     span.normal       = capture_normal;
     span.div_x        = capture_div[0];
     span.div_y        = capture_div[1];
@@ -1284,25 +1089,9 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
         sector_spans[capture_dependencies[i]].push_back(ref);
 
     if (span.hash_key != 0)
-    {
         region_surface_baked[span.hash_key] = 1;
-    }
-    else if (span.flag_slot >= 0)
-    {
-        size_t slot = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
-
-        if (span.is_wall)
-        {
-            if (span.covers_line)
-                MarkLineWallSlots(span, 1);
-            else if (slot < seg_wall_baked.size())
-                seg_wall_baked[slot] = 1;
-        }
-        else if (span.covers_sector)
-            MarkSectorFlatSlots(span, 1);
-        else if (slot < subsector_flat_baked.size())
-            subsector_flat_baked[slot] = 1;
-    }
+    else
+        MarkBakedSlot(span, 1);
 }
 
 static std::vector<Sector *> dynamic_sector_list;
@@ -1386,22 +1175,7 @@ void StaticMeshInvalidateSector(Sector *sec)
             continue;
         }
 
-        if (span.flag_slot < 0)
-            continue;
-
-        size_t slot = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
-
-        if (span.is_wall)
-        {
-            if (span.covers_line)
-                MarkLineWallSlots(span, 0);
-            else if (slot < seg_wall_baked.size())
-                seg_wall_baked[slot] = 0;
-        }
-        else if (span.covers_sector)
-            MarkSectorFlatSlots(span, 0);
-        else if (slot < subsector_flat_baked.size())
-            subsector_flat_baked[slot] = 0;
+        MarkBakedSlot(span, 0);
     }
 
     refs.clear();
@@ -1411,7 +1185,7 @@ void StaticCaptureEnd(void)
 {
     capture_batch        = -1;
     capture_hash_key     = 0;
-    capture_seg          = nullptr;
+    capture_line_side    = nullptr;
     capture_surf         = nullptr;
     capture_sector       = nullptr;
     capture_light_sector = nullptr;
@@ -1481,10 +1255,9 @@ void BuildStaticMesh(void)
             NoteDynamicSector(level_sectors + i);
     }
 
-    subsector_flat_baked.assign((size_t)total_level_subsectors * 2 * kHeightKeyTotal, 0);
-    seg_wall_baked.assign((size_t)total_level_segs * 3 * kHeightKeyTotal, 0);
+    sector_flat_baked.assign((size_t)total_level_sectors * 2 * kHeightKeyTotal, 0);
+    line_side_wall_baked.assign((size_t)total_level_lines * 2 * 3 * kHeightKeyTotal, 0);
 
-    BuildLineSegIndex();
     region_surface_baked.clear();
     sector_spans.assign((size_t)total_level_sectors, std::vector<SpanReference>());
 
@@ -1509,10 +1282,8 @@ void DestroyStaticMesh(void)
     }
 
     static_batches.clear();
-    line_side_starts.clear();
-    line_side_segs.clear();
-    subsector_flat_baked.clear();
-    seg_wall_baked.clear();
+    sector_flat_baked.clear();
+    line_side_wall_baked.clear();
     region_surface_baked.clear();
     sector_spans.clear();
     sector_light_cache.clear();
@@ -1631,8 +1402,6 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
             bool contiguous = live && run_start >= 0 && batch.spans[k].start == run_end &&
                               (size_t)(run_end + batch.spans[k].count - run_start) <= kMaximumStaticRun;
-
-            if (live)
 
             if (contiguous)
             {

@@ -215,12 +215,12 @@ static void PL_on_ground(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
     // not a 3D floor?
-    if (ui_player_who->map_object_->subsector_->sector->extrafloor_used == 0)
+    if (ui_player_who->map_object_->sector_->extrafloor_used == 0)
     {
         // on the edge above water/lava/etc? Handles edge walker case
         if (!epi::AlmostEquals(ui_player_who->map_object_->floor_z_,
-                          ui_player_who->map_object_->subsector_->sector->floor_height) &&
-            !ui_player_who->map_object_->subsector_->sector->floor_vertex_slope)
+                          ui_player_who->map_object_->sector_->floor_height) &&
+            !ui_player_who->map_object_->sector_->floor_vertex_slope)
             vm->ReturnFloat(0);
         else
         {
@@ -1028,16 +1028,16 @@ static void PL_floor_flat(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
     // If no 3D floors, just return the flat
-    if (ui_player_who->map_object_->subsector_->sector->extrafloor_used == 0)
+    if (ui_player_who->map_object_->sector_->extrafloor_used == 0)
     {
-        vm->ReturnString(ui_player_who->map_object_->subsector_->sector->floor.image->name_.c_str());
+        vm->ReturnString(ui_player_who->map_object_->sector_->floor.image->name_.c_str());
     }
     else
     {
         // Start from the lowest exfloor and check if the player is standing on
         // it, then return the control sector's flat
         float       player_floor_height = ui_player_who->map_object_->floor_z_;
-        Extrafloor *floor_checker       = ui_player_who->map_object_->subsector_->sector->bottom_extrafloor;
+        Extrafloor *floor_checker       = ui_player_who->map_object_->sector_->bottom_extrafloor;
         for (Extrafloor *ef = floor_checker; ef; ef = ef->higher)
         {
             if (player_floor_height + 1 > ef->top_height)
@@ -1047,7 +1047,7 @@ static void PL_floor_flat(coal::VM *vm, int argc)
             }
         }
         // Fallback if nothing else satisfies these conditions
-        vm->ReturnString(ui_player_who->map_object_->subsector_->sector->floor.image->name_.c_str());
+        vm->ReturnString(ui_player_who->map_object_->sector_->floor.image->name_.c_str());
     }
 }
 
@@ -1056,7 +1056,7 @@ static void PL_floor_flat(coal::VM *vm, int argc)
 static void PL_sector_tag(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
-    vm->ReturnFloat(ui_player_who->map_object_->subsector_->sector->tag);
+    vm->ReturnFloat(ui_player_who->map_object_->sector_->tag);
 }
 
 // player.play_footstep(flat name)
@@ -1616,7 +1616,7 @@ static void PL_query_weapon(coal::VM *vm, int argc)
 static void PL_sector_light(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
-    vm->ReturnFloat(ui_player_who->map_object_->subsector_->sector->properties.light_level);
+    vm->ReturnFloat(ui_player_who->map_object_->sector_->properties.light_level);
 }
 
 // player.sector_floor_height()
@@ -1625,9 +1625,9 @@ static void PL_sector_floor_height(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
     // If no 3D floors, just return the current sector floor height
-    if (ui_player_who->map_object_->subsector_->sector->extrafloor_used == 0)
+    if (ui_player_who->map_object_->sector_->extrafloor_used == 0)
     {
-        vm->ReturnFloat(ui_player_who->map_object_->subsector_->sector->floor_height);
+        vm->ReturnFloat(ui_player_who->map_object_->sector_->floor_height);
     }
     else
     {
@@ -1636,7 +1636,7 @@ static void PL_sector_floor_height(coal::VM *vm, int argc)
         //  then return the control sector floor height
         float       CurrentFloor        = 0;
         float       player_floor_height = ui_player_who->map_object_->floor_z_;
-        Extrafloor *floor_checker       = ui_player_who->map_object_->subsector_->sector->bottom_extrafloor;
+        Extrafloor *floor_checker       = ui_player_who->map_object_->sector_->bottom_extrafloor;
         for (Extrafloor *ef = floor_checker; ef; ef = ef->higher)
         {
             if (CurrentFloor > ef->top_height)
@@ -1660,9 +1660,9 @@ static void PL_sector_ceiling_height(coal::VM *vm, int argc)
 {
     EPI_UNUSED(argc);
     // If no 3D floors, just return the current sector ceiling height
-    if (ui_player_who->map_object_->subsector_->sector->extrafloor_used == 0)
+    if (ui_player_who->map_object_->sector_->extrafloor_used == 0)
     {
-        vm->ReturnFloat(ui_player_who->map_object_->subsector_->sector->ceiling_height);
+        vm->ReturnFloat(ui_player_who->map_object_->sector_->ceiling_height);
     }
     else
     {
@@ -1671,7 +1671,7 @@ static void PL_sector_ceiling_height(coal::VM *vm, int argc)
         //   then return the control sector ceiling height
         float       HighestCeiling      = 0;
         float       player_floor_height = ui_player_who->map_object_->floor_z_;
-        Extrafloor *floor_checker       = ui_player_who->map_object_->subsector_->sector->bottom_extrafloor;
+        Extrafloor *floor_checker       = ui_player_who->map_object_->sector_->bottom_extrafloor;
         for (Extrafloor *ef = floor_checker; ef; ef = ef->higher)
         {
             if (player_floor_height + 1 > ef->top_height)
@@ -1685,7 +1685,7 @@ static void PL_sector_ceiling_height(coal::VM *vm, int argc)
             }
         }
         // Fallback if nothing else satisfies these conditions
-        vm->ReturnFloat(ui_player_who->map_object_->subsector_->sector->ceiling_height);
+        vm->ReturnFloat(ui_player_who->map_object_->sector_->ceiling_height);
     }
 }
 
@@ -1696,7 +1696,7 @@ static void PL_is_outside(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
     // Doesn't account for extrafloors by design. Reasoning is that usually
     //  extrafloors will be platforms, not roofs...
-    if (ui_player_who->map_object_->subsector_->sector->ceiling.image != sky_flat_image) // is it outdoors?
+    if (ui_player_who->map_object_->sector_->ceiling.image != sky_flat_image) // is it outdoors?
         vm->ReturnFloat(0);
     else
         vm->ReturnFloat(1);

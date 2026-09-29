@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <utility>
 #include <vector>
 
 #include "earcut.hpp"
@@ -37,14 +38,15 @@ static int      polygon_total_triangles     = 0;
 static int      polygon_total_points        = 0;
 static int      polygon_winding_disagree    = 0;
 static int      polygon_area_mismatch_loops = 0;
-static int      polygon_area_mismatch_subs  = 0;
 static double   polygon_area_triangles      = 0.0;
 static double   polygon_area_loops          = 0.0;
-static double   polygon_area_subsectors     = 0.0;
 static int      polygon_deep_water_sectors  = 0;
 static int      polygon_oversized_sectors   = 0;
+static int      polygon_gap_sectors         = 0;
+static int      polygon_gap_edges           = 0;
 
 static std::vector<int>              polygon_self_reference_owned;
+static std::vector<uint8_t>          polygon_self_reference_only;
 static std::vector<float>            polygon_self_reference_probe;
 static std::vector<std::vector<int>> polygon_self_reference_ring;
 
@@ -54,9 +56,6 @@ static int polygon_self_reference_covered  = 0;
 static int polygon_self_reference_orphan   = 0;
 static int polygon_self_reference_open     = 0;
 
-static int polygon_locate_agree    = 0;
-static int polygon_locate_disagree = 0;
-static int polygon_locate_missing  = 0;
 
 static std::vector<int> grid_starts;
 static std::vector<int> grid_sectors;
@@ -481,6 +480,112 @@ int SectorPolygonAtPoint(float x, float y, int exclude_sector)
     return best;
 }
 
+static constexpr size_t kMaximumPolygonGapVertices = 512;
+
+struct PolygonGapCandidate
+{
+    double distance;
+    int    end_slot;
+    int    start_slot;
+};
+
+static bool PolygonGapCandidateLess(const PolygonGapCandidate &a, const PolygonGapCandidate &b)
+{
+    return a.distance < b.distance;
+}
+
+static void PolygonCloseGaps(std::vector<PolygonEdge> &edges)
+{
+    std::vector<std::pair<int, int>> incidence;
+
+    incidence.reserve(edges.size() * 2);
+
+    for (size_t i = 0; i < edges.size(); i++)
+    {
+        incidence.push_back(std::make_pair(edges[i].start, 1));
+        incidence.push_back(std::make_pair(edges[i].end, -1));
+    }
+
+    std::sort(incidence.begin(), incidence.end());
+
+    std::vector<int> open_ends;
+    std::vector<int> open_starts;
+
+    for (size_t i = 0; i < incidence.size();)
+    {
+        int vertex  = incidence[i].first;
+        int balance = 0;
+
+        for (; i < incidence.size() && incidence[i].first == vertex; i++)
+            balance += incidence[i].second;
+
+        for (; balance > 0; balance--)
+            open_starts.push_back(vertex);
+
+        for (; balance < 0; balance++)
+            open_ends.push_back(vertex);
+    }
+
+    if (open_ends.empty() || open_ends.size() != open_starts.size() ||
+        open_ends.size() > kMaximumPolygonGapVertices)
+        return;
+
+    std::vector<PolygonGapCandidate> candidates;
+
+    candidates.reserve(open_ends.size() * open_starts.size());
+
+    for (size_t e = 0; e < open_ends.size(); e++)
+    {
+        const Vertex *from = level_vertexes + open_ends[e];
+
+        for (size_t k = 0; k < open_starts.size(); k++)
+        {
+            if (open_starts[k] == open_ends[e])
+                continue;
+
+            const Vertex *to = level_vertexes + open_starts[k];
+
+            double dx = (double)to->X - (double)from->X;
+            double dy = (double)to->Y - (double)from->Y;
+
+            candidates.push_back(PolygonGapCandidate{dx * dx + dy * dy, (int)e, (int)k});
+        }
+    }
+
+    std::sort(candidates.begin(), candidates.end(), PolygonGapCandidateLess);
+
+    std::vector<uint8_t> end_used(open_ends.size(), 0);
+    std::vector<uint8_t> start_used(open_starts.size(), 0);
+
+    int added = 0;
+
+    for (size_t c = 0; c < candidates.size(); c++)
+    {
+        const PolygonGapCandidate &candidate = candidates[c];
+
+        if (end_used[candidate.end_slot] || start_used[candidate.start_slot])
+            continue;
+
+        end_used[candidate.end_slot]     = 1;
+        start_used[candidate.start_slot] = 1;
+
+        PolygonEdge edge;
+
+        edge.start = open_ends[candidate.end_slot];
+        edge.end   = open_starts[candidate.start_slot];
+
+        edges.push_back(edge);
+
+        added++;
+    }
+
+    if (added > 0)
+    {
+        polygon_gap_sectors++;
+        polygon_gap_edges += added;
+    }
+}
+
 static bool PolygonTraceLoops(const Sector *sec, std::vector<PolygonEdge> &edges, std::vector<std::vector<int>> &loops)
 {
     edges.clear();
@@ -519,6 +624,8 @@ static bool PolygonTraceLoops(const Sector *sec, std::vector<PolygonEdge> &edges
 
     if (edges.empty())
         return false;
+
+    PolygonCloseGaps(edges);
 
     std::sort(edges.begin(), edges.end(), PolygonEdgeLess);
 
@@ -800,6 +907,8 @@ static void PolygonAttachSelfReferences(void)
     {
         loops.clear();
 
+        bool self_only = sector_polygons[i].loop_points.empty();
+
         if (!PolygonTraceSelfReference(level_sectors + i, loops))
         {
             polygon_self_reference_open++;
@@ -832,6 +941,7 @@ static void PolygonAttachSelfReferences(void)
                 sector_polygons[i].status = kSectorPolygonOk;
 
             polygon_self_reference_owned.push_back(i);
+            polygon_self_reference_only.push_back(self_only ? 1 : 0);
             polygon_self_reference_probe.push_back(probe_x);
             polygon_self_reference_probe.push_back(probe_y);
             polygon_self_reference_ring.push_back(loops[k]);
@@ -855,6 +965,9 @@ static void PolygonSubtractSelfReferences(void)
             polygon_self_reference_orphan++;
             continue;
         }
+
+        if (polygon_self_reference_only[i] && !level_sectors[owner].deep_water_reference)
+            level_sectors[owner].deep_water_reference = level_sectors + container;
 
         std::vector<int> ring = polygon_self_reference_ring[i];
 
@@ -1026,28 +1139,6 @@ static void PolygonFinishSector(int sector_index)
         polygon_area_loops -= areas[i];
 }
 
-static double PolygonSubsectorArea(const Sector *sec)
-{
-    double total = 0.0;
-
-    for (const Subsector *sub = sec->subsectors; sub; sub = sub->sector_next)
-    {
-        double doubled = 0.0;
-
-        for (const Seg *seg = sub->segs; seg; seg = seg->subsector_next)
-        {
-            const Vertex *a = seg->vertex_1;
-            const Vertex *b = seg->vertex_2;
-
-            doubled += (double)a->X * (double)b->Y - (double)b->X * (double)a->Y;
-        }
-
-        total += fabs(doubled) * 0.5;
-    }
-
-    return total;
-}
-
 void DestroySectorPolygons(void)
 {
     sector_polygons.clear();
@@ -1055,6 +1146,7 @@ void DestroySectorPolygons(void)
     vertex_point_stamp.clear();
 
     polygon_self_reference_owned.clear();
+    polygon_self_reference_only.clear();
     polygon_self_reference_probe.clear();
     polygon_self_reference_ring.clear();
 
@@ -1062,50 +1154,6 @@ void DestroySectorPolygons(void)
 
     vertex_point_serial   = 0;
     sector_polygons_built = false;
-}
-
-static void PolygonSurveyPointLocation(void)
-{
-    std::vector<int> loop;
-
-    for (int i = 0; i < total_level_sectors; i++)
-    {
-        const SectorPolygon *poly = &sector_polygons[i];
-
-        if (poly->status != kSectorPolygonOk || PolygonStoredLoops(poly) == 0)
-            continue;
-
-        PolygonReadLoop(poly, 0, &loop);
-
-        if (loop.size() < 3)
-            continue;
-
-        float probe_x = 0.0f;
-        float probe_y = 0.0f;
-
-        PolygonLoopProbe(loop, PolygonLoopArea(loop), &probe_x, &probe_y);
-
-        if (!PolygonSectorContains(poly, probe_x, probe_y))
-            continue;
-
-        int found = SectorPolygonAtPoint(probe_x, probe_y, -1);
-
-        if (found < 0)
-        {
-            polygon_locate_missing++;
-            continue;
-        }
-
-        Subsector *sub = PointInSubsector(probe_x, probe_y);
-
-        if (sub && (sub->sector - level_sectors) == found)
-            polygon_locate_agree++;
-        else
-        {
-            polygon_locate_disagree++;
-
-        }
-    }
 }
 
 void BuildSectorPolygons(void)
@@ -1134,23 +1182,24 @@ void BuildSectorPolygons(void)
     polygon_total_points            = 0;
     polygon_winding_disagree        = 0;
     polygon_area_mismatch_loops     = 0;
-    polygon_area_mismatch_subs      = 0;
     polygon_area_triangles          = 0.0;
     polygon_area_loops              = 0.0;
-    polygon_area_subsectors         = 0.0;
     polygon_deep_water_sectors      = 0;
     polygon_oversized_sectors       = 0;
+    polygon_gap_sectors             = 0;
+    polygon_gap_edges               = 0;
     polygon_self_reference_loops    = 0;
     polygon_self_reference_attached = 0;
     polygon_self_reference_covered  = 0;
     polygon_self_reference_orphan   = 0;
     polygon_self_reference_open     = 0;
-    polygon_locate_agree            = 0;
-    polygon_locate_disagree         = 0;
-    polygon_locate_missing          = 0;
 
     for (int i = 0; i < total_level_sectors; i++)
+    {
+        level_sectors[i].deep_water_reference = nullptr;
+
         PolygonTraceSector(i);
+    }
 
     PolygonAttachSelfReferences();
 
@@ -1177,18 +1226,7 @@ void BuildSectorPolygons(void)
         if (poly->indices.size() > kMaximumSectorPolygonVertices)
             polygon_oversized_sectors++;
 
-        bool deep_water = false;
-
-        for (const Subsector *sub = level_sectors[i].subsectors; sub; sub = sub->sector_next)
-        {
-            if (sub->deep_water_reference)
-            {
-                deep_water = true;
-                break;
-            }
-        }
-
-        if (deep_water)
+        if (level_sectors[i].deep_water_reference)
             polygon_deep_water_sectors++;
 
         polygon_total_loops     += poly->loop_count;
@@ -1196,28 +1234,19 @@ void BuildSectorPolygons(void)
         polygon_total_triangles += (int)poly->indices.size() / 3;
         polygon_total_points    += (int)poly->points.size();
 
-        double sector_triangles  = polygon_area_triangles - before_triangles;
-        double sector_loops      = polygon_area_loops - before_loops;
-        double sector_subsectors = PolygonSubsectorArea(level_sectors + i);
-
-        polygon_area_subsectors += sector_subsectors;
+        double sector_triangles = polygon_area_triangles - before_triangles;
+        double sector_loops     = polygon_area_loops - before_loops;
 
         double scale = (sector_loops > 1.0) ? sector_loops : 1.0;
 
         if (fabs(sector_triangles - sector_loops) / scale > 0.001)
             polygon_area_mismatch_loops++;
-
-        if (fabs(sector_triangles - sector_subsectors) / scale > 0.001)
-        {
-            polygon_area_mismatch_subs++;
-        }
     }
-
-    PolygonSurveyPointLocation();
 
     polygon_self_reference_ring.clear();
     polygon_self_reference_probe.clear();
     polygon_self_reference_owned.clear();
+    polygon_self_reference_only.clear();
 
     polygon_build_microseconds = GetMicroseconds() - mark;
 
@@ -1266,17 +1295,16 @@ void SectorPolygonReport(void)
         LogPrint("      %-32s %6d\n", SectorPolygonStatusName(i), polygon_status_counts[i]);
     }
 
-    LogPrint("      %-32s triangles %.1f, loops %.1f, subsectors %.1f\n", "area", polygon_area_triangles,
-             polygon_area_loops, polygon_area_subsectors);
+    LogPrint("      %-32s triangles %.1f, loops %.1f\n", "area", polygon_area_triangles, polygon_area_loops);
 
-    LogPrint("      %-32s %6d vs loops, %d vs subsectors, %d winding/containment disagreements\n", "sectors off by >0.1%",
-             polygon_area_mismatch_loops, polygon_area_mismatch_subs, polygon_winding_disagree);
+    LogPrint("      %-32s %6d vs loops, %d winding/containment disagreements\n", "sectors off by >0.1%",
+             polygon_area_mismatch_loops, polygon_winding_disagree);
 
-    LogPrint("      %-32s %6d deep-water, %d over the vertex cap\n", "sectors the render path rejects",
+    LogPrint("      %-32s %6d deep-water, %d over the vertex cap\n", "special sectors",
              polygon_deep_water_sectors, polygon_oversized_sectors);
 
-    LogPrint("      %-32s %6d agree with the node descent, %d disagree, %d not found\n", "grid point location",
-             polygon_locate_agree, polygon_locate_disagree, polygon_locate_missing);
+    LogPrint("      %-32s %6d sectors, %d edges added\n", "open boundaries closed", polygon_gap_sectors,
+             polygon_gap_edges);
 
     LogPrint("      %-32s %6d loops, %d subtracted from a container, %d already covered, %d orphan, %d open\n",
              "self-referencing sectors", polygon_self_reference_loops, polygon_self_reference_attached,

@@ -471,12 +471,12 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
         trans    = 1.0f;
     }
 
-    RGBAColor fc_to_use = player->map_object_->subsector_->sector->properties.fog_color;
-    float     fd_to_use = player->map_object_->subsector_->sector->properties.fog_density;
+    RGBAColor fc_to_use = player->map_object_->sector_->properties.fog_color;
+    float     fd_to_use = player->map_object_->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
     {
-        if (EDGE_IMAGE_IS_SKY(player->map_object_->subsector_->sector->ceiling))
+        if (EDGE_IMAGE_IS_SKY(player->map_object_->sector_->ceiling))
         {
             fc_to_use = current_map->outdoor_fog_color_;
             fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -492,7 +492,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     {
         AbstractShader *shader =
             GetColormapShader(props, player->map_object_->info_->force_fullbright_ ? 255 : state->bright,
-                              player->map_object_->subsector_->sector);
+                              player->map_object_->sector_);
 
         shader->Sample(data.colors + 0, data.light_position.X, data.light_position.Y, data.light_position.Z);
 
@@ -538,7 +538,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
                 DLIT_PSprite(light, &data);
             }
 
-            SectorGlowIterator(player->map_object_->subsector_->sector, data.light_position.X - r,
+            SectorGlowIterator(player->map_object_->sector_, data.light_position.X - r,
                                data.light_position.Y - r, player->map_object_->z, data.light_position.X + r,
                                data.light_position.Y + r, player->map_object_->z + player->map_object_->height_,
                                DLIT_PSprite, &data);
@@ -941,7 +941,7 @@ static void RendererClipSpriteVertically(DrawThing *dthing)
 {
     float z = dthing->map_z + (dthing->map_object->height_ * 0.5f);
 
-    dthing->properties = GetPointProperties(dthing->map_object->subsector_, z);
+    dthing->properties = GetPointProperties(dthing->map_object->sector_, z);
 
     LinkDrawThingIntoView(dthing);
 }
@@ -950,7 +950,7 @@ void EnumerateViewThings(void)
 {
     for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {
-        if (mo->IsRemoved() || !mo->subsector_)
+        if (mo->IsRemoved() || !mo->sector_)
             continue;
 
         BSPWalkThing(mo);
@@ -1053,7 +1053,7 @@ void BSPWalkThing(MapObject *mo)
 
     float   sink_mult = 0;
     float   bob_mult  = 0;
-    Sector *cur_sec   = mo->subsector_->sector;
+    Sector *cur_sec   = mo->sector_;
     if (!cur_sec->extrafloor_used && !cur_sec->height_sector && epi::AlmostEquals(mz, cur_sec->floor_height))
     {
         if (!(mo->flags_ & kMapObjectFlagNoGravity))
@@ -1417,7 +1417,7 @@ static bool RenderThing(DrawThing *dthing, bool solid)
     if (!is_fuzzy)
     {
         AbstractShader *shader = GetColormapShader(
-            dthing->properties, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->subsector_->sector);
+            dthing->properties, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->sector_);
 
         for (int v = 0; v < 4; v++)
         {
@@ -1430,12 +1430,12 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
     int num_pass = is_fuzzy ? 1 : (detail_level > 0 ? 4 : 3);
 
-    RGBAColor fc_to_use = dthing->map_object->subsector_->sector->properties.fog_color;
-    float     fd_to_use = dthing->map_object->subsector_->sector->properties.fog_density;
+    RGBAColor fc_to_use = dthing->map_object->sector_->properties.fog_color;
+    float     fd_to_use = dthing->map_object->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
     {
-        if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling))
+        if (EDGE_IMAGE_IS_SKY(mo->sector_->ceiling))
         {
             fc_to_use = current_map->outdoor_fog_color_;
             fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -1476,7 +1476,7 @@ static bool RenderThing(DrawThing *dthing, bool solid)
             BeginRenderUnit(GL_QUADS, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
                             is_fuzzy ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable, fuzz_tex, pass, blending,
                             pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use, nullptr, nullptr, false, sprite_lit,
-                            sprite_lit ? LightGridGlowSetForSector(mo->subsector_->sector) : -1);
+                            sprite_lit ? LightGridGlowSetForSector(mo->sector_) : -1);
 
         for (int v_idx = 0; v_idx < 4; v_idx++)
         {

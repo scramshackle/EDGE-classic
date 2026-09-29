@@ -36,6 +36,7 @@
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
+#include "r_polygon.h"
 #include "r_sky.h"
 #include "r_static.h"
 #include "r_texgl.h"
@@ -359,8 +360,8 @@ static void SkyResidentReset(void)
 
     sky_sections.clear();
 
-    sky_plane_baked.assign((size_t)total_level_subsectors * 2 * kHeightKeyTotal, 0);
-    sky_wall_baked.assign((size_t)total_level_segs * 3 * kHeightKeyTotal, 0);
+    sky_plane_baked.assign((size_t)total_level_sectors * 2 * kHeightKeyTotal, 0);
+    sky_wall_baked.assign((size_t)total_level_lines * 2 * 3 * kHeightKeyTotal, 0);
     sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
 
     sky_capture_active = false;
@@ -390,17 +391,18 @@ static int SkyHeightKey(const Sector *front, const Sector *back)
     return SectorHeightState(front) * kHeightStateTotal + SectorHeightState(back);
 }
 
-static size_t SkyPlaneSlot(const Subsector *sub, int face, int height_key)
+static size_t SkyPlaneSlot(const Sector *sector, int face, int height_key)
 {
-    return ((size_t)(sub - level_subsectors) * 2 + (size_t)(face ? 1 : 0)) * (size_t)kHeightKeyTotal +
+    return ((size_t)(sector - level_sectors) * 2 + (size_t)(face ? 1 : 0)) * (size_t)kHeightKeyTotal +
            (size_t)height_key;
 }
 
-static size_t SkyWallSlot(const Seg *seg, int part, int height_key)
+static size_t SkyWallSlot(const LineSide *line_side, int part, int height_key)
 {
     int clamped = (part < 0) ? 0 : ((part > 2) ? 2 : part);
 
-    return ((size_t)(seg - level_segs) * 3 + (size_t)clamped) * (size_t)kHeightKeyTotal + (size_t)height_key;
+    return ((size_t)(line_side - level_line_sides) * 3 + (size_t)clamped) * (size_t)kHeightKeyTotal +
+           (size_t)height_key;
 }
 
 static void SkyCaptureBegin(int section, int flag_slot, int height_key, const Sector *height_front,
@@ -956,12 +958,12 @@ bool SkyResidentEnabled(void)
     return true;
 }
 
-bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner)
+bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner)
 {
-    if (!seg || !seg->back_sector || !seg->front_sector)
+    if (!line_side || !line_side->back_sector || !line_side->front_sector)
         return true;
 
-    const Sector *other = (sky_owner == seg->front_sector) ? seg->back_sector : seg->front_sector;
+    const Sector *other = (sky_owner == line_side->front_sector) ? line_side->back_sector : line_side->front_sector;
 
     const Image *owner_sky = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
     const Image *other_sky = (other && other->sky_image) ? other->sky_image : sky_image;
@@ -969,104 +971,62 @@ bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner)
     return owner_sky == other_sky;
 }
 
-bool SkyPlaneIsBaked(const Subsector *sub, int face)
-{
-    if (!sub || face < 0 || face > 1)
-        return false;
-
-    size_t slot = SkyPlaneSlot(sub, face, SkyHeightKey(sub->sector, nullptr));
-
-    if (slot >= sky_plane_baked.size())
-        return false;
-
-    return sky_plane_baked[slot] != 0;
-}
-
-bool SkyWallIsBaked(const Seg *seg, int part)
-{
-    if (!seg || part < 0 || part > 2)
-        return false;
-
-    size_t slot = SkyWallSlot(seg, part, SkyHeightKey(seg->front_sector, seg->back_sector));
-
-    if (slot >= sky_wall_baked.size())
-        return false;
-
-    return sky_wall_baked[slot] != 0;
-}
-
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMirror *mir)
+void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMirror *mir)
 {
     sky_current_bucket = SkyBucketFor(mir);
 
     if (!mir)
         need_to_draw_sky = true;
 
-    Seg *seg = sub->segs;
-    if (!seg)
+    const SectorPolygon *poly = SectorPolygonForSector((int)(sector - level_sectors));
+
+    if (!poly || poly->status != kSectorPolygonOk || poly->indices.size() < 3)
         return;
 
-    int    plane_key  = SkyHeightKey(sub->sector, nullptr);
-    size_t plane_slot = SkyPlaneSlot(sub, face, plane_key);
+    int    plane_key  = SkyHeightKey(sector, nullptr);
+    size_t plane_slot = SkyPlaneSlot(sector, face, plane_key);
 
     bool bake = !mir && plane_slot < sky_plane_baked.size();
 
     if (bake && sky_plane_baked[plane_slot])
         return;
 
-    float x0 = seg->vertex_1->X;
-    float y0 = seg->vertex_1->Y;
-    seg = seg->subsector_next;
-    if (!seg)
-        return;
-
-    float x1 = seg->vertex_1->X;
-    float y1 = seg->vertex_1->Y;
-    seg = seg->subsector_next;
-    if (!seg)
-        return;
-
     int group = MarkSkySection(sky_owner);
 
     if (bake)
     {
-        SkyCaptureBegin(group, (int)plane_slot, plane_key, sub->sector, nullptr, face ? h : -FLT_MAX,
-                        face ? FLT_MAX : h, false);
+        SkyCaptureBegin(group, (int)plane_slot, plane_key, sector, nullptr, face ? h : -FLT_MAX, face ? FLT_MAX : h,
+                        false);
 
-        SkyAddCaptureDependency(sub->sector);
+        SkyAddCaptureDependency(sector);
         SkyAddCaptureDependency(sky_owner);
-        SkyAddCaptureDependency(sub->deep_water_reference);
+        SkyAddCaptureDependency(sector->deep_water_reference);
     }
 
-
-    while (seg)
+    for (size_t i = 0; i + 2 < poly->indices.size(); i += 3)
     {
-        float x2 = seg->vertex_1->X;
-        float y2 = seg->vertex_1->Y;
+        for (int k = 0; k < 3; k++)
+        {
+            const Vertex *point = poly->points[poly->indices[i + k]];
 
-        PushSkyVertex(group, {{x0, y0, h}});
-        PushSkyVertex(group, {{x1, y1, h}});
-        PushSkyVertex(group, {{x2, y2, h}});
-
-        x1  = x2;
-        y1  = y2;
-        seg = seg->subsector_next;
+            PushSkyVertex(group, {{point->X, point->Y, h}});
+        }
     }
 
     SkyCaptureEnd();
 }
 
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir)
+void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir)
 {
     sky_current_bucket = SkyBucketFor(mir);
 
     if (!mir)
         need_to_draw_sky = true;
 
-    int    wall_key  = SkyHeightKey(seg->front_sector, seg->back_sector);
-    size_t wall_slot = SkyWallSlot(seg, part, wall_key);
+    int    wall_key  = SkyHeightKey(line_side->front_sector, line_side->back_sector);
+    size_t wall_slot = SkyWallSlot(line_side, part, wall_key);
 
-    bool bake = !mir && wall_slot < sky_wall_baked.size() && SkyWallBakeable(seg, sky_owner);
+    bool bake = !mir && wall_slot < sky_wall_baked.size() && SkyWallBakeable(line_side, sky_owner);
 
     if (bake && sky_wall_baked[wall_slot])
         return;
@@ -1075,24 +1035,18 @@ void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, Dr
 
     if (bake)
     {
-        SkyCaptureBegin(group, (int)wall_slot, wall_key, seg->front_sector, seg->back_sector, -FLT_MAX, FLT_MAX,
-                        true);
+        SkyCaptureBegin(group, (int)wall_slot, wall_key, line_side->front_sector, line_side->back_sector, -FLT_MAX,
+                        FLT_MAX, true);
 
         SkyAddCaptureDependency(sky_owner);
-        SkyAddCaptureDependency(seg->front_sector);
-        SkyAddCaptureDependency(seg->back_sector);
-
-        if (seg->front_subsector)
-            SkyAddCaptureDependency(seg->front_subsector->sector);
-
-        if (seg->back_subsector)
-            SkyAddCaptureDependency(seg->back_subsector->sector);
+        SkyAddCaptureDependency(line_side->front_sector);
+        SkyAddCaptureDependency(line_side->back_sector);
     }
 
-    float x1 = seg->vertex_1->X;
-    float y1 = seg->vertex_1->Y;
-    float x2 = seg->vertex_2->X;
-    float y2 = seg->vertex_2->Y;
+    float x1 = line_side->vertex_1->X;
+    float y1 = line_side->vertex_1->Y;
+    float x2 = line_side->vertex_2->X;
+    float y2 = line_side->vertex_2->Y;
 
     PushSkyVertex(group, {{x1, y1, h1}});
     PushSkyVertex(group, {{x1, y1, h2}});

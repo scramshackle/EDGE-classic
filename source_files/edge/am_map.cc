@@ -55,7 +55,6 @@ EDGE_DEFINE_CONSOLE_VARIABLE(automap_debug_collisions, "0", kConsoleVariableFlag
 EDGE_DEFINE_CONSOLE_VARIABLE(automap_keydoor_text, "0", kConsoleVariableFlagArchive)
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(automap_gridsize, "128", kConsoleVariableFlagArchive, 16, 1024)
 
-extern unsigned int root_node;
 
 // Automap colors
 

@@ -291,7 +291,7 @@ class plane_glow_c : public AbstractShader
     {
         EPI_UNUSED(x);
         EPI_UNUSED(y);
-        const Sector *sec = mo->subsector_->sector;
+        const Sector *sec = mo->sector_;
 
         float dist = Dist(sec, z);
 
@@ -315,7 +315,7 @@ class plane_glow_c : public AbstractShader
     {
         EPI_UNUSED(nx);
         EPI_UNUSED(ny);
-        const Sector *sec = mo->subsector_->sector;
+        const Sector *sec = mo->sector_;
 
         float dz = (mo->info_->glow_type_ == kSectorGlowTypeFloor) ? +1 : -1;
         float dist;

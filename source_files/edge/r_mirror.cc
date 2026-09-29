@@ -41,14 +41,14 @@ void InstallMirrorNearPlane(const DrawMirror *mir)
 
 static void DrawMirrorAperturePolygon(const DrawMirror *mir, bool push_to_far_plane)
 {
-    Line *ld = mir->seg->linedef;
+    Line *ld = mir->line_side->linedef;
 
-    float x1 = mir->seg->vertex_1->X;
-    float y1 = mir->seg->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->X;
+    float y1 = mir->line_side->vertex_1->Y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->seg->vertex_2->X;
-    float y2 = mir->seg->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->X;
+    float y2 = mir->line_side->vertex_2->Y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     RendererVertex quad[4];
@@ -158,7 +158,7 @@ static void DrawMirrorPolygon(DrawMirror *mir)
 {
     float alpha = 0.15 + 0.10 * mirror_view.depth;
 
-    Line *ld = mir->seg->linedef;
+    Line *ld = mir->line_side->linedef;
     EPI_ASSERT(ld);
     RGBAColor unit_col;
 
@@ -177,12 +177,12 @@ static void DrawMirrorPolygon(DrawMirror *mir)
     else
         unit_col = epi::MakeRGBA(255, 0, 0, (uint8_t)(alpha * 255.0f));
 
-    float x1 = mir->seg->vertex_1->X;
-    float y1 = mir->seg->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->X;
+    float y1 = mir->line_side->vertex_1->Y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->seg->vertex_2->X;
-    float y2 = mir->seg->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->X;
+    float y2 = mir->line_side->vertex_2->Y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
@@ -202,10 +202,10 @@ static void DrawMirrorPolygon(DrawMirror *mir)
 
 static void DrawPortalPolygon(DrawMirror *mir)
 {
-    Line *ld = mir->seg->linedef;
+    Line *ld = mir->line_side->linedef;
     EPI_ASSERT(ld);
 
-    const MapSurface *surf = &mir->seg->sidedef->middle;
+    const MapSurface *surf = &mir->line_side->sidedef->middle;
 
     if (!surf->image || !ld->special || !(ld->special->portal_effect_ & kPortalEffectTypeStandard))
     {
@@ -223,20 +223,20 @@ static void DrawPortalPolygon(DrawMirror *mir)
     epi::SetRGBAAlpha(unit_col, alpha);
 
     // get polygon coordinates
-    float x1 = mir->seg->vertex_1->X;
-    float y1 = mir->seg->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->X;
+    float y1 = mir->line_side->vertex_1->Y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->seg->vertex_2->X;
-    float y2 = mir->seg->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->X;
+    float y2 = mir->line_side->vertex_2->Y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     // get texture coordinates
     float total_w = surf->image->ScaledWidth();
     float total_h = surf->image->ScaledHeight();
 
-    float tx1 = mir->seg->offset;
-    float tx2 = tx1 + mir->seg->length;
+    float tx1 = 0.0f;
+    float tx2 = tx1 + mir->line_side->length;
 
     float ty1 = 0;
     float ty2 = (z2 - z1);
@@ -292,8 +292,8 @@ void RenderMirror(DrawMirror *mir)
     uint64_t mark      = top_level ? GetMicroseconds() : 0;
 
     // mark the line on the automap
-    if (!(mir->seg->linedef->flags & kLineFlagMapped))
-        newly_seen_lines.emplace(mir->seg->linedef);
+    if (!(mir->line_side->linedef->flags & kLineFlagMapped))
+        newly_seen_lines.emplace(mir->line_side->linedef);
 
     FinishUnitBatch();
 
@@ -332,7 +332,7 @@ void RenderMirror(DrawMirror *mir)
 
     FinishSkyForMirror(mir);
 
-    RenderSubList(mir->draw_subsectors, mir->draw_things, mir->draw_mirrors, true);
+    RenderSectorList(mir->draw_sectors, mir->draw_things, mir->draw_mirrors, true);
 
     render_backend->PopModelMatrix();
 

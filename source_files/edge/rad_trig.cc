@@ -433,7 +433,7 @@ bool ScriptRadiusCheck(MapObject *mo, RADScript *r)
     int sec_tag = r->sector_tag;
     if (sec_tag > 0)
     {
-        if (mo->subsector_->sector->tag != sec_tag)
+        if (mo->sector_->tag != sec_tag)
             return false;
         if (r->rad_z >= 0 && fabs(r->z - MapObjectMidZ(mo)) > r->rad_z + mo->height_ / 2)
             return false;
@@ -443,7 +443,7 @@ bool ScriptRadiusCheck(MapObject *mo, RADScript *r)
     int sec_ind = r->sector_index;
     if (sec_ind >= 0 && sec_ind <= total_level_sectors)
     {
-        if (mo->subsector_->sector - level_sectors != sec_ind)
+        if (mo->sector_ - level_sectors != sec_ind)
             return false;
         if (r->rad_z >= 0 && fabs(r->z - MapObjectMidZ(mo)) > r->rad_z + mo->height_ / 2)
             return false;
@@ -578,7 +578,7 @@ static bool ScriptCheckHeightTrigger(RADScriptTrigger *trig, ScriptOnHeightParam
         }
         else
         {
-            cond->cached_sector = PointInSubsector(trig->info->x, trig->info->y)->sector;
+            cond->cached_sector = PointInSector(trig->info->x, trig->info->y);
         }
     }
 

@@ -46,7 +46,6 @@ typedef HMM_Vec4 Vertex;
 
 // Forward of LineDefs, for Sectors.
 struct Line;
-struct Subsector;
 struct RegionProperties;
 
 //
@@ -312,6 +311,8 @@ struct Sector
     // touch list: objects in or touching this sector
     TouchNode *touch_things;
 
+    MapObject *thing_list;
+
     // list of sector glow things (linked via dlnext/dlprev)
     MapObject *glow_things;
 
@@ -337,8 +338,7 @@ struct Sector
     struct Sector *tag_next;
     struct Sector *tag_previous;
 
-    // -AJA- 2000/03/30: Keep a list of child subsectors.
-    struct Subsector *subsectors;
+    struct Sector *deep_water_reference;
 
     // For dynamic scroll/push/offset
     bool  old_stored;
@@ -463,37 +463,7 @@ struct Line
     bool old_stored = false;
 };
 
-//
-// SubSector.
-//
-// References a Sector.
-// Basically, this is a list of LineSegs, indicating the visible walls
-// that define all sides of a convex BSP leaf.
-//
-struct Subsector
-{
-    // link in sector list
-    Subsector *sector_next;
-
-    Sector     *sector;
-    struct Seg *segs;
-
-    // list of mobjs in subsector
-    MapObject *thing_list;
-
-    // pointer to bounding box (usually in parent node)
-    float *bounding_box;
-
-    // -AJA- 2004/04/20: used when emulating deep-water TRICK
-    Sector *deep_water_reference;
-};
-
-//
-// The LineSeg
-//
-// Defines part of a wall that faces inwards on a convex BSP leaf.
-//
-struct Seg
+struct LineSide
 {
     Vertex *vertex_1;
     Vertex *vertex_2;
@@ -502,42 +472,14 @@ struct Seg
 
     float length;
 
-    // link in subsector list.
-    // (NOTE: sorted in clockwise order)
-    struct Seg *subsector_next;
-
-    // -AJA- 1999/12/20: Reference to partner seg, or nullptr if the seg
-    //       lies along a one-sided line.
-    struct Seg *partner;
-
-    // -AJA- 1999/09/23: Reference to subsector on each side of seg,
-    //       back_sub is nullptr for one-sided segs.
-    //       (Addendum: back_sub is obsolete with new `partner' field)
-    Subsector *front_subsector;
-    Subsector *back_subsector;
-
-    // -AJA- 1999/09/23: For "True BSP rendering", we keep track of the
-    //       `minisegs' which define all the non-wall borders of the
-    //       subsector.  Thus all the segs (normal + mini) define a
-    //       closed convex polygon.  When the `miniseg' field is true,
-    //       all the fields below it are unused.
-    //
-    bool miniseg;
-
-    float offset;
-
-    Side *sidedef;
     Line *linedef;
+    Side *sidedef;
 
-    int side; // 0 for front, 1 for back
-
-    // Sector references.
-    // backsector is nullptr for one sided lines
+    int side;
 
     Sector *front_sector;
     Sector *back_sector;
 
-    // compact list of sectors touching each vertex (can be nullptr)
     VertexSectorList *vertex_sectors[2];
 };
 
@@ -548,21 +490,6 @@ struct DividingLine
     float y;
     float delta_x;
     float delta_y;
-};
-
-//
-// BSP node.
-//
-struct BSPNode
-{
-    DividingLine divider;
-    float        divider_length;
-
-    // bit kLeafSubsector set for a subsector.
-    unsigned int children[2];
-
-    // Bounding boxes for this node.
-    float bounding_boxes[2][4];
 };
 
 struct SectorAnimation

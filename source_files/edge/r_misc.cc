@@ -47,12 +47,12 @@
 #include "r_draw.h"
 #include "r_gldefs.h"
 #include "r_modes.h"
+#include "r_polygon.h"
 #include "r_shader.h"
 #include "r_units.h"
 
 EDGE_DEFINE_CONSOLE_VARIABLE(field_of_view, "90", kConsoleVariableFlagArchive)
 
-extern unsigned int root_node;
 
 int view_window_x;
 int view_window_y;
@@ -76,7 +76,7 @@ int valid_count = 1;
 int render_frame_count;
 int line_count;
 
-Subsector        *view_subsector;
+Sector           *view_sector;
 RegionProperties *view_properties;
 
 float view_x;
@@ -211,39 +211,46 @@ void RendererShutdown(void)
     DeleteAllImages(true);
 }
 
-Subsector *PointInSubsector(float x, float y)
+Sector *PointInSector(float x, float y)
 {
-    BSPNode     *node;
-    int          side;
-    unsigned int nodenum;
+    int index = SectorPolygonAtPoint(x, y, -1);
 
-    nodenum = root_node;
+    if (index >= 0)
+        return level_sectors + index;
 
-    while (!(nodenum & kLeafSubsector))
-    {
-        node    = &level_nodes[nodenum];
-        side    = PointOnDividingLineSide(x, y, &node->divider);
-        nodenum = node->children[side];
-    }
+    Line *ld = BlockmapNearestLine(x, y);
 
-    return &level_subsectors[nodenum & ~kLeafSubsector];
+    if (!ld)
+        return level_sectors;
+
+    DividingLine div;
+
+    div.x       = ld->vertex_1->X;
+    div.y       = ld->vertex_1->Y;
+    div.delta_x = ld->delta_x;
+    div.delta_y = ld->delta_y;
+
+    if (PointOnDividingLineSide(x, y, &div) == 1 && ld->back_sector)
+        return ld->back_sector;
+
+    return ld->front_sector;
 }
 
-RegionProperties *GetPointProperties(Subsector *sub, float z)
+RegionProperties *GetPointProperties(Sector *sector, float z)
 {
-    if (sub->sector->height_sector)
+    if (sector->height_sector)
     {
-        if (view_height_zone == kHeightZoneA && view_z > sub->sector->height_sector->interpolated_ceiling_height)
+        if (view_height_zone == kHeightZoneA && view_z > sector->height_sector->interpolated_ceiling_height)
         {
-            return sub->sector->height_sector->active_properties;
+            return sector->height_sector->active_properties;
         }
-        else if (view_height_zone == kHeightZoneC && view_z < sub->sector->height_sector->interpolated_floor_height)
+        else if (view_height_zone == kHeightZoneC && view_z < sector->height_sector->interpolated_floor_height)
         {
-            return sub->sector->height_sector->active_properties;
+            return sector->height_sector->active_properties;
         }
         else
         {
-            return sub->sector->active_properties;
+            return sector->active_properties;
         }
     }
     else
@@ -252,10 +259,10 @@ RegionProperties *GetPointProperties(Subsector *sub, float z)
         float       floor_h;
         // traverse extrafloors upwards
 
-        floor_h = sub->sector->floor_height;
+        floor_h = sector->floor_height;
 
-        S = sub->sector->bottom_extrafloor;
-        L = sub->sector->bottom_liquid;
+        S = sector->bottom_extrafloor;
+        L = sector->bottom_liquid;
 
         while (S || L)
         {
@@ -275,7 +282,7 @@ RegionProperties *GetPointProperties(Subsector *sub, float z)
             // ignore liquids in the middle of THICK solids, or below real
             // floor or above real ceiling
             //
-            if (C->bottom_height < floor_h || C->bottom_height > sub->sector->ceiling_height)
+            if (C->bottom_height < floor_h || C->bottom_height > sector->ceiling_height)
                 continue;
 
             if (z < C->top_height)
@@ -285,29 +292,26 @@ RegionProperties *GetPointProperties(Subsector *sub, float z)
         }
 
         // extrafloors were exhausted, must be top area
-        return sub->sector->active_properties;
+        return sector->active_properties;
     }
 }
 
 //----------------------------------------------------------------------------
 
 // large buffers for cache coherency vs allocating each on heap
-static constexpr uint32_t kDefaultDrawThings     = 65536;
-static constexpr uint32_t kDefaultDrawFloors     = 65536;
-static constexpr uint32_t kDefaultDrawSegs       = 65536;
-static constexpr uint32_t kDefaultDrawSubsectors = 65536;
-static constexpr uint32_t kDefaultDrawMirrors    = 512;
+static constexpr uint32_t kDefaultDrawThings  = 65536;
+static constexpr uint32_t kDefaultDrawFloors  = 65536;
+static constexpr uint32_t kDefaultDrawSectors = 65536;
+static constexpr uint32_t kDefaultDrawMirrors = 512;
 
-static std::vector<DrawThing *>     draw_things;
-static std::vector<DrawFloor *>     draw_floors;
-static std::vector<DrawSeg *>       draw_segs;
-static std::vector<DrawSubsector *> draw_subsectors;
-static std::vector<DrawMirror *>    draw_mirrors;
+static std::vector<DrawThing *>  draw_things;
+static std::vector<DrawFloor *>  draw_floors;
+static std::vector<DrawSector *> draw_sectors;
+static std::vector<DrawMirror *> draw_mirrors;
 
 static size_t draw_thing_position;
 static size_t draw_floor_position;
-static size_t draw_seg_position;
-static size_t draw_subsector_position;
+static size_t draw_sector_position;
 static size_t draw_mirror_position;
 
 static void *draw_memory_buffer = nullptr;
@@ -323,15 +327,13 @@ void AllocateDrawStructs(void)
 
     size_t size = sizeof(DrawThing) * kDefaultDrawThings;
     size += sizeof(DrawFloor) * kDefaultDrawFloors;
-    size += sizeof(DrawSeg) * kDefaultDrawSegs;
-    size += sizeof(DrawSubsector) * kDefaultDrawSubsectors;
+    size += sizeof(DrawSector) * kDefaultDrawSectors;
     size += sizeof(DrawMirror) * kDefaultDrawMirrors;
     size += sizeof(AutomapLine) * kDefaultAutomapLines;
 
     draw_things.reserve(kDefaultDrawThings);
     draw_floors.reserve(kDefaultDrawFloors);
-    draw_segs.reserve(kDefaultDrawSegs);
-    draw_subsectors.reserve(kDefaultDrawSubsectors);
+    draw_sectors.reserve(kDefaultDrawSectors);
     draw_mirrors.reserve(kDefaultDrawMirrors);
     automap_lines.reserve(kDefaultAutomapLines);
 
@@ -349,14 +351,9 @@ void AllocateDrawStructs(void)
         draw_floors.emplace_back(new (dst) DrawFloor());
     }
 
-    for (uint32_t i = 0; i < kDefaultDrawSegs; i++, dst += sizeof(DrawSeg))
+    for (uint32_t i = 0; i < kDefaultDrawSectors; i++, dst += sizeof(DrawSector))
     {
-        draw_segs.emplace_back(new (dst) DrawSeg());
-    }
-
-    for (uint32_t i = 0; i < kDefaultDrawSubsectors; i++, dst += sizeof(DrawSubsector))
-    {
-        draw_subsectors.emplace_back(new (dst) DrawSubsector());
+        draw_sectors.emplace_back(new (dst) DrawSector());
     }
 
     for (uint32_t i = 0; i < kDefaultDrawMirrors; i++, dst += sizeof(DrawMirror))
@@ -374,11 +371,10 @@ void AllocateDrawStructs(void)
 
 void ClearBSP(void)
 {
-    draw_thing_position     = 0;
-    draw_floor_position     = 0;
-    draw_seg_position       = 0;
-    draw_subsector_position = 0;
-    draw_mirror_position    = 0;
+    draw_thing_position  = 0;
+    draw_floor_position  = 0;
+    draw_sector_position = 0;
+    draw_mirror_position = 0;
 }
 
 void FreeBSP(void)
@@ -399,21 +395,13 @@ void FreeBSP(void)
     {
         delete draw_floors[i];
     }
-    for (size_t i = 0; i < kDefaultDrawSegs; i++)
+    for (size_t i = 0; i < kDefaultDrawSectors; i++)
     {
-        draw_segs[i]->~DrawSeg();
+        draw_sectors[i]->~DrawSector();
     }
-    for (size_t i = kDefaultDrawSegs; i < draw_segs.size(); i++)
+    for (size_t i = kDefaultDrawSectors; i < draw_sectors.size(); i++)
     {
-        delete draw_segs[i];
-    }
-    for (size_t i = 0; i < kDefaultDrawSubsectors; i++)
-    {
-        draw_subsectors[i]->~DrawSubsector();
-    }
-    for (size_t i = kDefaultDrawSubsectors; i < draw_subsectors.size(); i++)
-    {
-        delete draw_subsectors[i];
+        delete draw_sectors[i];
     }
     for (size_t i = 0; i < kDefaultDrawMirrors; i++)
     {
@@ -434,8 +422,7 @@ void FreeBSP(void)
 
     draw_things.clear();
     draw_floors.clear();
-    draw_segs.clear();
-    draw_subsectors.clear();
+    draw_sectors.clear();
     draw_mirrors.clear();
     automap_lines.clear();
 
@@ -464,20 +451,12 @@ DrawFloor *GetDrawFloor()
     return draw_floors[draw_floor_position++];
 }
 
-DrawSeg *GetDrawSeg()
+DrawSector *GetDrawSector()
 {
-    if (draw_seg_position == draw_segs.size())
-        draw_segs.push_back(new DrawSeg());
+    if (draw_sector_position == draw_sectors.size())
+        draw_sectors.push_back(new DrawSector());
 
-    return draw_segs[draw_seg_position++];
-}
-
-DrawSubsector *GetDrawSub()
-{
-    if (draw_subsector_position == draw_subsectors.size())
-        draw_subsectors.push_back(new DrawSubsector());
-
-    return draw_subsectors[draw_subsector_position++];
+    return draw_sectors[draw_sector_position++];
 }
 
 DrawMirror *GetDrawMirror()

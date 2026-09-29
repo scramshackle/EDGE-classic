@@ -9,7 +9,6 @@ set (EDGE_SOURCE_FILES
   i_sound.cc
   am_map.cc
   bot_nav.cc
-  bsp.cc
   bot_think.cc
   con_con.cc
   con_main.cc

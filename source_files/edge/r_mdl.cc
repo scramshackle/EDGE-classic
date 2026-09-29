@@ -874,7 +874,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
             FatalError("MDL Frame %s missing skins?\n", md->frames_[frame1].name);
 
         AbstractShader *shader =
-            GetColormapShader(props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->subsector_->sector);
+            GetColormapShader(props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->sector_);
 
         ShadeNormals(shader, &data, true);
 
@@ -925,12 +925,12 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
     int num_pass = (!data.is_fuzzy_ && MDLMulticolorMaximumRGB(&data, true) > 0) ? 2 : 1;
 
-    RGBAColor fc_to_use = mo->subsector_->sector->properties.fog_color;
-    float     fd_to_use = mo->subsector_->sector->properties.fog_density;
+    RGBAColor fc_to_use = mo->sector_->properties.fog_color;
+    float     fd_to_use = mo->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
     {
-        if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling))
+        if (EDGE_IMAGE_IS_SKY(mo->sector_->ceiling))
         {
             fc_to_use = current_map->outdoor_fog_color_;
             fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -1070,7 +1070,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
         info.world_lit = use_dynamic_lights && render_view_extra_light < 250 && !data.is_fuzzy_;
 
-        info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->subsector_->sector) : -1;
+        info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
 
         info.frame1 = frame1;
         info.frame2 = frame2;

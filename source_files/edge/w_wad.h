@@ -108,10 +108,7 @@ bool IsLumpInAnyWad(const char *name);
 // Returns index into game_checker vector if valid game found, else -1
 int CheckForUniqueGameLumps(epi::File *file);
 
-void BuildLevelNodes(void);
 void ReadUMAPINFOLumps(void);
-
-const std::string &GetNodeCachePathForLump(int lump);
 
 int GetKindForLump(int lump);
 

@@ -56,8 +56,8 @@ void FinishSky(bool use_depth_mask);
 
 void FinishSkyForMirror(const DrawMirror *mir);
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face, DrawMirror *mir);
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);
+void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMirror *mir);
+void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);
 
 void UpdateSkyboxTextures(void);
 
@@ -74,10 +74,7 @@ void SkyResidentInvalidateSector(Sector *sec);
 
 bool SkyResidentEnabled(void);
 
-bool SkyWallBakeable(const Seg *seg, const Sector *sky_owner);
-
-bool SkyPlaneIsBaked(const Subsector *sub, int face);
-bool SkyWallIsBaked(const Seg *seg, int part);
+bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

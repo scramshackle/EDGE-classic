@@ -90,6 +90,11 @@ void GenerateBlockmap(int min_x, int min_y, int max_x, int max_y);
 
 bool BlockmapLineIterator(float x1, float y1, float x2, float y2, bool (*func)(Line *, void *), void *data = nullptr);
 
+Line *BlockmapNearestLine(float x, float y);
+
+bool BlockmapSegmentLineIterator(float x1, float y1, float x2, float y2, bool (*func)(Line *, void *),
+                                 void *data = nullptr);
+
 bool BlockmapThingIterator(float x1, float y1, float x2, float y2, bool (*func)(MapObject *, void *),
                            void *data = nullptr);
 

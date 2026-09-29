@@ -44,25 +44,16 @@
 extern int     total_level_vertexes;
 extern Vertex *level_vertexes;
 
-extern Vertex *level_gl_vertexes;
-
-extern int  total_level_segs;
-extern Seg *level_segs;
-
 extern int     total_level_sectors;
 extern Sector *level_sectors;
-
-extern int        total_level_subsectors;
-extern Subsector *level_subsectors;
 
 extern int         total_level_extrafloors;
 extern Extrafloor *level_extrafloors;
 
-extern int      total_level_nodes;
-extern BSPNode *level_nodes;
-
 extern int   total_level_lines;
 extern Line *level_lines;
+
+extern LineSide *level_line_sides;
 
 extern int   total_level_sides;
 extern Side *level_sides;

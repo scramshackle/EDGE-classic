@@ -58,9 +58,9 @@ class MirrorSet
         return active_mirrors_[index].draw_mirror_->is_portal;
     }
 
-    Seg *GetSeg(int32_t index)
+    LineSide *GetLineSide(int32_t index)
     {
-        return active_mirrors_[index].draw_mirror_->seg;
+        return active_mirrors_[index].draw_mirror_->line_side;
     }
 
     int32_t TotalActive()
@@ -128,33 +128,30 @@ class MirrorSet
 
         return result;
     }
-    bool SegOnPortal(const Seg *seg)
+    bool LineSideOnPortal(const LineSide *line_side)
     {
         if (active_ == 0)
-            return false;
-
-        if (seg->miniseg)
             return false;
 
         const DrawMirror *def = active_mirrors_[active_ - 1].draw_mirror_;
 
         if (def->is_portal)
         {
-            if (seg->linedef == def->seg->linedef->portal_pair)
+            if (line_side->linedef == def->line_side->linedef->portal_pair)
                 return true;
         }
         else // mirror
         {
-            if (seg->linedef == def->seg->linedef)
+            if (line_side->linedef == def->line_side->linedef)
                 return true;
         }
 
         return false;
     }
 
-    void PushSubsector(int32_t index, DrawSubsector *subsector)
+    void PushSector(int32_t index, DrawSector *sector)
     {
-        active_mirrors_[index].draw_mirror_->draw_subsectors.push_back(subsector);
+        active_mirrors_[index].draw_mirror_->draw_sectors.push_back(sector);
     }
 
     void PushThing(int32_t index, DrawThing *thing)
@@ -170,7 +167,7 @@ class MirrorSet
     void Push(DrawMirror *mir)
     {
         EPI_ASSERT(mir);
-        EPI_ASSERT(mir->seg);
+        EPI_ASSERT(mir->line_side);
 
         EPI_ASSERT(active_ < kMaximumMirrors);
 
@@ -214,12 +211,12 @@ class MirrorSet
 
         void ComputeMirror()
         {
-            Seg *seg = draw_mirror_->seg;
+            LineSide *line_side = draw_mirror_->line_side;
 
-            float sdx = seg->vertex_2->X - seg->vertex_1->X;
-            float sdy = seg->vertex_2->Y - seg->vertex_1->Y;
+            float sdx = line_side->vertex_2->X - line_side->vertex_1->X;
+            float sdy = line_side->vertex_2->Y - line_side->vertex_1->Y;
 
-            float len_p2 = seg->length * seg->length;
+            float len_p2 = line_side->length * line_side->length;
 
             float A = (sdx * sdx - sdy * sdy) / len_p2;
             float B = (sdx * sdy * 2.0) / len_p2;
@@ -229,10 +226,10 @@ class MirrorSet
             yx_ = B;
             yy_ = -A;
 
-            xc_ = seg->vertex_1->X * (1.0 - A) - seg->vertex_1->Y * B;
-            yc_ = seg->vertex_1->Y * (1.0 + A) - seg->vertex_1->X * B;
+            xc_ = line_side->vertex_1->X * (1.0 - A) - line_side->vertex_1->Y * B;
+            yc_ = line_side->vertex_1->Y * (1.0 + A) - line_side->vertex_1->X * B;
 
-            tc_ = seg->angle << 1;
+            tc_ = line_side->angle << 1;
 
             zc_       = 0;
             z_scale_  = 1.0f;
@@ -249,20 +246,20 @@ class MirrorSet
 
         void ComputePortal()
         {
-            Seg  *seg   = draw_mirror_->seg;
-            Line *other = seg->linedef->portal_pair;
+            LineSide *line_side = draw_mirror_->line_side;
+            Line     *other     = line_side->linedef->portal_pair;
 
             EPI_ASSERT(other);
 
-            float ax1 = seg->vertex_1->X;
-            float ay1 = seg->vertex_1->Y;
+            float ax1 = line_side->vertex_1->X;
+            float ay1 = line_side->vertex_1->Y;
 
-            float ax2 = seg->vertex_2->X;
-            float ay2 = seg->vertex_2->Y;
+            float ax2 = line_side->vertex_2->X;
+            float ay2 = line_side->vertex_2->Y;
 
             // find corresponding coords on partner line
-            float along1 = GetAlong(seg->linedef, ax1, ay1);
-            float along2 = GetAlong(seg->linedef, ax2, ay2);
+            float along1 = GetAlong(line_side->linedef, ax1, ay1);
+            float along2 = GetAlong(line_side->linedef, ax2, ay2);
 
             float bx1 = other->vertex_2->X - other->delta_x * along1;
             float by1 = other->vertex_2->Y - other->delta_y * along1;
@@ -271,7 +268,7 @@ class MirrorSet
             float by2 = other->vertex_2->Y - other->delta_y * along2;
 
             // compute rotation angle
-            tc_ = kBAMAngle180 + PointToAngle(0, 0, other->delta_x, other->delta_y) - seg->angle;
+            tc_ = kBAMAngle180 + PointToAngle(0, 0, other->delta_x, other->delta_y) - line_side->angle;
 
             xx_ = epi::BAMCos(tc_);
             xy_ = epi::BAMSin(tc_);
@@ -279,7 +276,7 @@ class MirrorSet
             yy_ = epi::BAMCos(tc_);
 
             // scaling
-            float a_len = seg->length;
+            float a_len = line_side->length;
             float b_len = PointToDistance(bx1, by1, bx2, by2);
 
             xy_scale_ = a_len / HMM_MAX(1, b_len);
@@ -294,12 +291,13 @@ class MirrorSet
             yc_ = ay1 - bx1 * yx_ - by1 * yy_;
 
             // heights
-            float a_h = (seg->front_sector->interpolated_ceiling_height - seg->front_sector->interpolated_floor_height);
+            float a_h = (line_side->front_sector->interpolated_ceiling_height -
+                         line_side->front_sector->interpolated_floor_height);
             float b_h =
                 (other->front_sector->interpolated_ceiling_height - other->front_sector->interpolated_floor_height);
 
             z_scale_ = a_h / HMM_MAX(1, b_h);
-            zc_      = seg->front_sector->interpolated_floor_height -
+            zc_      = line_side->front_sector->interpolated_floor_height -
                   other->front_sector->interpolated_floor_height * z_scale_;
         }
 
@@ -404,8 +402,8 @@ class MirrorSet
 
         HMM_Vec2 v1, v2;
 
-        v1 = {{inner.draw_mirror_->seg->vertex_1->X, inner.draw_mirror_->seg->vertex_1->Y}};
-        v2 = {{inner.draw_mirror_->seg->vertex_2->X, inner.draw_mirror_->seg->vertex_2->Y}};
+        v1 = {{inner.draw_mirror_->line_side->vertex_1->X, inner.draw_mirror_->line_side->vertex_1->Y}};
+        v2 = {{inner.draw_mirror_->line_side->vertex_2->X, inner.draw_mirror_->line_side->vertex_2->Y}};
 
         for (int k = active_ - 2; k >= 0; k--)
         {
