@@ -673,6 +673,29 @@ static void P_SpawnLineEffectDebris(Line *TheLine, const LineType *special)
     SpawnDebris(midx, midy, midz, 0 + kBAMAngle180, info);
 }
 
+static void P_SkyTransfer(Line *source, int tag, const LineType *special)
+{
+    // Lobo 2022: experimental partial sky transfer support
+    if ((special->line_effect_ & (kLineEffectTypeSkyTransfer | kLineEffectTypeSkyTransferFlipped)) && source->side[0])
+    {
+        if (source->side[0]->top.image)
+        {
+            const Image *transfer_sky = ImageLookup(source->side[0]->top.image->name_.c_str(), kImageNamespaceTexture);
+            MapSurface  *transfer_ref = &source->side[0]->top;
+
+            for (Sector *tsec = FindSectorFromTag(tag); tsec != nullptr; tsec = tsec->tag_next)
+            {
+                tsec->sky_image   = transfer_sky;
+                MarkImageAsSky(transfer_sky);
+                tsec->sky_ref     = transfer_ref;
+                tsec->sky_flipped = (special->line_effect_ & kLineEffectTypeSkyTransferFlipped) != 0;
+            }
+
+            ComputeSkyHeights();
+        }
+    }
+}
+
 //
 // Handles BOOM's line -> tagged line transfers.
 //
@@ -848,25 +871,6 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
     {
         AdjustLightParts(target->side[0], 0, special->line_parts_, &source->front_sector->properties);
         AdjustLightParts(target->side[1], 1, special->line_parts_, &source->front_sector->properties);
-    }
-
-    // Lobo 2022: experimental partial sky transfer support
-    if ((special->line_effect_ & kLineEffectTypeSkyTransfer) && source->side[0])
-    {
-        if (source->side[0]->top.image)
-        {
-            const Image *transfer_sky = ImageLookup(source->side[0]->top.image->name_.c_str(), kImageNamespaceTexture);
-            MapSurface  *transfer_ref = &source->side[0]->top;
-
-            for (Sector *tsec = FindSectorFromTag(target->tag); tsec != nullptr; tsec = tsec->tag_next)
-            {
-                tsec->sky_image = transfer_sky;
-                MarkImageAsSky(transfer_sky);
-                tsec->sky_ref   = transfer_ref;
-            }
-
-            ComputeSkyHeights();
-        }
     }
 
     // experimental: stretch wall texture(s) by line length
@@ -1672,6 +1676,12 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
     // Tagged line effects
     if (line && special->line_effect_)
     {
+        if (special->line_effect_ & (kLineEffectTypeSkyTransfer | kLineEffectTypeSkyTransferFlipped))
+        {
+            P_SkyTransfer(line, tag, special);
+            texSwitch = true;
+        }
+
         if (!tag)
         {
             P_LineEffect(line, line, special);

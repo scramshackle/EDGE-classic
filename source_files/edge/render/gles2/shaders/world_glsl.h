@@ -218,7 +218,7 @@ static const char kWorldFragmentSource[] =
     "    {\n"
     "        vec4 averaged = vec4(0.0);\n"
     "\n"
-    "        float average_span = min(u_sky_u_scale, 1.0);\n"
+    "        float average_span = min(abs(u_sky_u_scale), 1.0);\n"
     "\n"
     "        for (int i = 0; i < kSkyPinchTaps; i++)\n"
     "        {\n"

@@ -46,3 +46,11 @@ const char *SectorPolygonStatusName(int status);
 void SectorPolygonReport(void);
 
 int SectorPolygonAtPoint(float x, float y, int exclude_sector);
+
+struct SectorPolygonContainment
+{
+    int owner;
+    int container;
+};
+
+const std::vector<SectorPolygonContainment> &SectorPolygonSelfReferenceContainers(void);

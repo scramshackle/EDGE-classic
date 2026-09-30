@@ -506,6 +506,7 @@ enum LineEffectType
     kLineEffectTypeBlockPlayers  = (1 << 12),
     kLineEffectTypeStretchWidth  = (1 << 13), // stretch the texture horizontally to line length
     kLineEffectTypeStretchHeight = (1 << 14), // stretch the texture vertically to line length
+    kLineEffectTypeSkyTransferFlipped = (1 << 15),
 };
 
 enum SectorEffectType

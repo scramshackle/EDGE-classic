@@ -63,8 +63,6 @@ static int      ddf_scroll_tic     = -1;
 
 SkyStretch current_sky_stretch = kSkyStretchUnset;
 
-static constexpr uint8_t kMBFSkyYShift = 28;
-
 EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 2);
 
 struct SectorSkyRing
@@ -93,6 +91,50 @@ struct SectorSkyRing
 // compute the maximal height of the group as we go.
 //
 static void SkyResidentReset(void);
+
+static void MergeSkyRings(SectorSkyRing *ring1, SectorSkyRing *ring2)
+{
+    SectorSkyRing *tmp_R;
+
+    // we require sky on both sides
+    if (ring1->group == 0 || ring2->group == 0)
+        return;
+
+    // already in the same group ?
+    if (ring1->group == ring2->group)
+        return;
+
+    // swap sectors to ensure the lower group is added to the higher
+    // group, since we don't need to update the `max_h' fields of the
+    // highest group.
+
+    if (ring1->maximum_height < ring2->maximum_height)
+    {
+        tmp_R = ring1;
+        ring1 = ring2;
+        ring2 = tmp_R;
+    }
+
+    // update the group numbers in the second group
+
+    ring2->group          = ring1->group;
+    ring2->maximum_height = ring1->maximum_height;
+
+    for (tmp_R = ring2->next; tmp_R != ring2; tmp_R = tmp_R->next)
+    {
+        tmp_R->group          = ring1->group;
+        tmp_R->maximum_height = ring1->maximum_height;
+    }
+
+    // merge 'em baby...
+
+    ring1->next->previous = ring2;
+    ring2->next->previous = ring1;
+
+    tmp_R       = ring1->next;
+    ring1->next = ring2->next;
+    ring2->next = tmp_R;
+}
 
 void ComputeSkyHeights(void)
 {
@@ -126,7 +168,7 @@ void ComputeSkyHeights(void)
     for (i = 0, ld = level_lines; i < total_level_lines; i++, ld++)
     {
         const Sector  *sec1, *sec2;
-        SectorSkyRing *ring1, *ring2, *tmp_R;
+        SectorSkyRing *ring1, *ring2;
 
         if (!ld->side[0] || !ld->side[1])
             continue;
@@ -142,44 +184,18 @@ void ComputeSkyHeights(void)
         ring1 = rings + (sec1 - level_sectors);
         ring2 = rings + (sec2 - level_sectors);
 
-        // we require sky on both sides
-        if (ring1->group == 0 || ring2->group == 0)
+        MergeSkyRings(ring1, ring2);
+    }
+
+    const std::vector<SectorPolygonContainment> &containers = SectorPolygonSelfReferenceContainers();
+
+    for (size_t k = 0; k < containers.size(); k++)
+    {
+        if (containers[k].owner < 0 || containers[k].owner >= total_level_sectors || containers[k].container < 0 ||
+            containers[k].container >= total_level_sectors)
             continue;
 
-        // already in the same group ?
-        if (ring1->group == ring2->group)
-            continue;
-
-        // swap sectors to ensure the lower group is added to the higher
-        // group, since we don't need to update the `max_h' fields of the
-        // highest group.
-
-        if (ring1->maximum_height < ring2->maximum_height)
-        {
-            tmp_R = ring1;
-            ring1 = ring2;
-            ring2 = tmp_R;
-        }
-
-        // update the group numbers in the second group
-
-        ring2->group          = ring1->group;
-        ring2->maximum_height = ring1->maximum_height;
-
-        for (tmp_R = ring2->next; tmp_R != ring2; tmp_R = tmp_R->next)
-        {
-            tmp_R->group          = ring1->group;
-            tmp_R->maximum_height = ring1->maximum_height;
-        }
-
-        // merge 'em baby...
-
-        ring1->next->previous = ring2;
-        ring2->next->previous = ring1;
-
-        tmp_R       = ring1->next;
-        ring1->next = ring2->next;
-        ring2->next = tmp_R;
+        MergeSkyRings(rings + containers[k].owner, rings + containers[k].container);
     }
 
     // --- now store the results, and free up ---
@@ -275,8 +291,9 @@ struct SkySpanReference
 
 struct SkySection
 {
-    const Image *image = nullptr;
-    MapSurface  *ref   = nullptr;
+    const Image *image   = nullptr;
+    MapSurface  *ref     = nullptr;
+    bool         flipped = false;
 
     std::vector<RendererVertex> vertices;
 
@@ -350,8 +367,17 @@ static constexpr int kMaximumSkyDependencies = 8;
 static int sky_capture_dependencies[kMaximumSkyDependencies];
 static int sky_capture_dependency_count = 0;
 
+static uint32_t sky_resident_generation = 0;
+
+uint32_t SkyResidentGeneration(void)
+{
+    return sky_resident_generation;
+}
+
 static void SkyResidentReset(void)
 {
+    sky_resident_generation++;
+
     for (size_t i = 0; i < sky_sections.size(); i++)
     {
         if (sky_sections[i].gpu_handle)
@@ -540,12 +566,13 @@ static void PushSkyVertex(int section, const HMM_Vec3 &position)
 
 static int MarkSkySection(Sector *sky_owner)
 {
-    const Image *image = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
-    MapSurface  *ref   = sky_owner ? sky_owner->sky_ref : nullptr;
+    const Image *image   = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
+    MapSurface  *ref     = sky_owner ? sky_owner->sky_ref : nullptr;
+    bool         flipped = ref && sky_owner->sky_flipped;
 
     for (size_t i = 0; i < sky_sections.size(); i++)
     {
-        if (sky_sections[i].image == image && sky_sections[i].ref == ref)
+        if (sky_sections[i].image == image && sky_sections[i].ref == ref && sky_sections[i].flipped == flipped)
         {
             sky_sections[i].used = true;
             return (int)i;
@@ -554,9 +581,10 @@ static int MarkSkySection(Sector *sky_owner)
 
     SkySection section;
 
-    section.image = image;
-    section.ref   = ref;
-    section.used  = true;
+    section.image   = image;
+    section.ref     = ref;
+    section.flipped = flipped;
+    section.used    = true;
 
     sky_sections.push_back(section);
 
@@ -720,15 +748,25 @@ static void RenderSkyEquirect(const SkySection &section)
     float offx = 0.0f;
     float offy = 0.0f;
 
+    float sky_rotation = 0.0f;
+
     if (sky_ref)
     {
-        if (!epi::AlmostEquals(sky_ref->old_offset.Y, sky_ref->offset.Y) && !console_active && !paused &&
-            !menu_active && !time_stop_active && !erraticism_active)
-            offy = HMM_Lerp(sky_ref->old_offset.Y, fractional_tic, sky_ref->offset.Y) - kMBFSkyYShift;
+        bool sky_ref_frozen = console_active || paused || menu_active || time_stop_active || erraticism_active;
+
+        if (!epi::AlmostEquals(sky_ref->old_offset.Y, sky_ref->offset.Y) && !sky_ref_frozen)
+            offy = HMM_Lerp(sky_ref->old_offset.Y, fractional_tic, sky_ref->offset.Y) - sky_ref->base_offset.Y;
         else
-            offy = sky_ref->offset.Y - kMBFSkyYShift;
+            offy = sky_ref->offset.Y - sky_ref->base_offset.Y;
 
         offy /= sky_image->ScaledHeight();
+
+        if (!epi::AlmostEquals(sky_ref->old_offset.X, sky_ref->offset.X) && !sky_ref_frozen)
+            sky_rotation = HMM_Lerp(sky_ref->old_offset.X, fractional_tic, sky_ref->offset.X);
+        else
+            sky_rotation = sky_ref->offset.X;
+
+        sky_rotation /= 65536.0f;
     }
     else
     {
@@ -759,7 +797,16 @@ static void RenderSkyEquirect(const SkySection &section)
     float sky_horizontal_tilings = 4.0f;
 
     if (sky_image->ScaledWidth() > 256)
-        sky_horizontal_tilings = HMM_MAX(1024.0f / (float)sky_image->ScaledWidth(), 1.0f);
+        sky_horizontal_tilings = HMM_MAX(roundf(1024.0f / (float)sky_image->ScaledWidth()), 1.0f);
+
+    float sky_u_scale  = -sky_horizontal_tilings;
+    float sky_u_offset = (0.75f - sky_rotation) * sky_horizontal_tilings - offx;
+
+    if (section.flipped)
+    {
+        sky_u_scale  = sky_horizontal_tilings;
+        sky_u_offset = offx + (sky_rotation - 0.75f) * sky_horizontal_tilings;
+    }
 
     float horizon_shift = -0.15f;
 
@@ -776,8 +823,8 @@ static void RenderSkyEquirect(const SkySection &section)
     sky_pass_info.viewport_size      = {{(float)view_window_width, (float)view_window_height}};
     sky_pass_info.stretch_mode       = (int)current_sky_stretch;
     sky_pass_info.ty                 = ty;
-    sky_pass_info.u_scale            = sky_horizontal_tilings;
-    sky_pass_info.u_offset           = offx;
+    sky_pass_info.u_scale            = sky_u_scale;
+    sky_pass_info.u_offset           = sky_u_offset;
     sky_pass_info.v_offset           = offy;
     sky_pass_info.fog_depth          = renderer_far_clip.f_ * 2.0f;
     sky_pass_info.vertical_fov_slope = view_y_slope;
@@ -928,6 +975,7 @@ void FinishSkyForMirror(const DrawMirror *mir)
 
         view_section.image    = section.image;
         view_section.ref      = section.ref;
+        view_section.flipped  = section.flipped;
         view_section.vertices = bucket->section_vertices[i];
 
         sky_current_section = (int)i;

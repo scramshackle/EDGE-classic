@@ -72,6 +72,8 @@ void ShutdownSky(void);
 
 void SkyResidentInvalidateSector(Sector *sec);
 
+uint32_t SkyResidentGeneration(void);
+
 bool SkyResidentEnabled(void);
 
 void SkyNoteResidentVisible(void);

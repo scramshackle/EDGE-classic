@@ -152,7 +152,7 @@ vec4 SampleEquirectSky()
     {
         vec4 averaged = vec4(0.0);
 
-        float average_span = min(u_sky_u_scale, 1.0);
+        float average_span = min(abs(u_sky_u_scale), 1.0);
 
         for (int i = 0; i < kSkyPinchTaps; i++)
         {

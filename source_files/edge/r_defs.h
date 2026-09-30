@@ -321,6 +321,7 @@ struct Sector
 
     const Image *sky_image;
     MapSurface  *sky_ref;
+    bool         sky_flipped;
 
     // keep track of vertical sight gaps within the sector.  This is
     // just a much more convenient form of the info in the extrafloor

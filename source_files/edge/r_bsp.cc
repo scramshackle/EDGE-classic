@@ -599,6 +599,7 @@ static std::vector<uint32_t>         sky_sector_done;
 static std::vector<uint64_t>         sky_line_side_done;
 static const Sector                 *sky_candidate_base       = nullptr;
 static uint32_t                      sky_candidate_generation = 0;
+static uint32_t                      sky_candidate_resident   = 0;
 static int                           sky_candidate_countdown  = 0;
 
 static constexpr int kSkyCandidateRescanFrames = 64;
@@ -618,7 +619,8 @@ static uint8_t SectorSkyFlag(const Sector *sec)
 
 static void RefreshSkyCandidates(void)
 {
-    bool changed = (sky_candidate_base != level_sectors || (int)sky_sector_flags.size() != total_level_sectors);
+    bool changed = (sky_candidate_base != level_sectors || (int)sky_sector_flags.size() != total_level_sectors ||
+                    sky_candidate_resident != SkyResidentGeneration());
 
     if (!changed && sky_candidate_generation == StaticGeometryGeneration() && sky_candidate_countdown > 0)
     {
@@ -631,7 +633,8 @@ static void RefreshSkyCandidates(void)
 
     if (changed)
     {
-        sky_candidate_base = level_sectors;
+        sky_candidate_base     = level_sectors;
+        sky_candidate_resident = SkyResidentGeneration();
         sky_sector_flags.assign((size_t)total_level_sectors, 0);
     }
 

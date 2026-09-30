@@ -785,9 +785,10 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
             {
                 for (int i = 0; i < total_level_sectors; i++)
                 {
-                    level_sectors[i].sky_image = image;
+                    level_sectors[i].sky_image   = image;
                     MarkImageAsSky(image);
-                    level_sectors[i].sky_ref   = nullptr;
+                    level_sectors[i].sky_ref     = nullptr;
+                    level_sectors[i].sky_flipped = false;
                 }
 
                 sky_image = image;
@@ -814,9 +815,10 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
                             continue;
                     }
 
-                    tsec->sky_image = image;
+                    tsec->sky_image   = image;
                     MarkImageAsSky(image);
-                    tsec->sky_ref   = nullptr;
+                    tsec->sky_ref     = nullptr;
+                    tsec->sky_flipped = false;
                 }
             }
 

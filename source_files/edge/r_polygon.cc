@@ -50,6 +50,8 @@ static std::vector<uint8_t>          polygon_self_reference_only;
 static std::vector<float>            polygon_self_reference_probe;
 static std::vector<std::vector<int>> polygon_self_reference_ring;
 
+static std::vector<SectorPolygonContainment> polygon_self_reference_containers;
+
 static int polygon_self_reference_loops    = 0;
 static int polygon_self_reference_attached = 0;
 static int polygon_self_reference_covered  = 0;
@@ -975,6 +977,8 @@ static void PolygonSubtractSelfReferences(void)
 
         PolygonStoreLoop(&sector_polygons[container], ring);
 
+        polygon_self_reference_containers.push_back(SectorPolygonContainment{owner, container});
+
         polygon_self_reference_attached++;
     }
 }
@@ -1149,6 +1153,7 @@ void DestroySectorPolygons(void)
     polygon_self_reference_only.clear();
     polygon_self_reference_probe.clear();
     polygon_self_reference_ring.clear();
+    polygon_self_reference_containers.clear();
 
     DestroySectorGrid();
 
@@ -1258,6 +1263,11 @@ void BuildSectorPolygons(void)
 bool SectorPolygonsBuilt(void)
 {
     return sector_polygons_built;
+}
+
+const std::vector<SectorPolygonContainment> &SectorPolygonSelfReferenceContainers(void)
+{
+    return polygon_self_reference_containers;
 }
 
 bool SectorPolygonsEnabled(void)

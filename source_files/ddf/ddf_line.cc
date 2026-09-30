@@ -835,6 +835,7 @@ static DDFSpecialFlags line_effect_names[] = {{"TRANSLUCENT", kLineEffectTypeTra
                                               {"BLOCK_PLAYERS", kLineEffectTypeBlockPlayers, 0},                // MBF21
                                               {"STRETCH_TEX_WIDTH", kLineEffectTypeStretchWidth, 0},   // Lobo 2023
                                               {"STRETCH_TEX_HEIGHT", kLineEffectTypeStretchHeight, 0}, // Lobo 2023
+                                              {"SKY_TRANSFER_FLIPPED", kLineEffectTypeSkyTransferFlipped, 0},
                                               {nullptr, 0, 0}};
 
 //
