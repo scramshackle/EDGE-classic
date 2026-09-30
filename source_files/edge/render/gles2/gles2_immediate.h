@@ -199,7 +199,8 @@ class Gles2Immediate
     void BindVertexAttributesFrom(GLuint buffer);
 
   public:
-    GLuint CreateStaticBuffer(const RendererVertex *vertices, int count);
+    GLuint CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity);
+    void   UpdateStaticBuffer(GLuint buffer, int first, const RendererVertex *vertices, int count);
     void   DeleteStaticBuffer(GLuint buffer);
     void   DrawStatic(GLuint buffer, GLuint shape, int first, int count);
 

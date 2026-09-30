@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -77,6 +79,93 @@ HMM_Vec2 static_batch_texture_offset = {{0, 0}};
 HMM_Vec2 static_batch_liquid         = {{0, 0}};
 
 
+
+static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
+{
+    OitPass unit_pass = kOitPassMasked;
+
+    if ((unit->blending & kBlendingAdd) || unit->pass > 0)
+        unit_pass = kOitPassAdditive;
+    else if (unit->blending & kBlendingAlpha)
+        unit_pass = kOitPassAccumulate;
+
+    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+}
+
+static bool                        retain_units = false;
+static std::vector<RendererVertex> retained_verts;
+static std::vector<RendererUnit>   retained_units;
+
+static void RetainCurrentUnits(void)
+{
+    int base = (int)retained_verts.size();
+
+    retained_verts.insert(retained_verts.end(), local_verts, local_verts + current_render_vert);
+
+    for (int j = 0; j < current_render_unit; j++)
+    {
+        RendererUnit unit = local_units[j];
+
+        if (!unit.static_buffer)
+            unit.first += base;
+
+        retained_units.push_back(unit);
+    }
+
+    current_render_vert = current_render_unit = 0;
+}
+
+void BeginRetainedUnits(void)
+{
+    retained_verts.clear();
+    retained_units.clear();
+
+    retain_units = true;
+}
+
+void EndRetainedUnits(void)
+{
+    RetainCurrentUnits();
+
+    retain_units = false;
+}
+
+void ReplayRetainedUnits(void)
+{
+    int32_t oit_mode = render_backend->OitMode();
+
+    for (size_t i = 0; i < retained_units.size(); i++)
+    {
+        const RendererUnit &source = retained_units[i];
+
+        if (oit_mode != kOitPassNone && !UnitWantedInOitPass(&source, oit_mode))
+            continue;
+
+        int vertices = source.static_buffer ? 0 : source.count;
+
+        if (current_render_vert + vertices >= kMaximumLocalVertices || current_render_unit >= kMaximumLocalUnits)
+            RenderCurrentUnits();
+
+        RendererUnit *dest = local_units + current_render_unit;
+
+        *dest = source;
+
+        if (!source.static_buffer)
+        {
+            dest->first = current_render_vert;
+
+            memcpy(local_verts + current_render_vert, retained_verts.data() + source.first,
+                   sizeof(RendererVertex) * (size_t)vertices);
+
+            current_render_vert += vertices;
+        }
+
+        current_render_unit++;
+    }
+
+    RenderCurrentUnits();
+}
+
 void StartUnitBatch(bool sort_em)
 {
     if (render_backend->RenderUnitsLocked())
@@ -103,7 +192,21 @@ void FinishUnitBatch(void)
 
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
 {
-    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count);
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, count);
+}
+
+uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity)
+{
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, capacity);
+}
+
+void UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+{
+    gles2_immediate.UpdateStaticBuffer((GLuint)handle, first, vertices, count);
+}
+
+void FlushStaticVertexUploads(void)
+{
 }
 
 void DeleteStaticVertexBuffer(uint32_t handle)
@@ -585,6 +688,12 @@ void RenderCurrentUnits(void)
     if (render_backend->RenderUnitsLocked())
     {
         FatalError("RenderCurrentUnits - Render units are locked");
+    }
+
+    if (retain_units)
+    {
+        RetainCurrentUnits();
+        return;
     }
 
     if (current_render_unit == 0)

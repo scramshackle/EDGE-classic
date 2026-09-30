@@ -2,6 +2,7 @@
 #include "r_backend.h"
 #include "r_misc.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 
@@ -23,6 +24,7 @@
 #include "r_gldefs.h"
 #include "r_lightgrid.h"
 #include "r_image.h"
+#include "r_mirror.h"
 #include "r_misc.h"
 #include "r_shader.h"
 #include "r_state.h"
@@ -71,6 +73,12 @@ struct StaticSpan
     float    div_x, div_y, div_delta_x, div_delta_y;
 };
 
+struct StaticRun
+{
+    int start;
+    int count;
+};
+
 struct SpanReference
 {
     int batch;
@@ -93,8 +101,17 @@ struct StaticBatch
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
 
-    uint32_t gpu_handle = 0;
-    bool     gpu_dirty  = true;
+    uint32_t gpu_handle   = 0;
+    int      gpu_capacity = 0;
+    int      gpu_count    = 0;
+    int      dirty_low    = INT_MAX;
+    int      dirty_high   = -1;
+    bool     is_wall      = false;
+    int      face_dir     = 0;
+
+    std::vector<StaticRun> runs;
+    bool                   runs_dirty       = true;
+    bool                   height_sensitive = false;
 };
 
 static std::vector<StaticBatch> static_batches;
@@ -122,10 +139,22 @@ int SectorHeightState(const Sector *sec)
     return kHeightStateNormal;
 }
 
-static void RefreshSectorHeightStates(void)
+static bool RefreshSectorHeightStates(void)
 {
+    bool changed = false;
+
     for (int i = 0; i < total_level_sectors; i++)
-        sector_height_state[i] = (uint8_t)SectorHeightState(level_sectors + i);
+    {
+        uint8_t state = (uint8_t)SectorHeightState(level_sectors + i);
+
+        if (state != sector_height_state[i])
+        {
+            sector_height_state[i] = state;
+            changed                = true;
+        }
+    }
+
+    return changed;
 }
 
 static int CachedHeightState(const Sector *sec)
@@ -339,6 +368,155 @@ static bool BuildRegionFlatKey(const Sector *sec, int face_dir, const Extrafloor
 bool StaticMeshBuilt(void)
 {
     return static_mesh_built;
+}
+
+static bool static_bake_active = false;
+static bool static_bake_deferred = false;
+
+void StaticBakeSetDeferred(bool deferred)
+{
+    static_bake_deferred = deferred;
+}
+
+bool StaticBakeDeferred(void)
+{
+    return static_bake_deferred;
+}
+
+static std::vector<uint8_t>  sector_bake_clean;
+static std::vector<uint8_t>  sector_bake_pending;
+static std::vector<uint32_t> sector_bake_epoch;
+static std::vector<int>     sector_pending_list;
+
+void StaticBakeSectorBegin(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_clean.size())
+        sector_bake_clean[index] = 1;
+}
+
+void StaticBakeSectorEnd(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_pending.size())
+        sector_bake_pending[index] = 0;
+}
+
+void StaticMarkSectorDeclined(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_clean.size())
+        sector_bake_clean[index] = 0;
+}
+
+void StaticMarkSectorPending(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_epoch.size())
+        sector_bake_epoch[index]++;
+
+    if (index >= sector_bake_pending.size() || sector_bake_pending[index])
+        return;
+
+    sector_bake_pending[index] = 1;
+    sector_pending_list.push_back((int)index);
+}
+
+bool StaticSectorReady(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_clean.size())
+        return false;
+
+    return sector_bake_clean[index] && !sector_bake_pending[index];
+}
+
+uint32_t StaticSectorEpoch(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    return (index < sector_bake_epoch.size()) ? sector_bake_epoch[index] : 0;
+}
+
+void StaticTakeSettledPendingSectors(std::vector<Sector *> &out)
+{
+    out.clear();
+
+    size_t keep = 0;
+
+    for (size_t i = 0; i < sector_pending_list.size(); i++)
+    {
+        int     index = sector_pending_list[i];
+        Sector *sec   = level_sectors + index;
+
+        if (!sector_bake_pending[(size_t)index] || sec->bake_dynamic)
+            continue;
+
+        if (sec->movement_suppressed)
+        {
+            sector_pending_list[keep++] = index;
+            continue;
+        }
+
+        out.push_back(sec);
+    }
+
+    sector_pending_list.resize(keep);
+}
+
+static void MarkSectorNeighboursPending(const Sector *sec)
+{
+    StaticMarkSectorPending(sec);
+
+    for (int i = 0; i < sec->line_count; i++)
+    {
+        const Line *ld = sec->lines[i];
+
+        StaticMarkSectorPending(ld->front_sector);
+        StaticMarkSectorPending(ld->back_sector);
+
+        for (int side = 0; side < 2; side++)
+        {
+            const LineSide *line_side = &level_line_sides[(ld - level_lines) * 2 + side];
+
+            for (int v = 0; v < 2; v++)
+            {
+                const VertexSectorList *seclist = line_side->vertex_sectors[v];
+
+                if (!seclist)
+                    continue;
+
+                for (int k = 0; k < seclist->total; k++)
+                    StaticMarkSectorPending(level_sectors + seclist->sectors[k]);
+            }
+        }
+    }
+}
+
+void StaticBakeBegin(void)
+{
+    static_bake_active = true;
+}
+
+void StaticBakeEnd(void)
+{
+    static_bake_active = false;
+}
+
+bool StaticBakeActive(void)
+{
+    return static_bake_active;
 }
 
 static bool StaticAnimationUniformSize(const Image *image)
@@ -609,7 +787,8 @@ bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *pla
 }
 
 static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
-                     BlendingMode blending, OitPass draw_pass, const MapSurface *scroll_surf)
+                     BlendingMode blending, OitPass draw_pass, const MapSurface *scroll_surf, bool is_wall,
+                     int face_dir)
 {
     const MapSurface *scroller = SurfaceScrolls(scroll_surf) ? scroll_surf : nullptr;
 
@@ -618,7 +797,7 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
         StaticBatch &b = static_batches[i];
 
         if (b.image == image && b.colormap == colormap && b.blending == blending && b.draw_pass == draw_pass &&
-            b.scroll_surface == scroller &&
+            b.scroll_surface == scroller && b.is_wall == is_wall && b.face_dir == face_dir &&
             epi::AlmostEquals(b.liquid_amplitude, capture_liquid_amplitude) &&
             b.properties->fog_color == props->fog_color && b.properties->fog_density == props->fog_density)
             return (int)i;
@@ -632,6 +811,8 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
     batch.sector     = sec;
     batch.blending   = blending;
     batch.draw_pass  = draw_pass;
+    batch.is_wall    = is_wall;
+    batch.face_dir   = face_dir;
 
     batch.uv_scale         = capture_uv_scale;
     batch.liquid_amplitude = capture_liquid_amplitude;
@@ -891,7 +1072,8 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
     capture_back_sector = line_side ? line_side->back_sector : nullptr;
     capture_height_key  = LiveHeightKey(line_side ? line_side->front_sector : sector, capture_back_sector);
 
-    capture_batch     = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, surf);
+    capture_batch =
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, surf, line_side != nullptr, 0);
     capture_line_side = line_side;
     capture_surf      = surf;
     capture_sector    = sector;
@@ -953,7 +1135,9 @@ void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, Re
     capture_back_sector = nullptr;
     capture_height_key  = LiveHeightKey(sector, nullptr);
 
-    capture_batch     = FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_flat_surface);
+    capture_batch =
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_flat_surface, false,
+                  (face_dir > 0) ? 1 : -1);
     capture_line_side = nullptr;
     capture_surf      = nullptr;
     capture_sector    = sector;
@@ -1076,7 +1260,10 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 
     span.count = (int)batch.vertices.size() - span.start;
 
-    batch.gpu_dirty = true;
+    batch.runs_dirty = true;
+
+    if ((span.sector && span.sector->height_sector) || (span.back_sector && span.back_sector->height_sector))
+        batch.height_sensitive = true;
 
     SpanReference ref;
 
@@ -1127,6 +1314,8 @@ void StaticPruneDynamicSectors(void)
         }
 
         dynamic_sector_mark[(size_t)(sec - level_sectors)] = 0;
+
+        MarkSectorNeighboursPending(sec);
     }
 
     dynamic_sector_list.resize(keep);
@@ -1152,6 +1341,8 @@ void StaticMeshInvalidateSector(Sector *sec)
 
     NoteDynamicSector(sec);
 
+    StaticMarkSectorPending(sec);
+
     size_t index = (size_t)(sec - level_sectors);
 
     if (index >= sector_spans.size())
@@ -1168,6 +1359,10 @@ void StaticMeshInvalidateSector(Sector *sec)
             continue;
 
         span.live = false;
+
+        batch.runs_dirty = true;
+
+        StaticMarkSectorPending(span.sector);
 
         if (span.hash_key != 0)
         {
@@ -1219,7 +1414,8 @@ static void RefreshStaticLighting(void)
             for (int v = span.start; v < span.start + span.count; v++)
                 batch.vertices[v].texture_coordinates[1].Y = light;
 
-            batch.gpu_dirty = true;
+            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
+            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
         }
     }
 }
@@ -1269,7 +1465,17 @@ void BuildStaticMesh(void)
         sector_light_cache[i] = level_sectors[i].properties.light_level;
 
 
+    swirl_cache = (int)swirling_flats;
+
+    sector_bake_clean.assign((size_t)total_level_sectors, 0);
+    sector_bake_pending.assign((size_t)total_level_sectors, 0);
+    sector_bake_epoch.assign((size_t)total_level_sectors, 0);
+    sector_pending_list.clear();
+
     static_mesh_built = true;
+
+    for (int i = 0; i < total_level_sectors; i++)
+        StaticMarkSectorPending(level_sectors + i);
 
 }
 
@@ -1287,6 +1493,10 @@ void DestroyStaticMesh(void)
     region_surface_baked.clear();
     sector_spans.clear();
     sector_light_cache.clear();
+    sector_bake_clean.clear();
+    sector_bake_pending.clear();
+    sector_bake_epoch.clear();
+    sector_pending_list.clear();
 
     StaticCaptureEnd();
 
@@ -1317,6 +1527,91 @@ void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertic
     }
 }
 
+static void UploadStaticBatch(StaticBatch &batch)
+{
+    int total = (int)batch.vertices.size();
+
+    if (total == 0)
+        return;
+
+    if (!batch.gpu_handle || total > batch.gpu_capacity)
+    {
+        EDGE_ZoneScopedN("StaticMesh upload");
+
+        if (batch.gpu_handle)
+            DeleteStaticVertexBuffer(batch.gpu_handle);
+
+        int capacity = HMM_MAX(total + total / 2, 4096);
+
+        batch.gpu_handle   = CreateStaticVertexBufferWithCapacity(batch.vertices.data(), total, capacity);
+        batch.gpu_capacity = batch.gpu_handle ? capacity : 0;
+        batch.gpu_count    = batch.gpu_handle ? total : 0;
+        batch.dirty_low    = INT_MAX;
+        batch.dirty_high   = -1;
+
+        return;
+    }
+
+    if (total > batch.gpu_count)
+    {
+        EDGE_ZoneScopedN("StaticMesh append");
+
+        UpdateStaticVertexBuffer(batch.gpu_handle, batch.gpu_count, batch.vertices.data() + batch.gpu_count,
+                                 total - batch.gpu_count);
+
+        batch.gpu_count = total;
+    }
+
+    if (batch.dirty_high > batch.dirty_low)
+    {
+        EDGE_ZoneScopedN("StaticMesh range update");
+
+        int low  = batch.dirty_low;
+        int high = HMM_MIN(batch.dirty_high, batch.gpu_count);
+
+        if (high > low)
+            UpdateStaticVertexBuffer(batch.gpu_handle, low, batch.vertices.data() + low, high - low);
+
+        batch.dirty_low  = INT_MAX;
+        batch.dirty_high = -1;
+    }
+}
+
+static void RebuildStaticRuns(StaticBatch &batch)
+{
+    batch.runs.clear();
+
+    int run_start = -1;
+    int run_end   = -1;
+
+    for (size_t k = 0; k < batch.spans.size(); k++)
+    {
+        const StaticSpan &span = batch.spans[k];
+
+        bool live = span.live && span.height_key == StaticHeightKey(span.sector, span.back_sector);
+
+        if (!live)
+            continue;
+
+        if (run_start >= 0 && span.start == run_end)
+        {
+            run_end += span.count;
+            continue;
+        }
+
+        if (run_start >= 0)
+            batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+
+        run_start = span.start;
+        run_end   = span.start + span.count;
+    }
+
+    if (run_start >= 0)
+        batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+
+    batch.runs_dirty = false;
+}
+
 void DrawStaticMesh(OitPass draw_pass, bool refresh)
 {
     if (!static_mesh_built)
@@ -1341,10 +1636,28 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         StaticPruneDynamicSectors();
 
-        RefreshSectorHeightStates();
+        if (RefreshSectorHeightStates())
+        {
+            for (size_t i = 0; i < static_batches.size(); i++)
+            {
+                if (static_batches[i].height_sensitive)
+                    static_batches[i].runs_dirty = true;
+            }
+        }
 
 
         RefreshStaticLighting();
+
+        if (r_static_mesh_resident.d_ != 0)
+        {
+            for (size_t i = 0; i < static_batches.size(); i++)
+            {
+                if (!static_batches[i].spans.empty())
+                    UploadStaticBatch(static_batches[i]);
+            }
+
+            FlushStaticVertexUploads();
+        }
 
     }
 
@@ -1369,67 +1682,42 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         bool resident = r_static_mesh_resident.d_ != 0;
 
-        if (resident && batch.gpu_dirty)
-        {
-            EDGE_ZoneScopedN("StaticMesh upload");
-
-            if (batch.gpu_handle)
-                DeleteStaticVertexBuffer(batch.gpu_handle);
-
-            batch.gpu_handle = CreateStaticVertexBuffer(batch.vertices.data(), (int)batch.vertices.size());
-            batch.gpu_dirty  = false;
-        }
-
         if (resident && !batch.gpu_handle)
-            resident = false;
+            continue;
+
+        if (batch.runs_dirty)
+            RebuildStaticRuns(batch);
 
         int pass = 0;
 
-        int run_start = -1;
-        int run_end   = -1;
+        BlendingMode blending = batch.blending;
 
+        bool inverted   = mirror_view.reflective != (fliplevels.d_ != 0);
+        bool cull_front = (batch.face_dir > 0) != inverted;
 
-        for (size_t k = 0; k <= batch.spans.size(); k++)
+        blending = (BlendingMode)(blending | (cull_front ? kBlendingCullFront : kBlendingCullBack));
+
+        for (size_t r = 0; r < batch.runs.size(); r++)
         {
-            bool live = (k < batch.spans.size()) && batch.spans[k].live;
+            const StaticRun &run = batch.runs[r];
 
-            if (live && batch.spans[k].height_key !=
-                            StaticHeightKey(batch.spans[k].sector, batch.spans[k].back_sector))
+            if (resident)
             {
+                int count = HMM_MIN(run.count, batch.gpu_count - run.start);
 
-                live = false;
-            }
-
-            bool contiguous = live && run_start >= 0 && batch.spans[k].start == run_end &&
-                              (size_t)(run_end + batch.spans[k].count - run_start) <= kMaximumStaticRun;
-
-            if (contiguous)
-            {
-                run_end += batch.spans[k].count;
+                if (count > 0)
+                    shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
+                                               blending);
                 continue;
             }
 
-            if (run_start >= 0)
+            for (int offset = 0; offset < run.count; offset += (int)kMaximumStaticRun)
             {
-                if (resident)
-                    shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run_start, run_end - run_start, tex_id,
-                                               &pass, batch.blending);
-                else
-                    shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run_start, run_end - run_start, tex_id,
-                                       1.0f, &pass, batch.blending);
+                int count = HMM_MIN((int)kMaximumStaticRun, run.count - offset);
 
-                run_start = -1;
-                run_end   = -1;
-            }
-
-            if (live)
-            {
-
-                run_start = batch.spans[k].start;
-                run_end   = batch.spans[k].start + batch.spans[k].count;
+                shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run.start + offset, count, tex_id, 1.0f,
+                                   &pass, blending);
             }
         }
-
-
     }
 }

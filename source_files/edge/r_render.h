@@ -13,6 +13,9 @@ void EnumerateViewSky(void);
 
 void EnumerateViewMirrors(void);
 void EnumerateViewSectors(void);
+bool SectorReachedThisView(const Sector *sector);
+
+DrawSector *BakeDrawSector(Sector *sector);
 
 void SkyDecideLineSide(LineSide *line_side, DrawMirror *mir, bool resident);
 void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident);

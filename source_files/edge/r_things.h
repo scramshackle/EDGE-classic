@@ -33,7 +33,8 @@ extern std::list<DrawThing *> draw_thing_list;
 
 void BSPWalkThing(MapObject *mo);
 void EnumerateViewThings(void);
-void RenderThings(std::list<DrawThing *> &things, bool solid);
+void RenderThings(std::list<DrawThing *> &things, std::vector<DrawThing *> &transparent_things);
+void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things, bool models);
 
 void RenderWeaponSprites(Player *p);
 void RenderWeaponModel(Player *p);

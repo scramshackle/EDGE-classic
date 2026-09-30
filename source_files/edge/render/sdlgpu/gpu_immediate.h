@@ -265,7 +265,9 @@ class GpuImmediate
 
     void SetLiquid(const HMM_Vec2 &liquid);
 
-    uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count);
+    uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity);
+    void     UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
+    void     FlushStaticUploads();
     void     DeleteStaticBuffer(uint32_t handle);
     void     FlushDeletedStaticBuffers();
     void     DrawStatic(uint32_t handle, int32_t first, int32_t count);
@@ -450,6 +452,19 @@ class GpuImmediate
 
     std::vector<SDL_GPUBuffer *> static_buffers_;
     std::vector<SDL_GPUBuffer *> deleted_static_buffers_;
+
+    struct PendingStaticUpload
+    {
+        SDL_GPUBuffer *buffer;
+        uint32_t       offset;
+        size_t         data_offset;
+        size_t         bytes;
+    };
+
+    std::vector<PendingStaticUpload> static_uploads_;
+    std::vector<uint8_t>             static_upload_data_;
+
+    void QueueStaticUpload(SDL_GPUBuffer *buffer, uint32_t offset, const void *data, size_t bytes);
     SDL_GPUBuffer               *bound_vertex_buffer_ = nullptr;
     SkyPassInfo sky_pass_info_;
 

@@ -946,11 +946,28 @@ static void RendererClipSpriteVertically(DrawThing *dthing)
     LinkDrawThingIntoView(dthing);
 }
 
+static bool ThingSectorReached(const MapObject *mo)
+{
+    if (SectorReachedThisView(mo->sector_))
+        return true;
+
+    for (const TouchNode *tn = mo->touch_sectors_; tn; tn = tn->map_object_next)
+    {
+        if (tn->sector && SectorReachedThisView(tn->sector))
+            return true;
+    }
+
+    return false;
+}
+
 void EnumerateViewThings(void)
 {
     for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {
         if (mo->IsRemoved() || !mo->sector_)
+            continue;
+
+        if (!ThingSectorReached(mo))
             continue;
 
         BSPWalkThing(mo);
@@ -1164,6 +1181,8 @@ struct ThingCoordinateData
 };
 
 
+static bool render_thing_needs_transparent = false;
+
 static bool RenderThing(DrawThing *dthing, bool solid)
 {
     ec_frame_stats.draw_things++;
@@ -1186,6 +1205,9 @@ static bool RenderThing(DrawThing *dthing, bool solid)
             RenderModel(dthing);
             return is_solid;
         }
+
+        if (solid)
+            render_thing_needs_transparent = true;
 
         return is_solid;
     }
@@ -1305,6 +1327,7 @@ static bool RenderThing(DrawThing *dthing, bool solid)
     {
         if ((blending & kBlendingNoZBuffer) || (blending & kBlendingAlpha))
         {
+            render_thing_needs_transparent = true;
             return false;
         }
     }
@@ -1521,11 +1544,27 @@ static bool RenderThing(DrawThing *dthing, bool solid)
     return solid;
 }
 
-void RenderThings(std::list<DrawThing *> &things, bool solid)
+void RenderThings(std::list<DrawThing *> &things, std::vector<DrawThing *> &transparent_things)
 {
+    transparent_things.clear();
+
     for (std::list<DrawThing *>::iterator it = things.begin(); it != things.end(); it++)
     {
-        RenderThing(*it, solid);
+        render_thing_needs_transparent = false;
+
+        RenderThing(*it, true);
+
+        if (render_thing_needs_transparent)
+            transparent_things.push_back(*it);
+    }
+}
+
+void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things, bool models)
+{
+    for (size_t i = 0; i < transparent_things.size(); i++)
+    {
+        if (transparent_things[i]->is_model == models)
+            RenderThing(transparent_things[i], false);
     }
 }
 

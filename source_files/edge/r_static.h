@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "r_backend.h"
 #include "r_units.h"
 
@@ -19,6 +21,22 @@ bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *pla
 bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, const Extrafloor *region_ef,
                           const Extrafloor *surface_ef);
 bool StaticMeshBuilt(void);
+
+void BakeStaticLevel(void);
+void StaticBakeSetDeferred(bool deferred);
+bool StaticBakeDeferred(void);
+
+void StaticBakeBegin(void);
+void StaticBakeEnd(void);
+bool StaticBakeActive(void);
+
+void StaticBakeSectorBegin(const Sector *sec);
+void StaticBakeSectorEnd(const Sector *sec);
+void StaticMarkSectorDeclined(const Sector *sec);
+void StaticMarkSectorPending(const Sector *sec);
+bool StaticSectorReady(const Sector *sec);
+uint32_t StaticSectorEpoch(const Sector *sec);
+void StaticTakeSettledPendingSectors(std::vector<Sector *> &out);
 
 enum HeightRenderState
 {

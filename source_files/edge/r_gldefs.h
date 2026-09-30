@@ -124,6 +124,10 @@ struct DrawFloor
 
     // list of things
     // (not sorted until RenderFloor is called).
+
+    std::vector<LineSide *> transparent_line_sides;
+
+    uint8_t transparent_planes;
 };
 
 struct DrawMirror

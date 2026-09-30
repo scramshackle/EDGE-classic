@@ -23,6 +23,7 @@
 //
 //----------------------------------------------------------------------------
 
+#include <float.h>
 #include <math.h>
 
 #include <algorithm>
@@ -42,6 +43,7 @@
 #include "i_system.h"
 #include "m_bbox.h"
 #include "p_local.h"
+#include "p_spec.h"
 #include "p_tick.h"
 #include "r_backend.h"
 #include "r_colormap.h"
@@ -66,6 +68,11 @@ std::list<DrawThing *>  draw_thing_list;
 std::list<DrawMirror *> draw_mirror_list;
 
 MirrorSet active_mirror_set;
+
+static std::vector<int> sector_reach_stamp;
+static int              sector_reach_serial = 0;
+static bool             sector_reach_all    = true;
+static std::vector<int> sector_reach_list;
 
 EDGE_DEFINE_CONSOLE_VARIABLE(debug_hall_of_mirrors, "0", kConsoleVariableFlagCheat)
 
@@ -217,6 +224,10 @@ static bool LineSideViewAngles(const LineSide *line_side, BAMAngle *out_left, BA
     // be flipped across them but also clipped across them.
 
     int32_t active_mirrors = active_mirror_set.TotalActive();
+
+    if (active_mirrors == 0 && (view_x - sx1) * (sy2 - sy1) - (view_y - sy1) * (sx2 - sx1) <= 0.0f)
+        return false;
+
     if (active_mirrors > 0)
     {
         for (int i = active_mirrors - 1; i >= 0; i--)
@@ -332,6 +343,7 @@ static bool PointPairViewAngles(float sx1, float sy1, float sx2, float sy2, bool
 
 static void VisitLineSide(DrawSector *dsector, LineSide *line_side)
 {
+
     if (active_mirror_set.LineSideOnPortal(line_side))
         return;
 
@@ -371,6 +383,9 @@ static inline void AddNewDrawFloor(DrawSector *dsector, Extrafloor *ef, float fl
     dfloor->extrafloor      = nullptr;
     dfloor->floor_extrafloor = nullptr;
     dfloor->properties      = nullptr;
+
+    dfloor->transparent_line_sides.clear();
+    dfloor->transparent_planes = 0;
 
     dfloor->floor_height   = floor_height;
     dfloor->ceiling_height = ceiling_height;
@@ -570,27 +585,177 @@ void EnumerateViewMirrors(void)
     }
 }
 
-void EnumerateViewSky(void)
+struct SkyLineCandidate
 {
-    EDGE_ZoneScoped;
+    int line_side;
+    int front;
+    int back;
+};
+
+static std::vector<uint8_t>          sky_sector_flags;
+static std::vector<int>              sky_sector_candidates;
+static std::vector<SkyLineCandidate> sky_line_side_candidates;
+static std::vector<uint32_t>         sky_sector_done;
+static std::vector<uint64_t>         sky_line_side_done;
+static const Sector                 *sky_candidate_base       = nullptr;
+static uint32_t                      sky_candidate_generation = 0;
+static int                           sky_candidate_countdown  = 0;
+
+static constexpr int kSkyCandidateRescanFrames = 64;
+
+static uint8_t SectorSkyFlag(const Sector *sec)
+{
+    if (EDGE_IMAGE_IS_SKY(sec->floor) || EDGE_IMAGE_IS_SKY(sec->ceiling))
+        return 1;
+
+    const Sector *height = sec->height_sector;
+
+    if (height && (EDGE_IMAGE_IS_SKY(height->floor) || EDGE_IMAGE_IS_SKY(height->ceiling)))
+        return 1;
+
+    return 0;
+}
+
+static void RefreshSkyCandidates(void)
+{
+    bool changed = (sky_candidate_base != level_sectors || (int)sky_sector_flags.size() != total_level_sectors);
+
+    if (!changed && sky_candidate_generation == StaticGeometryGeneration() && sky_candidate_countdown > 0)
+    {
+        sky_candidate_countdown--;
+        return;
+    }
+
+    sky_candidate_generation = StaticGeometryGeneration();
+    sky_candidate_countdown  = kSkyCandidateRescanFrames;
+
+    if (changed)
+    {
+        sky_candidate_base = level_sectors;
+        sky_sector_flags.assign((size_t)total_level_sectors, 0);
+    }
 
     for (int i = 0; i < total_level_sectors; i++)
     {
-        SkyDecideSector(&level_sectors[i], nullptr, true);
+        uint8_t flag = SectorSkyFlag(level_sectors + i);
+
+        if (flag != sky_sector_flags[(size_t)i])
+        {
+            sky_sector_flags[(size_t)i] = flag;
+            changed                     = true;
+        }
+    }
+
+    if (!changed)
+        return;
+
+    sky_sector_candidates.clear();
+    sky_line_side_candidates.clear();
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        if (sky_sector_flags[(size_t)i])
+            sky_sector_candidates.push_back(i);
     }
 
     for (int i = 0; i < total_level_lines * 2; i++)
     {
-        LineSide *line_side = &level_line_sides[i];
+        const LineSide *line_side = &level_line_sides[i];
 
-        if (!line_side->sidedef)
+        if (!line_side->sidedef || !line_side->front_sector)
             continue;
 
         if ((line_side->linedef->flags & kLineFlagMirror) || line_side->linedef->portal_pair)
             continue;
 
-        SkyDecideLineSide(line_side, nullptr, true);
+        int front = (int)(line_side->front_sector - level_sectors);
+        int back  = line_side->back_sector ? (int)(line_side->back_sector - level_sectors) : -1;
+
+        if (sky_sector_flags[(size_t)front] || (back >= 0 && sky_sector_flags[(size_t)back]))
+            sky_line_side_candidates.push_back(SkyLineCandidate{i, front, back});
     }
+
+    sky_sector_done.assign(sky_sector_candidates.size(), 0);
+    sky_line_side_done.assign(sky_line_side_candidates.size(), 0);
+}
+
+static bool SkySectorPlanesReachable(const Sector *sector)
+{
+    if (EDGE_IMAGE_IS_SKY(sector->floor) && view_z <= sector->interpolated_floor_height)
+        return false;
+
+    if (EDGE_IMAGE_IS_SKY(sector->ceiling) && view_z >= sector->sky_height)
+        return false;
+
+    return true;
+}
+
+static inline bool SectorIndexReached(int index)
+{
+    return sector_reach_all || active_mirror_set.TotalActive() > 0 ||
+           sector_reach_stamp[(size_t)index] == sector_reach_serial;
+}
+
+void EnumerateViewSky(void)
+{
+    EDGE_ZoneScoped;
+
+    RefreshSkyCandidates();
+
+    bool any_skipped = false;
+
+    for (size_t c = 0; c < sky_sector_candidates.size(); c++)
+    {
+        int index = sky_sector_candidates[c];
+
+        if (!SectorIndexReached(index))
+            continue;
+
+        Sector  *sector = &level_sectors[index];
+        bool     ready  = StaticSectorReady(sector);
+        uint32_t stamp  = StaticSectorEpoch(sector) + 1;
+
+        if (ready && sky_sector_done[c] == stamp)
+        {
+            any_skipped = true;
+            continue;
+        }
+
+        SkyDecideSector(sector, nullptr, true);
+
+        if (ready && SkySectorPlanesReachable(sector))
+            sky_sector_done[c] = stamp;
+    }
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    {
+        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+        if (!SectorIndexReached(candidate.front) && !(candidate.back >= 0 && SectorIndexReached(candidate.back)))
+            continue;
+
+        const Sector *front = level_sectors + candidate.front;
+        const Sector *back  = (candidate.back >= 0) ? level_sectors + candidate.back : nullptr;
+
+        bool ready = StaticSectorReady(front) && (!back || StaticSectorReady(back));
+
+        uint64_t back_epoch = back ? StaticSectorEpoch(back) : 0;
+        uint64_t stamp      = ((uint64_t)(StaticSectorEpoch(front) + 1) << 32) | back_epoch;
+
+        if (ready && sky_line_side_done[c] == stamp)
+        {
+            any_skipped = true;
+            continue;
+        }
+
+        SkyDecideLineSide(&level_line_sides[candidate.line_side], nullptr, true);
+
+        if (ready)
+            sky_line_side_done[c] = stamp;
+    }
+
+    if (any_skipped)
+        SkyNoteResidentVisible();
 }
 
 static bool SectorBeyondFarClip(const Sector *sector)
@@ -618,20 +783,8 @@ static bool SectorBeyondFarClip(const Sector *sector)
     return (dx * dx + dy * dy) > limit * limit;
 }
 
-static void VisitSector(Sector *sector)
+static void BuildSectorFloors(DrawSector *K, Sector *sector)
 {
-    if (draw_culling.d_ && SectorBeyondFarClip(sector))
-        return;
-
-    DrawSector *K    = GetDrawSector();
-    K->sector        = sector;
-    K->render_floors = nullptr;
-
-    K->floors.clear();
-    K->line_sides.clear();
-
-    SkyDecideSector(sector, active_mirror_set.InnermostMirror(), false);
-
     float floor_h = sector->interpolated_floor_height;
     float ceil_h  = sector->interpolated_ceiling_height;
 
@@ -721,6 +874,23 @@ static void VisitSector(Sector *sector)
 
     K->floors[0]->is_lowest                     = true;
     K->floors[K->floors.size() - 1]->is_highest = true;
+}
+
+static void VisitSector(Sector *sector)
+{
+    if (draw_culling.d_ && SectorBeyondFarClip(sector))
+        return;
+
+    DrawSector *K    = GetDrawSector();
+    K->sector        = sector;
+    K->render_floors = nullptr;
+
+    K->floors.clear();
+    K->line_sides.clear();
+
+    SkyDecideSector(sector, active_mirror_set.InnermostMirror(), false);
+
+    BuildSectorFloors(K, sector);
 
     for (int i = 0; i < sector->line_count; i++)
     {
@@ -743,10 +913,438 @@ static void VisitSector(Sector *sector)
         draw_sector_list.push_back(K);
 }
 
-void EnumerateViewSectors(void)
+DrawSector *BakeDrawSector(Sector *sector)
 {
+    DrawSector *K    = GetDrawSector();
+    K->sector        = sector;
+    K->render_floors = nullptr;
+
+    K->floors.clear();
+    K->line_sides.clear();
+
+    BuildSectorFloors(K, sector);
+
+    for (int i = 0; i < sector->line_count; i++)
+    {
+        Line *line = sector->lines[i];
+
+        if ((line->flags & kLineFlagMirror) || line->portal_pair)
+            continue;
+
+        for (int side = 0; side < 2; side++)
+        {
+            LineSide *line_side = &level_line_sides[(line - level_lines) * 2 + side];
+
+            if (line_side->sidedef && line_side->front_sector == sector)
+                K->line_sides.push_back(line_side);
+        }
+    }
+
+    return K;
+}
+
+
+static std::vector<int> view_grid_starts;
+static std::vector<int> view_grid_sectors;
+static const Sector    *view_grid_base   = nullptr;
+static int              view_grid_count  = 0;
+static float            view_grid_origin_x = 0.0f;
+static float            view_grid_origin_y = 0.0f;
+static float            view_grid_cell     = 128.0f;
+static int              view_grid_width    = 0;
+static int              view_grid_height   = 0;
+
+static void BuildViewGrid(void)
+{
+    view_grid_base  = level_sectors;
+    view_grid_count = total_level_sectors;
+
+    view_grid_starts.clear();
+    view_grid_sectors.clear();
+    view_grid_width  = 0;
+    view_grid_height = 0;
+
+    sector_reach_stamp.assign((size_t)total_level_sectors, 0);
+    sector_reach_serial = 0;
+
+    std::vector<float> bounds((size_t)total_level_sectors * 4);
+
+    float min_x = FLT_MAX;
+    float min_y = FLT_MAX;
+    float max_x = -FLT_MAX;
+    float max_y = -FLT_MAX;
+
     for (int i = 0; i < total_level_sectors; i++)
     {
-        VisitSector(&level_sectors[i]);
+        const Sector *sec = level_sectors + i;
+        float        *box = &bounds[(size_t)i * 4];
+
+        box[0] = box[1] = FLT_MAX;
+        box[2] = box[3] = -FLT_MAX;
+
+        for (int k = 0; k < sec->line_count; k++)
+        {
+            const Line *ld = sec->lines[k];
+
+            box[0] = HMM_MIN(box[0], HMM_MIN(ld->vertex_1->X, ld->vertex_2->X));
+            box[1] = HMM_MIN(box[1], HMM_MIN(ld->vertex_1->Y, ld->vertex_2->Y));
+            box[2] = HMM_MAX(box[2], HMM_MAX(ld->vertex_1->X, ld->vertex_2->X));
+            box[3] = HMM_MAX(box[3], HMM_MAX(ld->vertex_1->Y, ld->vertex_2->Y));
+        }
+
+        if (box[0] > box[2])
+            continue;
+
+        min_x = HMM_MIN(min_x, box[0]);
+        min_y = HMM_MIN(min_y, box[1]);
+        max_x = HMM_MAX(max_x, box[2]);
+        max_y = HMM_MAX(max_y, box[3]);
     }
+
+    if (min_x > max_x || min_y > max_y)
+        return;
+
+    view_grid_cell = 128.0f;
+
+    while ((max_x - min_x) / view_grid_cell > 1024.0f || (max_y - min_y) / view_grid_cell > 1024.0f)
+        view_grid_cell *= 2.0f;
+
+    view_grid_origin_x = min_x;
+    view_grid_origin_y = min_y;
+    view_grid_width    = (int)((max_x - min_x) / view_grid_cell) + 1;
+    view_grid_height   = (int)((max_y - min_y) / view_grid_cell) + 1;
+
+    view_grid_starts.assign((size_t)view_grid_width * view_grid_height + 1, 0);
+
+    for (int pass = 0; pass < 2; pass++)
+    {
+        std::vector<int> cursor;
+
+        if (pass == 1)
+        {
+            for (size_t i = 1; i < view_grid_starts.size(); i++)
+                view_grid_starts[i] += view_grid_starts[i - 1];
+
+            view_grid_sectors.assign((size_t)view_grid_starts.back(), 0);
+            cursor.assign(view_grid_starts.begin(), view_grid_starts.end() - 1);
+        }
+
+        for (int i = 0; i < total_level_sectors; i++)
+        {
+            const float *box = &bounds[(size_t)i * 4];
+
+            if (box[0] > box[2])
+                continue;
+
+            int x0 = (int)((box[0] - view_grid_origin_x) / view_grid_cell);
+            int y0 = (int)((box[1] - view_grid_origin_y) / view_grid_cell);
+            int x1 = (int)((box[2] - view_grid_origin_x) / view_grid_cell);
+            int y1 = (int)((box[3] - view_grid_origin_y) / view_grid_cell);
+
+            for (int y = y0; y <= y1; y++)
+            {
+                for (int x = x0; x <= x1; x++)
+                {
+                    size_t cell = (size_t)y * view_grid_width + x;
+
+                    if (pass == 0)
+                        view_grid_starts[cell + 1]++;
+                    else
+                        view_grid_sectors[(size_t)cursor[cell]++] = i;
+                }
+            }
+        }
+    }
+}
+
+static int ClipWedgeToStrip(const double *in_x, const double *in_y, int count, double y_low, double y_high,
+                            double *out_x, double *out_y)
+{
+    double mid_x[8];
+    double mid_y[8];
+    int    mid_count = 0;
+
+    for (int i = 0; i < count; i++)
+    {
+        int    j  = (i + 1) % count;
+        bool   ia = in_y[i] >= y_low;
+        bool   ja = in_y[j] >= y_low;
+
+        if (ia)
+        {
+            mid_x[mid_count]   = in_x[i];
+            mid_y[mid_count++] = in_y[i];
+        }
+
+        if (ia != ja)
+        {
+            double t = (y_low - in_y[i]) / (in_y[j] - in_y[i]);
+
+            mid_x[mid_count]   = in_x[i] + t * (in_x[j] - in_x[i]);
+            mid_y[mid_count++] = y_low;
+        }
+    }
+
+    int out_count = 0;
+
+    for (int i = 0; i < mid_count; i++)
+    {
+        int  j  = (i + 1) % mid_count;
+        bool ia = mid_y[i] <= y_high;
+        bool ja = mid_y[j] <= y_high;
+
+        if (ia)
+        {
+            out_x[out_count]   = mid_x[i];
+            out_y[out_count++] = mid_y[i];
+        }
+
+        if (ia != ja)
+        {
+            double t = (y_high - mid_y[i]) / (mid_y[j] - mid_y[i]);
+
+            out_x[out_count]   = mid_x[i] + t * (mid_x[j] - mid_x[i]);
+            out_y[out_count++] = y_high;
+        }
+    }
+
+    return out_count;
+}
+
+static void GridViewSectors(void)
+{
+    sector_reach_serial++;
+    sector_reach_all = false;
+
+    sector_reach_list.clear();
+
+    if (view_grid_width <= 0 || view_grid_height <= 0)
+        return;
+
+    double forward = epi::RadiansFromBAM(view_angle);
+    double left    = epi::RadiansFromBAM(view_angle + clip_left);
+    double right   = epi::RadiansFromBAM(view_angle + clip_right);
+
+    double apex_x = view_x - 32.0 * cos(forward);
+    double apex_y = view_y - 32.0 * sin(forward);
+
+    double reach = (double)(view_grid_width + view_grid_height) * view_grid_cell * 2.0;
+
+    double wedge_x[3] = {apex_x, apex_x + reach * cos(left), apex_x + reach * cos(right)};
+    double wedge_y[3] = {apex_y, apex_y + reach * sin(left), apex_y + reach * sin(right)};
+
+    double low_y  = HMM_MIN(wedge_y[0], HMM_MIN(wedge_y[1], wedge_y[2]));
+    double high_y = HMM_MAX(wedge_y[0], HMM_MAX(wedge_y[1], wedge_y[2]));
+
+    int row_low  = HMM_MAX(0, (int)floor((low_y - view_grid_origin_y) / view_grid_cell));
+    int row_high = HMM_MIN(view_grid_height - 1, (int)floor((high_y - view_grid_origin_y) / view_grid_cell));
+
+    for (int row = row_low; row <= row_high; row++)
+    {
+        double strip_low  = view_grid_origin_y + row * (double)view_grid_cell;
+        double strip_high = strip_low + view_grid_cell;
+
+        double clip_x[16];
+        double clip_y[16];
+
+        int clipped = ClipWedgeToStrip(wedge_x, wedge_y, 3, strip_low, strip_high, clip_x, clip_y);
+
+        if (clipped == 0)
+            continue;
+
+        double span_low  = clip_x[0];
+        double span_high = clip_x[0];
+
+        for (int k = 1; k < clipped; k++)
+        {
+            span_low  = HMM_MIN(span_low, clip_x[k]);
+            span_high = HMM_MAX(span_high, clip_x[k]);
+        }
+
+        int column_low  = HMM_MAX(0, (int)floor((span_low - view_grid_origin_x) / view_grid_cell));
+        int column_high = HMM_MIN(view_grid_width - 1, (int)floor((span_high - view_grid_origin_x) / view_grid_cell));
+
+        for (int column = column_low; column <= column_high; column++)
+        {
+            size_t cell = (size_t)row * view_grid_width + column;
+
+            for (int k = view_grid_starts[cell]; k < view_grid_starts[cell + 1]; k++)
+            {
+                int index = view_grid_sectors[(size_t)k];
+
+                if (sector_reach_stamp[(size_t)index] == sector_reach_serial)
+                    continue;
+
+                sector_reach_stamp[(size_t)index] = sector_reach_serial;
+
+                sector_reach_list.push_back(index);
+
+                if (!StaticSectorReady(level_sectors + index))
+                    VisitSector(level_sectors + index);
+            }
+        }
+    }
+}
+
+static constexpr int kAutomapLineBudget = 256;
+
+static size_t automap_cursor_sector = 0;
+static int    automap_cursor_line   = 0;
+
+struct AutomapSight
+{
+    const Line *target;
+    float       x1, y1, x2, y2;
+    bool        blocked;
+};
+
+static bool AutomapSightLine(Line *ld, void *data)
+{
+    AutomapSight *sight = (AutomapSight *)data;
+
+    if (ld == sight->target || (ld->back_sector && !ld->blocked))
+        return true;
+
+    DividingLine along;
+
+    along.x       = sight->x1;
+    along.y       = sight->y1;
+    along.delta_x = sight->x2 - sight->x1;
+    along.delta_y = sight->y2 - sight->y1;
+
+    if (PointOnDividingLineSide(ld->vertex_1->X, ld->vertex_1->Y, &along) ==
+        PointOnDividingLineSide(ld->vertex_2->X, ld->vertex_2->Y, &along))
+        return true;
+
+    DividingLine across;
+
+    across.x       = ld->vertex_1->X;
+    across.y       = ld->vertex_1->Y;
+    across.delta_x = ld->delta_x;
+    across.delta_y = ld->delta_y;
+
+    if (PointOnDividingLineSide(sight->x1, sight->y1, &across) ==
+        PointOnDividingLineSide(sight->x2, sight->y2, &across))
+        return true;
+
+    sight->blocked = true;
+
+    return false;
+}
+
+static void MarkAutomapLines(void)
+{
+    if (sector_reach_list.empty())
+        return;
+
+    int budget = kAutomapLineBudget;
+
+    if (automap_cursor_sector >= sector_reach_list.size())
+    {
+        automap_cursor_sector = 0;
+        automap_cursor_line   = 0;
+    }
+
+    size_t visited = 0;
+
+    while (budget > 0 && visited <= sector_reach_list.size())
+    {
+        Sector *sector = level_sectors + sector_reach_list[automap_cursor_sector];
+
+        if (automap_cursor_line >= sector->line_count)
+        {
+            automap_cursor_line = 0;
+            automap_cursor_sector++;
+            visited++;
+
+            if (automap_cursor_sector >= sector_reach_list.size())
+                automap_cursor_sector = 0;
+
+            continue;
+        }
+
+        Line *line = sector->lines[automap_cursor_line++];
+
+        if (line->flags & kLineFlagMapped)
+            continue;
+
+        for (int side = 0; side < 2; side++)
+        {
+            LineSide *line_side = &level_line_sides[(line - level_lines) * 2 + side];
+
+            if (!line_side->sidedef || line_side->front_sector != sector)
+                continue;
+
+            budget--;
+
+            BAMAngle angle_L = 0;
+            BAMAngle angle_R = 0;
+
+            if (!LineSideViewAngles(line_side, &angle_L, &angle_R))
+                continue;
+
+            float dx = line_side->vertex_2->X - line_side->vertex_1->X;
+            float dy = line_side->vertex_2->Y - line_side->vertex_1->Y;
+
+            float length = HMM_MAX(line_side->length, 1.0f);
+
+            AutomapSight sight;
+
+            sight.target  = line;
+            sight.x1      = view_x;
+            sight.y1      = view_y;
+            sight.x2      = (line_side->vertex_1->X + line_side->vertex_2->X) * 0.5f + dy / length * 2.0f;
+            sight.y2      = (line_side->vertex_1->Y + line_side->vertex_2->Y) * 0.5f - dx / length * 2.0f;
+            sight.blocked = false;
+
+            BlockmapSegmentLineIterator(sight.x1, sight.y1, sight.x2, sight.y2, AutomapSightLine, &sight);
+
+            if (!sight.blocked)
+            {
+                newly_seen_lines.emplace(line);
+                break;
+            }
+        }
+    }
+}
+
+bool SectorReachedThisView(const Sector *sector)
+{
+    if (sector_reach_all || active_mirror_set.TotalActive() > 0)
+        return true;
+
+    size_t index = (size_t)(sector - level_sectors);
+
+    return index < sector_reach_stamp.size() && sector_reach_stamp[index] == sector_reach_serial;
+}
+
+void EnumerateViewSectors(void)
+{
+    if (view_grid_base != level_sectors || view_grid_count != total_level_sectors)
+        BuildViewGrid();
+
+    if (active_mirror_set.TotalActive() == 0 && clip_scope != kBAMAngle180 && total_level_sectors > 0)
+    {
+        GridViewSectors();
+        MarkAutomapLines();
+        return;
+    }
+
+    if (active_mirror_set.TotalActive() == 0)
+    {
+        sector_reach_all = true;
+        sector_reach_list.clear();
+    }
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        if (active_mirror_set.TotalActive() == 0)
+            sector_reach_list.push_back(i);
+
+        if (!StaticSectorReady(&level_sectors[i]))
+            VisitSector(&level_sectors[i]);
+    }
+
+    if (active_mirror_set.TotalActive() == 0)
+        MarkAutomapLines();
 }

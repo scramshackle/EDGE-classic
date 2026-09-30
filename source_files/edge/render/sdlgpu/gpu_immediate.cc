@@ -603,13 +603,35 @@ void GpuImmediate::SetLineMode(bool enabled)
 static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBufferUsageFlags usage, const void *data,
                                               size_t bytes, const char *what);
 
-uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int count)
+
+uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
 {
     if (!vertices || count <= 0 || !device_)
         return 0;
 
-    SDL_GPUBuffer *buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, vertices,
-                                                    (size_t)count * sizeof(RendererVertex), "static mesh");
+    if (capacity < count)
+        capacity = count;
+
+    SDL_GPUBuffer *buffer = nullptr;
+
+    if (capacity == count)
+    {
+        buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, vertices,
+                                         (size_t)count * sizeof(RendererVertex), "static mesh");
+    }
+    else
+    {
+        SDL_GPUBufferCreateInfo buffer_info;
+        EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+
+        buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+        buffer_info.size  = (uint32_t)((size_t)capacity * sizeof(RendererVertex));
+
+        buffer = SDL_CreateGPUBuffer(device_, &buffer_info);
+
+        if (buffer)
+            QueueStaticUpload(buffer, 0, vertices, (size_t)count * sizeof(RendererVertex));
+    }
 
     if (!buffer)
         return 0;
@@ -628,6 +650,103 @@ uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int co
     return (uint32_t)static_buffers_.size();
 }
 
+void GpuImmediate::UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+{
+    if (handle == 0 || handle > static_buffers_.size() || !vertices || count <= 0 || first < 0 || !device_)
+        return;
+
+    SDL_GPUBuffer *buffer = static_buffers_[handle - 1];
+
+    if (!buffer)
+        return;
+
+    QueueStaticUpload(buffer, (uint32_t)((size_t)first * sizeof(RendererVertex)), vertices,
+                      (size_t)count * sizeof(RendererVertex));
+}
+
+void GpuImmediate::QueueStaticUpload(SDL_GPUBuffer *buffer, uint32_t offset, const void *data, size_t bytes)
+{
+    PendingStaticUpload upload;
+
+    upload.buffer      = buffer;
+    upload.offset      = offset;
+    upload.data_offset = static_upload_data_.size();
+    upload.bytes       = bytes;
+
+    const uint8_t *source = (const uint8_t *)data;
+
+    static_upload_data_.insert(static_upload_data_.end(), source, source + bytes);
+    static_uploads_.push_back(upload);
+}
+
+void GpuImmediate::FlushStaticUploads()
+{
+    if (static_uploads_.empty() || !device_)
+    {
+        static_uploads_.clear();
+        static_upload_data_.clear();
+        return;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transfer_info;
+    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+    transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_info.size  = (uint32_t)static_upload_data_.size();
+
+    SDL_GPUTransferBuffer *transfer = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
+
+    void *mapped = transfer ? SDL_MapGPUTransferBuffer(device_, transfer, false) : nullptr;
+
+    SDL_GPUCommandBuffer *command_buffer = mapped ? SDL_AcquireGPUCommandBuffer(device_) : nullptr;
+
+    if (!command_buffer)
+    {
+        LogPrint("GpuImmediate: static mesh upload failed: %s\n", SDL_GetError());
+
+        if (mapped)
+            SDL_UnmapGPUTransferBuffer(device_, transfer);
+
+        if (transfer)
+            SDL_ReleaseGPUTransferBuffer(device_, transfer);
+
+        static_uploads_.clear();
+        static_upload_data_.clear();
+        return;
+    }
+
+    memcpy(mapped, static_upload_data_.data(), static_upload_data_.size());
+
+    SDL_UnmapGPUTransferBuffer(device_, transfer);
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    for (size_t i = 0; i < static_uploads_.size(); i++)
+    {
+        const PendingStaticUpload &upload = static_uploads_[i];
+
+        SDL_GPUTransferBufferLocation source;
+        SDL_GPUBufferRegion           destination;
+
+        source.transfer_buffer = transfer;
+        source.offset          = (uint32_t)upload.data_offset;
+
+        destination.buffer = upload.buffer;
+        destination.offset = upload.offset;
+        destination.size   = (uint32_t)upload.bytes;
+
+        SDL_UploadToGPUBuffer(copy_pass, &source, &destination, false);
+    }
+
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
+    SDL_ReleaseGPUTransferBuffer(device_, transfer);
+
+    static_uploads_.clear();
+    static_upload_data_.clear();
+}
+
 void GpuImmediate::DeleteStaticBuffer(uint32_t handle)
 {
     if (handle == 0 || handle > static_buffers_.size())
@@ -640,6 +759,16 @@ void GpuImmediate::DeleteStaticBuffer(uint32_t handle)
 
     if (bound_vertex_buffer_ == buffer)
         bound_vertex_buffer_ = nullptr;
+
+    size_t keep = 0;
+
+    for (size_t i = 0; i < static_uploads_.size(); i++)
+    {
+        if (static_uploads_[i].buffer != buffer)
+            static_uploads_[keep++] = static_uploads_[i];
+    }
+
+    static_uploads_.resize(keep);
 
     deleted_static_buffers_.push_back(buffer);
 

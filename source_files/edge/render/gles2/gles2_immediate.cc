@@ -387,10 +387,13 @@ void Gles2Immediate::BindVertexAttributesFrom(GLuint buffer)
                           (const void *)offsetof(RendererVertex, rgba));
 }
 
-GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count)
+GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
 {
     if (!vertices || count <= 0)
         return 0;
+
+    if (capacity < count)
+        capacity = count;
 
     GLuint buffer = 0;
 
@@ -400,11 +403,32 @@ GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int co
         return 0;
 
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+
+    if (capacity == count)
+    {
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+    }
+    else
+    {
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)capacity * sizeof(RendererVertex)), nullptr,
+                     GL_STATIC_DRAW);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 
     return buffer;
+}
+
+void Gles2Immediate::UpdateStaticBuffer(GLuint buffer, int first, const RendererVertex *vertices, int count)
+{
+    if (!buffer || !vertices || count <= 0 || first < 0)
+        return;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)((size_t)first * sizeof(RendererVertex)),
+                    (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 }
 
 void Gles2Immediate::DeleteStaticBuffer(GLuint buffer)

@@ -3100,6 +3100,8 @@ void LevelSetup(void)
 
     BuildStaticMesh();
 
+    BakeStaticLevel();
+
     ChangeMusic(current_map->music_, true); // start level music
 
     level_active = true;

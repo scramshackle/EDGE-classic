@@ -77,6 +77,7 @@ extern ViewHeightZone view_height_zone;
 
 static Sector     *current_sector;
 static LineSide   *current_line_side;
+static bool        current_needs_transparent = false;
 static Extrafloor *current_region_extrafloor  = nullptr;
 static Extrafloor *current_surface_extrafloor = nullptr;
 
@@ -502,6 +503,9 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     // ignore non-solid walls in solid mode (& vice versa)
     if ((solid_mode && (blending & kBlendingAlpha)) || (!solid_mode && !(blending & kBlendingAlpha)))
     {
+        if (solid_mode)
+            current_needs_transparent = true;
+
         return;
     }
 
@@ -630,6 +634,9 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     bool capture = mirror_view.depth == 0 &&
                    StaticWallBakeEligible(current_line_side, surf, mid_masked, current_region_extrafloor,
                                           current_surface_extrafloor);
+
+    if (!capture && StaticBakeActive())
+        StaticMarkSectorDeclined(current_sector);
 
     if (capture)
         StaticCaptureBegin(current_line_side, surf, image, props, current_sector, blending, lit_adjust, data.normal,
@@ -1392,7 +1399,7 @@ static void RenderLineSide(DrawFloor *dfloor, LineSide *line_side)
     EPI_ASSERT(line_side->sidedef);
 
     // mark the line on the automap
-    if (!(line_side->linedef->flags & kLineFlagMapped))
+    if (!(line_side->linedef->flags & kLineFlagMapped) && !StaticBakeActive())
         newly_seen_lines.emplace(line_side->linedef);
 
     front_sector = line_side->front_sector;
@@ -1463,6 +1470,10 @@ static void RenderLineSide(DrawFloor *dfloor, LineSide *line_side)
             b_fh = back_sector->height_sector->interpolated_floor_height;
             b_ch = back_sector->height_sector->interpolated_ceiling_height;
         }
+
+        if (StaticBakeActive() && ((!sd->middle.image && !sd->bottom.image && b_fh > f_fh) ||
+                                   (!sd->top.image && b_ch < f_ch)))
+            StaticMarkSectorDeclined(current_sector);
 
         // -AJA- 2004/04/21: Emulate Flat-Flooding TRICK
         if (!debug_hall_of_mirrors.d_ && solid_mode && dfloor->is_lowest && !sd->middle.image && !sd->bottom.image &&
@@ -1560,7 +1571,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         return;
 
     // ignore non-facing planes
-    if ((view_z > h) != (face_dir > 0) && !slope && !own_sec->floor_vertex_slope)
+    if ((view_z > h) != (face_dir > 0) && !slope && !own_sec->floor_vertex_slope && !StaticBakeActive())
         return;
 
     // ignore dud regions (floor >= ceiling)
@@ -1579,7 +1590,12 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     // ignore non-solid walls in solid mode (& vice versa)
     if ((solid_mode && (blending & kBlendingAlpha)) || (!solid_mode && !(blending & kBlendingAlpha)))
+    {
+        if (solid_mode)
+            current_needs_transparent = true;
+
         return;
+    }
 
     sector_polygon_vertices.clear();
     sector_polygon_vertices.reserve(sector_polygon->indices.size());
@@ -1665,6 +1681,9 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     HMM_Vec2 uv_scale = {{1.0f / data.image_w, 1.0f / data.image_h}};
 
+    if (!capture && StaticBakeActive())
+        StaticMarkSectorDeclined(own_sec);
+
     constexpr size_t kPlaneChunk = kMaximumSectorPolygonVertices - (kMaximumSectorPolygonVertices % 3);
 
     bool parallax = surf->image->liquid_type_ > kLiquidImageNone && swirling_flats == kLiquidSwirlParallax;
@@ -1727,6 +1746,8 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> 
 {
     EDGE_ZoneScoped;
 
+    std::vector<DrawThing *> transparent_things;
+
     {
         EDGE_ZoneScopedN("RenderSectorList solid pass");
 
@@ -1743,7 +1764,7 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> 
         for (std::list<DrawMirror *>::iterator MRI = dmirrors.begin(); MRI != dmirrors.end(); MRI++)
             RenderMirror(*MRI);
 
-        RenderThings(dthings, solid_mode);
+        RenderThings(dthings, transparent_things);
 
         FinishUnitBatch();
     }
@@ -1754,6 +1775,17 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> 
         // draw all sprites and masked/translucent walls/planes
         solid_mode = false;
         render_backend->SetRenderLayer(kRenderLayerTransparent, false);
+
+        BeginRetainedUnits();
+        StartUnitBatch(solid_mode);
+
+        for (std::list<DrawSector *>::reverse_iterator RI = dsectors.rbegin(); RI != dsectors.rend(); RI++)
+            RenderSector(*RI);
+
+        RenderTransparentThings(transparent_things, false);
+
+        FinishUnitBatch();
+        EndRetainedUnits();
 
         static const OitPass oit_passes[4] = {kOitPassMasked, kOitPassAccumulate, kOitPassRevealage,
                                               kOitPassAdditive};
@@ -1775,16 +1807,130 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> 
 
             DrawStaticMesh(oit_passes[p], !for_mirror);
 
-            for (std::list<DrawSector *>::reverse_iterator RI = dsectors.rbegin(); RI != dsectors.rend(); RI++)
-                RenderSector(*RI);
+            ReplayRetainedUnits();
 
-            RenderThings(dthings, solid_mode);
+            RenderTransparentThings(transparent_things, true);
 
             FinishUnitBatch();
         }
 
         render_backend->SetOitPass(kOitPassNone);
     }
+}
+
+static void BakeSector(Sector *sector)
+{
+    StaticBakeSectorBegin(sector);
+
+    if (sector->height_sector || sector->extrafloor_used > 0)
+        StaticMarkSectorDeclined(sector);
+
+    for (int i = 0; i < sector->line_count; i++)
+    {
+        Line *line = sector->lines[i];
+
+        for (int side = 0; side < 2; side++)
+        {
+            LineSide *line_side = &level_line_sides[(line - level_lines) * 2 + side];
+
+            if (!line_side->sidedef || line_side->front_sector != sector)
+                continue;
+
+            Sector *back = line_side->back_sector;
+
+            if (back && (back->height_sector || back->extrafloor_used > 0))
+                StaticMarkSectorDeclined(sector);
+
+            if (back && !SkyWallBakeable(line_side, sector))
+                StaticMarkSectorDeclined(sector);
+        }
+    }
+
+    DrawSector *dsector = BakeDrawSector(sector);
+
+    for (int pass = 0; pass < 2; pass++)
+    {
+        solid_mode     = (pass == 0);
+        current_sector = dsector->sector;
+
+        for (DrawFloor *dfloor = dsector->render_floors; dfloor != nullptr; dfloor = dfloor->render_next)
+        {
+            for (size_t k = 0; k < dsector->line_sides.size(); k++)
+                RenderLineSide(dfloor, dsector->line_sides[k]);
+
+            RenderPlane(dfloor, dfloor->ceiling_height, dfloor->ceiling, -1);
+            RenderPlane(dfloor, dfloor->floor_height, dfloor->floor, +1);
+        }
+    }
+
+    StaticBakeSectorEnd(sector);
+}
+
+static std::vector<Sector *> pending_bake_sectors;
+
+void BakePendingStaticSectors(void)
+{
+    if (!StaticMeshBuilt())
+        return;
+
+    StaticTakeSettledPendingSectors(pending_bake_sectors);
+
+    if (pending_bake_sectors.empty())
+        return;
+
+    ViewHeightZone saved_zone  = view_height_zone;
+    bool           saved_solid = solid_mode;
+
+    view_height_zone = kHeightZoneNone;
+
+    StaticBakeBegin();
+
+    for (size_t i = 0; i < pending_bake_sectors.size(); i++)
+        BakeSector(pending_bake_sectors[i]);
+
+    StaticBakeEnd();
+
+    solid_mode       = saved_solid;
+    view_height_zone = saved_zone;
+}
+
+void BakeStaticLevel(void)
+{
+    if (!StaticMeshBuilt() || total_level_sectors <= 0 || StaticBakeDeferred())
+        return;
+
+    uint64_t mark = GetMicroseconds();
+
+    ViewHeightZone saved_zone  = view_height_zone;
+    bool           saved_solid = solid_mode;
+
+    view_height_zone = kHeightZoneNone;
+
+    StaticBakeBegin();
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        ClearBSP();
+
+        BakeSector(level_sectors + i);
+    }
+
+    StaticBakeEnd();
+
+    ClearBSP();
+
+    solid_mode       = saved_solid;
+    view_height_zone = saved_zone;
+
+    int batches    = 0;
+    int live_spans = 0;
+    int dead_spans = 0;
+    int vertices   = 0;
+
+    StaticMeshStats(&batches, &live_spans, &dead_spans, &vertices);
+
+    LogPrint("Static bake: %d sectors in %llu us, %d batches, %d spans, %d vertices\n", total_level_sectors,
+             (unsigned long long)(GetMicroseconds() - mark), batches, live_spans, vertices);
 }
 
 static void RenderSector(DrawSector *dsector)
@@ -1794,11 +1940,43 @@ static void RenderSector(DrawSector *dsector)
     // handle each floor, drawing planes and things
     for (DrawFloor *dfloor = dsector->render_floors; dfloor != nullptr; dfloor = dfloor->render_next)
     {
+        if (!solid_mode)
+        {
+            for (size_t i = 0; i < dfloor->transparent_line_sides.size(); i++)
+                RenderLineSide(dfloor, dfloor->transparent_line_sides[i]);
+
+            if (dfloor->transparent_planes & 1)
+                RenderPlane(dfloor, dfloor->ceiling_height, dfloor->ceiling, -1);
+
+            if (dfloor->transparent_planes & 2)
+                RenderPlane(dfloor, dfloor->floor_height, dfloor->floor, +1);
+
+            continue;
+        }
+
         for (size_t i = 0; i < dsector->line_sides.size(); i++)
+        {
+            current_needs_transparent = false;
+
             RenderLineSide(dfloor, dsector->line_sides[i]);
 
+            if (current_needs_transparent)
+                dfloor->transparent_line_sides.push_back(dsector->line_sides[i]);
+        }
+
+        current_needs_transparent = false;
+
         RenderPlane(dfloor, dfloor->ceiling_height, dfloor->ceiling, -1);
+
+        if (current_needs_transparent)
+            dfloor->transparent_planes |= 1;
+
+        current_needs_transparent = false;
+
         RenderPlane(dfloor, dfloor->floor_height, dfloor->floor, +1);
+
+        if (current_needs_transparent)
+            dfloor->transparent_planes |= 2;
     }
 }
 
@@ -2059,6 +2237,8 @@ void RenderTrueBSP(void)
         BeginSky();
     }
 
+
+    BakePendingStaticSectors();
 
     {
         EDGE_ZoneScopedN("RenderTrueBSP sectors");

@@ -25,6 +25,8 @@
 
 #include "r_colormap.h"
 
+#include <vector>
+
 #include "ddf_colormap.h"
 #include "ddf_game.h"
 #include "ddf_main.h"
@@ -559,6 +561,8 @@ class ColormapShader : public AbstractShader
     // for DDFLEVL fog checks
     Sector *sector_;
 
+    std::vector<RendererVertex> bake_vertices_;
+
   public:
     ColormapShader(const Colormap *CM)
         : colormap_(CM), light_level_(255), fade_texture_(0), lighting_model_(kLightingModelDoom),
@@ -650,6 +654,31 @@ class ColormapShader : public AbstractShader
                 fc_to_use = current_map->indoor_fog_color_;
                 fd_to_use = 0.01f * current_map->indoor_fog_density_;
             }
+        }
+
+        if (StaticBakeActive())
+        {
+            bake_vertices_.assign((size_t)num_vert, RendererVertex());
+
+            for (int v_idx = 0; v_idx < num_vert; v_idx++)
+            {
+                RendererVertex *dest = &bake_vertices_[(size_t)v_idx];
+
+                epi::SetRGBAAlpha(dest->rgba, alpha);
+
+                HMM_Vec3 lit_pos;
+                HMM_Vec3 normal;
+
+                (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
+
+                TextureCoordinates(dest, 1, &lit_pos);
+            }
+
+            StaticCaptureVertices(shape, bake_vertices_.data(), num_vert);
+
+            (*pass_var) += 1;
+
+            return;
         }
 
         RendererVertex *glvert =

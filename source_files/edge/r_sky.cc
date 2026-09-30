@@ -953,6 +953,12 @@ void FinishSkyForMirror(const DrawMirror *mir)
     sky_ref   = saved_sky_ref;
 }
 
+void SkyNoteResidentVisible(void)
+{
+    sky_current_bucket = SkyBucketFor(nullptr);
+    need_to_draw_sky   = true;
+}
+
 bool SkyResidentEnabled(void)
 {
     return true;

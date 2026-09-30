@@ -51,6 +51,10 @@ void StartUnitBatch(bool sort_em);
 void FinishUnitBatch(void);
 void RenderCurrentUnits(void);
 
+void BeginRetainedUnits(void);
+void EndRetainedUnits(void);
+void ReplayRetainedUnits(void);
+
 enum BlendingMode
 {
     kBlendingNone = 0,
@@ -164,6 +168,9 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 void            EndRenderUnit(int actual_vert);
 
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
+uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity);
+void     UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
+void     FlushStaticVertexUploads(void);
 void     DeleteStaticVertexBuffer(uint32_t handle);
 void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                              GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,

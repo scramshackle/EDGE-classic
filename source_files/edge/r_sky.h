@@ -74,6 +74,8 @@ void SkyResidentInvalidateSector(Sector *sec);
 
 bool SkyResidentEnabled(void);
 
+void SkyNoteResidentVisible(void);
+
 bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner);
 
 //--- editor settings ---
