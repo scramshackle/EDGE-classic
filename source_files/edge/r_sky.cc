@@ -1112,8 +1112,8 @@ static void BuildSkyCubemap(FakeSkybox *info)
         info->cubemap = 0;
     }
 
-    static const int kCubeFaceOrder[6] = {kSkyboxEast, kSkyboxWest,  kSkyboxTop,
-                                          kSkyboxBottom, kSkyboxSouth, kSkyboxNorth};
+    static const int kCubeFaceOrder[6] = {kSkyboxEast,  kSkyboxWest,  kSkyboxBottom,
+                                          kSkyboxTop,   kSkyboxNorth, kSkyboxSouth};
 
     ImageData *faces[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 

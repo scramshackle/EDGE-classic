@@ -162,7 +162,7 @@ static const char kWorldFragmentSource[] =
     "{\n"
     "    vec3 dir = SkyDirection();\n"
     "\n"
-    "    vec4 sampled = textureCube(u_sky_cube, vec3(dir.x, dir.z, -dir.y));\n"
+    "    vec4 sampled = textureCube(u_sky_cube, vec3(dir.y, -dir.z, dir.x));\n"
     "\n"
     "    vec3 rgb = sampled.rgb * v_color.rgb;\n"
     "\n"

@@ -176,7 +176,7 @@ vec4 SampleCubeSky()
 {
     vec3 dir = SkyDirection();
 
-    vec4 sampled = texture(texCube, vec3(dir.x, dir.z, -dir.y));
+    vec4 sampled = texture(texCube, vec3(dir.y, -dir.z, dir.x));
 
     vec3 rgb = sampled.rgb * color.rgb;
 

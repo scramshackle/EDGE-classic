@@ -242,7 +242,7 @@ static const char kModelFragmentSource[] =
     "        rgb = mix(rgb, u_fog_color.rgb, fog_factor);\n"
     "    }\n"
     "\n"
-    "    rgb += texel.rgb * modulate_sum + additive_sum;\n"
+    "    rgb += (texel.rgb * modulate_sum + additive_sum) * (1.0 - u_additive_pass);\n"
     "\n"
     "    vec4 fragment_color = vec4(rgb, texel.a * u_alpha);\n"
     "\n"
