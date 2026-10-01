@@ -1072,6 +1072,8 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
         info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
 
+        info.color_lookup = data.is_fuzzy_ ? 0 : render_unit_color_lookup;
+
         info.frame1 = frame1;
         info.frame2 = frame2;
         info.lerp   = lerp;

@@ -378,9 +378,7 @@ static void TextWrite(void)
         {
             if (title_scaling.d_) // Fill Border
             {
-                if (!finale_text_background->blurred_version_)
-                    StoreBlurredImage(finale_text_background);
-                HUDStretchImage(-320, -200, 960, 600, finale_text_background->blurred_version_, 0, 0);
+                HUDStretchImageBlurred(-320, -200, 960, 600, finale_text_background);
             }
             HUDDrawImageTitleWS(finale_text_background);
         }
@@ -767,9 +765,7 @@ static void CastDrawer(void)
         image = ImageLookup("BOSSBACK");
         if (title_scaling.d_) // Fill Border
         {
-            if (!image->blurred_version_)
-                StoreBlurredImage(image);
-            HUDStretchImage(-320, -200, 960, 600, image->blurred_version_, 0, 0);
+            HUDStretchImageBlurred(-320, -200, 960, 600, image);
         }
         HUDDrawImageTitleWS(image);
     }
@@ -857,10 +853,14 @@ static void CastDrawer(void)
     width *= scale_x;
     height *= scale_y;
 
-    GLuint tex_id = ImageCache(image, false, cast_order->palremap_);
+    GLuint tex_id = ImageCache(image, false);
+
+    render_unit_color_lookup = ColorLookupForColormap(cast_order->palremap_);
 
     HUDRawFromTexID(pos_x - offset_x, pos_y + offset_y, pos_x - offset_x + width, pos_y + offset_y + height, tex_id,
         (ImageOpacity)image->opacity_, flip ? 1.0f : 0, 0, flip ? 0 : 1.0f, 1.0f, 1.0f);
+
+    render_unit_color_lookup = 0;
 }
 
 //
@@ -953,9 +953,7 @@ void FinaleDrawer(void)
             ImageLookup(finale->pics_[HMM_MIN((size_t)picture_number, finale->pics_.size() - 1)].c_str());
         if (title_scaling.d_) // Fill Border
         {
-            if (!image->blurred_version_)
-                StoreBlurredImage(image);
-            HUDStretchImage(-320, -200, 960, 600, image->blurred_version_, 0, 0);
+            HUDStretchImageBlurred(-320, -200, 960, 600, image);
         }
         HUDDrawImageTitleWS(image);
         break;

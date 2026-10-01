@@ -96,7 +96,6 @@ struct StaticBatch
 
     const MapSurface *scroll_surface;
     HMM_Vec2          uv_scale;
-    float             liquid_amplitude;
 
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
@@ -123,7 +122,6 @@ static bool                     static_mesh_built = false;
 static std::vector<std::vector<SpanReference>> sector_spans;
 static std::vector<int>                       sector_light_cache;
 static std::vector<uint8_t>                   sector_height_state;
-static int                                    swirl_cache = -1;
 
 int SectorHeightState(const Sector *sec)
 {
@@ -184,12 +182,8 @@ static const MapSurface *capture_flat_surface = nullptr;
 static HMM_Vec2          capture_scroll_uv      = {{0, 0}};
 static HMM_Vec2          capture_uv_scale       = {{0, 0}};
 
-static float capture_liquid_amplitude = 0.0f;
-
 static void SetCaptureScrollOffset(const MapSurface *surf, const HMM_Vec2 &uv_scale)
 {
-    capture_liquid_amplitude = LiquidTurbulenceAmplitude();
-
     capture_scroll_uv = {{0, 0}};
     capture_uv_scale  = uv_scale;
 
@@ -798,7 +792,6 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
 
         if (b.image == image && b.colormap == colormap && b.blending == blending && b.draw_pass == draw_pass &&
             b.scroll_surface == scroller && b.is_wall == is_wall && b.face_dir == face_dir &&
-            epi::AlmostEquals(b.liquid_amplitude, capture_liquid_amplitude) &&
             b.properties->fog_color == props->fog_color && b.properties->fog_density == props->fog_density)
             return (int)i;
     }
@@ -814,9 +807,8 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
     batch.is_wall    = is_wall;
     batch.face_dir   = face_dir;
 
-    batch.uv_scale         = capture_uv_scale;
-    batch.liquid_amplitude = capture_liquid_amplitude;
-    batch.scroll_surface   = scroller;
+    batch.uv_scale       = capture_uv_scale;
+    batch.scroll_surface = scroller;
 
     static_batches.push_back(batch);
 
@@ -1246,16 +1238,6 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 
         dest.texture_coordinates[0].X -= capture_scroll_uv.X;
         dest.texture_coordinates[0].Y -= capture_scroll_uv.Y;
-
-        if (!epi::AlmostEquals(capture_liquid_amplitude, 0.0f))
-        {
-            HMM_Vec2 turbulence;
-
-            LiquidTurbulenceDelta(dest.position, &turbulence);
-
-            dest.texture_coordinates[0].X -= turbulence.X;
-            dest.texture_coordinates[0].Y -= turbulence.Y;
-        }
     }
 
     span.count = (int)batch.vertices.size() - span.start;
@@ -1464,9 +1446,6 @@ void BuildStaticMesh(void)
     for (int i = 0; i < total_level_sectors; i++)
         sector_light_cache[i] = level_sectors[i].properties.light_level;
 
-
-    swirl_cache = (int)swirling_flats;
-
     sector_bake_clean.assign((size_t)total_level_sectors, 0);
     sector_bake_pending.assign((size_t)total_level_sectors, 0);
     sector_bake_epoch.assign((size_t)total_level_sectors, 0);
@@ -1619,16 +1598,6 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
     EDGE_ZoneScoped;
 
-    if (refresh && draw_pass == kOitPassNone && swirl_cache != (int)swirling_flats)
-    {
-        swirl_cache = (int)swirling_flats;
-
-        DestroyStaticMesh();
-        BuildStaticMesh();
-
-        return;
-    }
-
     if (refresh && draw_pass == kOitPassNone)
     {
         EDGE_ZoneScopedN("StaticMesh RefreshLighting");
@@ -1672,11 +1641,11 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
             continue;
 
 
-        GLuint tex_id = ImageCache(batch.image, true, render_view_effect_colormap);
+        GLuint tex_id = ImageCache(batch.image, true);
 
         static_batch_texture_offset = BatchScrollOffset(batch);
 
-        static_batch_liquid = {{batch.liquid_amplitude, LiquidTurbulenceWave()}};
+        render_unit_liquid = LiquidShaderParameters(batch.image, LiquidLevelSeconds());
 
         AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
 
@@ -1720,4 +1689,6 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
             }
         }
     }
+
+    render_unit_liquid = {{0, 0, 0, 0}};
 }

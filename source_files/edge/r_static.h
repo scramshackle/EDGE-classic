@@ -48,9 +48,7 @@ enum HeightRenderState
 
 constexpr int kHeightKeyTotal = kHeightStateTotal * kHeightStateTotal;
 
-float LiquidTurbulenceAmplitude(void);
-float LiquidTurbulenceWave(void);
-void  LiquidTurbulenceDelta(const HMM_Vec3 &pos, HMM_Vec2 *delta);
+float LiquidLevelSeconds(void);
 
 int SectorHeightState(const Sector *sec);
 int StaticHeightKey(const Sector *front, const Sector *back);

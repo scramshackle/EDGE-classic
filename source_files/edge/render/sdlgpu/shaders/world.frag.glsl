@@ -34,6 +34,10 @@ layout(set = 3, binding = 0) uniform FragmentParameters
     vec4 glow_plane[2];
     vec4 glow_color[2];
     vec4 glow_additive;
+
+    vec4 color_lookup;
+    vec4 blur;
+    vec4 liquid;
 };
 
 
@@ -50,6 +54,7 @@ layout(set = 3, binding = 0) uniform FragmentParameters
 layout(set = 2, binding = 0) uniform sampler2D tex0;
 layout(set = 2, binding = 1) uniform sampler2D tex1;
 layout(set = 2, binding = 2) uniform samplerCube texCube;
+layout(set = 2, binding = 3) uniform sampler3D color_lookup_texture;
 
 layout(location = 0) out vec4 frag_color;
 
@@ -63,17 +68,17 @@ struct GpuLight
     vec4 color_additive;
 };
 
-layout(set = 2, binding = 3) readonly buffer LightBuffer
+layout(set = 2, binding = 4) readonly buffer LightBuffer
 {
     GpuLight gpu_lights[];
 };
 
-layout(set = 2, binding = 4) readonly buffer ClusterBuffer
+layout(set = 2, binding = 5) readonly buffer ClusterBuffer
 {
     uint gpu_clusters[];
 };
 
-layout(set = 2, binding = 5) readonly buffer LightIndexBuffer
+layout(set = 2, binding = 6) readonly buffer LightIndexBuffer
 {
     uint gpu_light_indices[];
 };
@@ -277,6 +282,94 @@ void OitEmit(vec4 fragment_color)
 }
 #endif
 
+vec2 LiquidFlow(vec2 point, vec2 direction, float time, float seed)
+{
+    float k = 6.2831853 / 72.0;
+    vec2  q = point + direction * 6.0 * time;
+
+    q += 4.0 * vec2(sin(q.y * k + time * 0.9 + seed), sin(q.x * k * 1.13 - time * 0.7 + seed * 1.7));
+    q += 2.4 * vec2(sin((q.x + q.y) * k * 0.61 + time * 0.53 + seed * 2.3),
+                    sin((q.x - q.y) * k * 0.79 - time * 0.61 + seed * 0.4));
+
+    return q;
+}
+
+vec4 SampleLiquid(vec2 coordinate)
+{
+    vec2  size  = liquid.zw;
+    vec2  point = coordinate * size;
+    float time  = liquid.y;
+
+    if (liquid.x < 1.5)
+    {
+        float k     = 6.2831853 / 40.0;
+        float swirl = time * 2.0;
+
+        point += vec2(sin(point.y * k + swirl * 1.7) + sin(point.x * k * 0.5 + swirl * 1.1 + 1.3),
+                      sin(point.x * k + swirl * 1.3 + 0.7) + sin(point.y * k * 0.5 - swirl * 0.9 + 2.1));
+
+        float kt = 6.2831853 / 320.0;
+
+        point += 3.0 * vec2(sin((point.x + point.y) * kt + swirl * 0.8),
+                            sin((point.y - point.x) * kt * 1.21 + swirl * 0.6));
+
+        return texture(tex0, point / size);
+    }
+
+    if (liquid.x < 2.5)
+    {
+        vec4 lower = texture(tex0, LiquidFlow(point, vec2(0.8, 0.6), time, 0.0) / size);
+        vec4 upper = texture(tex0, LiquidFlow(point + 25.0, vec2(-0.97386, 0.22717), time * 1.3, 3.1) / size);
+
+        return mix(lower, upper, 0.33);
+    }
+
+    float row = floor(point.y) + 0.5;
+
+    point.x += 2.0 * sin(row * 6.2831853 / 16.0 + time * 4.0);
+
+    return texture(tex0, point / size);
+}
+
+vec4 SampleBlurred(vec2 coordinate)
+{
+    vec2  size  = blur.zw;
+    vec2  point = coordinate * size - 0.5;
+    vec2  base  = floor(point);
+    float scale = -0.5 / (blur.x * blur.x);
+    vec4  sum   = vec4(0.0);
+    float total = 0.0;
+
+    for (int j = -1; j <= 2; j++)
+    {
+        for (int i = -1; i <= 2; i++)
+        {
+            vec2  center = base + vec2(float(i), float(j));
+            vec2  delta  = center - point;
+            float weight = exp(dot(delta, delta) * scale);
+
+            sum += texture(tex0, (center + 0.5) / size) * weight;
+            total += weight;
+        }
+    }
+
+    return sum / total;
+}
+
+vec3 WhitenColor(vec3 source)
+{
+    float brightest = max(source.r, max(source.g, source.b));
+
+    return vec3((brightest * 196.0 + (source.r + source.g + source.b) * 20.0) / 256.0);
+}
+
+vec3 ApplyColorLookup(vec3 source)
+{
+    vec3 coordinate = clamp(source, 0.0, 1.0) * (63.0 / 64.0) + (0.5 / 64.0);
+
+    return texture(color_lookup_texture, coordinate).rgb;
+}
+
 void main()
 {
     if ((flags & 16) == 16)
@@ -296,6 +389,9 @@ void main()
             frag_color = SampleCubeSky();
         else
             frag_color = SampleEquirectSky();
+
+        if (color_lookup.x > 0.5)
+            frag_color.rgb = ApplyColorLookup(frag_color.rgb);
         return;
     }
 
@@ -320,10 +416,28 @@ void main()
         return;
     }
 
-    vec4 c0 = texture(tex0, uv.xy);
+    vec4 c0;
+
+    if (blur.x > 0.0)
+        c0 = SampleBlurred(uv.xy);
+    else if (liquid.x > 0.5)
+        c0 = SampleLiquid(uv.xy);
+    else
+        c0 = texture(tex0, uv.xy);
+
     if (alpha_test != 0.0 && c0.w < alpha_test)
     {
         discard;
+    }
+
+    if (color_lookup.x > 0.5)
+    {
+        c0.rgb = ApplyColorLookup(c0.rgb);
+    }
+
+    if ((flags & 64) == 64)
+    {
+        c0.rgb = WhitenColor(c0.rgb);
     }
 
     if ((flags & 4) == 4)

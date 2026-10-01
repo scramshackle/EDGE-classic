@@ -546,6 +546,7 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetAlpha(info.alpha);
         gles2_model_program.SetAlphaTest(info.alpha_test);
         gles2_model_program.SetAdditivePass(info.additive_pass);
+        gles2_model_program.SetColorLookup(info.color_lookup);
         gles2_model_program.SetOit(
             (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage) ? (float)oit_mode : 0.0f,
             gles2_immediate.OitScale());
@@ -603,7 +604,16 @@ class Gles2RenderState : public RenderState
 
         ApplyState();
 
+        gles2_program.SetColorLookup(color_lookup_slot_);
+
         gles2_immediate.DrawModelIndexed(index_first, index_count);
+
+        gles2_program.SetColorLookup(0);
+    }
+
+    void SetColorLookup(int slot)
+    {
+        color_lookup_slot_ = slot;
     }
 
     void ApplyState()
@@ -829,6 +839,8 @@ class Gles2RenderState : public RenderState
     bool state_dirty_ = true;
 
     const RendererVertex *vertex_array_base_ = nullptr;
+
+    int color_lookup_slot_ = 0;
 };
 
 static Gles2RenderState state;

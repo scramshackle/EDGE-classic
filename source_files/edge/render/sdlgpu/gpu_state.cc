@@ -726,6 +726,8 @@ class GpuRenderState : public RenderState
             fragment_parameters.glow_additive[i] = live ? glow_set->glows[i].additive : 0.0f;
         }
 
+        fragment_parameters.color_lookup[0] = gpu_immediate.SetColorLookup(info.color_lookup) ? 1.0f : 0.0f;
+
         gpu_immediate.RecordModelDraw(info, vertex_parameters, fragment_parameters);
     }
 
@@ -745,7 +747,16 @@ class GpuRenderState : public RenderState
 
         ApplyTextureBindings();
 
+        gpu_immediate.SetColorLookup(color_lookup_slot_);
+
         gpu_immediate.DrawIndexed(vertex_array_base_, vertex_array_count_, model_indices_ + index_first, index_count);
+
+        gpu_immediate.SetColorLookup(0);
+    }
+
+    void SetColorLookup(int slot)
+    {
+        color_lookup_slot_ = slot;
     }
 
   private:
@@ -859,6 +870,8 @@ class GpuRenderState : public RenderState
 
     const uint16_t *model_indices_     = nullptr;
     int             model_index_count_ = 0;
+
+    int color_lookup_slot_ = 0;
 };
 
 static GpuRenderState state;

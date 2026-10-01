@@ -322,7 +322,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     if (!image)
         return;
 
-    GLuint tex_id = ImageCache(image, false, (which == kPlayerSpriteCrosshair) ? nullptr : render_view_effect_colormap);
+    GLuint tex_id = ImageCache(image, false);
 
     float w     = image->ScaledWidth();
     float h     = image->ScaledHeight();
@@ -552,6 +552,11 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
     /* draw the weapon */
 
+    int saved_lookup = render_unit_color_lookup;
+
+    if (which == kPlayerSpriteCrosshair)
+        render_unit_color_lookup = 0;
+
     StartUnitBatch(false);
 
     int num_pass = is_fuzzy ? 1 : (detail_level > 0 ? 4 : 3);
@@ -624,6 +629,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     }
 
     FinishUnitBatch();
+
+    render_unit_color_lookup = saved_lookup;
 
     render_state->Disable(GL_SCISSOR_TEST);
 }
@@ -745,7 +752,14 @@ void RenderCrosshair(Player *p)
     }
 
     if (p->health_ > 0)
+    {
+        int saved_lookup         = render_unit_color_lookup;
+        render_unit_color_lookup = 0;
+
         DrawStdCrossHair();
+
+        render_unit_color_lookup = saved_lookup;
+    }
 }
 
 void RenderWeaponModel(Player *p)
@@ -1225,8 +1239,7 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
     const Image *image = dthing->image;
 
-    GLuint tex_id = ImageCache(
-        image, false, render_view_effect_colormap ? render_view_effect_colormap : dthing->map_object->info_->palremap_);
+    GLuint tex_id = ImageCache(image, false);
 
     // calculate edges of the shape
     float sprite_width  = image->ScaledWidth();
@@ -1470,6 +1483,15 @@ static bool RenderThing(DrawThing *dthing, bool solid)
         }
     }
 
+    float tint_r = 1.0f;
+    float tint_g = 1.0f;
+    float tint_b = 1.0f;
+
+    int saved_lookup = render_unit_color_lookup;
+
+    if (!render_view_effect_colormap && !ColormapTintFactors(mo->info_->palremap_, &tint_r, &tint_g, &tint_b))
+        render_unit_color_lookup = ColorLookupForColormap(mo->info_->palremap_);
+
     for (int pass = 0; pass < num_pass; pass++)
     {
         if (pass == 1)
@@ -1520,9 +1542,10 @@ static bool RenderThing(DrawThing *dthing, bool solid)
             }
             else if (!is_additive)
             {
-                dest->rgba = epi::MakeRGBAClamped(data.colors[v_idx].modulate_red_ * render_view_red_multiplier,
-                                                  (data.colors[v_idx].modulate_green_ * render_view_green_multiplier),
-                                                  data.colors[v_idx].modulate_blue_ * render_view_blue_multiplier);
+                dest->rgba =
+                    epi::MakeRGBAClamped(data.colors[v_idx].modulate_red_ * render_view_red_multiplier * tint_r,
+                                         data.colors[v_idx].modulate_green_ * render_view_green_multiplier * tint_g,
+                                         data.colors[v_idx].modulate_blue_ * render_view_blue_multiplier * tint_b);
 
                 data.colors[v_idx].modulate_red_ -= 256;
                 data.colors[v_idx].modulate_green_ -= 256;
@@ -1540,6 +1563,8 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
         EndRenderUnit(4);
     }
+
+    render_unit_color_lookup = saved_lookup;
 
     return solid;
 }

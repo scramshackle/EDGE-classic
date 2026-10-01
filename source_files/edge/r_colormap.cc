@@ -25,6 +25,8 @@
 
 #include "r_colormap.h"
 
+#include <limits.h>
+
 #include <vector>
 
 #include "ddf_colormap.h"
@@ -41,6 +43,7 @@
 #include "i_defs_gl.h"
 #include "i_system.h"
 #include "m_argv.h"
+#include "r_backend.h"
 #include "r_gldefs.h"
 #include "r_image.h"
 #include "r_mirror.h"
@@ -146,6 +149,8 @@ void InitializePalette(void)
     LogPrint("Loaded global palette.\n");
 
     LogDebug("Black:%d White:%d Gray:%d\n", playpal_black, playpal_white, playpal_gray);
+
+    ResetColorLookups();
 }
 
 static int cur_palette = -1;
@@ -263,6 +268,140 @@ void TranslatePalette(uint8_t *new_pal, const uint8_t *old_pal, const Colormap *
             new_pal[j * 3 + 2] = old_pal[k * 3 + 2];
         }
     }
+}
+
+int render_unit_color_lookup = 0;
+
+static std::vector<uint8_t> color_lookup_nearest;
+static const Colormap      *color_lookup_owners[kColorLookupMaximum];
+static int                  color_lookup_next = 1;
+
+static std::vector<const Colormap *> color_lookup_identities;
+
+static void BuildColorLookupNearest(void)
+{
+    color_lookup_nearest.resize((size_t)kColorLookupSize * kColorLookupSize * kColorLookupSize);
+
+    int step_max = kColorLookupSize - 1;
+
+    for (int b = 0; b < kColorLookupSize; b++)
+    {
+        int blue = (b * 255 + step_max / 2) / step_max;
+
+        for (int g = 0; g < kColorLookupSize; g++)
+        {
+            int green = (g * 255 + step_max / 2) / step_max;
+
+            for (int r = 0; r < kColorLookupSize; r++)
+            {
+                int red = (r * 255 + step_max / 2) / step_max;
+
+                int best_distance = INT_MAX;
+                int best_index    = 0;
+
+                for (int k = 0; k < 256; k++)
+                {
+                    int dr = playpal_data[0][k][0] - red;
+                    int dg = playpal_data[0][k][1] - green;
+                    int db = playpal_data[0][k][2] - blue;
+
+                    int distance = dr * dr + dg * dg + db * db;
+
+                    if (distance < best_distance)
+                    {
+                        best_distance = distance;
+                        best_index    = k;
+                    }
+                }
+
+                color_lookup_nearest[((size_t)b * kColorLookupSize + g) * kColorLookupSize + r] = (uint8_t)best_index;
+            }
+        }
+    }
+}
+
+bool ColormapTintFactors(const Colormap *colmap, float *r, float *g, float *b)
+{
+    if (!colmap || colmap->length_ != 0)
+        return false;
+
+    *r = (epi::GetRGBARed(colmap->gl_color_) + 1) / 256.0f;
+    *g = (epi::GetRGBAGreen(colmap->gl_color_) + 1) / 256.0f;
+    *b = (epi::GetRGBABlue(colmap->gl_color_) + 1) / 256.0f;
+
+    return true;
+}
+
+void ResetColorLookups(void)
+{
+    color_lookup_nearest.clear();
+
+    for (int i = 0; i < kColorLookupMaximum; i++)
+        color_lookup_owners[i] = nullptr;
+
+    color_lookup_identities.clear();
+
+    color_lookup_next = 1;
+
+    render_unit_color_lookup = 0;
+}
+
+int ColorLookupForColormap(const Colormap *colmap)
+{
+    if (!colmap)
+        return 0;
+
+    for (int i = 1; i < kColorLookupMaximum; i++)
+    {
+        if (color_lookup_owners[i] == colmap)
+            return i;
+    }
+
+    for (const Colormap *identity : color_lookup_identities)
+    {
+        if (identity == colmap)
+            return 0;
+    }
+
+    uint8_t translated[256 * 3];
+
+    TranslatePalette(translated, &playpal_data[0][0][0], colmap);
+
+    if (memcmp(translated, &playpal_data[0][0][0], sizeof(translated)) == 0)
+    {
+        color_lookup_identities.push_back(colmap);
+        return 0;
+    }
+
+    if (color_lookup_nearest.empty())
+        BuildColorLookupNearest();
+
+    size_t cells = color_lookup_nearest.size();
+
+    std::vector<uint8_t> pixels(cells * 4);
+
+    for (size_t i = 0; i < cells; i++)
+    {
+        const uint8_t *source = &translated[color_lookup_nearest[i] * 3];
+
+        pixels[i * 4 + 0] = source[0];
+        pixels[i * 4 + 1] = source[1];
+        pixels[i * 4 + 2] = source[2];
+        pixels[i * 4 + 3] = 255;
+    }
+
+    int slot = color_lookup_next;
+
+    color_lookup_next++;
+
+    if (color_lookup_next >= kColorLookupMaximum)
+        color_lookup_next = 1;
+
+    color_lookup_owners[slot] = colmap;
+
+    render_backend->UploadColorLookup(slot, pixels.data());
+
+    return slot;
 }
 
 static int AnalyseColourmap(const uint8_t *table, int alpha, int *r, int *g, int *b)

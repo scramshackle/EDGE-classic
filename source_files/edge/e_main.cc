@@ -246,9 +246,7 @@ class StartupProgress
         {
             if (title_scaling.d_) // Fill Border
             {
-                if (!loading_image->blurred_version_)
-                    StoreBlurredImage(loading_image);
-                HUDStretchImage(-320, -200, 960, 600, loading_image->blurred_version_, 0, 0);
+                HUDStretchImageBlurred(-320, -200, 960, 600, loading_image);
             }
             HUDDrawImageTitleWS(loading_image);
             HUDSolidBox(25, 25, 295, 175, kRGBABlack);
@@ -831,9 +829,7 @@ static void TitleDrawer(void)
     {
         if (title_scaling.d_) // Fill Border
         {
-            if (!title_image->blurred_version_)
-                StoreBlurredImage(title_image);
-            HUDStretchImage(-320, -200, 960, 600, title_image->blurred_version_, 0, 0);
+            HUDStretchImageBlurred(-320, -200, 960, 600, title_image);
         }
         HUDDrawImageTitleWS(title_image);
     }
@@ -1033,29 +1029,7 @@ static void PickMenuBackdrop(void)
         // found one !!
         title_game                       = gamedefs.size() - 1;
         title_pic                        = 29999;
-        Image *new_backdrop              = new Image;
-        new_backdrop->name_              = menu_image->name_;
-        new_backdrop->height_            = menu_image->height_;
-        new_backdrop->width_             = menu_image->width_;
-        new_backdrop->cache_             = menu_image->cache_;
-        new_backdrop->is_empty_          = menu_image->is_empty_;
-        new_backdrop->is_font_           = menu_image->is_font_;
-        new_backdrop->liquid_type_       = menu_image->liquid_type_;
-        new_backdrop->offset_x_          = menu_image->offset_x_;
-        new_backdrop->offset_y_          = menu_image->offset_y_;
-        new_backdrop->opacity_           = menu_image->opacity_;
-        new_backdrop->scale_x_           = menu_image->scale_x_;
-        new_backdrop->scale_y_           = menu_image->scale_y_;
-        new_backdrop->source_graphic_    = menu_image->source_graphic_;
-        new_backdrop->source_flat_       = menu_image->source_flat_;
-        new_backdrop->source_texture_    = menu_image->source_texture_;
-        new_backdrop->source_dummy_      = menu_image->source_dummy_;
-        new_backdrop->source_user_       = menu_image->source_user_;
-        new_backdrop->source_palette_    = menu_image->source_palette_;
-        new_backdrop->source_type_       = menu_image->source_type_;
-        new_backdrop->animation_.current = new_backdrop;
-        new_backdrop->grayscale_         = true;
-        menu_backdrop                    = new_backdrop;
+        menu_backdrop = menu_image;
         return;
     }
 
@@ -1064,29 +1038,7 @@ static void PickMenuBackdrop(void)
     title_pic  = 29999;
     if (loading_image)
     {
-        Image *new_backdrop              = new Image;
-        new_backdrop->name_              = loading_image->name_;
-        new_backdrop->height_            = loading_image->height_;
-        new_backdrop->width_             = loading_image->width_;
-        new_backdrop->cache_             = loading_image->cache_;
-        new_backdrop->is_empty_          = loading_image->is_empty_;
-        new_backdrop->is_font_           = loading_image->is_font_;
-        new_backdrop->liquid_type_       = loading_image->liquid_type_;
-        new_backdrop->offset_x_          = loading_image->offset_x_;
-        new_backdrop->offset_y_          = loading_image->offset_y_;
-        new_backdrop->opacity_           = loading_image->opacity_;
-        new_backdrop->scale_x_           = loading_image->scale_x_;
-        new_backdrop->scale_y_           = loading_image->scale_y_;
-        new_backdrop->source_graphic_    = loading_image->source_graphic_;
-        new_backdrop->source_flat_       = loading_image->source_flat_;
-        new_backdrop->source_texture_    = loading_image->source_texture_;
-        new_backdrop->source_dummy_      = loading_image->source_dummy_;
-        new_backdrop->source_user_       = loading_image->source_user_;
-        new_backdrop->source_palette_    = loading_image->source_palette_;
-        new_backdrop->source_type_       = loading_image->source_type_;
-        new_backdrop->animation_.current = new_backdrop;
-        new_backdrop->grayscale_         = true;
-        menu_backdrop                    = new_backdrop;
+        menu_backdrop = loading_image;
     }
     else
         menu_backdrop = nullptr;
@@ -2149,6 +2101,8 @@ static void EdgeStartup(void)
     ShowDateAndVersion();
 
     LoadDefaults();
+
+    NormalizeLiquidSwirl();
 
     HandleProgramArguments();
     SetGlobalVariables();

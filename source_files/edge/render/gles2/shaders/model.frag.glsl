@@ -2,6 +2,8 @@ const float kFogLinear = 1.0;
 const float kLog2      = 1.442695;
 
 uniform sampler2D u_texture0;
+uniform sampler2D u_color_lookup;
+uniform float     u_color_lookup_enabled;
 
 uniform sampler2D u_light_data;
 uniform sampler2D u_light_headers;
@@ -65,6 +67,20 @@ float OitWeight(float alpha, float view_depth)
     return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
 }
 
+vec3 ApplyColorLookup(vec3 source)
+{
+    vec3  scaled = clamp(source, 0.0, 1.0) * 63.0;
+    float blue0  = floor(scaled.b);
+    float blue1  = min(blue0 + 1.0, 63.0);
+    vec2  inner  = (scaled.rg + 0.5) / 512.0;
+    vec2  tile0  = vec2(mod(blue0, 8.0), floor(blue0 / 8.0)) * 0.125;
+    vec2  tile1  = vec2(mod(blue1, 8.0), floor(blue1 / 8.0)) * 0.125;
+    vec3  low    = texture2D(u_color_lookup, tile0 + inner).rgb;
+    vec3  high   = texture2D(u_color_lookup, tile1 + inner).rgb;
+
+    return mix(low, high, scaled.b - blue0);
+}
+
 void main()
 {
     vec4 texel = texture2D(u_texture0, vec2(v_color_and_u.w, v_eye_and_v.w));
@@ -72,6 +88,11 @@ void main()
     if (u_alpha_test > 0.0 && texel.a < u_alpha_test)
     {
         discard;
+    }
+
+    if (u_color_lookup_enabled > 0.5)
+    {
+        texel.rgb = ApplyColorLookup(texel.rgb);
     }
 
     vec3 modulate_sum = vec3(0.0, 0.0, 0.0);

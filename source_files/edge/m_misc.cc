@@ -113,7 +113,7 @@ static ConfigurationDefault defaults[] = {
     {kConfigInteger, "mipmapping", &image_mipmapping, EDGE_DEFAULT_USE_MIPMAPPING},
     {kConfigInteger, "dlights", &use_dynamic_lights, EDGE_DEFAULT_USE_DLIGHTS},
     {kConfigInteger, "detail_level", &detail_level, EDGE_DEFAULT_DETAIL_LEVEL},
-    {kConfigInteger, "hq2x_scaling", &hq2x_scaling, EDGE_DEFAULT_HQ2X_SCALING},
+    {kConfigInteger, "hq2x_scaling", &image_upscaling, EDGE_DEFAULT_UPSCALING},
 
     // -KM- 1998/09/01 Useless mouse/joy stuff removed,
     //                 analogue binding added

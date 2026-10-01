@@ -56,7 +56,8 @@ enum GpuFragmentFlag
     kGpuFragmentFlagSkipRGB      = (1 << 2),
     kGpuFragmentFlagSkyPass      = (1 << 3),
     kGpuFragmentFlagOitComposite = (1 << 4),
-    kGpuFragmentFlagLightFalloff = (1 << 5)
+    kGpuFragmentFlagLightFalloff = (1 << 5),
+    kGpuFragmentFlagWhiten       = (1 << 6)
 };
 
 enum GpuFogMode
@@ -77,7 +78,7 @@ struct GpuVertexParameters
     float    sky_geometry;
     float    view_tint[4];
     float    texture_offset[2];
-    float    liquid[2];
+    float    vertex_padding0[2];
 };
 
 struct GpuFragmentParameters
@@ -110,6 +111,10 @@ struct GpuFragmentParameters
     float glow_plane[2][4];
     float glow_color[2][4];
     float glow_additive[4];
+
+    float color_lookup[4];
+    float blur[4];
+    float liquid[4];
 };
 
 struct GpuModelVertexParameters
@@ -145,6 +150,8 @@ struct GpuModelFragmentParameters
     float glow_plane[2][4];
     float glow_color[2][4];
     float glow_additive[4];
+
+    float color_lookup[4];
 };
 
 
@@ -179,7 +186,9 @@ static_assert(offsetof(GpuModelFragmentParameters, glow_color) == 112,
               "GpuModelFragmentParameters::glow_color offset");
 static_assert(offsetof(GpuModelFragmentParameters, glow_additive) == 144,
               "GpuModelFragmentParameters::glow_additive offset");
-static_assert(sizeof(GpuModelFragmentParameters) == 160, "GpuModelFragmentParameters size");
+static_assert(offsetof(GpuModelFragmentParameters, color_lookup) == 160,
+              "GpuModelFragmentParameters::color_lookup offset");
+static_assert(sizeof(GpuModelFragmentParameters) == 176, "GpuModelFragmentParameters size");
 
 static_assert(offsetof(GpuVertexParameters, mvp) == 0, "GpuVertexParameters::mvp offset");
 static_assert(offsetof(GpuVertexParameters, tm) == 64, "GpuVertexParameters::tm offset");
@@ -189,7 +198,7 @@ static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 196, "GpuVertexPar
 static_assert(offsetof(GpuVertexParameters, light_depth) == 200, "GpuVertexParameters::light_depth offset");
 static_assert(offsetof(GpuVertexParameters, view_tint) == 208, "GpuVertexParameters::view_tint offset");
 static_assert(offsetof(GpuVertexParameters, texture_offset) == 224, "GpuVertexParameters::texture_offset offset");
-static_assert(offsetof(GpuVertexParameters, liquid) == 232, "GpuVertexParameters::liquid offset");
+static_assert(offsetof(GpuVertexParameters, vertex_padding0) == 232, "GpuVertexParameters::vertex_padding0 offset");
 static_assert(sizeof(GpuVertexParameters) == 240, "GpuVertexParameters size");
 
 static_assert(offsetof(GpuFragmentParameters, flags) == 0, "GpuFragmentParameters::flags offset");
@@ -214,7 +223,10 @@ static_assert(offsetof(GpuFragmentParameters, light_range) == 240, "GpuFragmentP
 static_assert(offsetof(GpuFragmentParameters, glow_plane) == 256, "GpuFragmentParameters::glow_plane offset");
 static_assert(offsetof(GpuFragmentParameters, glow_color) == 288, "GpuFragmentParameters::glow_color offset");
 static_assert(offsetof(GpuFragmentParameters, glow_additive) == 320, "GpuFragmentParameters::glow_additive offset");
-static_assert(sizeof(GpuFragmentParameters) == 336, "GpuFragmentParameters size");
+static_assert(offsetof(GpuFragmentParameters, color_lookup) == 336, "GpuFragmentParameters::color_lookup offset");
+static_assert(offsetof(GpuFragmentParameters, blur) == 352, "GpuFragmentParameters::blur offset");
+static_assert(offsetof(GpuFragmentParameters, liquid) == 368, "GpuFragmentParameters::liquid offset");
+static_assert(sizeof(GpuFragmentParameters) == 384, "GpuFragmentParameters size");
 
 bool CreateModelShaders(SDL_GPUDevice *device);
 

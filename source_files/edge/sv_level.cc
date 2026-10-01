@@ -702,10 +702,6 @@ void SaveGameLevelPutSurface(void *storage, int index)
 {
     MapSurface *src = (MapSurface *)storage + index;
 
-    // force fogwall recreation when loading a save
-    if (src->fog_wall)
-        src->image = nullptr;
-
     SaveGameStructSave(src, &sv_struct_surface);
 }
 

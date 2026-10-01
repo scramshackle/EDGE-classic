@@ -6,10 +6,13 @@
 
 #include <string.h>
 
+#include <vector>
+
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
 #include "r_backend.h"
+#include "r_colormap.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
 #include "shaders/oit_glsl.h"
@@ -19,6 +22,79 @@ Gles2Program      gles2_program;
 Gles2ModelProgram gles2_model_program;
 Gles2MovieProgram gles2_movie_program;
 Gles2OitProgram   gles2_oit_program;
+
+static constexpr int kColorLookupTiles = 8;
+
+static GLuint color_lookup_textures[kColorLookupMaximum] = {};
+static GLuint color_lookup_bound                         = 0;
+
+static void BindColorLookupTexture(GLuint texture)
+{
+    GLint previous_unit = GL_TEXTURE0;
+
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previous_unit);
+
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitColorLookup);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glActiveTexture((GLenum)previous_unit);
+
+    color_lookup_bound = texture;
+}
+
+static bool UseColorLookup(int slot)
+{
+    GLuint texture = (slot > 0 && slot < kColorLookupMaximum) ? color_lookup_textures[slot] : 0;
+
+    if (texture != 0 && texture != color_lookup_bound)
+        BindColorLookupTexture(texture);
+
+    return texture != 0;
+}
+
+void Gles2UploadColorLookup(int slot, const uint8_t *pixels)
+{
+    if (slot <= 0 || slot >= kColorLookupMaximum || !pixels)
+        return;
+
+    int atlas_size = kColorLookupSize * kColorLookupTiles;
+
+    std::vector<uint8_t> packed((size_t)atlas_size * atlas_size * 4);
+
+    for (int b = 0; b < kColorLookupSize; b++)
+    {
+        int tile_x = (b % kColorLookupTiles) * kColorLookupSize;
+        int tile_y = (b / kColorLookupTiles) * kColorLookupSize;
+
+        for (int g = 0; g < kColorLookupSize; g++)
+        {
+            const uint8_t *source = pixels + ((size_t)b * kColorLookupSize + g) * kColorLookupSize * 4;
+            uint8_t       *dest   = packed.data() + ((size_t)(tile_y + g) * atlas_size + tile_x) * 4;
+
+            memcpy(dest, source, (size_t)kColorLookupSize * 4);
+        }
+    }
+
+    if (color_lookup_textures[slot] == 0)
+        glGenTextures(1, &color_lookup_textures[slot]);
+
+    GLint previous_unit = GL_TEXTURE0;
+
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previous_unit);
+
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitColorLookup);
+    glBindTexture(GL_TEXTURE_2D, color_lookup_textures[slot]);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas_size, atlas_size, 0, GL_RGBA, GL_UNSIGNED_BYTE, packed.data());
+
+    glActiveTexture((GLenum)previous_unit);
+
+    color_lookup_bound = color_lookup_textures[slot];
+}
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
 {
@@ -132,6 +208,10 @@ bool Gles2Program::Init()
     uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
     uniform_oit_mode_               = glGetUniformLocation(program_, "u_oit_mode");
     uniform_oit_scale_              = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_color_lookup_           = glGetUniformLocation(program_, "u_color_lookup");
+    uniform_color_lookup_enabled_   = glGetUniformLocation(program_, "u_color_lookup_enabled");
+    uniform_whiten_                 = glGetUniformLocation(program_, "u_whiten");
+    uniform_blur_                   = glGetUniformLocation(program_, "u_blur");
     uniform_texture_offset_         = glGetUniformLocation(program_, "u_texture_offset");
     uniform_liquid_                 = glGetUniformLocation(program_, "u_liquid");
     uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
@@ -159,6 +239,7 @@ bool Gles2Program::Init()
     glUniform1i(uniform_light_data_, kGles2TextureUnitLightData);
     glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
     glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
+    glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
 
     return true;
 }
@@ -346,14 +427,36 @@ void Gles2Program::SetTextureOffset(const HMM_Vec2 &offset)
     glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
 }
 
-void Gles2Program::SetLiquid(const HMM_Vec2 &liquid)
+void Gles2Program::SetLiquid(const HMM_Vec4 &liquid)
 {
-    if (epi::AlmostEquals(shadow_liquid_.X, liquid.X) && epi::AlmostEquals(shadow_liquid_.Y, liquid.Y))
+    if (epi::AlmostEquals(shadow_liquid_.X, liquid.X) && epi::AlmostEquals(shadow_liquid_.Y, liquid.Y) &&
+        epi::AlmostEquals(shadow_liquid_.Z, liquid.Z) && epi::AlmostEquals(shadow_liquid_.W, liquid.W))
         return;
 
     shadow_liquid_ = liquid;
 
-    glUniform2f(uniform_liquid_, liquid.X, liquid.Y);
+    glUniform4f(uniform_liquid_, liquid.X, liquid.Y, liquid.Z, liquid.W);
+}
+
+void Gles2Program::SetColorLookup(int slot)
+{
+    SetFloat(uniform_color_lookup_enabled_, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetWhiten(bool enabled)
+{
+    SetFloat(uniform_whiten_, shadow_whiten_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetBlur(const HMM_Vec4 &blur)
+{
+    if (epi::AlmostEquals(shadow_blur_.X, blur.X) && epi::AlmostEquals(shadow_blur_.Z, blur.Z) &&
+        epi::AlmostEquals(shadow_blur_.W, blur.W))
+        return;
+
+    shadow_blur_ = blur;
+
+    glUniform4f(uniform_blur_, blur.X, blur.Y, blur.Z, blur.W);
 }
 
 void Gles2Program::ForceOitReset()
@@ -510,14 +613,22 @@ bool Gles2ModelProgram::Init()
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
     uniform_oit_mode_              = glGetUniformLocation(program_, "u_oit_mode");
     uniform_oit_scale_             = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_color_lookup_          = glGetUniformLocation(program_, "u_color_lookup");
+    uniform_color_lookup_enabled_  = glGetUniformLocation(program_, "u_color_lookup_enabled");
 
     glUseProgram(program_);
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
     glUniform1i(uniform_light_data_, kGles2TextureUnitLightData);
     glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
     glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
+    glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
 
     return true;
+}
+
+void Gles2ModelProgram::SetColorLookup(int slot)
+{
+    SetFloat(uniform_color_lookup_enabled_, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
 }
 
 void Gles2ModelProgram::SetWorldLit(bool enabled)

@@ -142,6 +142,11 @@ class GpuRenderBackend : public RenderBackend
         return gpu_immediate.ModelViewMatrix();
     }
 
+    void UploadColorLookup(int slot, const uint8_t *pixels)
+    {
+        gpu_immediate.UploadColorLookup(slot, pixels);
+    }
+
     void UploadLightGrid(const LightGrid *grid)
     {
         GpuUploadLightGrid(grid);
@@ -387,7 +392,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.SetLineMode(false);
         gpu_immediate.SetViewTint(1.0f, 1.0f, 1.0f);
         gpu_immediate.SetTextureOffset({{0.0f, 0.0f}});
-        gpu_immediate.SetLiquid({{0.0f, 0.0f}});
+        gpu_immediate.SetLiquid({{0.0f, 0.0f, 0.0f, 0.0f}});
         gpu_immediate.SetOitComposite(true);
 
         gpu_immediate.SetMultiTexture(accumulation->texture, accumulation->sampler, revealage->texture,

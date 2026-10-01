@@ -13,6 +13,7 @@
 #include "gpu_lights.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
+#include "r_colormap.h"
 #include "r_gldefs.h"
 #include "r_misc.h"
 #include "r_state.h"
@@ -47,11 +48,14 @@ struct RendererUnit
     bool        world_lit_enabled   = false;
     int         glow_set            = -1;
     int         light_view_index    = -1;
+    int         color_lookup        = 0;
+    bool        whiten              = false;
+    HMM_Vec4    blur                = {{0, 0, 0, 0}};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
     HMM_Vec2 texture_offset = {{0, 0}};
-    HMM_Vec2 liquid         = {{0, 0}};
+    HMM_Vec4 liquid         = {{0, 0, 0, 0}};
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -72,7 +76,10 @@ static bool batch_sort;
 RGBAColor culling_fog_color;
 
 HMM_Vec2 static_batch_texture_offset = {{0, 0}};
-HMM_Vec2 static_batch_liquid         = {{0, 0}};
+
+bool     render_unit_whiten = false;
+HMM_Vec4 render_unit_blur   = {{0, 0, 0, 0}};
+HMM_Vec4 render_unit_liquid = {{0, 0, 0, 0}};
 
 
 static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
@@ -246,10 +253,13 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->world_lit_enabled   = world_lit;
     unit->glow_set            = glow_set;
     unit->light_view_index    = GpuCurrentLightView();
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->scissor_enabled     = false;
     unit->static_buffer       = handle;
     unit->texture_offset      = static_batch_texture_offset;
-    unit->liquid              = static_batch_liquid;
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
     unit->static_first        = first;
 
     if (sky_pass)
@@ -303,8 +313,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->world_lit_enabled   = world_lit;
     unit->glow_set            = glow_set;
     unit->light_view_index    = GpuCurrentLightView();
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->texture_offset      = {{0, 0}};
-    unit->liquid              = {{0, 0}};
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
     unit->static_buffer       = 0;
     unit->static_first        = 0;
 
@@ -367,6 +380,12 @@ struct Compare_Unit_pred
 
         if (A->environment_mode[1] != B->environment_mode[1])
             return A->environment_mode[1] < B->environment_mode[1];
+
+        if (A->color_lookup != B->color_lookup)
+            return A->color_lookup < B->color_lookup;
+
+        if (A->whiten != B->whiten)
+            return A->whiten < B->whiten;
 
         return A->blending < B->blending;
     }
@@ -703,6 +722,9 @@ void RenderCurrentUnits(void)
         gpu_immediate.SetGlowSet(unit->glow_set);
         gpu_immediate.SetTextureOffset(unit->texture_offset);
         gpu_immediate.SetLiquid(unit->liquid);
+        gpu_immediate.SetColorLookup(unit->color_lookup);
+        gpu_immediate.SetWhiten(unit->whiten);
+        gpu_immediate.SetBlur(unit->blur);
 
         if (unit->light_depth_enabled)
             gpu_immediate.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
@@ -731,6 +753,9 @@ void RenderCurrentUnits(void)
 
     gpu_immediate.SetSkipRGB(false);
     gpu_immediate.SetSkyPass(nullptr);
+    gpu_immediate.SetColorLookup(0);
+    gpu_immediate.SetWhiten(false);
+    gpu_immediate.SetBlur({{0, 0, 0, 0}});
 
     current_render_vert = current_render_unit = 0;
 }

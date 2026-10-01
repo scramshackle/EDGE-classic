@@ -1243,10 +1243,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
     }
     else /* (! data.is_fuzzy_) */
     {
-        skin_tex = ImageCache(skin_img, false,
-                              render_view_effect_colormap ? render_view_effect_colormap
-                              : is_weapon                 ? nullptr
-                                                          : mo->info_->palremap_);
+        skin_tex = ImageCache(skin_img, false);
 
         AbstractShader *shader =
             GetColormapShader(props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->sector_);
@@ -1447,6 +1444,14 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
 
         info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
 
+        info.color_lookup = render_unit_color_lookup;
+
+        if (!render_view_effect_colormap && !is_weapon)
+            info.color_lookup = ColorLookupForColormap(mo->info_->palremap_);
+
+        if (data.is_fuzzy_)
+            info.color_lookup = 0;
+
         info.frame1 = frame1;
         info.frame2 = frame2;
         info.lerp   = lerp;
@@ -1499,7 +1504,7 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
     if (frame < 0 || frame >= md->total_frames_)
         return;
 
-    GLuint skin_tex = ImageCache(skin_img, false, info->palremap_);
+    GLuint skin_tex = ImageCache(skin_img, false);
 
     xscale = yscale * info->model_scale_ * info->model_aspect_;
     yscale = yscale * info->model_scale_;
@@ -1548,7 +1553,9 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
         const ModelMeshSubmesh &submesh = mesh.submeshes_[s];
 
         render_state->SetVertexArrays(model_vertices.data() + submesh.first_vertex, submesh.vertex_count);
+        render_state->SetColorLookup(ColorLookupForColormap(info->palremap_));
         render_state->DrawModelIndexed(submesh.first_index, submesh.index_count);
+        render_state->SetColorLookup(0);
     }
 
     render_state->Disable(GL_BLEND);

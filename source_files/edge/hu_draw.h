@@ -52,6 +52,7 @@ void  HUDSetFont(Font *font = nullptr);
 void  HUDSetScale(float scale = 1.0f);
 void  HUDSetTextColor(RGBAColor color = kRGBANoValue);
 void  HUDSetAlpha(float alpha = 1.0f);
+void  HUDSetImageWhiten(bool whiten);
 float HUDGetAlpha(void);
 
 // xa is -1 for left, 0 for centred, +1 for right
@@ -98,6 +99,7 @@ void HUDDrawImageTitleWS(const Image *image);
 void HUDStretchImage(float x, float y, float w, float h, const Image *image, float sx, float sy,
                      const Colormap *colmap = nullptr);
 void HUDStretchImageNoOffset(float x, float y, float w, float h, const Image *image, float sx, float sy);
+void HUDStretchImageBlurred(float x, float y, float w, float h, const Image *image);
 void HUDTileImage(float x, float y, float w, float h, const Image *image, float offset_x = 0.0f, float offset_y = 0.0f);
 
 // Functions for when we want to draw without having an Image class

@@ -55,6 +55,15 @@ void TranslatePalette(uint8_t *new_pal, const uint8_t *old_pal, const Colormap *
 
 void GetColormapRGB(const Colormap *colmap, float *r, float *g, float *b);
 
+constexpr int kColorLookupSize    = 64;
+constexpr int kColorLookupMaximum = 32;
+
+extern int render_unit_color_lookup;
+
+int  ColorLookupForColormap(const Colormap *colmap);
+void ResetColorLookups(void);
+bool ColormapTintFactors(const Colormap *colmap, float *r, float *g, float *b);
+
 RGBAColor GetFontColor(const Colormap *colmap);
 RGBAColor ParseFontColor(const char *name, bool strict = false);
 

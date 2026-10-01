@@ -163,6 +163,11 @@ class Gles2RenderBackend : public RenderBackend
         return gles2_immediate.ModelViewMatrix();
     }
 
+    void UploadColorLookup(int slot, const uint8_t *pixels)
+    {
+        Gles2UploadColorLookup(slot, pixels);
+    }
+
     void UploadLightGrid(const LightGrid *grid)
     {
         Gles2UploadLightGrid(grid);

@@ -230,6 +230,8 @@ class RenderState
 
     virtual void DrawModelIndexed(int index_first, int index_count) = 0;
 
+    virtual void SetColorLookup(int slot) = 0;
+
     virtual uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count) = 0;
 
     virtual void DeleteModelMesh(uint32_t handle) = 0;

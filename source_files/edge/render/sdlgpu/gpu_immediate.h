@@ -9,6 +9,7 @@
 #include "gpu_pipeline.h"
 #include "gpu_shaders.h"
 #include "i_defs_gl.h"
+#include "r_colormap.h"
 #include "r_units.h"
 
 constexpr int32_t kGpuMatrixStackDepth = 32;
@@ -67,8 +68,8 @@ struct GpuDrawArguments
 {
     SDL_GPUGraphicsPipeline *pipeline;
 
-    SDL_GPUTexture *texture[3];
-    SDL_GPUSampler *sampler[3];
+    SDL_GPUTexture *texture[4];
+    SDL_GPUSampler *sampler[4];
 
     int32_t base_vertex;
     int32_t vertex_count;
@@ -93,6 +94,8 @@ struct GpuModelDrawArguments
 
     SDL_GPUTexture *texture;
     SDL_GPUSampler *sampler;
+    SDL_GPUTexture *lookup_texture;
+    SDL_GPUSampler *lookup_sampler;
 
     SDL_GPUBuffer *position_buffer;
     SDL_GPUBuffer *normal_buffer;
@@ -263,7 +266,15 @@ class GpuImmediate
 
     void SetTextureOffset(const HMM_Vec2 &offset);
 
-    void SetLiquid(const HMM_Vec2 &liquid);
+    void SetLiquid(const HMM_Vec4 &liquid);
+
+    bool SetColorLookup(int slot);
+
+    void SetWhiten(bool enabled);
+
+    void SetBlur(const HMM_Vec4 &blur);
+
+    void UploadColorLookup(int slot, const uint8_t *pixels);
 
     uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity);
     void     UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
@@ -437,6 +448,9 @@ class GpuImmediate
 
     SDL_GPUTexture *current_texture_[2] = {nullptr, nullptr};
     SDL_GPUTexture *current_sky_cube_texture_ = nullptr;
+    SDL_GPUTexture *current_color_lookup_texture_ = nullptr;
+    SDL_GPUSampler *current_color_lookup_sampler_ = nullptr;
+    GLuint          color_lookup_ids_[kColorLookupMaximum] = {};
     SDL_GPUSampler *current_sky_cube_sampler_ = nullptr;
     SDL_GPUSampler *current_sampler_[2] = {nullptr, nullptr};
 
@@ -447,7 +461,6 @@ class GpuImmediate
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;
     float       texture_offset_[2]  = {0.0f, 0.0f};
-    float       liquid_[2]          = {0.0f, 0.0f};
     float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;
@@ -472,8 +485,8 @@ class GpuImmediate
     int32_t pending_count_ = 0;
 
     SDL_GPUGraphicsPipeline *bound_pipeline_    = nullptr;
-    SDL_GPUTexture          *bound_texture_[3]  = {nullptr, nullptr, nullptr};
-    SDL_GPUSampler          *bound_sampler_[3]  = {nullptr, nullptr, nullptr};
+    SDL_GPUTexture          *bound_texture_[4]  = {nullptr, nullptr, nullptr, nullptr};
+    SDL_GPUSampler          *bound_sampler_[4]  = {nullptr, nullptr, nullptr, nullptr};
     SDL_GPUBuffer           *bound_index_buffer_ = nullptr;
 
     int32_t bound_stencil_reference_        = -1;

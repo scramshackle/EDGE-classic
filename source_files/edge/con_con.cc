@@ -383,7 +383,7 @@ static RendererVertex *StartText()
     {
         // Always whiten the font when used with console output
         const ImageFont *con_font = (ImageFont *)console_font;
-        tex_id                    = ImageCache(con_font->font_image_, true, (const Colormap *)0, true);
+        tex_id                    = ImageCache(con_font->font_image_, true);
         blend                     = kBlendingMasked;
     }
     else if (console_font->definition_->type_ == kFontTypeTrueType)
@@ -399,8 +399,14 @@ static RendererVertex *StartText()
         blend = kBlendingAlpha;
     }
 
-    return BeginRenderUnit(GL_QUADS, kMaximumLocalVertices, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0,
-                           0, blend);
+    render_unit_whiten = (console_font->definition_->type_ == kFontTypeImage);
+
+    RendererVertex *glvert = BeginRenderUnit(GL_QUADS, kMaximumLocalVertices, GL_MODULATE, tex_id,
+                                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
+
+    render_unit_whiten = false;
+
+    return glvert;
 }
 
 static void AddChar(float x, float y, char ch, RendererVertex *&glvert, RGBAColor col)
@@ -637,9 +643,11 @@ void ConsoleDrawer(void)
         EndRenderUnit(console_verts);
         console_verts            = 0;
         const ImageFont *en_font = (const ImageFont *)endoom_font;
+        render_unit_whiten       = true;
         console_glvert           = BeginRenderUnit(GL_QUADS, kENDOOMTotalVerts, GL_MODULATE,
-                                                   ImageCache(en_font->font_image_, true, (const Colormap *)0, true),
+                                                   ImageCache(en_font->font_image_, true),
                                                    (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingMasked);
+        render_unit_whiten       = false;
         int enwidth              = RoundToInteger((float)en_font->image_monospace_width_ *
                                                   ((float)FNSZ / en_font->image_monospace_width_) / 2);
 

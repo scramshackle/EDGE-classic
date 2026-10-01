@@ -217,11 +217,7 @@ struct FakeSkybox
 {
     const Image *base_sky = nullptr;
 
-    const Colormap *effect_colormap = nullptr;
-
     int face_size = 1;
-
-    GLuint texture[6] = {0, 0, 0, 0, 0, 0};
 
     GLuint cubemap = 0;
 
@@ -234,22 +230,13 @@ static std::unordered_map<uint64_t, FakeSkybox> fake_box_cache;
 
 static FakeSkybox *current_fake_box = nullptr;
 
-static uint64_t MakeSkyboxCacheKey(const Image *base_sky, const Colormap *effect_colormap)
+static uint64_t MakeSkyboxCacheKey(const Image *base_sky)
 {
-    return (uint64_t)(uintptr_t)base_sky ^ ((uint64_t)(uintptr_t)effect_colormap * 0x9E3779B97F4A7C15ull);
+    return (uint64_t)(uintptr_t)base_sky;
 }
 
 static void DeleteSkyTexGroup(FakeSkybox &box)
 {
-    for (int i = 0; i < 6; i++)
-    {
-        if (box.texture[i] != 0)
-        {
-            render_state->DeleteTexture(&box.texture[i]);
-            box.texture[i] = 0;
-        }
-    }
-
     if (box.cubemap != 0)
     {
         DeleteSkyCubemap(box.cubemap);
@@ -702,7 +689,7 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
 
 static void RenderSkyEquirect(const SkySection &section)
 {
-    GLuint sky_tex_id = ImageCache(sky_image, true, render_view_effect_colormap);
+    GLuint sky_tex_id = ImageCache(sky_image, true);
 
     if (current_map->forced_skystretch_ > kSkyStretchUnset)
         current_sky_stretch = current_map->forced_skystretch_;
@@ -1184,18 +1171,17 @@ static void BuildSkyCubemap(FakeSkybox *info)
 
 void UpdateSkyboxTextures(void)
 {
-    FakeSkybox *info = &fake_box_cache[MakeSkyboxCacheKey(sky_image, render_view_effect_colormap)];
+    FakeSkybox *info = &fake_box_cache[MakeSkyboxCacheKey(sky_image)];
 
     current_fake_box = info;
 
-    if (info->base_sky == sky_image && info->effect_colormap == render_view_effect_colormap)
+    if (info->base_sky == sky_image)
     {
         custom_skybox = (info->face[kSkyboxNorth] != nullptr);
         return;
     }
 
-    info->base_sky        = sky_image;
-    info->effect_colormap = render_view_effect_colormap;
+    info->base_sky = sky_image;
 
     // check for custom sky boxes
     info->face[kSkyboxNorth] =
@@ -1240,9 +1226,6 @@ void UpdateSkyboxTextures(void)
 
         for (int k = 0; k < 6; k++)
             MarkImageAsSky(info->face[k]);
-
-        for (int k = 0; k < 6; k++)
-            info->texture[k] = ImageCache(info->face[k], true, render_view_effect_colormap);
 
         BuildSkyCubemap(info);
     }

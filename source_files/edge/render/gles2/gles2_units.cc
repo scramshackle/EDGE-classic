@@ -13,6 +13,7 @@
 #include "gles2_program.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
+#include "r_colormap.h"
 #include "r_gldefs.h"
 #include "r_misc.h"
 #include "r_state.h"
@@ -48,11 +49,14 @@ struct RendererUnit
     bool        light_depth_enabled = false;
     bool        world_lit_enabled   = false;
     int         glow_set            = -1;
+    int         color_lookup        = 0;
+    bool        whiten              = false;
+    HMM_Vec4    blur                = {{0, 0, 0, 0}};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
     HMM_Vec2 texture_offset = {{0, 0}};
-    HMM_Vec2 liquid         = {{0, 0}};
+    HMM_Vec4 liquid         = {{0, 0, 0, 0}};
     SkyPassInfo sky_pass;
 
     bool            scissor_enabled = false;
@@ -76,7 +80,10 @@ static bool batch_sort;
 RGBAColor culling_fog_color;
 
 HMM_Vec2 static_batch_texture_offset = {{0, 0}};
-HMM_Vec2 static_batch_liquid         = {{0, 0}};
+
+bool     render_unit_whiten = false;
+HMM_Vec4 render_unit_blur   = {{0, 0, 0, 0}};
+HMM_Vec4 render_unit_liquid = {{0, 0, 0, 0}};
 
 
 
@@ -250,6 +257,9 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->light_depth_enabled = true;
     unit->world_lit_enabled   = world_lit;
     unit->glow_set            = glow_set;
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->scissor_enabled     = false;
     unit->index_first         = 0;
     unit->index_count         = 0;
@@ -257,7 +267,7 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->static_first        = first;
     unit->count               = count;
     unit->texture_offset      = static_batch_texture_offset;
-    unit->liquid              = static_batch_liquid;
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -312,8 +322,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->light_depth_enabled = light_depth;
     unit->world_lit_enabled   = world_lit;
     unit->glow_set            = glow_set;
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->texture_offset      = {{0, 0}};
-    unit->liquid              = {{0, 0}};
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -374,6 +387,12 @@ struct Compare_Unit_pred
 
         if (A->environment_mode[1] != B->environment_mode[1])
             return A->environment_mode[1] < B->environment_mode[1];
+
+        if (A->color_lookup != B->color_lookup)
+            return A->color_lookup < B->color_lookup;
+
+        if (A->whiten != B->whiten)
+            return A->whiten < B->whiten;
 
         return A->blending < B->blending;
     }
@@ -496,7 +515,10 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
         !epi::AlmostEquals(a->texture_offset.X, b->texture_offset.X) ||
         !epi::AlmostEquals(a->texture_offset.Y, b->texture_offset.Y) ||
         !epi::AlmostEquals(a->liquid.X, b->liquid.X) || !epi::AlmostEquals(a->liquid.Y, b->liquid.Y) ||
-        a->light_depth_enabled != b->light_depth_enabled || a->world_lit_enabled != b->world_lit_enabled || a->glow_set != b->glow_set || a->static_buffer || b->static_buffer ||
+        !epi::AlmostEquals(a->liquid.Z, b->liquid.Z) || !epi::AlmostEquals(a->liquid.W, b->liquid.W) ||
+        a->light_depth_enabled != b->light_depth_enabled || a->world_lit_enabled != b->world_lit_enabled || a->glow_set != b->glow_set ||
+        a->color_lookup != b->color_lookup || a->whiten != b->whiten || !epi::AlmostEquals(a->blur.X, b->blur.X) ||
+        a->static_buffer || b->static_buffer ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
         return false;
 
@@ -992,6 +1014,9 @@ void RenderCurrentUnits(void)
         gles2_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
         gles2_program.SetTextureOffset(unit->texture_offset);
         gles2_program.SetLiquid(unit->liquid);
+        gles2_program.SetColorLookup(unit->color_lookup);
+        gles2_program.SetWhiten(unit->whiten);
+        gles2_program.SetBlur(unit->blur);
 
         if (unit->light_depth_enabled)
             gles2_program.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
@@ -1035,6 +1060,10 @@ void RenderCurrentUnits(void)
     }
 
     render_state->ActiveTexture(GL_TEXTURE0);
+
+    gles2_program.SetColorLookup(0);
+    gles2_program.SetWhiten(false);
+    gles2_program.SetBlur({{0, 0, 0, 0}});
 
     gles2_immediate.InvalidateBatch();
 

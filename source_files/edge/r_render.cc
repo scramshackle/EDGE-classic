@@ -104,9 +104,6 @@ static constexpr float kWavetableIncrement = 0.0009765625f;
 static Sector *front_sector;
 static Sector *back_sector;
 
-static int  swirl_pass   = 0;
-static bool thick_liquid = false;
-
 static float wave_now;    // value for doing wave table lookups
 static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
@@ -205,46 +202,9 @@ static HMM_Vec3 PlaneGeometricNormal(const Sector *sec, int face_dir)
     return normal;
 }
 
-float LiquidTurbulenceAmplitude(void)
+float LiquidLevelSeconds(void)
 {
-    if (swirl_pass == 0)
-        return 0.0f;
-
-    if (swirling_flats == kLiquidSwirlParallax)
-    {
-        if (thick_liquid)
-            return (swirl_pass == 1) ? 0.05f : 0.0f;
-
-        return (swirl_pass == 1) ? 0.025f : -0.015f;
-    }
-
-    return 0.05f;
-}
-
-float LiquidTurbulenceWave(void)
-{
-    return wave_now * (thick_liquid ? 0.5f : 1.0f);
-}
-
-void LiquidTurbulenceDelta(const HMM_Vec3 &pos, HMM_Vec2 *delta)
-{
-    float amplitude = LiquidTurbulenceAmplitude();
-    float now       = LiquidTurbulenceWave();
-
-    delta->X = sine_table[(int)(((pos.X + pos.Z) * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] *
-               amplitude;
-    delta->Y = sine_table[(int)((pos.Y * kWavetableIncrement + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-}
-
-// Adapted from Quake 3 GPL release - Dasho
-static void CalcTurbulentTexCoords(HMM_Vec2 *texc, HMM_Vec3 *pos)
-{
-    HMM_Vec2 delta;
-
-    LiquidTurbulenceDelta(*pos, &delta);
-
-    texc->X += delta.X;
-    texc->Y += delta.Y;
+    return ((float)level_time_elapsed + fractional_tic) / 35.0f;
 }
 
 struct WallCoordinateData
@@ -294,18 +254,9 @@ static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM
     *pos    = data->vertices[v_idx];
     *normal = data->normal;
 
-    if (swirl_pass > 1)
-    {
-        *rgb = epi::MakeRGBA((uint8_t)(255.0f / data->R * render_view_red_multiplier),
-                             (uint8_t)(255.0f / data->G * render_view_green_multiplier),
-                             (uint8_t)(255.0f / data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
-    }
-    else
-    {
-        *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
-                             (uint8_t)(data->G * render_view_green_multiplier),
-                             (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
-    }
+    *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
+                         (uint8_t)(data->G * render_view_green_multiplier),
+                         (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
 
     float along;
 
@@ -320,9 +271,6 @@ static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM
 
     texc->X = data->tx0 + along * data->tx_mul;
     texc->Y = data->ty0 + pos->Z * data->ty_mul;
-
-    if (swirl_pass > 0)
-        CalcTurbulentTexCoords(texc, pos);
 
     *lit_pos = *pos;
 }
@@ -380,18 +328,9 @@ static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
     *pos    = data->vertices[v_idx];
     *normal = data->normal;
 
-    if (swirl_pass > 1)
-    {
-        *rgb = epi::MakeRGBA((uint8_t)(255.0f / data->R * render_view_red_multiplier),
-                             (uint8_t)(255.0f / data->G * render_view_green_multiplier),
-                             (uint8_t)(255.0f / data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
-    }
-    else
-    {
-        *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
-                             (uint8_t)(data->G * render_view_green_multiplier),
-                             (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
-    }
+    *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
+                         (uint8_t)(data->G * render_view_green_multiplier),
+                         (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
 
     HMM_Vec2 rxy = {{(data->tx0 + pos->X), (data->ty0 + pos->Y)}};
 
@@ -403,9 +342,6 @@ static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
 
     texc->X = rxy.X * data->x_mat.X + rxy.Y * data->x_mat.Y;
     texc->Y = rxy.X * data->y_mat.X + rxy.Y * data->y_mat.Y;
-
-    if (swirl_pass > 0)
-        CalcTurbulentTexCoords(texc, pos);
 
     if (data->bob_amount > 0)
         pos->Z += (plane_z_bob * data->bob_amount);
@@ -496,7 +432,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     EPI_ASSERT(image);
 
     // (need to load the image to know the opacity)
-    GLuint tex_id = ImageCache(image, true, render_view_effect_colormap);
+    GLuint tex_id = ImageCache(image, true);
 
     BlendingMode blending = GetSurfaceBlending(trans, (ImageOpacity)image->opacity_);
 
@@ -603,6 +539,13 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
 
     data.R = data.G = data.B = 255;
 
+    if (surf->fog_wall)
+    {
+        data.R = epi::GetRGBARed(current_line_side->fog_wall_color);
+        data.G = epi::GetRGBAGreen(current_line_side->fog_wall_color);
+        data.B = epi::GetRGBABlue(current_line_side->fog_wall_color);
+    }
+
     data.div.x       = x1;
     data.div.y       = y1;
     data.div.delta_x = x2 - x1;
@@ -621,14 +564,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     data.trans      = trans;
     data.mid_masked = mid_masked;
 
-    if (surf->image && surf->image->liquid_type_ == kLiquidImageThick)
-        thick_liquid = true;
-    else
-        thick_liquid = false;
-
-    if (surf->image && surf->image->liquid_type_ > kLiquidImageNone && swirling_flats > kLiquidSwirlSmmu)
-        swirl_pass = 1;
-
     AbstractShader *cmap_shader = GetColormapShader(props, lit_adjust, current_sector);
 
     bool capture = mirror_view.depth == 0 &&
@@ -644,39 +579,15 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
                            CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}},
                            current_region_extrafloor, current_surface_extrafloor);
 
+    render_unit_liquid = LiquidShaderParameters(surf->image, LiquidLevelSeconds());
+
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
 
+    render_unit_liquid = {{0, 0, 0, 0}};
+
     if (capture)
         StaticCaptureEnd();
-
-    if (surf->image && surf->image->liquid_type_ > kLiquidImageNone && swirling_flats == kLiquidSwirlParallax)
-    {
-        data.tx0               = data.tx0 + 25;
-        data.ty0               = data.ty0 + 25;
-        swirl_pass             = 2;
-        BlendingMode old_blend = data.blending;
-        float        old_dt    = data.trans;
-        data.blending          = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
-        data.trans             = 85;
-
-        if (capture)
-            StaticCaptureBegin(current_line_side, surf, image, props, current_sector, data.blending, lit_adjust,
-                               data.normal, data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
-                               CaptureDrawPass(data.blending), {{surf->x_matrix.X / total_w, -ty_mul}},
-                               current_region_extrafloor, current_surface_extrafloor);
-
-        cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false, &data,
-                              WallCoordFunc);
-
-        if (capture)
-            StaticCaptureEnd();
-
-        data.blending = old_blend;
-        data.trans    = old_dt;
-    }
-
-    swirl_pass = 0;
 }
 
 static void DrawSlidingDoor(DrawFloor *dfloor, float c, float f, float tex_top_h, MapSurface *surf, bool opaque,
@@ -954,6 +865,8 @@ static void ComputeWallTiles(LineSide *line_side, DrawFloor *dfloor, int sidenum
     bool lower_invis = false;
     bool upper_invis = false;
 
+    line_side->fog_wall_active = false;
+
     if (!sd)
         return;
 
@@ -1085,37 +998,45 @@ static void ComputeWallTiles(LineSide *line_side, DrawFloor *dfloor, int sidenum
         }
     }
 
-    if (sd->middle.fog_wall && draw_culling.d_)
-        sd->middle.image = nullptr; // Don't delete image in case culling is toggled again
+    MapSurface *middle = &sd->middle;
 
     if (!sd->middle.image && !draw_culling.d_)
     {
+        RGBAColor fog_wall_color   = kRGBANoValue;
+        float     fog_wall_density = 0.0f;
+
         if (sec_fc == kRGBANoValue && other_fc != kRGBANoValue)
         {
-            Image *fw               = (Image *)ImageForFogWall(other_fc);
-            fw->opacity_            = kOpacityComplex;
-            sd->middle.image        = fw;
-            sd->middle.translucency = other_fd * 100;
-            sd->middle.fog_wall     = true;
+            fog_wall_color   = other_fc;
+            fog_wall_density = other_fd;
         }
         else if (sec_fc != kRGBANoValue && other_fc != sec_fc)
         {
-            Image *fw               = (Image *)ImageForFogWall(sec_fc);
-            fw->opacity_            = kOpacityComplex;
-            sd->middle.image        = fw;
-            sd->middle.translucency = sec_fd * 100;
-            sd->middle.fog_wall     = true;
+            fog_wall_color   = sec_fc;
+            fog_wall_density = sec_fd;
+        }
+
+        if (fog_wall_color != kRGBANoValue)
+        {
+            line_side->fog_wall_surface              = sd->middle;
+            line_side->fog_wall_surface.image        = ImageForFogWall();
+            line_side->fog_wall_surface.translucency = fog_wall_density * 100;
+            line_side->fog_wall_surface.fog_wall     = true;
+            line_side->fog_wall_color                = fog_wall_color;
+            line_side->fog_wall_active               = true;
+
+            middle = &line_side->fog_wall_surface;
         }
     }
 
     if (!other)
     {
-        if (!sd->middle.image && !debug_hall_of_mirrors.d_)
+        if (!middle->image && !debug_hall_of_mirrors.d_)
             return;
 
-        AddWallTile(line_side, dfloor, &sd->middle, slope_fh, slope_ch,
+        AddWallTile(line_side, dfloor, middle, slope_fh, slope_ch,
                     (ld->flags & kLineFlagLowerUnpegged)
-                        ? sec->interpolated_floor_height + (SafeImageHeight(sd->middle.image) / sd->middle.y_matrix.Y)
+                        ? sec->interpolated_floor_height + (SafeImageHeight(middle->image) / middle->y_matrix.Y)
                         : sec->interpolated_ceiling_height,
                     0, f_min, c_max);
         return;
@@ -1245,14 +1166,14 @@ static void ComputeWallTiles(LineSide *line_side, DrawFloor *dfloor, int sidenum
         }
     }
 
-    if (sd->middle.image)
+    if (middle->image)
     {
         float f1 = HMM_MAX(sec->interpolated_floor_height, other->interpolated_floor_height);
         float c1 = HMM_MIN(sec->interpolated_ceiling_height, other->interpolated_ceiling_height);
 
         float f2, c2;
 
-        if (sd->middle.fog_wall)
+        if (middle->fog_wall)
         {
             float ofh = other->interpolated_floor_height;
             if (other->floor_slope)
@@ -1311,7 +1232,7 @@ static void ComputeWallTiles(LineSide *line_side, DrawFloor *dfloor, int sidenum
 
         if (c2 > f2)
         {
-            AddWallTile(line_side, dfloor, &sd->middle, f2, c2, tex_z, kWallTileMidMask, f_min, c_max);
+            AddWallTile(line_side, dfloor, middle, f2, c2, tex_z, kWallTileMidMask, f_min, c_max);
         }
     }
 
@@ -1471,12 +1392,14 @@ static void RenderLineSide(DrawFloor *dfloor, LineSide *line_side)
             b_ch = back_sector->height_sector->interpolated_ceiling_height;
         }
 
-        if (StaticBakeActive() && ((!sd->middle.image && !sd->bottom.image && b_fh > f_fh) ||
+        bool middle_empty = !sd->middle.image && !line_side->fog_wall_active;
+
+        if (StaticBakeActive() && ((middle_empty && !sd->bottom.image && b_fh > f_fh) ||
                                    (!sd->top.image && b_ch < f_ch)))
             StaticMarkSectorDeclined(current_sector);
 
         // -AJA- 2004/04/21: Emulate Flat-Flooding TRICK
-        if (!debug_hall_of_mirrors.d_ && solid_mode && dfloor->is_lowest && !sd->middle.image && !sd->bottom.image &&
+        if (!debug_hall_of_mirrors.d_ && solid_mode && dfloor->is_lowest && middle_empty && !sd->bottom.image &&
             b_fh > f_fh && b_fh < view_z)
         {
             EmulateFloodPlane(dfloor, back_sector, +1, f_fh, b_fh);
@@ -1584,7 +1507,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         return;
 
     // (need to load the image to know the opacity)
-    GLuint tex_id = ImageCache(surf->image, true, render_view_effect_colormap);
+    GLuint tex_id = ImageCache(surf->image, true);
 
     BlendingMode blending = GetSurfaceBlending(trans, (ImageOpacity)surf->image->opacity_);
 
@@ -1655,14 +1578,6 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
             data.bob_amount = own_sec->properties.special->ceiling_bob_;
     }
 
-    if (surf->image->liquid_type_ == kLiquidImageThick)
-        thick_liquid = true;
-    else
-        thick_liquid = false;
-
-    if (surf->image->liquid_type_ > kLiquidImageNone && swirling_flats > kLiquidSwirlSmmu)
-        swirl_pass = 1;
-
     AbstractShader *cmap_shader = GetColormapShader(props, 0, own_sec);
 
     bool capture = false;
@@ -1686,7 +1601,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
     constexpr size_t kPlaneChunk = kMaximumSectorPolygonVertices - (kMaximumSectorPolygonVertices % 3);
 
-    bool parallax = surf->image->liquid_type_ > kLiquidImageNone && swirling_flats == kLiquidSwirlParallax;
+    render_unit_liquid = LiquidShaderParameters(surf->image, LiquidLevelSeconds());
 
     for (size_t offset = 0; offset < sector_polygon_vertices.size(); offset += kPlaneChunk)
     {
@@ -1704,39 +1619,9 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
         if (capture)
             StaticCaptureEnd();
-
-        if (parallax) // Kept as an example for future effects
-        {
-            float        old_tx0   = data.tx0;
-            float        old_ty0   = data.ty0;
-            BlendingMode old_blend = data.blending;
-            float        old_dt    = data.trans;
-
-            data.tx0      = data.tx0 + 25;
-            data.ty0      = data.ty0 + 25;
-            swirl_pass    = 2;
-            data.blending = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
-            data.trans    = 0.33f;
-
-            if (capture)
-                StaticCaptureBeginFlat(own_sec, face_dir, surf->image, props, data.blending, data.normal,
-                                       CaptureDrawPass(data.blending), surf, uv_scale, plane_ef);
-
-            cmap_shader->WorldMix(GL_TRIANGLES, data.v_count, data.tex_id, 0.33f, &data.pass, data.blending, false,
-                                  &data, PlaneCoordFunc);
-
-            if (capture)
-                StaticCaptureEnd();
-
-            data.tx0      = old_tx0;
-            data.ty0      = old_ty0;
-            data.blending = old_blend;
-            data.trans    = old_dt;
-            swirl_pass    = 1;
-        }
     }
 
-    swirl_pass = 0;
+    render_unit_liquid = {{0, 0, 0, 0}};
 }
 
 static void RenderSector(DrawSector *dsector);
@@ -2204,6 +2089,8 @@ void RenderTrueBSP(void)
         // handle powerup effects and BOOM colormaps
         RendererRainbowEffect(v_player);
 
+        render_unit_color_lookup = ColorLookupForColormap(render_view_effect_colormap);
+
         // update interpolation for moving sectors
         for (std::vector<PlaneMover *>::iterator PMI = active_planes.begin(), PMI_END = active_planes.end();
              PMI != PMI_END; ++PMI)
@@ -2343,6 +2230,8 @@ void RenderTrueBSP(void)
         render_backend->SetRenderLayer(kRenderLayerHUD);
         RenderCrosshair(v_player);
     }
+
+    render_unit_color_lookup = 0;
 }
 
 void RenderView(int x, int y, int w, int h, MapObject *camera, bool full_height, float expand_w)
@@ -2450,7 +2339,7 @@ void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int fac
 
     FloodEmulationData data;
 
-    data.tex_id = ImageCache(surf->image, true, render_view_effect_colormap);
+    data.tex_id = ImageCache(surf->image, true);
     data.pass   = 0;
 
     data.R = data.G = data.B = 255;

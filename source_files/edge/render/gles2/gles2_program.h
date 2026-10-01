@@ -26,6 +26,7 @@ constexpr GLint kGles2TextureUnitSkyCube = 2;
 constexpr GLint kGles2TextureUnitLightData = 3;
 constexpr GLint kGles2TextureUnitLightHeaders = 4;
 constexpr GLint kGles2TextureUnitLightIndices = 5;
+constexpr GLint kGles2TextureUnitColorLookup = 6;
 
 enum Gles2FogMode
 {
@@ -75,7 +76,13 @@ class Gles2Program
 
     void SetTextureOffset(const HMM_Vec2 &offset);
 
-    void SetLiquid(const HMM_Vec2 &liquid);
+    void SetLiquid(const HMM_Vec4 &liquid);
+
+    void SetColorLookup(int slot);
+
+    void SetWhiten(bool enabled);
+
+    void SetBlur(const HMM_Vec4 &blur);
 
     float OitModeShadow() const
     {
@@ -150,6 +157,10 @@ class Gles2Program
     GLint uniform_oit_scale_              = -1;
     GLint uniform_texture_offset_         = -1;
     GLint uniform_liquid_                 = -1;
+    GLint uniform_color_lookup_           = -1;
+    GLint uniform_color_lookup_enabled_   = -1;
+    GLint uniform_whiten_                 = -1;
+    GLint uniform_blur_                   = -1;
 
     HMM_Mat4 shadow_model_view_projection_ = {};
     HMM_Mat4 shadow_model_view_            = {};
@@ -178,7 +189,12 @@ class Gles2Program
     float shadow_oit_scale_ = -1.0f;
 
     HMM_Vec2 shadow_texture_offset_ = {{-1.0e30f, -1.0e30f}};
-    HMM_Vec2 shadow_liquid_         = {{-1.0e30f, -1.0e30f}};
+    HMM_Vec4 shadow_liquid_         = {{-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f}};
+
+    float shadow_color_lookup_enabled_ = -1.0f;
+    float shadow_whiten_               = -1.0f;
+
+    HMM_Vec4 shadow_blur_ = {{-1.0f, -1.0f, -1.0f, -1.0f}};
 
     uint32_t uniform_update_count_ = 0;
 };
@@ -218,6 +234,8 @@ class Gles2ModelProgram
 
     void SetGlowSet(int index);
 
+    void SetColorLookup(int slot);
+
   private:
     void SetFloat(GLint location, float &shadow, float value);
 
@@ -254,6 +272,8 @@ class Gles2ModelProgram
     GLint uniform_fog_end_               = -1;
     GLint uniform_oit_mode_              = -1;
     GLint uniform_oit_scale_             = -1;
+    GLint uniform_color_lookup_          = -1;
+    GLint uniform_color_lookup_enabled_  = -1;
 
     float shadow_lerp_          = -1.0f;
     float shadow_alpha_         = -1.0f;
@@ -270,9 +290,13 @@ class Gles2ModelProgram
     float shadow_oit_scale_ = -1.0f;
     float shadow_world_lit_ = -1.0f;
     int   shadow_glow_set_  = -2;
+
+    float shadow_color_lookup_enabled_ = -1.0f;
 };
 
 extern Gles2ModelProgram gles2_model_program;
+
+void Gles2UploadColorLookup(int slot, const uint8_t *pixels);
 
 class Gles2MovieProgram
 {

@@ -11,7 +11,7 @@ layout(set = 1, binding = 0) uniform VertexParameters
     float sky_geometry;
     vec4  view_tint;
     vec2  texture_offset;
-    vec2  liquid;
+    vec2  vertex_padding0;
 };
 
 layout(location = 0) in vec3 position;
@@ -29,15 +29,6 @@ void main()
 
     uv    = texcoords;
     uv.xy += texture_offset;
-
-    if (liquid.x != 0.0)
-    {
-        float wave_x = (position.x + position.z) * 0.0009765625 + liquid.y;
-        float wave_y = position.y * 0.0009765625 + liquid.y;
-
-        uv.x += sin(6.28318531 * wave_x) * liquid.x;
-        uv.y += sin(6.28318531 * wave_y) * liquid.x;
-    }
 
     color = color0;
     color.rgb *= view_tint.rgb;

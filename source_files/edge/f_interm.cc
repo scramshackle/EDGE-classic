@@ -395,9 +395,7 @@ static void DrawLevelFinished(void)
         {
             if (title_scaling.d_) // Fill Border
             {
-                if (!leaving_background_image->blurred_version_)
-                    StoreBlurredImage(leaving_background_image);
-                HUDStretchImage(-320, -200, 960, 600, leaving_background_image->blurred_version_, 0, 0);
+                HUDStretchImageBlurred(-320, -200, 960, 600, leaving_background_image);
             }
             HUDDrawImageTitleWS(leaving_background_image);
         }
@@ -563,9 +561,7 @@ static void DrawEnteringLevel(void)
         {
             if (title_scaling.d_) // Fill Border
             {
-                if (!entering_background_image->blurred_version_)
-                    StoreBlurredImage(entering_background_image);
-                HUDStretchImage(-320, -200, 960, 600, entering_background_image->blurred_version_, 0, 0);
+                HUDStretchImageBlurred(-320, -200, 960, 600, entering_background_image);
             }
             HUDDrawImageTitleWS(entering_background_image);
         }
@@ -1818,9 +1814,7 @@ void IntermissionDrawer(void)
             {
                 if (title_scaling.d_)           // Fill Border
                 {
-                    if (!background_image->blurred_version_)
-                        StoreBlurredImage(background_image);
-                    HUDStretchImage(-320, -200, 960, 600, background_image->blurred_version_, 0, 0);
+                    HUDStretchImageBlurred(-320, -200, 960, 600, background_image);
                 }
                 HUDDrawImageTitleWS(background_image);
             }

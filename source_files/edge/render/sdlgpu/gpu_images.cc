@@ -384,6 +384,153 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
     return true;
 }
 
+const GpuImage *GetDefaultGpuVolume(SDL_GPUDevice *device)
+{
+    static GLuint default_volume_id = 0;
+
+    if (default_volume_id != 0)
+    {
+        const GpuImage *existing = GetGpuImage(default_volume_id);
+
+        if (existing)
+            return existing;
+    }
+
+    static const uint8_t kBlackPixel[4] = {0, 0, 0, 255};
+
+    if (default_volume_id == 0)
+        default_volume_id = AllocateGpuCubemapId();
+
+    if (!CreateGpuVolume(device, default_volume_id, 1, kBlackPixel))
+        return nullptr;
+
+    return GetGpuImage(default_volume_id);
+}
+
+bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void *pixels)
+{
+    if (!device || !pixels || size <= 0)
+        return false;
+
+    DeleteGpuImage(id);
+
+    SDL_GPUSamplerCreateInfo sampler_info;
+    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+
+    sampler_info.min_filter     = SDL_GPU_FILTER_LINEAR;
+    sampler_info.mag_filter     = SDL_GPU_FILTER_LINEAR;
+    sampler_info.mipmap_mode    = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    SDL_GPUSampler *sampler = GetGpuSampler(device, &sampler_info);
+
+    if (!sampler)
+        return false;
+
+    SDL_GPUTextureCreateInfo texture_info;
+    EPI_CLEAR_MEMORY(&texture_info, SDL_GPUTextureCreateInfo, 1);
+
+    texture_info.type                 = SDL_GPU_TEXTURETYPE_3D;
+    texture_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    texture_info.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    texture_info.width                = (uint32_t)size;
+    texture_info.height               = (uint32_t)size;
+    texture_info.layer_count_or_depth = (uint32_t)size;
+    texture_info.num_levels           = 1;
+    texture_info.sample_count         = SDL_GPU_SAMPLECOUNT_1;
+
+    SDL_GPUTexture *texture = SDL_CreateGPUTexture(device, &texture_info);
+
+    if (!texture)
+    {
+        LogPrint("GpuImages: SDL_CreateGPUTexture (volume) failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    size_t volume_bytes = (size_t)size * (size_t)size * (size_t)size * kGpuImagePixelSize;
+
+    SDL_GPUTransferBufferCreateInfo transfer_info;
+    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+    transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_info.size  = (uint32_t)volume_bytes;
+
+    SDL_GPUTransferBuffer *transfer = SDL_CreateGPUTransferBuffer(device, &transfer_info);
+
+    if (!transfer)
+    {
+        LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (volume) failed: %s\n", SDL_GetError());
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+
+    uint8_t *mapped = (uint8_t *)SDL_MapGPUTransferBuffer(device, transfer, false);
+
+    if (!mapped)
+    {
+        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (volume) failed: %s\n", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+
+    memcpy(mapped, pixels, volume_bytes);
+
+    SDL_UnmapGPUTransferBuffer(device, transfer);
+
+    SDL_GPUCommandBuffer *command_buffer = gpu_device.BeginUpload();
+
+    if (!command_buffer)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    SDL_GPUTextureTransferInfo source;
+    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+
+    source.transfer_buffer = transfer;
+    source.offset          = 0;
+    source.pixels_per_row  = (uint32_t)size;
+    source.rows_per_layer  = (uint32_t)size;
+
+    SDL_GPUTextureRegion destination;
+    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+
+    destination.texture = texture;
+    destination.w       = (uint32_t)size;
+    destination.h       = (uint32_t)size;
+    destination.d       = (uint32_t)size;
+
+    SDL_UploadToGPUTexture(copy_pass, &source, &destination, false);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    gpu_device.EndUpload(command_buffer);
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer);
+
+    GpuImage image;
+
+    image.texture       = texture;
+    image.sampler       = sampler;
+    image.update_buffer = nullptr;
+    image.width         = size;
+    image.height        = size;
+    image.levels        = 1;
+    image.update_frame  = -1;
+    image.external      = false;
+
+    gpu_images[id] = image;
+
+    return true;
+}
+
 bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t height, const void *pixels)
 {
     if (!device)

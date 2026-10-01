@@ -12,7 +12,6 @@ attribute vec3 a_position;
 attribute vec4 a_texture_coordinates;
 
 uniform vec2 u_texture_offset;
-uniform vec2 u_liquid;
 attribute vec4 a_color;
 
 varying vec4 v_texture_coordinates;
@@ -25,15 +24,6 @@ void main()
 
     v_texture_coordinates = a_texture_coordinates;
     v_texture_coordinates.xy += u_texture_offset;
-
-    if (u_liquid.x != 0.0)
-    {
-        float wave_x = (a_position.x + a_position.z) * 0.0009765625 + u_liquid.y;
-        float wave_y = a_position.y * 0.0009765625 + u_liquid.y;
-
-        v_texture_coordinates.x += sin(6.28318531 * wave_x) * u_liquid.x;
-        v_texture_coordinates.y += sin(6.28318531 * wave_y) * u_liquid.x;
-    }
     v_color               = a_color;
     v_color.rgb *= u_view_tint.rgb;
 

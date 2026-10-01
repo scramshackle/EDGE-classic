@@ -24,6 +24,8 @@ layout(set = 3, binding = 0) uniform ModelFragmentParameters
     vec4  glow_plane[2];
     vec4  glow_color[2];
     vec4  glow_additive;
+
+    vec4  color_lookup;
 };
 
 struct GpuLight
@@ -32,22 +34,23 @@ struct GpuLight
     vec4 color_additive;
 };
 
-layout(set = 2, binding = 1) readonly buffer LightBuffer
+layout(set = 2, binding = 2) readonly buffer LightBuffer
 {
     GpuLight gpu_lights[];
 };
 
-layout(set = 2, binding = 2) readonly buffer ClusterBuffer
+layout(set = 2, binding = 3) readonly buffer ClusterBuffer
 {
     uint gpu_clusters[];
 };
 
-layout(set = 2, binding = 3) readonly buffer LightIndexBuffer
+layout(set = 2, binding = 4) readonly buffer LightIndexBuffer
 {
     uint gpu_light_indices[];
 };
 
 layout(set = 2, binding = 0) uniform sampler2D tex0;
+layout(set = 2, binding = 1) uniform sampler3D color_lookup_texture;
 
 layout(location = 0) out vec4 frag_color;
 
@@ -166,6 +169,13 @@ float FogFactor(float fog_dist)
     return 1.0 - clamp(exp2(-fog_density * fog_density * fog_dist * fog_dist * LOG2), 0.0, 1.0);
 }
 
+vec3 ApplyColorLookup(vec3 source)
+{
+    vec3 coordinate = clamp(source, 0.0, 1.0) * (63.0 / 64.0) + (0.5 / 64.0);
+
+    return texture(color_lookup_texture, coordinate).rgb;
+}
+
 void main()
 {
     vec4 texel = texture(tex0, uv);
@@ -173,6 +183,11 @@ void main()
     if (alpha_test != 0.0 && texel.w < alpha_test)
     {
         discard;
+    }
+
+    if (color_lookup.x > 0.5)
+    {
+        texel.rgb = ApplyColorLookup(texel.rgb);
     }
 
     vec3 modulate_sum = vec3(0.0);

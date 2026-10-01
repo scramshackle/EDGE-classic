@@ -45,7 +45,10 @@ struct RendererVertex
 extern RGBAColor culling_fog_color;
 
 extern HMM_Vec2 static_batch_texture_offset;
-extern HMM_Vec2 static_batch_liquid;
+
+extern bool     render_unit_whiten;
+extern HMM_Vec4 render_unit_blur;
+extern HMM_Vec4 render_unit_liquid;
 
 void StartUnitBatch(bool sort_em);
 void FinishUnitBatch(void);
@@ -131,6 +134,8 @@ struct ModelDrawInfo
 
     bool world_lit = false;
     int  glow_set  = -1;
+
+    int color_lookup = 0;
 };
 
 struct RendererScissor

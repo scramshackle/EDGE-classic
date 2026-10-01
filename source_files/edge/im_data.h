@@ -139,8 +139,6 @@ class ImageData
     // compute the darkest color in the RGB image
     RGBAColor DarkestColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
 
-    // SMMU-style swirling
-    void Swirl(int level_time, int thickness);
 
     // Change various HSV color values if needed
     void SetHSV(int rotation, int saturation, int value);

@@ -482,6 +482,10 @@ struct LineSide
     Sector *back_sector;
 
     VertexSectorList *vertex_sectors[2];
+
+    MapSurface fog_wall_surface;
+    RGBAColor  fog_wall_color  = kRGBANoValue;
+    bool       fog_wall_active = false;
 };
 
 // Partition line.

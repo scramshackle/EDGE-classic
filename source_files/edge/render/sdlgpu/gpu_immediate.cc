@@ -34,6 +34,17 @@ static void ResolveSkyCubeBinding(SDL_GPUTexture **texture, SDL_GPUSampler **sam
     *sampler = cube ? cube->sampler : nullptr;
 }
 
+static void ResolveColorLookupBinding(SDL_GPUTexture **texture, SDL_GPUSampler **sampler)
+{
+    if (*texture && *sampler)
+        return;
+
+    const GpuImage *volume = GetDefaultGpuVolume(gpu_device.Handle());
+
+    *texture = volume ? volume->texture : nullptr;
+    *sampler = volume ? volume->sampler : nullptr;
+}
+
 bool GpuImmediate::Init(SDL_GPUDevice *device)
 {
     device_ = device;
@@ -814,6 +825,9 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
     draw->texture[2]               = current_sky_cube_texture_;
     draw->sampler[2]               = current_sky_cube_sampler_;
     ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    draw->texture[3] = current_color_lookup_texture_;
+    draw->sampler[3] = current_color_lookup_sampler_;
+    ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
     draw->base_vertex              = first;
     draw->vertex_count             = count;
     draw->index_first              = 0;
@@ -851,15 +865,83 @@ void GpuImmediate::SetTextureOffset(const HMM_Vec2 &offset)
     vertex_parameters_dirty_ = true;
 }
 
-void GpuImmediate::SetLiquid(const HMM_Vec2 &liquid)
+void GpuImmediate::SetLiquid(const HMM_Vec4 &liquid)
 {
-    if (epi::AlmostEquals(liquid_[0], liquid.X) && epi::AlmostEquals(liquid_[1], liquid.Y))
+    float *current = current_fragment_parameters_.liquid;
+
+    if (epi::AlmostEquals(current[0], liquid.X) && epi::AlmostEquals(current[1], liquid.Y) &&
+        epi::AlmostEquals(current[2], liquid.Z) && epi::AlmostEquals(current[3], liquid.W))
         return;
 
-    liquid_[0] = liquid.X;
-    liquid_[1] = liquid.Y;
+    current[0] = liquid.X;
+    current[1] = liquid.Y;
+    current[2] = liquid.Z;
+    current[3] = liquid.W;
 
-    vertex_parameters_dirty_ = true;
+    fragment_parameters_dirty_ = true;
+}
+
+bool GpuImmediate::SetColorLookup(int slot)
+{
+    const GpuImage *image = nullptr;
+
+    if (slot > 0 && slot < kColorLookupMaximum && color_lookup_ids_[slot] != 0)
+        image = GetGpuImage(color_lookup_ids_[slot]);
+
+    current_color_lookup_texture_ = image ? image->texture : nullptr;
+    current_color_lookup_sampler_ = image ? image->sampler : nullptr;
+
+    float enabled = image ? 1.0f : 0.0f;
+
+    if (!epi::AlmostEquals(current_fragment_parameters_.color_lookup[0], enabled))
+    {
+        current_fragment_parameters_.color_lookup[0] = enabled;
+        fragment_parameters_dirty_                   = true;
+    }
+
+    return image != nullptr;
+}
+
+void GpuImmediate::SetWhiten(bool enabled)
+{
+    bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagWhiten) != 0;
+
+    if (current == enabled)
+        return;
+
+    if (enabled)
+        current_fragment_parameters_.flags |= kGpuFragmentFlagWhiten;
+    else
+        current_fragment_parameters_.flags &= ~kGpuFragmentFlagWhiten;
+
+    fragment_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetBlur(const HMM_Vec4 &blur)
+{
+    float *current = current_fragment_parameters_.blur;
+
+    if (epi::AlmostEquals(current[0], blur.X) && epi::AlmostEquals(current[2], blur.Z) &&
+        epi::AlmostEquals(current[3], blur.W))
+        return;
+
+    current[0] = blur.X;
+    current[1] = blur.Y;
+    current[2] = blur.Z;
+    current[3] = blur.W;
+
+    fragment_parameters_dirty_ = true;
+}
+
+void GpuImmediate::UploadColorLookup(int slot, const uint8_t *pixels)
+{
+    if (slot <= 0 || slot >= kColorLookupMaximum || !pixels)
+        return;
+
+    if (color_lookup_ids_[slot] == 0)
+        color_lookup_ids_[slot] = AllocateGpuCubemapId();
+
+    CreateGpuVolume(device_, color_lookup_ids_[slot], kColorLookupSize, pixels);
 }
 
 void GpuImmediate::SetLightDepth(bool enabled)
@@ -1158,8 +1240,8 @@ int32_t GpuImmediate::CurrentVertexParameters()
 
     parameters.texture_offset[0] = texture_offset_[0];
     parameters.texture_offset[1] = texture_offset_[1];
-    parameters.liquid[0]         = liquid_[0];
-    parameters.liquid[1]         = liquid_[1];
+    parameters.vertex_padding0[0] = 0.0f;
+    parameters.vertex_padding0[1] = 0.0f;
 
     vertex_parameters_.push_back(parameters);
 
@@ -1273,6 +1355,11 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
 
     SDL_GPUGraphicsPipeline *pipeline = SelectWorldPipeline(primitive);
 
+    SDL_GPUTexture *lookup_texture = current_color_lookup_texture_;
+    SDL_GPUSampler *lookup_sampler = current_color_lookup_sampler_;
+
+    ResolveColorLookupBinding(&lookup_texture, &lookup_sampler);
+
     if (mergeable && !commands_.empty())
     {
         GpuCommand *previous = &commands_.back();
@@ -1284,6 +1371,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
             if (draw->mergeable && draw->pipeline == pipeline && draw->index_source == index_source &&
                 index_source == kGpuIndexSourceDynamic && draw->texture[0] == texture0 &&
                 draw->sampler[0] == sampler0 && draw->texture[1] == texture1 && draw->sampler[1] == sampler1 &&
+                draw->texture[3] == lookup_texture && draw->sampler[3] == lookup_sampler &&
                 draw->vertex_parameter_index == vertex_parameters &&
                 draw->fragment_parameter_index == fragment_parameters &&
                 draw->stencil_reference == stencil_reference_ &&
@@ -1312,6 +1400,9 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->texture[2]               = current_sky_cube_texture_;
     draw->sampler[2]               = current_sky_cube_sampler_;
     ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    draw->texture[3] = current_color_lookup_texture_;
+    draw->sampler[3] = current_color_lookup_sampler_;
+    ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
     draw->base_vertex = pending_base_;
     draw->index_first = (int32_t)dynamic_indices_.size();
 
@@ -1637,6 +1728,10 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     draw->texture = texturing_enabled_ ? current_texture_[0] : default_texture_;
     draw->sampler = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
 
+    draw->lookup_texture = current_color_lookup_texture_;
+    draw->lookup_sampler = current_color_lookup_sampler_;
+    ResolveColorLookupBinding(&draw->lookup_texture, &draw->lookup_sampler);
+
     draw->position_buffer           = mesh->position_buffer;
     draw->normal_buffer             = mesh->normal_buffer;
     draw->texture_coordinate_buffer = mesh->texture_coordinate_buffer;
@@ -1711,6 +1806,9 @@ void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_co
     draw->texture[2] = current_sky_cube_texture_;
     draw->sampler[2] = current_sky_cube_sampler_;
     ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    draw->texture[3] = current_color_lookup_texture_;
+    draw->sampler[3] = current_color_lookup_sampler_;
+    ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
 
     draw->base_vertex = pending_base_;
     draw->index_first = (int32_t)dynamic_indices_.size();
@@ -2169,17 +2267,20 @@ void GpuImmediate::Replay()
             SDL_SetGPUStencilReference(pass, model->stencil_reference);
             bound_stencil_reference_ = model->stencil_reference;
 
-            SDL_GPUTextureSamplerBinding model_binding;
-            model_binding.texture = model->texture;
-            model_binding.sampler = model->sampler;
+            SDL_GPUTextureSamplerBinding model_bindings[2];
+            model_bindings[0].texture = model->texture;
+            model_bindings[0].sampler = model->sampler;
+            model_bindings[1].texture = model->lookup_texture;
+            model_bindings[1].sampler = model->lookup_sampler;
 
-            SDL_BindGPUFragmentSamplers(pass, 0, &model_binding, 1);
+            SDL_BindGPUFragmentSamplers(pass, 0, model_bindings, 2);
             binding_count_++;
 
-            bound_texture_[0] = nullptr;
-            bound_texture_[1] = nullptr;
-            bound_sampler_[0] = nullptr;
-            bound_sampler_[1] = nullptr;
+            for (int b = 0; b < 4; b++)
+            {
+                bound_texture_[b] = nullptr;
+                bound_sampler_[b] = nullptr;
+            }
 
             SDL_GPUBufferBinding vertex_bindings[6];
 
@@ -2333,9 +2434,10 @@ void GpuImmediate::Replay()
 
         if (bound_texture_[0] != draw->texture[0] || bound_sampler_[0] != draw->sampler[0] ||
             bound_texture_[1] != draw->texture[1] || bound_sampler_[1] != draw->sampler[1] ||
-            bound_texture_[2] != draw->texture[2] || bound_sampler_[2] != draw->sampler[2])
+            bound_texture_[2] != draw->texture[2] || bound_sampler_[2] != draw->sampler[2] ||
+            bound_texture_[3] != draw->texture[3] || bound_sampler_[3] != draw->sampler[3])
         {
-            SDL_GPUTextureSamplerBinding bindings[3];
+            SDL_GPUTextureSamplerBinding bindings[4];
 
             bindings[0].texture = draw->texture[0] ? draw->texture[0] : default_texture_;
             bindings[0].sampler = draw->sampler[0] ? draw->sampler[0] : default_sampler_;
@@ -2343,8 +2445,10 @@ void GpuImmediate::Replay()
             bindings[1].sampler = draw->sampler[1] ? draw->sampler[1] : default_sampler_;
             bindings[2].texture = draw->texture[2];
             bindings[2].sampler = draw->sampler[2];
+            bindings[3].texture = draw->texture[3];
+            bindings[3].sampler = draw->sampler[3];
 
-            SDL_BindGPUFragmentSamplers(pass, 0, bindings, 3);
+            SDL_BindGPUFragmentSamplers(pass, 0, bindings, 4);
 
             bound_texture_[0] = draw->texture[0];
             bound_sampler_[0] = draw->sampler[0];
@@ -2352,6 +2456,8 @@ void GpuImmediate::Replay()
             bound_sampler_[1] = draw->sampler[1];
             bound_texture_[2] = draw->texture[2];
             bound_sampler_[2] = draw->sampler[2];
+            bound_texture_[3] = draw->texture[3];
+            bound_sampler_[3] = draw->sampler[3];
 
             binding_count_++;
         }

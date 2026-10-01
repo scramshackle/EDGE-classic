@@ -3,6 +3,11 @@ const float kLog2      = 1.442695;
 
 uniform sampler2D u_texture0;
 uniform sampler2D u_texture1;
+uniform sampler2D u_color_lookup;
+uniform float     u_color_lookup_enabled;
+uniform float     u_whiten;
+uniform vec4      u_blur;
+uniform vec4      u_liquid;
 
 
 uniform float u_multi_texture;
@@ -186,6 +191,101 @@ float OitWeight(float alpha, float view_depth)
     return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
 }
 
+vec2 LiquidFlow(vec2 point, vec2 direction, float time, float seed)
+{
+    float k = 6.2831853 / 72.0;
+    vec2  q = point + direction * 6.0 * time;
+
+    q += 4.0 * vec2(sin(q.y * k + time * 0.9 + seed), sin(q.x * k * 1.13 - time * 0.7 + seed * 1.7));
+    q += 2.4 * vec2(sin((q.x + q.y) * k * 0.61 + time * 0.53 + seed * 2.3),
+                    sin((q.x - q.y) * k * 0.79 - time * 0.61 + seed * 0.4));
+
+    return q;
+}
+
+vec4 SampleLiquid(vec2 coordinate)
+{
+    vec2  size  = u_liquid.zw;
+    vec2  point = coordinate * size;
+    float time  = u_liquid.y;
+
+    if (u_liquid.x < 1.5)
+    {
+        float k     = 6.2831853 / 40.0;
+        float swirl = time * 2.0;
+
+        point += vec2(sin(point.y * k + swirl * 1.7) + sin(point.x * k * 0.5 + swirl * 1.1 + 1.3),
+                      sin(point.x * k + swirl * 1.3 + 0.7) + sin(point.y * k * 0.5 - swirl * 0.9 + 2.1));
+
+        float kt = 6.2831853 / 320.0;
+
+        point += 3.0 * vec2(sin((point.x + point.y) * kt + swirl * 0.8),
+                            sin((point.y - point.x) * kt * 1.21 + swirl * 0.6));
+
+        return texture2D(u_texture0, point / size);
+    }
+
+    if (u_liquid.x < 2.5)
+    {
+        vec4 lower = texture2D(u_texture0, LiquidFlow(point, vec2(0.8, 0.6), time, 0.0) / size);
+        vec4 upper = texture2D(u_texture0, LiquidFlow(point + 25.0, vec2(-0.97386, 0.22717), time * 1.3, 3.1) / size);
+
+        return mix(lower, upper, 0.33);
+    }
+
+    float row = floor(point.y) + 0.5;
+
+    point.x += 2.0 * sin(row * 6.2831853 / 16.0 + time * 4.0);
+
+    return texture2D(u_texture0, point / size);
+}
+
+vec4 SampleBlurred(vec2 coordinate)
+{
+    vec2  size  = u_blur.zw;
+    vec2  point = coordinate * size - 0.5;
+    vec2  base  = floor(point);
+    float scale = -0.5 / (u_blur.x * u_blur.x);
+    vec4  sum   = vec4(0.0);
+    float total = 0.0;
+
+    for (int j = -1; j <= 2; j++)
+    {
+        for (int i = -1; i <= 2; i++)
+        {
+            vec2  center = base + vec2(float(i), float(j));
+            vec2  delta  = center - point;
+            float weight = exp(dot(delta, delta) * scale);
+
+            sum += texture2D(u_texture0, (center + 0.5) / size) * weight;
+            total += weight;
+        }
+    }
+
+    return sum / total;
+}
+
+vec3 WhitenColor(vec3 source)
+{
+    float brightest = max(source.r, max(source.g, source.b));
+
+    return vec3((brightest * 196.0 + (source.r + source.g + source.b) * 20.0) / 256.0);
+}
+
+vec3 ApplyColorLookup(vec3 source)
+{
+    vec3  scaled = clamp(source, 0.0, 1.0) * 63.0;
+    float blue0  = floor(scaled.b);
+    float blue1  = min(blue0 + 1.0, 63.0);
+    vec2  inner  = (scaled.rg + 0.5) / 512.0;
+    vec2  tile0  = vec2(mod(blue0, 8.0), floor(blue0 / 8.0)) * 0.125;
+    vec2  tile1  = vec2(mod(blue1, 8.0), floor(blue1 / 8.0)) * 0.125;
+    vec3  low    = texture2D(u_color_lookup, tile0 + inner).rgb;
+    vec3  high   = texture2D(u_color_lookup, tile1 + inner).rgb;
+
+    return mix(low, high, scaled.b - blue0);
+}
+
 void main()
 {
     if (u_sky_pass > 0.5)
@@ -194,6 +294,9 @@ void main()
             gl_FragColor = SampleCubeSky();
         else
             gl_FragColor = SampleEquirectSky();
+
+        if (u_color_lookup_enabled > 0.5)
+            gl_FragColor.rgb = ApplyColorLookup(gl_FragColor.rgb);
         return;
     }
 
@@ -212,11 +315,29 @@ void main()
         return;
     }
 
-    vec4 texel0 = texture2D(u_texture0, v_texture_coordinates.xy);
+    vec4 texel0;
+
+    if (u_blur.x > 0.0)
+        texel0 = SampleBlurred(v_texture_coordinates.xy);
+    else if (u_liquid.x > 0.5)
+        texel0 = SampleLiquid(v_texture_coordinates.xy);
+    else
+        texel0 = texture2D(u_texture0, v_texture_coordinates.xy);
+
 
     if (u_alpha_test > 0.0 && texel0.a < u_alpha_test)
     {
         discard;
+    }
+
+    if (u_color_lookup_enabled > 0.5)
+    {
+        texel0.rgb = ApplyColorLookup(texel0.rgb);
+    }
+
+    if (u_whiten > 0.5)
+    {
+        texel0.rgb = WhitenColor(texel0.rgb);
     }
 
     texel0 = mix(texel0, vec4(1.0, 1.0, 1.0, texel0.a), u_skip_rgb);

@@ -25,7 +25,6 @@
 #include "HandmadeMath.h"
 #include "epi.h"
 #include "epi_color.h"
-#include "swirl_table.h"
 
 ImageData::ImageData(int width, int height, int depth) : width_(width), height_(height), depth_(depth)
 {
@@ -755,55 +754,6 @@ RGBAColor ImageData::DarkestColor(int from_x, int to_x, int from_y, int to_y)
     }
 
     return epi::MakeRGBA(darkest_r, darkest_g, darkest_b);
-}
-
-void ImageData::Swirl(int leveltime, int thickness)
-{
-    const int swirlfactor  = 8192 / 64;
-    const int swirlfactor2 = 8192 / 32;
-    const int amp          = 2;
-    int       speed;
-
-    if (thickness == 1) // Thin liquid
-    {
-        speed = 40;
-    }
-    else
-    {
-        speed = 10;
-    }
-
-    uint8_t *new_pixels_ = new uint8_t[width_ * height_ * depth_];
-
-    int x, y;
-
-    // SMMU swirling algorithm
-    for (x = 0; x < width_; x++)
-    {
-        for (y = 0; y < height_; y++)
-        {
-            int x1, y1;
-            int sinvalue, sinvalue2;
-
-            sinvalue  = (y * swirlfactor + leveltime * speed * 5 + 900) & 8191;
-            sinvalue2 = (x * swirlfactor2 + leveltime * speed * 4 + 300) & 8191;
-            x1        = x + width_ + height_ + ((finesine[sinvalue] * amp) >> 16) + ((finesine[sinvalue2] * amp) >> 16);
-
-            sinvalue  = (x * swirlfactor + leveltime * speed * 3 + 700) & 8191;
-            sinvalue2 = (y * swirlfactor2 + leveltime * speed * 4 + 1200) & 8191;
-            y1        = y + width_ + height_ + ((finesine[sinvalue] * amp) >> 16) + ((finesine[sinvalue2] * amp) >> 16);
-
-            x1 &= width_ - 1;
-            y1 &= height_ - 1;
-
-            uint8_t *src  = pixels_ + (y1 * width_ + x1) * depth_;
-            uint8_t *dest = new_pixels_ + (y * width_ + x) * depth_;
-
-            memcpy(dest, src, depth_);
-        }
-    }
-    delete[] pixels_;
-    pixels_ = new_pixels_;
 }
 
 void ImageData::SetHSV(int rotation, int saturation, int value)

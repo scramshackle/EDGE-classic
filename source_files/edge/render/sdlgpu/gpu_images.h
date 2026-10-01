@@ -33,6 +33,8 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
 
 bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel faces[6]);
 
+bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void *pixels);
+
 bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t height, const void *pixels);
 
 void DeleteGpuImage(GLuint id);
@@ -52,5 +54,7 @@ void ForgetGpuExternalImage(SDL_GPUDevice *device, GLuint id);
 const GpuImage *GetGpuImage(GLuint id);
 
 const GpuImage *GetDefaultGpuCubemap(SDL_GPUDevice *device);
+
+const GpuImage *GetDefaultGpuVolume(SDL_GPUDevice *device);
 
 GLuint AllocateGpuCubemapId(void);
