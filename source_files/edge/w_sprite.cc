@@ -41,6 +41,7 @@
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "p_local.h" // map_object_list_head
+#include "r_atlas.h"
 #include "r_image.h"
 #include "r_things.h"
 #include "w_epk.h"
@@ -699,6 +700,28 @@ bool CheckSpritesExist(const std::vector<StateRange> &group)
     return false;
 }
 
+void GetSpriteImages(int spr_num, std::vector<const Image *> &images)
+{
+    if (spr_num <= 0 || spr_num >= sprite_count)
+        return;
+
+    SpriteDefinition *def = sprites[spr_num];
+
+    for (int fr = 0; fr < def->total_frames_; fr++)
+    {
+        if (!def->frames_[fr].finished_)
+            continue;
+
+        for (int rot = 0; rot < 16; rot++)
+        {
+            const Image *image = def->frames_[fr].images_[rot];
+
+            if (image && std::find(images.begin(), images.end(), image) == images.end())
+                images.push_back(image);
+        }
+    }
+}
+
 SpriteFrame *GetSpriteFrame(int spr_num, int framenum)
 {
     // spr_num comes from the 'sprite' field of State, and
@@ -751,6 +774,12 @@ void PrecacheSprites(void)
         // Note: all weapon sprites are pre-cached
 
         if (!(sprite_present[i] || def->HasWeapon()))
+            continue;
+
+        if (sprite_present[i])
+            AtlasPrecacheSprite(i);
+
+        if (!def->HasWeapon())
             continue;
 
         /* Lobo 2022: info overload. Shut up.

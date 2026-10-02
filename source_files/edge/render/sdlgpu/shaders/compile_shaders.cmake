@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model world_oit model_oit)
+set(SHADER_NAMES world movie model world_oit model_oit sprite)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
@@ -40,6 +40,10 @@ endif()
 set(GENERATED_BODY "")
 
 foreach(STAGE IN LISTS SHADER_STAGES)
+  if (SHADER_NAME STREQUAL "sprite" AND STAGE STREQUAL "frag")
+    continue()
+  endif()
+
   set(SHADER_SOURCE_NAME "${SHADER_NAME}")
   set(EXTRA_DEFINES "")
 

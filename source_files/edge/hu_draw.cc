@@ -30,6 +30,7 @@
 #include "epi_str_compare.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
+#include "r_atlas.h"
 #include "r_backend.h"
 #include "r_colormap.h"
 #include "r_gldefs.h"
@@ -492,12 +493,7 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         {
             const TTFFont *cur_font = (const TTFFont *)current_font;
             blend                   = kBlendingAlpha;
-            if ((image_smoothing &&
-                 cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-                cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-                tex_id = cur_font->truetype_smoothed_texture_id_[current_font_size];
-            else
-                tex_id = cur_font->truetype_texture_id_[current_font_size];
+            tex_id                  = cur_font->truetype_texture_id_[current_font_size];
         }
         else // patch font
         {
@@ -507,26 +503,24 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
             else
                 blend = kBlendingMasked;
             blend = (BlendingMode)(blend | kBlendingAlpha);
-            if ((image_smoothing &&
-                 cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-                cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-            {
-                tex_id = cur_font->patch_font_cache_.atlas_smoothed_texture_id;
-            }
-            else
-            {
-                tex_id = cur_font->patch_font_cache_.atlas_texture_id;
-            }
+            tex_id = cur_font->patch_font_cache_.atlas_texture_id;
         }
 
         StartUnitBatch(false);
 
         render_unit_whiten = do_whiten && current_font->definition_->type_ == kFontTypePatch;
 
+        bool smooth = (image_smoothing &&
+                       current_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
+                      current_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways;
+
+        render_unit_filter = smooth ? 1 : 0;
+
         RendererVertex *glvert =
             BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
         render_unit_whiten = false;
+        render_unit_filter = -1;
 
         glvert->rgba                   = unit_col;
         glvert->texture_coordinates[0] = {{tx1, ty2}};
@@ -547,7 +541,28 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         return;
     }
 
-    tex_id = ImageCache(image, true);
+    bool scrolling = !epi::AlmostEquals(sx, 0.0f) || !epi::AlmostEquals(sy, 0.0f);
+
+    AtlasRegion region;
+
+    if (!scrolling && current_image_blur <= 0.0f && image->liquid_type_ == kLiquidImageNone &&
+        HMM_MIN(tx1, tx2) >= 0.0f && HMM_MAX(tx1, tx2) <= 1.0f && HMM_MIN(ty1, ty2) >= 0.0f &&
+        HMM_MAX(ty1, ty2) <= 1.0f && AtlasImageRegion(image->animation_.current, &region))
+    {
+        tex_id = region.texture;
+
+        float region_width  = region.rectangle[2] - region.rectangle[0];
+        float region_height = region.rectangle[3] - region.rectangle[1];
+
+        tx1 = region.rectangle[0] + tx1 * region_width;
+        tx2 = region.rectangle[0] + tx2 * region_width;
+        ty1 = region.rectangle[1] + ty1 * region_height;
+        ty2 = region.rectangle[1] + ty2 * region_height;
+    }
+    else
+    {
+        tex_id = ImageCache(image, true);
+    }
 
     if (alpha >= 0.99f && image->opacity_ == kOpacitySolid)
         blend = kBlendingNone;

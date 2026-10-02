@@ -392,6 +392,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.SetLineMode(false);
         gpu_immediate.SetViewTint(1.0f, 1.0f, 1.0f);
         gpu_immediate.SetTextureOffset({{0.0f, 0.0f}});
+        gpu_immediate.SetLightRowOffset(0.0f);
         gpu_immediate.SetLiquid({{0.0f, 0.0f, 0.0f, 0.0f}});
         gpu_immediate.SetOitComposite(true);
 

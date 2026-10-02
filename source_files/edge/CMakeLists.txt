@@ -59,6 +59,7 @@ set (EDGE_SOURCE_FILES
   rad_act.cc
   rad_pars.cc
   rad_trig.cc
+  r_atlas.cc
   r_bsp.cc
   r_draw.cc
   r_lightgrid.cc

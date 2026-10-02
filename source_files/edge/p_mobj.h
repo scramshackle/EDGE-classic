@@ -368,6 +368,14 @@ class MapObject : public Position
     // touch list: sectors this thing is in or touches
     struct TouchNode *touch_sectors_ = nullptr;
 
+    uint64_t render_hash_           = 0;
+    uint64_t render_look_hash_      = 0;
+    int      render_quiet_tics_     = 0;
+    int      render_dynamic_index_  = -1;
+    int      render_resident_batch_ = -1;
+    int      render_resident_slot_  = -1;
+    bool     render_candidate_      = false;
+
     // linked list (map_object_list_head)
     MapObject *next_     = nullptr;
     MapObject *previous_ = nullptr;

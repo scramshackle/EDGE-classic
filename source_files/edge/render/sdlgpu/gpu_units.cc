@@ -50,13 +50,21 @@ struct RendererUnit
     int         light_view_index    = -1;
     int         color_lookup        = 0;
     bool        whiten              = false;
+    int         filter              = -1;
     HMM_Vec4    blur                = {{0, 0, 0, 0}};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
     HMM_Vec2 texture_offset = {{0, 0}};
+    float    light_row_offset = 0;
     HMM_Vec4 liquid         = {{0, 0, 0, 0}};
     SkyPassInfo sky_pass;
+
+    bool                    sprite             = false;
+    const SpriteLightTable *sprite_light_table = nullptr;
+    uint8_t                 sprite_alpha       = 255;
+    uint32_t                sprite_buffer      = 0;
+    HMM_Vec4                sprite_view[2];
 
     bool            scissor_enabled = false;
     RendererScissor scissor;
@@ -76,11 +84,22 @@ static bool batch_sort;
 RGBAColor culling_fog_color;
 
 HMM_Vec2 static_batch_texture_offset = {{0, 0}};
+float    static_batch_light_row_offset = 0;
 
 bool     render_unit_whiten = false;
+int      render_unit_filter = -1;
 HMM_Vec4 render_unit_blur   = {{0, 0, 0, 0}};
 HMM_Vec4 render_unit_liquid = {{0, 0, 0, 0}};
+HMM_Vec4 render_unit_sprite_view[2] = {{{0, 0, 0, 0}}, {{0, 0, 0, 0}}};
 
+
+static uint8_t UnitAlpha(const RendererUnit *unit)
+{
+    if (unit->sprite)
+        return unit->sprite_alpha;
+
+    return epi::GetRGBAAlpha(local_verts[unit->first].rgba);
+}
 
 static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
 {
@@ -108,7 +127,7 @@ static void RetainCurrentUnits(void)
     {
         RendererUnit unit = local_units[j];
 
-        if (!unit.static_buffer)
+        if (!unit.static_buffer && !unit.sprite)
             unit.first += base;
 
         retained_units.push_back(unit);
@@ -143,7 +162,7 @@ void ReplayRetainedUnits(void)
         if (oit_mode != kOitPassNone && !UnitWantedInOitPass(&source, oit_mode))
             continue;
 
-        int vertices = source.static_buffer ? 0 : source.count;
+        int vertices = (source.static_buffer || source.sprite) ? 0 : source.count;
 
         if (current_render_vert + vertices >= kMaximumLocalVertices || current_render_unit >= kMaximumLocalUnits)
             RenderCurrentUnits();
@@ -152,7 +171,7 @@ void ReplayRetainedUnits(void)
 
         *dest = source;
 
-        if (!source.static_buffer)
+        if (!source.static_buffer && !source.sprite)
         {
             dest->first = current_render_vert;
 
@@ -255,15 +274,96 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->light_view_index    = GpuCurrentLightView();
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->filter              = -1;
     unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->scissor_enabled     = false;
     unit->static_buffer       = handle;
     unit->texture_offset      = static_batch_texture_offset;
+    unit->light_row_offset    = static_batch_light_row_offset;
     unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
     unit->static_first        = first;
+    unit->sprite              = false;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
+
+    current_render_unit++;
+}
+
+uint32_t CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity)
+{
+    if (!instances || count <= 0)
+        return 0;
+
+    if (capacity < count)
+        capacity = count;
+
+    return (uint32_t)gpu_immediate.CreateStaticBytes(instances, (size_t)count * sizeof(SpriteInstance),
+                                                 (size_t)capacity * sizeof(SpriteInstance));
+}
+
+void UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count)
+{
+    if (!instances || count <= 0 || first < 0)
+        return;
+
+    gpu_immediate.UpdateStaticBytes(handle, (size_t)first * sizeof(SpriteInstance), instances,
+                                (size_t)count * sizeof(SpriteInstance));
+}
+
+SpriteInstance *ReserveSpriteInstances(int count, int *first)
+{
+    return gpu_immediate.ReserveSpriteInstances(count, first);
+}
+
+void AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_texture, BlendingMode blending,
+                         RGBAColor fog_color, float fog_density, int color_lookup, bool world_lit, int glow_set,
+                         const SpriteLightTable *light_table, uint8_t alpha, uint32_t buffer)
+{
+    if (count <= 0)
+        return;
+
+    if (render_backend->RenderUnitsLocked())
+        FatalError("AddSpriteRenderUnit - Render units are locked");
+
+    if (current_render_unit >= kMaximumLocalUnits)
+        RenderCurrentUnits();
+
+    RendererUnit *unit = local_units + current_render_unit;
+
+    unit->shape               = GL_QUADS;
+    unit->environment_mode[0] = GL_MODULATE;
+    unit->environment_mode[1] = fuzz_texture ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable;
+    unit->texture[0]          = texture;
+    unit->texture[1]          = fuzz_texture;
+    unit->pass                = 0;
+    unit->blending            = blending;
+    unit->first               = first;
+    unit->count               = count;
+    unit->line_width          = 1.0f;
+    unit->fog_color           = fog_color;
+    unit->fog_density         = fog_density;
+    unit->sky_pass_enabled    = false;
+    unit->light_depth_enabled = false;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->light_view_index    = GpuCurrentLightView();
+    unit->color_lookup        = color_lookup;
+    unit->whiten              = false;
+    unit->filter              = -1;
+    unit->blur                = {{0, 0, 0, 0}};
+    unit->scissor_enabled     = false;
+    unit->static_buffer       = 0;
+    unit->static_first        = 0;
+    unit->texture_offset      = {{0, 0}};
+    unit->light_row_offset    = 0;
+    unit->liquid              = {{0, 0, 0, 0}};
+    unit->sprite              = true;
+    unit->sprite_light_table  = light_table;
+    unit->sprite_alpha        = alpha;
+    unit->sprite_buffer       = buffer;
+    unit->sprite_view[0]      = render_unit_sprite_view[0];
+    unit->sprite_view[1]      = render_unit_sprite_view[1];
 
     current_render_unit++;
 }
@@ -315,11 +415,14 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->light_view_index    = GpuCurrentLightView();
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->filter              = tex1 ? render_unit_filter : -1;
     unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->texture_offset      = {{0, 0}};
+    unit->light_row_offset    = 0;
     unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
     unit->static_buffer       = 0;
     unit->static_first        = 0;
+    unit->sprite              = false;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -387,6 +490,9 @@ struct Compare_Unit_pred
         if (A->whiten != B->whiten)
             return A->whiten < B->whiten;
 
+        if (A->filter != B->filter)
+            return A->filter < B->filter;
+
         return A->blending < B->blending;
     }
 };
@@ -401,15 +507,20 @@ static void BindUnitTextures(const RendererUnit *unit)
 
     const GpuImage *image0 = GetGpuImage(unit->texture[0]);
 
+    SDL_GPUSampler *sampler0 = image0 ? image0->sampler : nullptr;
+
+    if (image0 && unit->filter >= 0)
+        sampler0 = GetGpuImageFilteredSampler(image0, unit->filter > 0);
+
     if (!unit->texture[1] || unit->environment_mode[1] == kTextureEnvironmentDisable)
     {
-        gpu_immediate.SetTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr);
+        gpu_immediate.SetTexture(image0 ? image0->texture : nullptr, sampler0);
         return;
     }
 
     const GpuImage *image1 = GetGpuImage(unit->texture[1]);
 
-    gpu_immediate.SetMultiTexture(image0 ? image0->texture : nullptr, image0 ? image0->sampler : nullptr,
+    gpu_immediate.SetMultiTexture(image0 ? image0->texture : nullptr, sampler0,
                                   image1 ? image1->texture : nullptr, image1 ? image1->sampler : nullptr);
 }
 
@@ -669,14 +780,14 @@ void RenderCurrentUnits(void)
         else if (unit->blending & kBlendingGEqual)
         {
             render_state->Enable(GL_ALPHA_TEST);
-            render_state->AlphaFunction(GL_GEQUAL, 1.0f - (epi::GetRGBAAlpha(local_verts[unit->first].rgba) / 255.0f));
+            render_state->AlphaFunction(GL_GEQUAL, 1.0f - (UnitAlpha(unit) / 255.0f));
         }
         else
             render_state->Disable(GL_ALPHA_TEST);
 
         if (unit->blending & kBlendingLess)
         {
-            float a = epi::GetRGBAAlpha(local_verts[unit->first].rgba) / 255.0f;
+            float a = UnitAlpha(unit) / 255.0f;
             render_state->AlphaFunction(GL_GREATER, a * 0.66f);
         }
 
@@ -695,7 +806,8 @@ void RenderCurrentUnits(void)
 
         render_state->SetPipeline(0);
 
-        if (!unit->static_buffer && (!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
+        if (!unit->static_buffer && !unit->sprite &&
+            (!unit->texture[0] || unit->environment_mode[0] == kTextureEnvironmentDisable) &&
             (unit->texture[1] && unit->environment_mode[1] != kTextureEnvironmentDisable))
         {
             unit->texture[0]          = unit->texture[1];
@@ -721,12 +833,13 @@ void RenderCurrentUnits(void)
         gpu_immediate.SetWorldLit(unit->world_lit_enabled, unit->light_view_index);
         gpu_immediate.SetGlowSet(unit->glow_set);
         gpu_immediate.SetTextureOffset(unit->texture_offset);
+        gpu_immediate.SetLightRowOffset(unit->light_row_offset);
         gpu_immediate.SetLiquid(unit->liquid);
         gpu_immediate.SetColorLookup(unit->color_lookup);
         gpu_immediate.SetWhiten(unit->whiten);
         gpu_immediate.SetBlur(unit->blur);
 
-        if (unit->light_depth_enabled)
+        if (unit->light_depth_enabled || unit->sprite)
             gpu_immediate.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
         else
             gpu_immediate.SetViewTint(1.0f, 1.0f, 1.0f);
@@ -739,7 +852,12 @@ void RenderCurrentUnits(void)
 
         BindUnitTextures(unit);
 
-        if (unit->static_buffer)
+        if (unit->sprite)
+            gpu_immediate.SetSpriteView(unit->sprite_view);
+
+        if (unit->sprite)
+            gpu_immediate.DrawSprites(unit->first, unit->count, unit->sprite_light_table, unit->sprite_buffer);
+        else if (unit->static_buffer)
             gpu_immediate.DrawStatic(unit->static_buffer, unit->static_first, unit->count);
         else
             gpu_immediate.Draw(unit->shape, local_verts + unit->first, unit->count);

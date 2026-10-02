@@ -32,6 +32,8 @@
 
 EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh_resident, "1", kConsoleVariableFlagArchive)
 
+extern ConsoleVariable sector_brightness_correction;
+
 static constexpr size_t kMaximumStaticRun = 3 * 4096;
 
 static inline BlendingMode StaticSurfaceBlending(float alpha, ImageOpacity opacity)
@@ -115,12 +117,17 @@ struct StaticBatch
 
 static std::vector<StaticBatch> static_batches;
 static std::vector<uint8_t>     sector_flat_baked;
+static int                      static_light_correction = 5;
 static std::vector<uint8_t>     line_side_wall_baked;
 static std::unordered_map<uint64_t, uint8_t> region_surface_baked;
 static bool                     static_mesh_built = false;
 
 static std::vector<std::vector<SpanReference>> sector_spans;
 static std::vector<int>                       sector_light_cache;
+static std::vector<RGBAColor>                 sector_fog_color_cache;
+static std::vector<float>                     sector_fog_density_cache;
+static std::vector<const Colormap *>          sector_colormap_cache;
+static std::vector<StaticSectorChange>        static_sector_changes;
 static std::vector<uint8_t>                   sector_height_state;
 
 int SectorHeightState(const Sector *sec)
@@ -1173,6 +1180,13 @@ static void MarkBakedSlot(const StaticSpan &span, uint8_t value)
         baked[slot] = value;
 }
 
+static float StaticLightRow(int light, int adjust)
+{
+    int lit = light + adjust + (sector_brightness_correction.d_ - 5) * 10;
+
+    return (floorf((float)lit / 4.0f) + 0.5f) / 64.0f;
+}
+
 void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 {
     if (capture_batch < 0 || count < 3)
@@ -1230,11 +1244,15 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
         }
     }
 
+    float span_light_row = StaticLightRow(capture_light, capture_adjust);
+
     for (int v = span.start; v < (int)batch.vertices.size(); v++)
     {
         RendererVertex &dest = batch.vertices[v];
 
         dest.rgba = epi::MakeRGBA(255, 255, 255, epi::GetRGBAAlpha(dest.rgba));
+
+        dest.texture_coordinates[1].Y = span_light_row;
 
         dest.texture_coordinates[0].X -= capture_scroll_uv.X;
         dest.texture_coordinates[0].Y -= capture_scroll_uv.Y;
@@ -1370,11 +1388,43 @@ void StaticCaptureEnd(void)
 
 static void RefreshStaticLighting(void)
 {
+    if (sector_brightness_correction.d_ != static_light_correction)
+    {
+        static_light_correction = sector_brightness_correction.d_;
+
+        for (size_t i = 0; i < sector_light_cache.size(); i++)
+            sector_light_cache[i] = INT_MIN;
+    }
+
+    static_sector_changes.clear();
+
     for (size_t i = 0; i < sector_light_cache.size(); i++)
     {
         Sector *sec = level_sectors + i;
 
         int current = sec->properties.light_level;
+
+        RGBAColor       fog_color   = sec->properties.fog_color;
+        float           fog_density = sec->properties.fog_density;
+        const Colormap *colormap    = sec->properties.colourmap;
+
+        bool appearance = fog_color != sector_fog_color_cache[i] ||
+                          !epi::AlmostEquals(fog_density, sector_fog_density_cache[i]) ||
+                          colormap != sector_colormap_cache[i];
+
+        if (current == sector_light_cache[i] && !appearance)
+            continue;
+
+        StaticSectorChange change;
+
+        change.sector     = (int)i;
+        change.appearance = appearance;
+
+        static_sector_changes.push_back(change);
+
+        sector_fog_color_cache[i]   = fog_color;
+        sector_fog_density_cache[i] = fog_density;
+        sector_colormap_cache[i]    = colormap;
 
         if (current == sector_light_cache[i])
             continue;
@@ -1391,7 +1441,7 @@ static void RefreshStaticLighting(void)
             if (!span.live || span.light_sector != sec)
                 continue;
 
-            float light = ((float)((current + span.light_adjust) / 4) + 0.5f) / 64.0f;
+            float light = StaticLightRow(current, span.light_adjust);
 
             for (int v = span.start; v < span.start + span.count; v++)
                 batch.vertices[v].texture_coordinates[1].Y = light;
@@ -1400,6 +1450,11 @@ static void RefreshStaticLighting(void)
             batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
         }
     }
+}
+
+const std::vector<StaticSectorChange> &StaticSectorChanges(void)
+{
+    return static_sector_changes;
 }
 
 void SnapshotSurfaceBaseOffsets(void)
@@ -1446,6 +1501,21 @@ void BuildStaticMesh(void)
     for (int i = 0; i < total_level_sectors; i++)
         sector_light_cache[i] = level_sectors[i].properties.light_level;
 
+    sector_fog_color_cache.resize((size_t)total_level_sectors);
+    sector_fog_density_cache.resize((size_t)total_level_sectors);
+    sector_colormap_cache.resize((size_t)total_level_sectors);
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        sector_fog_color_cache[i]   = level_sectors[i].properties.fog_color;
+        sector_fog_density_cache[i] = level_sectors[i].properties.fog_density;
+        sector_colormap_cache[i]    = level_sectors[i].properties.colourmap;
+    }
+
+    static_sector_changes.clear();
+
+    static_light_correction = sector_brightness_correction.d_;
+
     sector_bake_clean.assign((size_t)total_level_sectors, 0);
     sector_bake_pending.assign((size_t)total_level_sectors, 0);
     sector_bake_epoch.assign((size_t)total_level_sectors, 0);
@@ -1472,6 +1542,10 @@ void DestroyStaticMesh(void)
     region_surface_baked.clear();
     sector_spans.clear();
     sector_light_cache.clear();
+    sector_fog_color_cache.clear();
+    sector_fog_density_cache.clear();
+    sector_colormap_cache.clear();
+    static_sector_changes.clear();
     sector_bake_clean.clear();
     sector_bake_pending.clear();
     sector_bake_epoch.clear();
@@ -1645,6 +1719,14 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         static_batch_texture_offset = BatchScrollOffset(batch);
 
+        int extra_light = render_view_extra_light;
+
+        if (batch.properties->colourmap && (batch.properties->colourmap->special_ & kColorSpecialNoFlash) &&
+            extra_light <= 250)
+            extra_light = 0;
+
+        static_batch_light_row_offset = (float)(extra_light / 4) / 64.0f;
+
         render_unit_liquid = LiquidShaderParameters(batch.image, LiquidLevelSeconds());
 
         AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
@@ -1691,4 +1773,6 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
     }
 
     render_unit_liquid = {{0, 0, 0, 0}};
+
+    static_batch_light_row_offset = 0;
 }

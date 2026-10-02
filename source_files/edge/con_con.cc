@@ -389,12 +389,13 @@ static RendererVertex *StartText()
     else if (console_font->definition_->type_ == kFontTypeTrueType)
     {
         const TTFFont *con_font = (TTFFont *)console_font;
-        if ((image_smoothing &&
-             con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-            con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-            tex_id = con_font->truetype_smoothed_texture_id_[current_font_size];
-        else
-            tex_id = con_font->truetype_texture_id_[current_font_size];
+        tex_id                  = con_font->truetype_texture_id_[current_font_size];
+
+        bool smooth = (image_smoothing &&
+                       con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
+                      con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways;
+
+        render_unit_filter = smooth ? 1 : 0;
 
         blend = kBlendingAlpha;
     }
@@ -405,6 +406,7 @@ static RendererVertex *StartText()
                                              (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     render_unit_whiten = false;
+    render_unit_filter = -1;
 
     return glvert;
 }

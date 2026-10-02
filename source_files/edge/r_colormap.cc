@@ -694,6 +694,8 @@ class ColormapShader : public AbstractShader
 
     RGBAColor whites_[32];
 
+    SpriteLightTable light_table_;
+
     RGBAColor fog_color_;
     float     fog_density_;
 
@@ -914,6 +916,8 @@ class ColormapShader : public AbstractShader
                 *dest = source[v_idx];
 
                 dest->rgba = tint;
+
+                dest->texture_coordinates[1].Y += static_batch_light_row_offset;
             }
         }
 
@@ -1010,9 +1014,27 @@ class ColormapShader : public AbstractShader
         }
 
         fade_texture_ = UploadTexture(&img, kUploadSmooth | kUploadClamp);
+
+        for (int ci = 0; ci < kSpriteLightLevels; ci++)
+        {
+            light_table_.whites[ci][0] = epi::GetRGBARed(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][1] = epi::GetRGBAGreen(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][2] = epi::GetRGBABlue(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][3] = 1.0f;
+        }
+
+        light_table_.parameters[0] = (lighting_model_ == kLightingModelFlat) ? 1.0f : 0.0f;
+        light_table_.parameters[1] = (colormap_ && (colormap_->special_ & kColorSpecialNoFlash)) ? 1.0f : 0.0f;
+        light_table_.parameters[2] = 0.0f;
+        light_table_.parameters[3] = 0.0f;
     }
 
   public:
+    const SpriteLightTable *LightTable() const
+    {
+        return &light_table_;
+    }
+
     void Update()
     {
         if (fade_texture_ == 0 ||
@@ -1067,7 +1089,7 @@ class ColormapShader : public AbstractShader
 
 static ColormapShader *standard_colormap_shader;
 
-AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
+static ColormapShader *PrepareColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
 {
     if (!standard_colormap_shader)
         standard_colormap_shader = new ColormapShader(nullptr);
@@ -1108,6 +1130,21 @@ AbstractShader *GetColormapShader(const struct RegionProperties *props, int ligh
     shader->SetSector(sec);
 
     return shader;
+}
+
+AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
+{
+    return PrepareColormapShader(props, light_add, sec);
+}
+
+const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                            int *light_level)
+{
+    ColormapShader *shader = PrepareColormapShader(props, light_add, sec);
+
+    *light_level = props->light_level + light_add + ((sector_brightness_correction.d_ - 5) * 10);
+
+    return shader->LightTable();
 }
 
 void DeleteColourmapTextures(void)

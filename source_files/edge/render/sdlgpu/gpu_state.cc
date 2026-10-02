@@ -448,15 +448,18 @@ class GpuRenderState : public RenderState
         EPI_UNUSED(format);
         EPI_UNUSED(type);
 
-        if (level != 0 || xoffset != 0 || yoffset != 0)
-            FatalError("TexSubImage2D: only full-image updates of level 0 are supported");
+        if (level != 0)
+            FatalError("TexSubImage2D: only updates of level 0 are supported");
 
         GLuint texture_id = bind_texture_2d_[active_texture_ - GL_TEXTURE0];
 
         if (!texture_id)
             FatalError("TexSubImage2D: no texture bound on update");
 
-        if (!UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+        if (xoffset == 0 && yoffset == 0 && UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+            return;
+
+        if (!UpdateGpuImageRegion(gpu_device.Handle(), texture_id, xoffset, yoffset, width, height, pixels))
             FatalError("TexSubImage2D: failed to update texture %u", texture_id);
     }
 

@@ -6,7 +6,7 @@
 
 extern std::unordered_set<Line *> newly_seen_lines;
 
-void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> &dthings,
+void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *> &dthings,
                       std::list<DrawMirror *> &dmirrors, bool for_mirror = false);
 
 void EnumerateViewSky(void);

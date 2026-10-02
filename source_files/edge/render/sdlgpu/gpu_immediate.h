@@ -37,6 +37,7 @@ enum GpuCommandType
 {
     kGpuCommandDraw = 0,
     kGpuCommandModelDraw,
+    kGpuCommandSpriteDraw,
     kGpuCommandLightDraw,
     kGpuCommandMovie,
     kGpuCommandViewport,
@@ -118,6 +119,25 @@ struct GpuModelDrawArguments
     uint8_t stencil_reference;
 };
 
+struct GpuSpriteDrawArguments
+{
+    SDL_GPUGraphicsPipeline *pipeline;
+
+    SDL_GPUTexture *texture[4];
+    SDL_GPUSampler *sampler[4];
+
+    int32_t instance_first;
+    int32_t instance_count;
+
+    int32_t vertex_parameter_index;
+    int32_t fragment_parameter_index;
+    int32_t light_table_index;
+
+    uint8_t stencil_reference;
+
+    SDL_GPUBuffer *buffer;
+};
+
 struct GpuLightDrawArguments
 {
     SDL_GPUGraphicsPipeline *pipeline;
@@ -162,6 +182,7 @@ struct GpuCommand
     union {
         GpuDrawArguments      draw;
         GpuModelDrawArguments model_draw;
+        GpuSpriteDrawArguments sprite_draw;
         GpuLightDrawArguments light_draw;
         GpuMovieArguments     movie;
         GpuRectangleArguments rectangle;
@@ -266,6 +287,10 @@ class GpuImmediate
 
     void SetTextureOffset(const HMM_Vec2 &offset);
 
+    void SetLightRowOffset(float offset);
+
+    void SetSpriteView(const HMM_Vec4 view[2]);
+
     void SetLiquid(const HMM_Vec4 &liquid);
 
     bool SetColorLookup(int slot);
@@ -282,6 +307,14 @@ class GpuImmediate
     void     DeleteStaticBuffer(uint32_t handle);
     void     FlushDeletedStaticBuffers();
     void     DrawStatic(uint32_t handle, int32_t first, int32_t count);
+
+    SpriteInstance *ReserveSpriteInstances(int32_t count, int32_t *first);
+
+    void DrawSprites(int32_t first, int32_t count, const SpriteLightTable *light_table, uint32_t buffer);
+
+    uint32_t CreateStaticBytes(const void *data, size_t bytes, size_t capacity);
+
+    void UpdateStaticBytes(uint32_t handle, size_t offset, const void *data, size_t bytes);
 
     void Viewport(int32_t x, int32_t y, int32_t width, int32_t height);
 
@@ -365,6 +398,15 @@ class GpuImmediate
 
     void UploadIndices();
 
+    bool EnsureSpriteCapacity(size_t bytes);
+
+    void UploadSpriteInstances();
+
+    int32_t SpriteLightTableIndex(const SpriteLightTable *light_table);
+
+    void BindFragmentTextures(SDL_GPURenderPass *pass, SDL_GPUTexture *const texture[4],
+                              SDL_GPUSampler *const sampler[4]);
+
     int32_t AppendDynamicIndices(GLuint shape, int32_t count, int32_t rebase);
 
     void MarkMatrixDirty()
@@ -394,6 +436,15 @@ class GpuImmediate
     size_t                 dynamic_index_capacity_        = 0;
 
     std::vector<uint16_t> dynamic_indices_;
+
+    SDL_GPUBuffer         *sprite_buffer_          = nullptr;
+    SDL_GPUTransferBuffer *sprite_transfer_buffer_ = nullptr;
+    size_t                 sprite_buffer_capacity_ = 0;
+
+    std::vector<SpriteInstance>           sprite_instances_;
+    int32_t                               sprite_instance_count_ = 0;
+    std::vector<SpriteLightTable>         sprite_light_tables_;
+    std::vector<const SpriteLightTable *> sprite_light_table_sources_;
 
     SDL_GPUTexture *default_texture_ = nullptr;
     SDL_GPUSampler *default_sampler_ = nullptr;
@@ -461,6 +512,8 @@ class GpuImmediate
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;
     float       texture_offset_[2]  = {0.0f, 0.0f};
+    float       light_row_offset_   = 0.0f;
+    HMM_Vec4    sprite_view_[2]     = {{{0, 0, 0, 0}}, {{0, 0, 0, 0}}};
     float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;
@@ -492,6 +545,7 @@ class GpuImmediate
     int32_t bound_stencil_reference_        = -1;
     int32_t bound_vertex_parameter_index_   = -1;
     int32_t bound_fragment_parameter_index_ = -1;
+    int32_t bound_light_table_index_        = -1;
 
     GpuRectangleArguments current_viewport_ = {0, 0, 0, 0};
     GpuRectangleArguments current_scissor_  = {0, 0, 0, 0};

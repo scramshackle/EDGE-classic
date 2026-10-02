@@ -11,7 +11,10 @@ layout(set = 1, binding = 0) uniform VertexParameters
     float sky_geometry;
     vec4  view_tint;
     vec2  texture_offset;
-    vec2  vertex_padding0;
+    float light_row_offset;
+    float vertex_padding0;
+    vec4  sprite_view0;
+    vec4  sprite_view1;
 };
 
 layout(location = 0) in vec3 position;
@@ -47,6 +50,7 @@ void main()
         if (light_depth > 0.5)
         {
             uv.z = -vertex.z * 0.000625;
+            uv.w = clamp(uv.w + light_row_offset, 0.5 / 64.0, 63.5 / 64.0);
         }
 
         gl_Position = mvp * model_position;

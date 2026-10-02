@@ -26,6 +26,7 @@ constexpr uint32_t kGpuModelBufferSlotNormalFrame1       = 4;
 constexpr uint32_t kGpuModelBufferSlotNormalFrame2       = 5;
 
 constexpr uint32_t kGpuVertexUniformSlot   = 0;
+constexpr uint32_t kGpuSpriteUniformSlot   = 1;
 constexpr uint32_t kGpuFragmentUniformSlot = 0;
 
 constexpr uint32_t kGpuStorageSlotLights  = 0;
@@ -78,7 +79,10 @@ struct GpuVertexParameters
     float    sky_geometry;
     float    view_tint[4];
     float    texture_offset[2];
-    float    vertex_padding0[2];
+    float    light_row_offset;
+    float    vertex_padding0;
+    float    sprite_view0[4];
+    float    sprite_view1[4];
 };
 
 struct GpuFragmentParameters
@@ -198,8 +202,11 @@ static_assert(offsetof(GpuVertexParameters, sky_fog_depth) == 196, "GpuVertexPar
 static_assert(offsetof(GpuVertexParameters, light_depth) == 200, "GpuVertexParameters::light_depth offset");
 static_assert(offsetof(GpuVertexParameters, view_tint) == 208, "GpuVertexParameters::view_tint offset");
 static_assert(offsetof(GpuVertexParameters, texture_offset) == 224, "GpuVertexParameters::texture_offset offset");
-static_assert(offsetof(GpuVertexParameters, vertex_padding0) == 232, "GpuVertexParameters::vertex_padding0 offset");
-static_assert(sizeof(GpuVertexParameters) == 240, "GpuVertexParameters size");
+static_assert(offsetof(GpuVertexParameters, light_row_offset) == 232, "GpuVertexParameters::light_row_offset offset");
+static_assert(offsetof(GpuVertexParameters, vertex_padding0) == 236, "GpuVertexParameters::vertex_padding0 offset");
+static_assert(offsetof(GpuVertexParameters, sprite_view0) == 240, "GpuVertexParameters::sprite_view0 offset");
+static_assert(offsetof(GpuVertexParameters, sprite_view1) == 256, "GpuVertexParameters::sprite_view1 offset");
+static_assert(sizeof(GpuVertexParameters) == 272, "GpuVertexParameters size");
 
 static_assert(offsetof(GpuFragmentParameters, flags) == 0, "GpuFragmentParameters::flags offset");
 static_assert(offsetof(GpuFragmentParameters, alpha_test) == 4, "GpuFragmentParameters::alpha_test offset");
@@ -258,3 +265,5 @@ SDL_GPUShader *WorldVertexShader();
 
 SDL_GPUShader *WorldFragmentShader();
 SDL_GPUShader *WorldOitFragmentShader();
+
+SDL_GPUShader *SpriteVertexShader();

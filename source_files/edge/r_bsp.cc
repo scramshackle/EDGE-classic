@@ -64,7 +64,7 @@
 #include "r_units.h"
 
 std::list<DrawSector *> draw_sector_list;
-std::list<DrawThing *>  draw_thing_list;
+std::vector<DrawThing *> draw_thing_list;
 std::list<DrawMirror *> draw_mirror_list;
 
 MirrorSet active_mirror_set;

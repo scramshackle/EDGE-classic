@@ -204,6 +204,14 @@ class Gles2Immediate
     void   DeleteStaticBuffer(GLuint buffer);
     void   DrawStatic(GLuint buffer, GLuint shape, int first, int count);
 
+    SpriteInstance *ReserveSpriteInstances(int32_t count, int32_t *first);
+
+    void DrawSprites(int32_t first, int32_t count, GLuint buffer);
+
+    GLuint CreateStaticBytes(const void *data, size_t bytes, size_t capacity);
+
+    void UpdateStaticBytes(GLuint buffer, size_t offset, const void *data, size_t bytes);
+
   private:
 
     void DrawRange(GLuint shape, size_t byte_offset, int32_t count);
@@ -248,6 +256,11 @@ class Gles2Immediate
     GLuint merged_index_buffer_ = 0;
     GLuint model_index_buffer_  = 0;
     GLuint default_texture_     = 0;
+    GLuint sprite_corner_buffer_   = 0;
+    GLuint sprite_instance_buffer_ = 0;
+
+    std::vector<SpriteInstance> sprite_instances_;
+    int32_t                     sprite_instance_count_ = 0;
 
     size_t vertex_buffer_offset_ = 0;
 

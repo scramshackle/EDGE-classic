@@ -10,6 +10,10 @@
 constexpr GLuint kGles2AttributePosition           = 0;
 constexpr GLuint kGles2AttributeTextureCoordinates = 1;
 constexpr GLuint kGles2AttributeColor              = 2;
+constexpr GLuint kGles2AttributeSpriteOrigin       = 3;
+constexpr GLuint kGles2AttributeSpriteExtent       = 4;
+constexpr GLuint kGles2AttributeSpriteFuzz         = 5;
+constexpr GLuint kGles2AttributeSpriteLight        = 6;
 
 
 
@@ -76,6 +80,14 @@ class Gles2Program
 
     void SetTextureOffset(const HMM_Vec2 &offset);
 
+    void SetLightRowOffset(float offset);
+
+    void SetSpriteMode(bool enabled);
+
+    void SetSpriteLightTable(const SpriteLightTable *light_table);
+
+    void SetSpriteView(const HMM_Vec4 view[2]);
+
     void SetLiquid(const HMM_Vec4 &liquid);
 
     void SetColorLookup(int slot);
@@ -98,8 +110,9 @@ class Gles2Program
 
     void ResetStatistics()
     {
-        uniform_update_count_ = 0;
-        shadow_glow_set_      = -2;
+        uniform_update_count_      = 0;
+        shadow_glow_set_           = -2;
+        shadow_sprite_light_table_ = nullptr;
     }
 
   private:
@@ -156,6 +169,12 @@ class Gles2Program
     GLint uniform_oit_mode_               = -1;
     GLint uniform_oit_scale_              = -1;
     GLint uniform_texture_offset_         = -1;
+    GLint uniform_light_row_offset_       = -1;
+    GLint uniform_sprite_mode_            = -1;
+    GLint uniform_sprite_whites_          = -1;
+    GLint uniform_sprite_lighting_        = -1;
+    GLint uniform_sprite_view0_           = -1;
+    GLint uniform_sprite_view1_           = -1;
     GLint uniform_liquid_                 = -1;
     GLint uniform_color_lookup_           = -1;
     GLint uniform_color_lookup_enabled_   = -1;
@@ -189,6 +208,11 @@ class Gles2Program
     float shadow_oit_scale_ = -1.0f;
 
     HMM_Vec2 shadow_texture_offset_ = {{-1.0e30f, -1.0e30f}};
+    float    shadow_light_row_offset_ = -1.0e30f;
+    float    shadow_sprite_mode_      = -1.0f;
+    HMM_Vec4 shadow_sprite_view_[2]   = {{{-1.0e30f, 0, 0, 0}}, {{-1.0e30f, 0, 0, 0}}};
+
+    const SpriteLightTable *shadow_sprite_light_table_ = nullptr;
     HMM_Vec4 shadow_liquid_         = {{-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f}};
 
     float shadow_color_lookup_enabled_ = -1.0f;

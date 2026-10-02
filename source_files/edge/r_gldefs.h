@@ -155,7 +155,7 @@ struct DrawMirror
     HMM_Vec4 near_plane;
 
     std::list<DrawSector *> draw_sectors;
-    std::list<DrawThing *>  draw_things;
+    std::vector<DrawThing *> draw_things;
     std::list<DrawMirror *> draw_mirrors;
 };
 

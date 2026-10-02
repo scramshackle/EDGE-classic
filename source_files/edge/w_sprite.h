@@ -79,5 +79,7 @@ void PrecacheSprites(void);
 
 SpriteFrame *GetSpriteFrame(int spr_num, int framenum);
 
+void GetSpriteImages(int spr_num, std::vector<const Image *> &images);
+
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

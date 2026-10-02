@@ -10,6 +10,8 @@ struct GpuImage
     SDL_GPUTexture *texture;
     SDL_GPUSampler *sampler;
 
+    SDL_GPUSamplerCreateInfo sampler_info = {};
+
     SDL_GPUTransferBuffer *update_buffer;
 
     int32_t width;
@@ -37,6 +39,9 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
 
 bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t height, const void *pixels);
 
+bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y, int32_t width, int32_t height,
+                          const void *pixels);
+
 void DeleteGpuImage(GLuint id);
 
 void FlushDeletedGpuImages(SDL_GPUDevice *device);
@@ -52,6 +57,8 @@ bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *
 void ForgetGpuExternalImage(SDL_GPUDevice *device, GLuint id);
 
 const GpuImage *GetGpuImage(GLuint id);
+
+SDL_GPUSampler *GetGpuImageFilteredSampler(const GpuImage *image, bool smooth);
 
 const GpuImage *GetDefaultGpuCubemap(SDL_GPUDevice *device);
 

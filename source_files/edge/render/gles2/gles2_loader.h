@@ -101,11 +101,22 @@ EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glGenRenderbuffers         ec_glGenRenderbuffers
 #define glRenderbufferStorage      ec_glRenderbufferStorage
 
+typedef void(APIENTRY *Gles2DrawElementsInstancedFunction)(GLenum mode, GLsizei count, GLenum type,
+                                                           const void *indices, GLsizei instance_count);
+typedef void(APIENTRY *Gles2VertexAttribDivisorFunction)(GLuint index, GLuint divisor);
+
 #else
 
 #include <GLES2/gl2.h>
 
+typedef void(GL_APIENTRY *Gles2DrawElementsInstancedFunction)(GLenum mode, GLsizei count, GLenum type,
+                                                              const void *indices, GLsizei instance_count);
+typedef void(GL_APIENTRY *Gles2VertexAttribDivisorFunction)(GLuint index, GLuint divisor);
+
 #endif
+
+extern Gles2DrawElementsInstancedFunction gles2_draw_elements_instanced;
+extern Gles2VertexAttribDivisorFunction   gles2_vertex_attrib_divisor;
 
 void Gles2LoadEntryPoints();
 

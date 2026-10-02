@@ -35,6 +35,7 @@
 #include "w_epk.h"
 
 struct TextureDefinition;
+class ImageData;
 
 // the transparent pixel value we use
 constexpr uint8_t kTransparentPixelIndex = 247;
@@ -146,6 +147,10 @@ class Image
     // --- information about caching ---
 
     std::vector<struct CachedImage *> cache_;
+
+    bool  atlas_checked_      = false;
+    int   atlas_page_         = -1;
+    float atlas_rectangle_[4] = {0.0f, 0.0f, 1.0f, 1.0f};
 
     // --- animation info ---
 
@@ -260,6 +265,8 @@ void CreateFallbackFlat(void);
 void CreateFallbackTexture(void);
 
 GLuint ImageCache(const Image *image, bool anim = true);
+
+ImageData *LoadAtlasImageData(Image *rim, bool *smooth);
 void   MarkImageAsSky(const Image *image);
 void   ImagePrecache(const Image *image);
 

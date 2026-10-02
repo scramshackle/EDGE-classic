@@ -1,6 +1,7 @@
 #include "gles2_loader.h"
 
 #include <SDL3/SDL_video.h>
+#include <stdio.h>
 
 #include "epi.h"
 #include "i_system.h"
@@ -17,6 +18,58 @@ static const char *Gles2ShaderDefines()
     return defines;
 }
 
+
+Gles2DrawElementsInstancedFunction gles2_draw_elements_instanced = nullptr;
+Gles2VertexAttribDivisorFunction   gles2_vertex_attrib_divisor   = nullptr;
+
+static bool LoadInstancingEntryPoints(const char *suffix)
+{
+    char name[64];
+
+    stbsp_snprintf(name, sizeof(name), "glDrawElementsInstanced%s", suffix);
+    gles2_draw_elements_instanced = (Gles2DrawElementsInstancedFunction)SDL_GL_GetProcAddress(name);
+
+    stbsp_snprintf(name, sizeof(name), "glVertexAttribDivisor%s", suffix);
+    gles2_vertex_attrib_divisor = (Gles2VertexAttribDivisorFunction)SDL_GL_GetProcAddress(name);
+
+    return gles2_draw_elements_instanced && gles2_vertex_attrib_divisor;
+}
+
+static void LoadInstancing()
+{
+    int major = 0;
+    int minor = 0;
+
+    const char *version = (const char *)glGetString(GL_VERSION);
+
+#ifdef EDGE_GLES2_DESKTOP_GL
+    if (version)
+        sscanf(version, "%d.%d", &major, &minor);
+
+    if ((major > 3 || (major == 3 && minor >= 3)) && LoadInstancingEntryPoints(""))
+        return;
+
+    if (SDL_GL_ExtensionSupported("GL_ARB_instanced_arrays") && LoadInstancingEntryPoints("ARB"))
+        return;
+
+    FatalError("OpenGL: instanced rendering is required (OpenGL 3.3 or GL_ARB_instanced_arrays)\n");
+#else
+    if (version)
+        sscanf(version, "OpenGL ES %d.%d", &major, &minor);
+
+    if (major >= 3 && LoadInstancingEntryPoints(""))
+        return;
+
+    if (SDL_GL_ExtensionSupported("GL_ANGLE_instanced_arrays") && LoadInstancingEntryPoints("ANGLE"))
+        return;
+
+    if (SDL_GL_ExtensionSupported("GL_EXT_instanced_arrays") && LoadInstancingEntryPoints("EXT"))
+        return;
+
+    FatalError("OpenGL ES: instanced rendering is required (OpenGL ES 3.0, ANGLE_instanced_arrays or "
+               "EXT_instanced_arrays)\n");
+#endif
+}
 
 #ifdef EDGE_GLES2_DESKTOP_GL
 
@@ -48,6 +101,8 @@ void Gles2LoadEntryPoints()
 
     EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_LOAD_FRAMEBUFFER)
 #undef EDGE_GLES2_LOAD_FRAMEBUFFER
+
+    LoadInstancing();
 }
 
 bool Gles2HasFramebufferObjects()
@@ -79,6 +134,7 @@ const char *Gles2ShaderPreamble(bool fragment_stage)
 
 void Gles2LoadEntryPoints()
 {
+    LoadInstancing();
 }
 
 bool Gles2HasFramebufferObjects()

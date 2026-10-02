@@ -61,6 +61,7 @@
 #include "r_polygon.h"
 #include "r_sky.h"
 #include "r_static.h"
+#include "r_things.h"
 #include "rad_trig.h" // MUSINFO changers
 #include "s_music.h"
 #include "s_sound.h"
@@ -3102,6 +3103,8 @@ void LevelSetup(void)
     BuildStaticMesh();
 
     BakeStaticLevel();
+
+    ResidentThingsReset();
 
     ChangeMusic(current_map->music_, true); // start level music
 

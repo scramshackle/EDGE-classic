@@ -293,6 +293,20 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     static_buffers_.clear();
 
+    if (sprite_buffer_)
+    {
+        SDL_ReleaseGPUBuffer(device, sprite_buffer_);
+        sprite_buffer_ = nullptr;
+    }
+
+    if (sprite_transfer_buffer_)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, sprite_transfer_buffer_);
+        sprite_transfer_buffer_ = nullptr;
+    }
+
+    sprite_buffer_capacity_ = 0;
+
     for (size_t i = 0; i < deleted_static_buffers_.size(); i++)
         SDL_ReleaseGPUBuffer(device, deleted_static_buffers_[i]);
 
@@ -371,6 +385,10 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 void GpuImmediate::BeginFrame()
 {
     vertex_count_ = 0;
+
+    sprite_instance_count_ = 0;
+    sprite_light_tables_.clear();
+    sprite_light_table_sources_.clear();
     dynamic_indices_.clear();
     commands_.clear();
 
@@ -617,18 +635,29 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
 
 uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
 {
-    if (!vertices || count <= 0 || !device_)
+    if (!vertices || count <= 0)
         return 0;
 
     if (capacity < count)
         capacity = count;
 
+    return CreateStaticBytes(vertices, (size_t)count * sizeof(RendererVertex),
+                             (size_t)capacity * sizeof(RendererVertex));
+}
+
+uint32_t GpuImmediate::CreateStaticBytes(const void *data, size_t bytes, size_t capacity)
+{
+    if (!data || bytes == 0 || !device_)
+        return 0;
+
+    if (capacity < bytes)
+        capacity = bytes;
+
     SDL_GPUBuffer *buffer = nullptr;
 
-    if (capacity == count)
+    if (capacity == bytes)
     {
-        buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, vertices,
-                                         (size_t)count * sizeof(RendererVertex), "static mesh");
+        buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, data, bytes, "static mesh");
     }
     else
     {
@@ -636,12 +665,12 @@ uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int co
         EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
 
         buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-        buffer_info.size  = (uint32_t)((size_t)capacity * sizeof(RendererVertex));
+        buffer_info.size  = (uint32_t)capacity;
 
         buffer = SDL_CreateGPUBuffer(device_, &buffer_info);
 
         if (buffer)
-            QueueStaticUpload(buffer, 0, vertices, (size_t)count * sizeof(RendererVertex));
+            QueueStaticUpload(buffer, 0, data, bytes);
     }
 
     if (!buffer)
@@ -663,7 +692,15 @@ uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int co
 
 void GpuImmediate::UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
 {
-    if (handle == 0 || handle > static_buffers_.size() || !vertices || count <= 0 || first < 0 || !device_)
+    if (!vertices || count <= 0 || first < 0)
+        return;
+
+    UpdateStaticBytes(handle, (size_t)first * sizeof(RendererVertex), vertices, (size_t)count * sizeof(RendererVertex));
+}
+
+void GpuImmediate::UpdateStaticBytes(uint32_t handle, size_t offset, const void *data, size_t bytes)
+{
+    if (handle == 0 || handle > static_buffers_.size() || !data || bytes == 0 || !device_)
         return;
 
     SDL_GPUBuffer *buffer = static_buffers_[handle - 1];
@@ -671,8 +708,7 @@ void GpuImmediate::UpdateStaticBuffer(uint32_t handle, int first, const Renderer
     if (!buffer)
         return;
 
-    QueueStaticUpload(buffer, (uint32_t)((size_t)first * sizeof(RendererVertex)), vertices,
-                      (size_t)count * sizeof(RendererVertex));
+    QueueStaticUpload(buffer, (uint32_t)offset, data, bytes);
 }
 
 void GpuImmediate::QueueStaticUpload(SDL_GPUBuffer *buffer, uint32_t offset, const void *data, size_t bytes)
@@ -842,6 +878,98 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
     commands_.push_back(command);
 }
 
+SpriteInstance *GpuImmediate::ReserveSpriteInstances(int32_t count, int32_t *first)
+{
+    EPI_ASSERT(count > 0);
+
+    size_t required = (size_t)sprite_instance_count_ + (size_t)count;
+
+    if (required > sprite_instances_.size())
+    {
+        size_t capacity = sprite_instances_.empty() ? (size_t)4096 : sprite_instances_.size();
+
+        while (capacity < required)
+            capacity *= 2;
+
+        sprite_instances_.resize(capacity);
+    }
+
+    *first = sprite_instance_count_;
+
+    sprite_instance_count_ += count;
+
+    return sprite_instances_.data() + *first;
+}
+
+int32_t GpuImmediate::SpriteLightTableIndex(const SpriteLightTable *light_table)
+{
+    for (size_t i = 0; i < sprite_light_table_sources_.size(); i++)
+    {
+        if (sprite_light_table_sources_[i] == light_table)
+            return (int32_t)i;
+    }
+
+    SpriteLightTable table;
+
+    if (light_table)
+        table = *light_table;
+    else
+        EPI_CLEAR_MEMORY(&table, SpriteLightTable, 1);
+
+    sprite_light_tables_.push_back(table);
+    sprite_light_table_sources_.push_back(light_table);
+
+    return (int32_t)sprite_light_tables_.size() - 1;
+}
+
+void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTable *light_table, uint32_t buffer)
+{
+    if (count <= 0)
+        return;
+
+    SDL_GPUBuffer *instance_buffer = nullptr;
+
+    if (buffer)
+    {
+        if (buffer > static_buffers_.size() || !static_buffers_[buffer - 1])
+            return;
+
+        instance_buffer = static_buffers_[buffer - 1];
+    }
+
+    SDL_GPUGraphicsPipeline *pipeline = oit_pipeline_
+                                            ? GetSpriteOitPipeline(pipeline_flags_)
+                                            : GetSpritePipeline(pipeline_flags_, source_blend_, destination_blend_);
+
+    GpuCommand command;
+
+    command.type = kGpuCommandSpriteDraw;
+
+    GpuSpriteDrawArguments *draw = &command.arguments.sprite_draw;
+
+    draw->pipeline   = pipeline;
+    draw->texture[0] = texturing_enabled_ ? current_texture_[0] : default_texture_;
+    draw->sampler[0] = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
+    draw->texture[1] = texturing_enabled_ ? current_texture_[1] : default_texture_;
+    draw->sampler[1] = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
+    draw->texture[2] = current_sky_cube_texture_;
+    draw->sampler[2] = current_sky_cube_sampler_;
+    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    draw->texture[3] = current_color_lookup_texture_;
+    draw->sampler[3] = current_color_lookup_sampler_;
+    ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
+
+    draw->instance_first           = first;
+    draw->instance_count           = count;
+    draw->vertex_parameter_index   = CurrentVertexParameters();
+    draw->fragment_parameter_index = CurrentFragmentParameters();
+    draw->light_table_index        = SpriteLightTableIndex(light_table);
+    draw->stencil_reference        = stencil_reference_;
+    draw->buffer                   = instance_buffer;
+
+    commands_.push_back(command);
+}
+
 void GpuImmediate::SetViewTint(float r, float g, float b)
 {
     if (view_tint_[0] == r && view_tint_[1] == g && view_tint_[2] == b)
@@ -861,6 +989,27 @@ void GpuImmediate::SetTextureOffset(const HMM_Vec2 &offset)
 
     texture_offset_[0] = offset.X;
     texture_offset_[1] = offset.Y;
+
+    vertex_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetLightRowOffset(float offset)
+{
+    if (epi::AlmostEquals(light_row_offset_, offset))
+        return;
+
+    light_row_offset_ = offset;
+
+    vertex_parameters_dirty_ = true;
+}
+
+void GpuImmediate::SetSpriteView(const HMM_Vec4 view[2])
+{
+    if (!memcmp(sprite_view_, view, sizeof(sprite_view_)))
+        return;
+
+    sprite_view_[0] = view[0];
+    sprite_view_[1] = view[1];
 
     vertex_parameters_dirty_ = true;
 }
@@ -1240,8 +1389,14 @@ int32_t GpuImmediate::CurrentVertexParameters()
 
     parameters.texture_offset[0] = texture_offset_[0];
     parameters.texture_offset[1] = texture_offset_[1];
-    parameters.vertex_padding0[0] = 0.0f;
-    parameters.vertex_padding0[1] = 0.0f;
+    parameters.light_row_offset   = light_row_offset_;
+    parameters.vertex_padding0    = 0.0f;
+
+    for (int i = 0; i < 4; i++)
+    {
+        parameters.sprite_view0[i] = sprite_view_[0].Elements[i];
+        parameters.sprite_view1[i] = sprite_view_[1].Elements[i];
+    }
 
     vertex_parameters_.push_back(parameters);
 
@@ -1884,6 +2039,133 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
     return true;
 }
 
+bool GpuImmediate::EnsureSpriteCapacity(size_t bytes)
+{
+    if (sprite_buffer_ && sprite_buffer_capacity_ >= bytes)
+        return true;
+
+    size_t capacity = sprite_buffer_capacity_ ? sprite_buffer_capacity_ : (size_t)(4096 * sizeof(SpriteInstance));
+
+    while (capacity < bytes)
+        capacity *= 2;
+
+    if (sprite_buffer_)
+        SDL_ReleaseGPUBuffer(device_, sprite_buffer_);
+
+    if (sprite_transfer_buffer_)
+        SDL_ReleaseGPUTransferBuffer(device_, sprite_transfer_buffer_);
+
+    sprite_buffer_          = nullptr;
+    sprite_transfer_buffer_ = nullptr;
+    sprite_buffer_capacity_ = 0;
+
+    SDL_GPUBufferCreateInfo buffer_info;
+    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+
+    buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+    buffer_info.size  = (uint32_t)capacity;
+
+    sprite_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
+
+    bound_vertex_buffer_ = nullptr;
+
+    if (!sprite_buffer_)
+    {
+        LogPrint("GpuImmediate: SDL_CreateGPUBuffer (sprite) failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transfer_info;
+    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+    transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_info.size  = (uint32_t)capacity;
+
+    sprite_transfer_buffer_ = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
+
+    if (!sprite_transfer_buffer_)
+    {
+        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (sprite) failed: %s\n", SDL_GetError());
+        SDL_ReleaseGPUBuffer(device_, sprite_buffer_);
+        sprite_buffer_ = nullptr;
+        return false;
+    }
+
+    sprite_buffer_capacity_ = capacity;
+
+    return true;
+}
+
+void GpuImmediate::UploadSpriteInstances()
+{
+    if (sprite_instance_count_ == 0)
+        return;
+
+    size_t bytes = (size_t)sprite_instance_count_ * sizeof(SpriteInstance);
+
+    if (!EnsureSpriteCapacity(bytes))
+        return;
+
+    void *mapped = SDL_MapGPUTransferBuffer(device_, sprite_transfer_buffer_, true);
+
+    if (!mapped)
+    {
+        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (sprite) failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    memcpy(mapped, sprite_instances_.data(), bytes);
+
+    SDL_UnmapGPUTransferBuffer(device_, sprite_transfer_buffer_);
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(gpu_device.CommandBuffer());
+
+    SDL_GPUTransferBufferLocation source;
+    source.transfer_buffer = sprite_transfer_buffer_;
+    source.offset          = 0;
+
+    SDL_GPUBufferRegion destination;
+    destination.buffer = sprite_buffer_;
+    destination.offset = 0;
+    destination.size   = (uint32_t)bytes;
+
+    SDL_UploadToGPUBuffer(copy_pass, &source, &destination, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    uploaded_bytes_ += bytes;
+}
+
+void GpuImmediate::BindFragmentTextures(SDL_GPURenderPass *pass, SDL_GPUTexture *const texture[4],
+                                        SDL_GPUSampler *const sampler[4])
+{
+    if (bound_texture_[0] == texture[0] && bound_sampler_[0] == sampler[0] && bound_texture_[1] == texture[1] &&
+        bound_sampler_[1] == sampler[1] && bound_texture_[2] == texture[2] && bound_sampler_[2] == sampler[2] &&
+        bound_texture_[3] == texture[3] && bound_sampler_[3] == sampler[3])
+        return;
+
+    SDL_GPUTextureSamplerBinding bindings[4];
+
+    bindings[0].texture = texture[0] ? texture[0] : default_texture_;
+    bindings[0].sampler = sampler[0] ? sampler[0] : default_sampler_;
+    bindings[1].texture = texture[1] ? texture[1] : default_texture_;
+    bindings[1].sampler = sampler[1] ? sampler[1] : default_sampler_;
+    bindings[2].texture = texture[2];
+    bindings[2].sampler = sampler[2];
+    bindings[3].texture = texture[3];
+    bindings[3].sampler = sampler[3];
+
+    SDL_BindGPUFragmentSamplers(pass, 0, bindings, 4);
+
+    for (int b = 0; b < 4; b++)
+    {
+        bound_texture_[b] = texture[b];
+        bound_sampler_[b] = sampler[b];
+    }
+
+    binding_count_++;
+}
+
 int32_t GpuImmediate::AppendDynamicIndices(GLuint shape, int32_t count, int32_t rebase)
 {
     size_t start = dynamic_indices_.size();
@@ -2097,6 +2379,7 @@ void GpuImmediate::ApplyPassState()
     bound_vertex_buffer_            = nullptr;
     bound_vertex_parameter_index_   = -1;
     bound_fragment_parameter_index_ = -1;
+    bound_light_table_index_        = -1;
     bound_stencil_reference_        = -1;
 
     if (!pass)
@@ -2161,6 +2444,7 @@ void GpuImmediate::Replay()
 
     UploadVertices();
     UploadIndices();
+    UploadSpriteInstances();
     UploadModelColors();
     GpuFlushLightBuffers();
 
@@ -2224,6 +2508,18 @@ void GpuImmediate::Replay()
 
             bound_vertex_parameter_index_   = -1;
             bound_fragment_parameter_index_ = -1;
+
+            if (vertex_buffer_ && bound_vertex_buffer_ != vertex_buffer_)
+            {
+                SDL_GPUBufferBinding movie_vertex_binding;
+                movie_vertex_binding.buffer = vertex_buffer_;
+                movie_vertex_binding.offset = 0;
+
+                SDL_BindGPUVertexBuffers(pass, 0, &movie_vertex_binding, 1);
+
+                bound_vertex_buffer_ = vertex_buffer_;
+                binding_count_++;
+            }
 
             if (bound_index_buffer_ != quad_index_buffer_)
             {
@@ -2331,6 +2627,8 @@ void GpuImmediate::Replay()
 
             draw_count_++;
 
+            bound_vertex_buffer_ = nullptr;
+
             if (vertex_buffer_)
             {
                 SDL_GPUBufferBinding world_binding;
@@ -2338,12 +2636,104 @@ void GpuImmediate::Replay()
                 world_binding.offset = 0;
 
                 SDL_BindGPUVertexBuffers(pass, 0, &world_binding, 1);
+                bound_vertex_buffer_ = vertex_buffer_;
                 binding_count_++;
             }
 
             continue;
         }
 
+
+        if (command->type == kGpuCommandSpriteDraw)
+        {
+            SDL_GPURenderPass *pass = gpu_device.RenderPass();
+
+            const GpuSpriteDrawArguments *sprite = &command->arguments.sprite_draw;
+
+            SDL_GPUBuffer *instance_buffer = sprite->buffer ? sprite->buffer : sprite_buffer_;
+
+            if (!pass || !instance_buffer)
+                continue;
+
+            if (bound_pipeline_ != sprite->pipeline)
+            {
+                SDL_BindGPUGraphicsPipeline(pass, sprite->pipeline);
+                bound_pipeline_ = sprite->pipeline;
+                pipeline_bind_count_++;
+            }
+
+            if (bound_stencil_reference_ != sprite->stencil_reference)
+            {
+                SDL_SetGPUStencilReference(pass, sprite->stencil_reference);
+                bound_stencil_reference_ = sprite->stencil_reference;
+            }
+
+            BindFragmentTextures(pass, sprite->texture, sprite->sampler);
+
+            if (bound_vertex_parameter_index_ != sprite->vertex_parameter_index)
+            {
+                SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuVertexUniformSlot,
+                                             &vertex_parameters_[sprite->vertex_parameter_index],
+                                             (uint32_t)sizeof(GpuVertexParameters));
+
+                bound_vertex_parameter_index_ = sprite->vertex_parameter_index;
+                uniform_push_count_++;
+                uniform_bytes_ += sizeof(GpuVertexParameters);
+            }
+
+            if (bound_fragment_parameter_index_ != sprite->fragment_parameter_index)
+            {
+                SDL_PushGPUFragmentUniformData(gpu_device.CommandBuffer(), kGpuFragmentUniformSlot,
+                                               &fragment_parameters_[sprite->fragment_parameter_index],
+                                               (uint32_t)sizeof(GpuFragmentParameters));
+
+                bound_fragment_parameter_index_ = sprite->fragment_parameter_index;
+                uniform_push_count_++;
+                uniform_bytes_ += sizeof(GpuFragmentParameters);
+            }
+
+            if (bound_light_table_index_ != sprite->light_table_index)
+            {
+                SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuSpriteUniformSlot,
+                                             &sprite_light_tables_[sprite->light_table_index],
+                                             (uint32_t)sizeof(SpriteLightTable));
+
+                bound_light_table_index_ = sprite->light_table_index;
+                uniform_push_count_++;
+                uniform_bytes_ += sizeof(SpriteLightTable);
+            }
+
+            if (bound_vertex_buffer_ != instance_buffer)
+            {
+                SDL_GPUBufferBinding sprite_binding;
+                sprite_binding.buffer = instance_buffer;
+                sprite_binding.offset = 0;
+
+                SDL_BindGPUVertexBuffers(pass, 0, &sprite_binding, 1);
+
+                bound_vertex_buffer_ = instance_buffer;
+                binding_count_++;
+            }
+
+            if (bound_index_buffer_ != quad_index_buffer_)
+            {
+                SDL_GPUBufferBinding sprite_index_binding;
+                sprite_index_binding.buffer = quad_index_buffer_;
+                sprite_index_binding.offset = 0;
+
+                SDL_BindGPUIndexBuffer(pass, &sprite_index_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+                bound_index_buffer_ = quad_index_buffer_;
+                binding_count_++;
+            }
+
+            SDL_DrawGPUIndexedPrimitives(pass, 6, (uint32_t)sprite->instance_count, 0, 0,
+                                         (uint32_t)sprite->instance_first);
+
+            draw_count_++;
+
+            continue;
+        }
 
         if (command->type != kGpuCommandDraw)
         {
@@ -2432,35 +2822,7 @@ void GpuImmediate::Replay()
             bound_stencil_reference_ = draw->stencil_reference;
         }
 
-        if (bound_texture_[0] != draw->texture[0] || bound_sampler_[0] != draw->sampler[0] ||
-            bound_texture_[1] != draw->texture[1] || bound_sampler_[1] != draw->sampler[1] ||
-            bound_texture_[2] != draw->texture[2] || bound_sampler_[2] != draw->sampler[2] ||
-            bound_texture_[3] != draw->texture[3] || bound_sampler_[3] != draw->sampler[3])
-        {
-            SDL_GPUTextureSamplerBinding bindings[4];
-
-            bindings[0].texture = draw->texture[0] ? draw->texture[0] : default_texture_;
-            bindings[0].sampler = draw->sampler[0] ? draw->sampler[0] : default_sampler_;
-            bindings[1].texture = draw->texture[1] ? draw->texture[1] : default_texture_;
-            bindings[1].sampler = draw->sampler[1] ? draw->sampler[1] : default_sampler_;
-            bindings[2].texture = draw->texture[2];
-            bindings[2].sampler = draw->sampler[2];
-            bindings[3].texture = draw->texture[3];
-            bindings[3].sampler = draw->sampler[3];
-
-            SDL_BindGPUFragmentSamplers(pass, 0, bindings, 4);
-
-            bound_texture_[0] = draw->texture[0];
-            bound_sampler_[0] = draw->sampler[0];
-            bound_texture_[1] = draw->texture[1];
-            bound_sampler_[1] = draw->sampler[1];
-            bound_texture_[2] = draw->texture[2];
-            bound_sampler_[2] = draw->sampler[2];
-            bound_texture_[3] = draw->texture[3];
-            bound_sampler_[3] = draw->sampler[3];
-
-            binding_count_++;
-        }
+        BindFragmentTextures(pass, draw->texture, draw->sampler);
 
         if (bound_vertex_parameter_index_ != draw->vertex_parameter_index)
         {

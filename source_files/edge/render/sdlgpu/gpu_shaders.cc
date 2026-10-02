@@ -5,12 +5,14 @@
 #include "shaders/model_oit_spirv.h"
 #include "shaders/model_spirv.h"
 #include "shaders/movie_spirv.h"
+#include "shaders/sprite_spirv.h"
 #include "shaders/world_oit_spirv.h"
 #include "shaders/world_spirv.h"
 
 static SDL_GPUShader *world_vertex_shader   = nullptr;
 static SDL_GPUShader *world_oit_fragment_shader = nullptr;
 static SDL_GPUShader *world_fragment_shader = nullptr;
+static SDL_GPUShader *sprite_vertex_shader  = nullptr;
 static SDL_GPUShader *movie_vertex_shader    = nullptr;
 static SDL_GPUShader *movie_fragment_shader  = nullptr;
 static SDL_GPUShader *model_vertex_shader    = nullptr;
@@ -50,7 +52,7 @@ static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage sta
 
 bool CreateWorldShaders(SDL_GPUDevice *device)
 {
-    if (world_vertex_shader && world_fragment_shader)
+    if (world_vertex_shader && world_fragment_shader && sprite_vertex_shader)
         return true;
 
     world_vertex_shader =
@@ -67,7 +69,11 @@ bool CreateWorldShaders(SDL_GPUDevice *device)
         kWorldOitFragmentShaderSamplerCount, kWorldOitFragmentShaderUniformBufferCount, "world_oit.frag",
         kWorldOitFragmentShaderStorageBufferCount);
 
-    if (!world_vertex_shader || !world_fragment_shader || !world_oit_fragment_shader)
+    sprite_vertex_shader =
+        CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kSpriteVertexShaderSpirv, sizeof(kSpriteVertexShaderSpirv),
+                     kSpriteVertexShaderSamplerCount, kSpriteVertexShaderUniformBufferCount, "sprite.vert");
+
+    if (!world_vertex_shader || !world_fragment_shader || !world_oit_fragment_shader || !sprite_vertex_shader)
     {
         DestroyWorldShaders(device);
         return false;
@@ -95,6 +101,12 @@ void DestroyWorldShaders(SDL_GPUDevice *device)
         SDL_ReleaseGPUShader(device, world_oit_fragment_shader);
         world_oit_fragment_shader = nullptr;
     }
+
+    if (sprite_vertex_shader)
+    {
+        SDL_ReleaseGPUShader(device, sprite_vertex_shader);
+        sprite_vertex_shader = nullptr;
+    }
 }
 
 SDL_GPUShader *WorldVertexShader()
@@ -110,6 +122,11 @@ SDL_GPUShader *WorldFragmentShader()
 SDL_GPUShader *WorldOitFragmentShader()
 {
     return world_oit_fragment_shader;
+}
+
+SDL_GPUShader *SpriteVertexShader()
+{
+    return sprite_vertex_shader;
 }
 
 

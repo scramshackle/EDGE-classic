@@ -149,6 +149,10 @@ bool Gles2Program::Init()
     glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
     glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
     glBindAttribLocation(program_, kGles2AttributeColor, "a_color");
+    glBindAttribLocation(program_, kGles2AttributeSpriteOrigin, "a_sprite_origin");
+    glBindAttribLocation(program_, kGles2AttributeSpriteExtent, "a_sprite_extent");
+    glBindAttribLocation(program_, kGles2AttributeSpriteFuzz, "a_sprite_fuzz");
+    glBindAttribLocation(program_, kGles2AttributeSpriteLight, "a_sprite_light");
 
     glLinkProgram(program_);
 
@@ -213,6 +217,12 @@ bool Gles2Program::Init()
     uniform_whiten_                 = glGetUniformLocation(program_, "u_whiten");
     uniform_blur_                   = glGetUniformLocation(program_, "u_blur");
     uniform_texture_offset_         = glGetUniformLocation(program_, "u_texture_offset");
+    uniform_light_row_offset_       = glGetUniformLocation(program_, "u_light_row_offset");
+    uniform_sprite_mode_            = glGetUniformLocation(program_, "u_sprite_mode");
+    uniform_sprite_whites_          = glGetUniformLocation(program_, "u_sprite_whites");
+    uniform_sprite_lighting_        = glGetUniformLocation(program_, "u_sprite_lighting");
+    uniform_sprite_view0_           = glGetUniformLocation(program_, "u_sprite_view0");
+    uniform_sprite_view1_           = glGetUniformLocation(program_, "u_sprite_view1");
     uniform_liquid_                 = glGetUniformLocation(program_, "u_liquid");
     uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
     uniform_view_tint_              = glGetUniformLocation(program_, "u_view_tint");
@@ -425,6 +435,43 @@ void Gles2Program::SetTextureOffset(const HMM_Vec2 &offset)
     shadow_texture_offset_ = offset;
 
     glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+}
+
+void Gles2Program::SetLightRowOffset(float offset)
+{
+    SetFloat(uniform_light_row_offset_, shadow_light_row_offset_, offset);
+}
+
+void Gles2Program::SetSpriteMode(bool enabled)
+{
+    SetFloat(uniform_sprite_mode_, shadow_sprite_mode_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetSpriteLightTable(const SpriteLightTable *light_table)
+{
+    if (!light_table || light_table == shadow_sprite_light_table_)
+        return;
+
+    shadow_sprite_light_table_ = light_table;
+
+    glUniform4fv(uniform_sprite_whites_, kSpriteLightLevels, &light_table->whites[0][0]);
+    glUniform4fv(uniform_sprite_lighting_, 1, light_table->parameters);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetSpriteView(const HMM_Vec4 view[2])
+{
+    if (!memcmp(shadow_sprite_view_, view, sizeof(shadow_sprite_view_)))
+        return;
+
+    shadow_sprite_view_[0] = view[0];
+    shadow_sprite_view_[1] = view[1];
+
+    glUniform4fv(uniform_sprite_view0_, 1, view[0].Elements);
+    glUniform4fv(uniform_sprite_view1_, 1, view[1].Elements);
+
+    uniform_update_count_++;
 }
 
 void Gles2Program::SetLiquid(const HMM_Vec4 &liquid)

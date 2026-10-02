@@ -70,6 +70,7 @@
 #include "r_gldefs.h"
 #include "r_misc.h"
 #include "r_shader.h"
+#include "r_things.h"
 #include "s_sound.h"
 
 #define EDGE_DEBUG_MAP_OBJECTS 0
@@ -1900,6 +1901,8 @@ static void DeleteMobj(MapObject *mo)
 
     StopSoundEffect(mo);
 
+    ThingRenderDeleted(mo);
+
     mo->next_     = (MapObject *)-1;
     mo->previous_ = (MapObject *)-1;
 
@@ -1999,6 +2002,8 @@ static void AddMobjToList(MapObject *mo)
     map_object_list_head = mo;
     seen_monsters.insert(mo->info_);
 
+    ThingRenderSpawned(mo);
+
 #if (EDGE_DEBUG_MAP_OBJECTS > 0)
     LogDebug("tics=%05d  ADD %p [%s]\n", level_time_elapsed, mo, mo->info_ ? mo->info_->name_.c_str() : "???");
 #endif
@@ -2076,6 +2081,8 @@ void RemoveMapObject(MapObject *mo)
         LogDebug("Warning: object %p already removed.\n", mo);
         return;
     }
+
+    ThingRenderRemoved(mo);
 
     if ((mo->info_->flags_ & kMapObjectFlagSpecial) && 0 == (mo->extended_flags_ & kExtendedFlagNoRespawn) &&
         0 == (mo->flags_ & (kMapObjectFlagMissile | kMapObjectFlagDropped)) && mo->spawnpoint_.info)
@@ -2223,7 +2230,10 @@ void RunMapObjectThinkers()
         else
         {
             if (time_stop_active)
+            {
+                ThingRenderTic(mo);
                 continue;
+            }
             if (!distance_cull_thinkers.d_)
             {
                 P_MobjThinker(mo);
@@ -2240,6 +2250,9 @@ void RunMapObjectThinkers()
                 }
             }
         }
+
+        if (!mo->IsRemoved())
+            ThingRenderTic(mo);
     }
 }
 

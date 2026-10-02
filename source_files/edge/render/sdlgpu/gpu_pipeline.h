@@ -53,3 +53,7 @@ SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source
 SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive);
 
 SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags);
+
+SDL_GPUGraphicsPipeline *GetSpritePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
+
+SDL_GPUGraphicsPipeline *GetSpriteOitPipeline(uint32_t pipeline_flags);

@@ -197,6 +197,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
 
     image.texture       = texture;
     image.sampler       = sampler;
+    image.sampler_info  = *sampler_info;
     image.update_buffer = nullptr;
     image.width         = levels[0].width;
     image.height        = levels[0].height;
@@ -618,6 +619,89 @@ bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t hei
     return true;
 }
 
+bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y, int32_t width, int32_t height,
+                          const void *pixels)
+{
+    if (!device || !pixels || width <= 0 || height <= 0)
+        return false;
+
+    std::unordered_map<GLuint, GpuImage>::iterator itr = gpu_images.find(id);
+
+    if (itr == gpu_images.end())
+        return false;
+
+    GpuImage *image = &itr->second;
+
+    if (x < 0 || y < 0 || x + width > image->width || y + height > image->height)
+        return false;
+
+    size_t bytes = (size_t)width * (size_t)height * kGpuImagePixelSize;
+
+    SDL_GPUTransferBufferCreateInfo transfer_info;
+    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+    transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_info.size  = (uint32_t)bytes;
+
+    SDL_GPUTransferBuffer *transfer = SDL_CreateGPUTransferBuffer(device, &transfer_info);
+
+    if (!transfer)
+    {
+        LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (region) failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    void *mapped = SDL_MapGPUTransferBuffer(device, transfer, false);
+
+    if (!mapped)
+    {
+        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (region) failed: %s\n", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        return false;
+    }
+
+    memcpy(mapped, pixels, bytes);
+
+    SDL_UnmapGPUTransferBuffer(device, transfer);
+
+    SDL_GPUCommandBuffer *command_buffer = gpu_device.BeginUpload();
+
+    if (!command_buffer)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        return false;
+    }
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    SDL_GPUTextureTransferInfo source;
+    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+
+    source.transfer_buffer = transfer;
+    source.pixels_per_row  = (uint32_t)width;
+    source.rows_per_layer  = (uint32_t)height;
+
+    SDL_GPUTextureRegion destination;
+    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+
+    destination.texture = image->texture;
+    destination.x       = (uint32_t)x;
+    destination.y       = (uint32_t)y;
+    destination.w       = (uint32_t)width;
+    destination.h       = (uint32_t)height;
+    destination.d       = 1;
+
+    SDL_UploadToGPUTexture(copy_pass, &source, &destination, false);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    gpu_device.EndUpload(command_buffer);
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer);
+
+    return true;
+}
+
 void DeleteGpuImage(GLuint id)
 {
     std::unordered_map<GLuint, GpuImage>::iterator itr = gpu_images.find(id);
@@ -731,6 +815,18 @@ void ForgetGpuExternalImage(SDL_GPUDevice *device, GLuint id)
         SDL_ReleaseGPUSampler(device, itr->second.sampler);
 
     gpu_images.erase(itr);
+}
+
+SDL_GPUSampler *GetGpuImageFilteredSampler(const GpuImage *image, bool smooth)
+{
+    SDL_GPUSamplerCreateInfo info = image->sampler_info;
+
+    info.min_filter = smooth ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+    info.mag_filter = smooth ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+
+    SDL_GPUSampler *sampler = GetGpuSampler(gpu_device.Handle(), &info);
+
+    return sampler ? sampler : image->sampler;
 }
 
 const GpuImage *GetGpuImage(GLuint id)

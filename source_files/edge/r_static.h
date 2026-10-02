@@ -11,11 +11,20 @@ struct MapSurface;
 struct RegionProperties;
 struct Extrafloor;
 class Image;
+class Colormap;
+
+struct StaticSectorChange
+{
+    int  sector;
+    bool appearance;
+};
 
 void SnapshotSurfaceBaseOffsets(void);
 void BuildStaticMesh(void);
 void DestroyStaticMesh(void);
 void DrawStaticMesh(OitPass draw_pass, bool refresh = true);
+
+const std::vector<StaticSectorChange> &StaticSectorChanges(void);
 
 bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *plane_ef);
 bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, const Extrafloor *region_ef,

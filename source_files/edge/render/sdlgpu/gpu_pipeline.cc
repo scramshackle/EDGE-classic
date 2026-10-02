@@ -18,13 +18,23 @@ static_assert(offsetof(RendererVertex, rgba) == 0, "RendererVertex::rgba offset"
 static_assert(offsetof(RendererVertex, position) == 4, "RendererVertex::position offset");
 static_assert(offsetof(RendererVertex, texture_coordinates) == 16, "RendererVertex::texture_coordinates offset");
 
+static_assert(sizeof(SpriteInstance) == 80, "SpriteInstance size");
+static_assert(offsetof(SpriteInstance, extent) == 16, "SpriteInstance::extent offset");
+static_assert(offsetof(SpriteInstance, texture_coordinates) == 32, "SpriteInstance::texture_coordinates offset");
+static_assert(offsetof(SpriteInstance, fuzz) == 48, "SpriteInstance::fuzz offset");
+static_assert(offsetof(SpriteInstance, light) == 64, "SpriteInstance::light offset");
+static_assert(offsetof(SpriteInstance, rgba) == 72, "SpriteInstance::rgba offset");
+static_assert(sizeof(SpriteLightTable) == 528, "SpriteLightTable size");
+
 enum GpuPipelineShaderKind
 {
     kGpuPipelineShaderWorld = 0,
     kGpuPipelineShaderModel,
     kGpuPipelineShaderLight,
     kGpuPipelineShaderOit,
-    kGpuPipelineShaderModelOit
+    kGpuPipelineShaderModelOit,
+    kGpuPipelineShaderSprite,
+    kGpuPipelineShaderSpriteOit
 };
 
 static std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *> pipelines;
@@ -136,7 +146,8 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
 static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
                                                GpuPrimitiveType primitive, GpuPipelineShaderKind shader_kind)
 {
-    bool model = (shader_kind == kGpuPipelineShaderModel || shader_kind == kGpuPipelineShaderModelOit);
+    bool model  = (shader_kind == kGpuPipelineShaderModel || shader_kind == kGpuPipelineShaderModelOit);
+    bool sprite = (shader_kind == kGpuPipelineShaderSprite || shader_kind == kGpuPipelineShaderSpriteOit);
 
     SDL_GPUVertexBufferDescription buffer_description[6];
     EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 6);
@@ -206,6 +217,32 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         attributes[5].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
         attributes[5].offset      = 0;
     }
+    else if (sprite)
+    {
+        attribute_count = 6;
+
+        buffer_description[0].slot       = 0;
+        buffer_description[0].pitch      = (uint32_t)sizeof(SpriteInstance);
+        buffer_description[0].input_rate = SDL_GPU_VERTEXINPUTRATE_INSTANCE;
+
+        const uint32_t sprite_offsets[6] = {
+            (uint32_t)offsetof(SpriteInstance, origin), (uint32_t)offsetof(SpriteInstance, extent),
+            (uint32_t)offsetof(SpriteInstance, texture_coordinates), (uint32_t)offsetof(SpriteInstance, fuzz),
+            (uint32_t)offsetof(SpriteInstance, light), (uint32_t)offsetof(SpriteInstance, rgba)};
+
+        const SDL_GPUVertexElementFormat sprite_formats[6] = {
+            SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+            SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+            SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM};
+
+        for (uint32_t i = 0; i < 6; i++)
+        {
+            attributes[i].location    = i;
+            attributes[i].buffer_slot = 0;
+            attributes[i].format      = sprite_formats[i];
+            attributes[i].offset      = sprite_offsets[i];
+        }
+    }
     else
     {
         buffer_description[0].slot       = 0;
@@ -235,7 +272,8 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
     uint32_t color_target_count = 1;
 
-    if (shader_kind == kGpuPipelineShaderOit || shader_kind == kGpuPipelineShaderModelOit)
+    if (shader_kind == kGpuPipelineShaderOit || shader_kind == kGpuPipelineShaderModelOit ||
+        shader_kind == kGpuPipelineShaderSpriteOit)
     {
         color_target[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
         color_target[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
@@ -269,6 +307,16 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     {
         info.vertex_shader   = ModelVertexShader();
         info.fragment_shader = ModelOitFragmentShader();
+    }
+    else if (shader_kind == kGpuPipelineShaderSpriteOit)
+    {
+        info.vertex_shader   = SpriteVertexShader();
+        info.fragment_shader = WorldOitFragmentShader();
+    }
+    else if (shader_kind == kGpuPipelineShaderSprite)
+    {
+        info.vertex_shader   = SpriteVertexShader();
+        info.fragment_shader = WorldFragmentShader();
     }
     else if (shader_kind == kGpuPipelineShaderModel)
     {
@@ -605,3 +653,45 @@ SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags)
     return pipeline;
 }
 
+
+SDL_GPUGraphicsPipeline *GetSpritePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend)
+{
+    pipeline_flags = EncodeBlendFlags(pipeline_flags, source_blend, destination_blend);
+
+    uint32_t key = pipeline_flags | (5u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline = CreatePipeline(pipeline_flags, source_blend, destination_blend,
+                                                       kGpuPrimitiveTriangleList, kGpuPipelineShaderSprite);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}
+
+SDL_GPUGraphicsPipeline *GetSpriteOitPipeline(uint32_t pipeline_flags)
+{
+    pipeline_flags &= ~(uint32_t)(kGpuPipelineBlend | kGpuPipelineBlendSourceSourceAlpha |
+                                  kGpuPipelineBlendSourceOneMinusDestinationColor |
+                                  kGpuPipelineBlendSourceDestinationColor | kGpuPipelineBlendSourceZero |
+                                  kGpuPipelineBlendDestinationOne | kGpuPipelineBlendDestinationOneMinusSourceAlpha |
+                                  kGpuPipelineBlendDestinationSourceColor | kGpuPipelineBlendDestinationZero);
+
+    uint32_t key = pipeline_flags | (6u << 24);
+
+    auto itr = pipelines.find(key);
+
+    if (itr != pipelines.end())
+        return itr->second;
+
+    SDL_GPUGraphicsPipeline *pipeline =
+        CreatePipeline(pipeline_flags, GL_ONE, GL_ONE, kGpuPrimitiveTriangleList, kGpuPipelineShaderSpriteOit);
+
+    pipelines[key] = pipeline;
+
+    return pipeline;
+}

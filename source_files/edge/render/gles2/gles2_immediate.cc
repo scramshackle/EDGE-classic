@@ -127,6 +127,21 @@ bool Gles2Immediate::Init()
         return false;
     }
 
+    const float corners[12] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+
+    glGenBuffers(1, &sprite_corner_buffer_);
+    glGenBuffers(1, &sprite_instance_buffer_);
+
+    if (!sprite_corner_buffer_ || !sprite_instance_buffer_)
+    {
+        return false;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, sprite_corner_buffer_);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)sizeof(corners), corners, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+
     for (int32_t i = 0; i < kGles2MatrixModeTotal; i++)
     {
         matrix_top_[i]       = 0;
@@ -154,6 +169,18 @@ void Gles2Immediate::Shutdown()
     {
         glDeleteBuffers(1, &quad_index_buffer_);
         quad_index_buffer_ = 0;
+    }
+
+    if (sprite_corner_buffer_)
+    {
+        glDeleteBuffers(1, &sprite_corner_buffer_);
+        sprite_corner_buffer_ = 0;
+    }
+
+    if (sprite_instance_buffer_)
+    {
+        glDeleteBuffers(1, &sprite_instance_buffer_);
+        sprite_instance_buffer_ = 0;
     }
 
     if (merged_index_buffer_)
@@ -184,6 +211,8 @@ void Gles2Immediate::Shutdown()
 void Gles2Immediate::BeginFrame()
 {
     vertex_buffer_offset_ = 0;
+
+    sprite_instance_count_ = 0;
 
     InvalidateBatch();
 
@@ -387,6 +416,39 @@ void Gles2Immediate::BindVertexAttributesFrom(GLuint buffer)
                           (const void *)offsetof(RendererVertex, rgba));
 }
 
+GLuint Gles2Immediate::CreateStaticBytes(const void *data, size_t bytes, size_t capacity)
+{
+    if (!data || bytes == 0)
+        return 0;
+
+    if (capacity < bytes)
+        capacity = bytes;
+
+    GLuint buffer = 0;
+
+    glGenBuffers(1, &buffer);
+
+    if (!buffer)
+        return 0;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)capacity, nullptr, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)bytes, data);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+
+    return buffer;
+}
+
+void Gles2Immediate::UpdateStaticBytes(GLuint buffer, size_t offset, const void *data, size_t bytes)
+{
+    if (!buffer || !data || bytes == 0)
+        return;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes, data);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+}
+
 GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
 {
     if (!vertices || count <= 0)
@@ -451,6 +513,104 @@ void Gles2Immediate::DrawStatic(GLuint buffer, GLuint shape, int first, int coun
     BindVertexAttributesFrom(buffer);
 
     glDrawArrays(shape, first, count);
+
+    draw_count_++;
+
+    BindVertexAttributes(batch_offset_);
+}
+
+SpriteInstance *Gles2Immediate::ReserveSpriteInstances(int32_t count, int32_t *first)
+{
+    EPI_ASSERT(count > 0);
+
+    size_t required = (size_t)sprite_instance_count_ + (size_t)count;
+
+    if (required > sprite_instances_.size())
+    {
+        size_t capacity = sprite_instances_.empty() ? (size_t)4096 : sprite_instances_.size();
+
+        while (capacity < required)
+            capacity *= 2;
+
+        sprite_instances_.resize(capacity);
+    }
+
+    *first = sprite_instance_count_;
+
+    sprite_instance_count_ += count;
+
+    return sprite_instances_.data() + *first;
+}
+
+void Gles2Immediate::DrawSprites(int32_t first, int32_t count, GLuint buffer)
+{
+    if (count <= 0 || first < 0)
+        return;
+
+    if (!buffer && first + count > sprite_instance_count_)
+        return;
+
+    ApplyMatrices();
+
+    size_t base = 0;
+
+    if (buffer)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+        base = (size_t)first * sizeof(SpriteInstance);
+    }
+    else
+    {
+        size_t bytes = (size_t)count * sizeof(SpriteInstance);
+
+        glBindBuffer(GL_ARRAY_BUFFER, sprite_instance_buffer_);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, sprite_instances_.data() + first, GL_STREAM_DRAW);
+
+        uploaded_bytes_ += bytes;
+        upload_count_++;
+    }
+
+    glVertexAttribPointer(kGles2AttributeTextureCoordinates, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, texture_coordinates)));
+    glVertexAttribPointer(kGles2AttributeColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, rgba)));
+    glVertexAttribPointer(kGles2AttributeSpriteOrigin, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, origin)));
+    glVertexAttribPointer(kGles2AttributeSpriteExtent, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, extent)));
+    glVertexAttribPointer(kGles2AttributeSpriteFuzz, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, fuzz)));
+    glVertexAttribPointer(kGles2AttributeSpriteLight, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, light)));
+
+    glBindBuffer(GL_ARRAY_BUFFER, sprite_corner_buffer_);
+
+    glVertexAttribPointer(kGles2AttributePosition, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (const void *)0);
+
+    const GLuint instanced[6] = {kGles2AttributeTextureCoordinates, kGles2AttributeColor,
+                                 kGles2AttributeSpriteOrigin,       kGles2AttributeSpriteExtent,
+                                 kGles2AttributeSpriteFuzz,         kGles2AttributeSpriteLight};
+
+    for (int i = 0; i < 6; i++)
+    {
+        if (i >= 2)
+            glEnableVertexAttribArray(instanced[i]);
+
+        gles2_vertex_attrib_divisor(instanced[i], 1);
+    }
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_index_buffer_);
+
+    gles2_draw_elements_instanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *)0, count);
+
+    for (int i = 0; i < 6; i++)
+    {
+        gles2_vertex_attrib_divisor(instanced[i], 0);
+
+        if (i >= 2)
+            glDisableVertexAttribArray(instanced[i]);
+    }
 
     draw_count_++;
 

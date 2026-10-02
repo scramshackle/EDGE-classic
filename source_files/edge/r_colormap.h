@@ -29,6 +29,7 @@
 #include "r_defs.h"
 
 class AbstractShader;
+struct SpriteLightTable;
 
 void InitializePalette(void);
 
@@ -68,6 +69,9 @@ RGBAColor GetFontColor(const Colormap *colmap);
 RGBAColor ParseFontColor(const char *name, bool strict = false);
 
 AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add = 0, Sector *sec = nullptr);
+
+const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                            int *light_level);
 
 // colour indices from palette
 extern int playpal_black, playpal_white, playpal_gray;

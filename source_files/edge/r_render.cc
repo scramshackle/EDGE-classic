@@ -109,7 +109,7 @@ static float plane_z_bob; // for floor/ceiling bob DDFSECT stuff
 
 
 extern std::list<DrawSector *> draw_sector_list;
-extern std::list<DrawThing *>  draw_thing_list;
+extern std::vector<DrawThing *> draw_thing_list;
 extern std::list<DrawMirror *> draw_mirror_list;
 
 static void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int face_dir, float h1, float h2);
@@ -1626,7 +1626,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
 static void RenderSector(DrawSector *dsector);
 
-void RenderSectorList(std::list<DrawSector *> &dsectors, std::list<DrawThing *> &dthings,
+void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *> &dthings,
                       std::list<DrawMirror *> &dmirrors, bool for_mirror)
 {
     EDGE_ZoneScoped;

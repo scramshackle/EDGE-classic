@@ -63,6 +63,7 @@
 #include "m_menu.h"
 #include "m_misc.h"
 #include "p_local.h"
+#include "r_atlas.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
@@ -1222,15 +1223,13 @@ static int IM_PixelLimit()
         return (1 << 22);
 }
 
-static GLuint LoadImageOGL(Image *rim)
+static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 {
     bool clamp  = IM_ShouldClamp(rim);
     bool mip    = IM_ShouldMipmap(rim);
     bool smooth = IM_ShouldSmooth();
     bool flip   = false;
     bool invert = false;
-
-    int max_pix = IM_PixelLimit();
 
     if (rim->source_type_ == kImageSourceUser)
     {
@@ -1346,18 +1345,51 @@ static GLuint LoadImageOGL(Image *rim)
         tmp_img = scaled_img;
     }
 
-    GLuint tex_id =
-        UploadTexture(tmp_img,
-                      (clamp ? kUploadClamp : 0) | (mip ? kUploadMipMap : 0) | (smooth ? kUploadSmooth : 0) |
-                          ((rim->opacity_ == kOpacityMasked) ? kUploadThresh : 0),
-                      max_pix);
-
-    delete tmp_img;
+    *upload_flags = (clamp ? kUploadClamp : 0) | (mip ? kUploadMipMap : 0) | (smooth ? kUploadSmooth : 0) |
+                    ((rim->opacity_ == kOpacityMasked) ? kUploadThresh : 0);
 
     if (what_pal_cached)
         delete[] what_palette;
 
+    return tmp_img;
+}
+
+static GLuint LoadImageOGL(Image *rim)
+{
+    int max_pix = IM_PixelLimit();
+
+    int upload_flags = 0;
+
+    ImageData *tmp_img = BuildImageData(rim, max_pix, &upload_flags);
+
+    GLuint tex_id = UploadTexture(tmp_img, upload_flags, max_pix);
+
+    delete tmp_img;
+
     return tex_id;
+}
+
+ImageData *LoadAtlasImageData(Image *rim, bool *smooth)
+{
+    int max_pix = IM_PixelLimit();
+
+    int upload_flags = 0;
+
+    ImageData *img = BuildImageData(rim, max_pix, &upload_flags);
+
+    if (!(upload_flags & kUploadClamp) || (upload_flags & kUploadMipMap) || rim->is_sky_ ||
+        img->width_ * img->height_ > max_pix)
+    {
+        delete img;
+        return nullptr;
+    }
+
+    if (img->depth_ == 3)
+        img->SetAlpha(255);
+
+    *smooth = (upload_flags & kUploadSmooth) ? true : false;
+
+    return img;
 }
 
 //----------------------------------------------------------------------------
@@ -1902,6 +1934,8 @@ void AnimationTicker(void)
 
 void DeleteAllImages(bool shutdown)
 {
+    AtlasClear();
+
     std::list<CachedImage *>::iterator CI;
 
     for (CI = image_cache.begin(); CI != image_cache.end(); CI++)
@@ -1934,10 +1968,6 @@ void DeleteAllImages(bool shutdown)
                     {
                         render_state->DeleteTexture(&ttf->truetype_texture_id_[i]);
                     }
-                    if (ttf->truetype_smoothed_texture_id_[i])
-                    {
-                        render_state->DeleteTexture(&ttf->truetype_smoothed_texture_id_[i]);
-                    }
                 }
             }
             else if (font->definition_->type_ == kFontTypePatch)
@@ -1945,8 +1975,6 @@ void DeleteAllImages(bool shutdown)
                 PatchFont *pat = (PatchFont *)font;
                 if (pat->patch_font_cache_.atlas_texture_id)
                     render_state->DeleteTexture(&pat->patch_font_cache_.atlas_texture_id);
-                if (pat->patch_font_cache_.atlas_smoothed_texture_id)
-                    render_state->DeleteTexture(&pat->patch_font_cache_.atlas_smoothed_texture_id);
             }
         }
         for (ImageMap::iterator iter = real_graphics.begin(), iter_end = real_graphics.end(); iter != iter_end; ++iter)
