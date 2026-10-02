@@ -145,9 +145,8 @@ struct ModelDrawInfo
 
     HMM_Mat4 transform = HMM_M4D(1.0f);
 
-    float alpha         = 1.0f;
-    float alpha_test    = 0.0f;
-    bool  additive_pass = false;
+    float alpha      = 1.0f;
+    float alpha_test = 0.0f;
 
     HMM_Vec2 texture_scale  = {{1.0f, 1.0f}};
     HMM_Vec2 texture_offset = {{0.0f, 0.0f}};
@@ -161,6 +160,14 @@ struct ModelDrawInfo
     int  glow_set  = -1;
 
     int color_lookup = 0;
+
+    const SpriteLightTable *light_table = nullptr;
+
+    float    light_level       = 255.0f;
+    float    light_fixed_depth = 0.0f;
+    bool     light_depth_fixed = false;
+    bool     fuzzy             = false;
+    HMM_Vec3 tint              = {{1.0f, 1.0f, 1.0f}};
 };
 
 struct RendererScissor

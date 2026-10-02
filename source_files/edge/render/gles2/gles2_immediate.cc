@@ -719,11 +719,9 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
     glGenBuffers(1, &mesh.position_buffer);
     glGenBuffers(1, &mesh.normal_buffer);
     glGenBuffers(1, &mesh.texture_coordinate_buffer);
-    glGenBuffers(1, &mesh.color_buffer);
     glGenBuffers(1, &mesh.index_buffer);
 
-    if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.color_buffer ||
-        !mesh.index_buffer)
+    if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer)
         return 0;
 
     size_t position_bytes = (size_t)data.vertex_count * (size_t)data.frame_count * 3 * sizeof(float);
@@ -737,10 +735,6 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
     glBindBuffer(GL_ARRAY_BUFFER, mesh.texture_coordinate_buffer);
     glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)data.vertex_count * 2 * sizeof(float)),
                  data.texture_coordinates, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh.color_buffer);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)data.vertex_count * 6 * sizeof(float)), nullptr,
-                 GL_STREAM_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)index_count * sizeof(uint16_t)), indices,
@@ -767,32 +761,13 @@ void Gles2Immediate::DeleteModelMesh(uint32_t handle)
     if (mesh->texture_coordinate_buffer)
         glDeleteBuffers(1, &mesh->texture_coordinate_buffer);
 
-    if (mesh->color_buffer)
-        glDeleteBuffers(1, &mesh->color_buffer);
+    if (mesh->normal_buffer)
+        glDeleteBuffers(1, &mesh->normal_buffer);
 
     if (mesh->index_buffer)
         glDeleteBuffers(1, &mesh->index_buffer);
 
     EPI_CLEAR_MEMORY(mesh, Gles2ModelMesh, 1);
-}
-
-void Gles2Immediate::UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count)
-{
-    if (handle == 0 || handle > model_meshes_.size() || !colors || vertex_count <= 0)
-        return;
-
-    Gles2ModelMesh *mesh = &model_meshes_[handle - 1];
-
-    if (!mesh->color_buffer || vertex_count > mesh->vertex_count)
-        return;
-
-    size_t bytes = (size_t)vertex_count * 6 * sizeof(float);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->color_buffer);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)bytes, colors);
-
-    uploaded_bytes_ += bytes;
-    upload_count_++;
 }
 
 void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
@@ -823,13 +798,6 @@ void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
     glVertexAttribPointer(kGles2AttributeModelTextureCoordinates, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
                           (const void *)((size_t)info.first_vertex * 2 * sizeof(float)));
 
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->color_buffer);
-
-    size_t color_offset = (size_t)info.first_vertex * 6 * sizeof(float) + (info.additive_pass ? 3 * sizeof(float) : 0);
-
-    glVertexAttribPointer(kGles2AttributeModelColor, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                          (const void *)color_offset);
-
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
 }
 
@@ -843,7 +811,6 @@ void Gles2Immediate::DrawModelMesh(const ModelDrawInfo &info)
     if (!mesh->position_buffer || info.frame1 >= mesh->frame_count || info.frame2 >= mesh->frame_count)
         return;
 
-    glEnableVertexAttribArray(kGles2AttributeModelColor);
     glEnableVertexAttribArray(kGles2AttributeModelNormalFrame1);
     glEnableVertexAttribArray(kGles2AttributeModelNormalFrame2);
 
@@ -854,7 +821,6 @@ void Gles2Immediate::DrawModelMesh(const ModelDrawInfo &info)
 
     glDisableVertexAttribArray(kGles2AttributeModelNormalFrame2);
     glDisableVertexAttribArray(kGles2AttributeModelNormalFrame1);
-    glDisableVertexAttribArray(kGles2AttributeModelColor);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

@@ -622,11 +622,6 @@ class GpuRenderState : public RenderState
         gpu_immediate.DeleteModelMesh(handle);
     }
 
-    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
-    {
-        gpu_immediate.UpdateModelColors(handle, colors, vertex_count);
-    }
-
     void DrawModel(const ModelDrawInfo &info)
     {
         if (info.handle == 0 || info.index_count <= 0)
@@ -636,12 +631,7 @@ class GpuRenderState : public RenderState
 
         if (oit_mode != kOitPassNone)
         {
-            OitPass model_pass = kOitPassMasked;
-
-            if (info.additive_pass)
-                model_pass = kOitPassAdditive;
-            else if (info.alpha < 1.0f)
-                model_pass = kOitPassAccumulate;
+            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
 
             if (model_pass != oit_mode)
                 return;
@@ -675,12 +665,21 @@ class GpuRenderState : public RenderState
         vertex_parameters.texture_offset[0] = info.texture_offset.X;
         vertex_parameters.texture_offset[1] = info.texture_offset.Y;
 
+        vertex_parameters.light[0] = info.light_level;
+        vertex_parameters.light[1] = info.light_fixed_depth;
+        vertex_parameters.light[2] = info.light_depth_fixed ? 1.0f : 0.0f;
+        vertex_parameters.light[3] = info.fuzzy ? 1.0f : 0.0f;
+
+        vertex_parameters.tint[0] = info.tint.X;
+        vertex_parameters.tint[1] = info.tint.Y;
+        vertex_parameters.tint[2] = info.tint.Z;
+        vertex_parameters.tint[3] = 1.0f;
+
         GpuModelFragmentParameters fragment_parameters;
         EPI_CLEAR_MEMORY(&fragment_parameters, GpuModelFragmentParameters, 1);
 
-        fragment_parameters.alpha         = info.alpha;
-        fragment_parameters.alpha_test    = info.alpha_test;
-        fragment_parameters.additive_pass = info.additive_pass ? 1.0f : 0.0f;
+        fragment_parameters.alpha      = info.alpha;
+        fragment_parameters.alpha_test = info.alpha_test;
 
         if (enable_fog_)
         {

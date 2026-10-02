@@ -14,16 +14,14 @@ constexpr uint32_t kGpuAttributeColor           = 2;
 constexpr uint32_t kGpuAttributeModelPositionFrame1     = 0;
 constexpr uint32_t kGpuAttributeModelPositionFrame2     = 1;
 constexpr uint32_t kGpuAttributeModelTextureCoordinates = 2;
-constexpr uint32_t kGpuAttributeModelColor              = 3;
-constexpr uint32_t kGpuAttributeModelNormalFrame1       = 4;
-constexpr uint32_t kGpuAttributeModelNormalFrame2       = 5;
+constexpr uint32_t kGpuAttributeModelNormalFrame1       = 3;
+constexpr uint32_t kGpuAttributeModelNormalFrame2       = 4;
 
 constexpr uint32_t kGpuModelBufferSlotPositionFrame1     = 0;
 constexpr uint32_t kGpuModelBufferSlotPositionFrame2     = 1;
 constexpr uint32_t kGpuModelBufferSlotTextureCoordinates = 2;
-constexpr uint32_t kGpuModelBufferSlotColor              = 3;
-constexpr uint32_t kGpuModelBufferSlotNormalFrame1       = 4;
-constexpr uint32_t kGpuModelBufferSlotNormalFrame2       = 5;
+constexpr uint32_t kGpuModelBufferSlotNormalFrame1       = 3;
+constexpr uint32_t kGpuModelBufferSlotNormalFrame2       = 4;
 
 constexpr uint32_t kGpuVertexUniformSlot   = 0;
 constexpr uint32_t kGpuSpriteUniformSlot   = 1;
@@ -131,13 +129,15 @@ struct GpuModelVertexParameters
     float    texture_scale[2];
     float    texture_offset[2];
     float    vertex_padding1[2];
+    float    light[4];
+    float    tint[4];
 };
 
 struct GpuModelFragmentParameters
 {
     float alpha;
     float alpha_test;
-    float additive_pass;
+    float model_fragment_padding1;
 
     int32_t fog_mode;
     float   fog_density;
@@ -168,12 +168,14 @@ static_assert(offsetof(GpuModelVertexParameters, texture_scale) == 200,
               "GpuModelVertexParameters::texture_scale offset");
 static_assert(offsetof(GpuModelVertexParameters, texture_offset) == 208,
               "GpuModelVertexParameters::texture_offset offset");
-static_assert(sizeof(GpuModelVertexParameters) == 224, "GpuModelVertexParameters size");
+static_assert(offsetof(GpuModelVertexParameters, light) == 224, "GpuModelVertexParameters::light offset");
+static_assert(offsetof(GpuModelVertexParameters, tint) == 240, "GpuModelVertexParameters::tint offset");
+static_assert(sizeof(GpuModelVertexParameters) == 256, "GpuModelVertexParameters size");
 
 static_assert(offsetof(GpuModelFragmentParameters, alpha) == 0, "GpuModelFragmentParameters::alpha offset");
 static_assert(offsetof(GpuModelFragmentParameters, alpha_test) == 4, "GpuModelFragmentParameters::alpha_test offset");
-static_assert(offsetof(GpuModelFragmentParameters, additive_pass) == 8,
-              "GpuModelFragmentParameters::additive_pass offset");
+static_assert(offsetof(GpuModelFragmentParameters, model_fragment_padding1) == 8,
+              "GpuModelFragmentParameters::model_fragment_padding1 offset");
 static_assert(offsetof(GpuModelFragmentParameters, fog_mode) == 12, "GpuModelFragmentParameters::fog_mode offset");
 static_assert(offsetof(GpuModelFragmentParameters, fog_density) == 16,
               "GpuModelFragmentParameters::fog_density offset");

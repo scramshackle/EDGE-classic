@@ -31,8 +31,6 @@ class ModelMesh
 
     uint32_t gpu_handle_ = 0;
 
-    std::vector<float> colors_;
-
     int TotalVertices() const
     {
         return (int)vertices_.size();

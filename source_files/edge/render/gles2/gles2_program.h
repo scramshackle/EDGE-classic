@@ -20,7 +20,6 @@ constexpr GLuint kGles2AttributeSpriteLight        = 6;
 constexpr GLuint kGles2AttributeModelPositionFrame1     = 0;
 constexpr GLuint kGles2AttributeModelPositionFrame2     = 1;
 constexpr GLuint kGles2AttributeModelTextureCoordinates = 2;
-constexpr GLuint kGles2AttributeModelColor              = 3;
 constexpr GLuint kGles2AttributeModelNormalFrame1       = 4;
 constexpr GLuint kGles2AttributeModelNormalFrame2       = 5;
 
@@ -247,7 +246,7 @@ class Gles2ModelProgram
 
     void SetAlphaTest(float reference);
 
-    void SetAdditivePass(bool additive);
+    void SetLighting(const ModelDrawInfo &info);
 
     void SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end);
 
@@ -290,7 +289,10 @@ class Gles2ModelProgram
     GLint uniform_texture0_              = -1;
     GLint uniform_alpha_                 = -1;
     GLint uniform_alpha_test_            = -1;
-    GLint uniform_additive_pass_         = -1;
+    GLint uniform_model_whites_          = -1;
+    GLint uniform_model_lighting_        = -1;
+    GLint uniform_model_light_           = -1;
+    GLint uniform_model_tint_            = -1;
     GLint uniform_fog_mode_              = -1;
     GLint uniform_fog_color_             = -1;
     GLint uniform_fog_density_           = -1;
@@ -301,14 +303,13 @@ class Gles2ModelProgram
     GLint uniform_color_lookup_          = -1;
     GLint uniform_color_lookup_enabled_  = -1;
 
-    float shadow_lerp_          = -1.0f;
-    float shadow_alpha_         = -1.0f;
-    float shadow_alpha_test_    = -1.0f;
-    float shadow_additive_pass_ = -1.0f;
-    float shadow_fog_mode_      = -1.0f;
-    float shadow_fog_density_   = -1.0f;
-    float shadow_fog_start_     = -1.0f;
-    float shadow_fog_end_       = -1.0f;
+    float shadow_lerp_        = -1.0f;
+    float shadow_alpha_       = -1.0f;
+    float shadow_alpha_test_  = -1.0f;
+    float shadow_fog_mode_    = -1.0f;
+    float shadow_fog_density_ = -1.0f;
+    float shadow_fog_start_   = -1.0f;
+    float shadow_fog_end_     = -1.0f;
 
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 

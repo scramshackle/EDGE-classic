@@ -236,8 +236,6 @@ class RenderState
 
     virtual void DeleteModelMesh(uint32_t handle) = 0;
 
-    virtual void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count) = 0;
-
     virtual void DrawModel(const ModelDrawInfo &info) = 0;
 };
 

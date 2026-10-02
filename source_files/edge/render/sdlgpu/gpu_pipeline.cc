@@ -156,8 +156,8 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
     if (model)
     {
-        buffer_count    = 6;
-        attribute_count = 6;
+        buffer_count    = 5;
+        attribute_count = 5;
 
         buffer_description[0].slot       = kGpuModelBufferSlotPositionFrame1;
         buffer_description[0].pitch      = (uint32_t)(3 * sizeof(float));
@@ -170,10 +170,6 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         buffer_description[2].slot       = kGpuModelBufferSlotTextureCoordinates;
         buffer_description[2].pitch      = (uint32_t)(2 * sizeof(float));
         buffer_description[2].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
-
-        buffer_description[3].slot       = kGpuModelBufferSlotColor;
-        buffer_description[3].pitch      = (uint32_t)(6 * sizeof(float));
-        buffer_description[3].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
         attributes[0].location    = kGpuAttributeModelPositionFrame1;
         attributes[0].buffer_slot = kGpuModelBufferSlotPositionFrame1;
@@ -190,28 +186,23 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
         attributes[2].offset      = 0;
 
-        attributes[3].location    = kGpuAttributeModelColor;
-        attributes[3].buffer_slot = kGpuModelBufferSlotColor;
-        attributes[3].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-        attributes[3].offset      = 0;
+        buffer_description[3].slot       = kGpuModelBufferSlotNormalFrame1;
+        buffer_description[3].pitch      = (uint32_t)(3 * sizeof(float));
+        buffer_description[3].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
-        buffer_description[4].slot       = kGpuModelBufferSlotNormalFrame1;
+        buffer_description[4].slot       = kGpuModelBufferSlotNormalFrame2;
         buffer_description[4].pitch      = (uint32_t)(3 * sizeof(float));
         buffer_description[4].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
-        buffer_description[5].slot       = kGpuModelBufferSlotNormalFrame2;
-        buffer_description[5].pitch      = (uint32_t)(3 * sizeof(float));
-        buffer_description[5].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+        attributes[3].location    = kGpuAttributeModelNormalFrame1;
+        attributes[3].buffer_slot = kGpuModelBufferSlotNormalFrame1;
+        attributes[3].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attributes[3].offset      = 0;
 
-        attributes[4].location    = kGpuAttributeModelNormalFrame1;
-        attributes[4].buffer_slot = kGpuModelBufferSlotNormalFrame1;
+        attributes[4].location    = kGpuAttributeModelNormalFrame2;
+        attributes[4].buffer_slot = kGpuModelBufferSlotNormalFrame2;
         attributes[4].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
         attributes[4].offset      = 0;
-
-        attributes[5].location    = kGpuAttributeModelNormalFrame2;
-        attributes[5].buffer_slot = kGpuModelBufferSlotNormalFrame2;
-        attributes[5].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-        attributes[5].offset      = 0;
     }
     else if (sprite)
     {

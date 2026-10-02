@@ -102,8 +102,6 @@ class Gles2Immediate
 
     void DeleteModelMesh(uint32_t handle);
 
-    void UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count);
-
     void BindModelMesh(const ModelDrawInfo &info);
 
     void DrawModelMesh(const ModelDrawInfo &info);
@@ -177,7 +175,6 @@ class Gles2Immediate
         GLuint position_buffer;
         GLuint normal_buffer;
         GLuint texture_coordinate_buffer;
-        GLuint color_buffer;
         GLuint index_buffer;
 
         int32_t vertex_count;

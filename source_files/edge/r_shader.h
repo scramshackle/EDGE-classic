@@ -87,7 +87,7 @@ class ColorMixer
 };
 
 typedef void (*ShaderCoordinateFunction)(void *data, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc,
-                                         HMM_Vec3 *normal, HMM_Vec3 *lit_pos);
+                                         HMM_Vec3 *lit_pos);
 
 struct DynamicLightParameters
 {
@@ -112,9 +112,6 @@ class AbstractShader
 
     // used for arbitrary points in the world (sprites)
     virtual void Sample(ColorMixer *col, float x, float y, float z) = 0;
-
-    // used for normal-based lighting (MD2 models)
-    virtual void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon = false) = 0;
 
     virtual void WorldMix(GLuint shape, int num_vert, GLuint tex, float alpha, int *pass_var, BlendingMode blending,
                           bool masked, void *data, ShaderCoordinateFunction func)

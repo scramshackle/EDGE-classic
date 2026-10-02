@@ -669,6 +669,15 @@ void PaletteTicker(void)
 //  COLORMAP SHADERS
 //----------------------------------------------------------------------------
 
+static float ViewPlaneDistance(float x, float y, float z)
+{
+    float dx = (x - mirror_view.view_position.X) * mirror_view.view_plane.X;
+    float dy = (y - mirror_view.view_position.Y) * mirror_view.view_plane.Y;
+    float dz = (z - mirror_view.view_position.Z) * mirror_view.view_plane.Z;
+
+    return dx + dy + dz;
+}
+
 static int DoomLightingEquation(int L, float dist)
 {
     /* L in the range 0 to 63 */
@@ -720,11 +729,7 @@ class ColormapShader : public AbstractShader
   private:
     inline float DistanceFromViewPlane(float x, float y, float z)
     {
-        float dx = (x - mirror_view.view_position.X) * mirror_view.view_plane.X;
-        float dy = (y - mirror_view.view_position.Y) * mirror_view.view_plane.Y;
-        float dz = (z - mirror_view.view_position.Z) * mirror_view.view_plane.Z;
-
-        return dx + dy + dz;
+        return ViewPlaneDistance(x, y, z);
     }
 
     inline void TextureCoordinates(RendererVertex *v, int t, const HMM_Vec3 *lit_pos)
@@ -756,24 +761,6 @@ class ColormapShader : public AbstractShader
         col->modulate_red_ += epi::GetRGBARed(WH);
         col->modulate_green_ += epi::GetRGBAGreen(WH);
         col->modulate_blue_ += epi::GetRGBABlue(WH);
-    }
-
-    virtual void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon)
-    {
-        EPI_UNUSED(nx);
-        EPI_UNUSED(ny);
-        EPI_UNUSED(nz);
-        float mx = mod_pos->x;
-        float my = mod_pos->y;
-        float mz = mod_pos->z + mod_pos->height_ / 2;
-
-        if (is_weapon)
-        {
-            mx += view_cosine * 110;
-            my += view_sine * 110;
-        }
-
-        Sample(col, mx, my, mz);
     }
 
     virtual void WorldMix(GLuint shape, int num_vert, GLuint tex, float alpha, int *pass_var, BlendingMode blending,
@@ -808,9 +795,8 @@ class ColormapShader : public AbstractShader
                 epi::SetRGBAAlpha(dest->rgba, alpha);
 
                 HMM_Vec3 lit_pos;
-                HMM_Vec3 normal;
 
-                (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
+                (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
 
                 TextureCoordinates(dest, 1, &lit_pos);
             }
@@ -834,9 +820,8 @@ class ColormapShader : public AbstractShader
             epi::SetRGBAAlpha(dest->rgba, alpha);
 
             HMM_Vec3 lit_pos;
-            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
 
             TextureCoordinates(dest, 1, &lit_pos);
         }
@@ -1034,6 +1019,11 @@ class ColormapShader : public AbstractShader
         return &light_table_;
     }
 
+    int LightLevel() const
+    {
+        return light_level_;
+    }
+
     void Update()
     {
         if (fade_texture_ == 0 ||
@@ -1144,6 +1134,21 @@ const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props
     *light_level = props->light_level + light_add + ((sector_brightness_correction.d_ - 5) * 10);
 
     return shader->LightTable();
+}
+
+const SpriteLightTable *GetModelLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                           int *light_level)
+{
+    ColormapShader *shader = PrepareColormapShader(props, light_add, sec);
+
+    *light_level = shader->LightLevel();
+
+    return shader->LightTable();
+}
+
+float WeaponModelLightDepth(const MapObject *mo)
+{
+    return ViewPlaneDistance(mo->x + view_cosine * 110, mo->y + view_sine * 110, mo->z + mo->height_ / 2);
 }
 
 void DeleteColourmapTextures(void)

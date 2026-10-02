@@ -602,7 +602,6 @@ bool Gles2ModelProgram::Init()
     glBindAttribLocation(program_, kGles2AttributeModelPositionFrame1, "a_position_frame1");
     glBindAttribLocation(program_, kGles2AttributeModelPositionFrame2, "a_position_frame2");
     glBindAttribLocation(program_, kGles2AttributeModelTextureCoordinates, "a_texture_coordinates");
-    glBindAttribLocation(program_, kGles2AttributeModelColor, "a_color");
     glBindAttribLocation(program_, kGles2AttributeModelNormalFrame1, "a_normal_frame1");
     glBindAttribLocation(program_, kGles2AttributeModelNormalFrame2, "a_normal_frame2");
 
@@ -656,7 +655,10 @@ bool Gles2ModelProgram::Init()
     uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
     uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
     uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
-    uniform_additive_pass_         = glGetUniformLocation(program_, "u_additive_pass");
+    uniform_model_whites_          = glGetUniformLocation(program_, "u_model_whites");
+    uniform_model_lighting_        = glGetUniformLocation(program_, "u_model_lighting");
+    uniform_model_light_           = glGetUniformLocation(program_, "u_model_light");
+    uniform_model_tint_            = glGetUniformLocation(program_, "u_model_tint");
     uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
     uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
     uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
@@ -806,9 +808,17 @@ void Gles2ModelProgram::SetAlphaTest(float reference)
     SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
 }
 
-void Gles2ModelProgram::SetAdditivePass(bool additive)
+void Gles2ModelProgram::SetLighting(const ModelDrawInfo &info)
 {
-    SetFloat(uniform_additive_pass_, shadow_additive_pass_, additive ? 1.0f : 0.0f);
+    if (info.light_table)
+    {
+        glUniform4fv(uniform_model_whites_, kSpriteLightLevels, &info.light_table->whites[0][0]);
+        glUniform4fv(uniform_model_lighting_, 1, info.light_table->parameters);
+    }
+
+    glUniform4f(uniform_model_light_, info.light_level, info.light_fixed_depth, info.light_depth_fixed ? 1.0f : 0.0f,
+                info.fuzzy ? 1.0f : 0.0f);
+    glUniform4f(uniform_model_tint_, info.tint.X, info.tint.Y, info.tint.Z, 1.0f);
 }
 
 void Gles2ModelProgram::SetOit(float mode, float scale)

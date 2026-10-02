@@ -108,13 +108,13 @@ struct GpuModelDrawArguments
     uint32_t normal_frame1_offset;
     uint32_t normal_frame2_offset;
     uint32_t texture_coordinate_offset;
-    uint32_t color_offset;
 
     int32_t index_first;
     int32_t index_count;
 
     int32_t vertex_parameter_index;
     int32_t fragment_parameter_index;
+    int32_t light_table_index;
 
     uint8_t stencil_reference;
 };
@@ -272,8 +272,6 @@ class GpuImmediate
 
     void SetGlowSet(int index);
 
-    void UploadModelColors();
-
     void SetOitPipeline(bool enabled);
 
     void SetOitComposite(bool enabled);
@@ -347,8 +345,6 @@ class GpuImmediate
     uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count);
 
     void DeleteModelMesh(uint32_t handle);
-
-    void UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count);
 
     void RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
                          const GpuModelFragmentParameters &fragment_parameters);
@@ -461,12 +457,6 @@ class GpuImmediate
     };
 
     std::vector<GpuModelMesh> model_meshes_;
-
-    std::vector<float>     model_color_data_;
-    SDL_GPUBuffer         *model_color_buffer_   = nullptr;
-    SDL_GPUTransferBuffer *model_color_transfer_ = nullptr;
-    size_t                 model_color_capacity_ = 0;
-    uint32_t               pending_color_base_   = 0;
 
     std::vector<GpuModelVertexParameters>   model_vertex_parameters_;
     std::vector<GpuModelFragmentParameters> model_fragment_parameters_;

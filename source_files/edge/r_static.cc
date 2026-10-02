@@ -76,10 +76,9 @@ struct StaticSpan
     HMM_Vec2          scroll_scale;
     HMM_Vec2          scroll_applied;
 
-    HMM_Vec3 normal;
-    float    low[3];
-    float    high[3];
-    float    div_x, div_y, div_delta_x, div_delta_y;
+    float low[3];
+    float high[3];
+    float div_x, div_y, div_delta_x, div_delta_y;
 };
 
 struct StaticRun
@@ -328,7 +327,6 @@ static uint64_t capture_hash_key  = 0;
 static bool capture_is_wall       = false;
 static bool capture_mid_masked    = false;
 
-static HMM_Vec3 capture_normal = {{0, 0, 1}};
 static float capture_div[4]    = {0, 0, 0, 0};
 static int  capture_light      = 0;
 static Sector *capture_light_sector = nullptr;
@@ -1115,16 +1113,14 @@ bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, con
 }
 
 void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
-                        Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
-                        float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked,
-                        OitPass draw_pass, const HMM_Vec2 &uv_scale, const Extrafloor *region_ef,
-                        const Extrafloor *surface_ef)
+                        Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
+                        float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
+                        const HMM_Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
     capture_mid_masked = mid_masked;
 
-    capture_normal = normal;
     capture_div[0] = div_x;
     capture_div[1] = div_y;
     capture_div[2] = div_delta_x;
@@ -1185,14 +1181,13 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
 }
 
 void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
-                            BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass, const MapSurface *surf,
-                            const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef)
+                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const HMM_Vec2 &uv_scale,
+                            const Extrafloor *plane_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
     capture_flip_winding = face_dir > 0;
 
-    capture_normal = normal;
     capture_div[0] = capture_div[1] = capture_div[2] = capture_div[3] = 0;
 
     capture_back_sector = nullptr;
@@ -1274,7 +1269,6 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
     span.scroll_surface = capture_scroll_surface;
     span.scroll_scale   = capture_uv_scale;
     span.scroll_applied = capture_scroll_uv;
-    span.normal       = capture_normal;
     span.div_x        = capture_div[0];
     span.div_y        = capture_div[1];
     span.div_delta_x  = capture_div[2];

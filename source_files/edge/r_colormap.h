@@ -73,6 +73,11 @@ AbstractShader *GetColormapShader(const struct RegionProperties *props, int ligh
 const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
                                             int *light_level);
 
+const SpriteLightTable *GetModelLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                           int *light_level);
+
+float WeaponModelLightDepth(const MapObject *mo);
+
 // colour indices from palette
 extern int playpal_black, playpal_white, playpal_gray;
 

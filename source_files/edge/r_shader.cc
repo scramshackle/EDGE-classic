@@ -66,14 +66,8 @@ class dynlight_shader_c : public AbstractShader
 
     float radius;
 
-    HMM_Vec3 surface_normal_;
-    HMM_Vec3 surface_tangent_u_;
-    HMM_Vec3 surface_tangent_v_;
-
   public:
-    dynlight_shader_c(MapObject *object, float r)
-        : mo(object), radius(r), surface_normal_({{0.0f, 0.0f, 1.0f}}), surface_tangent_u_({{1.0f, 0.0f, 0.0f}}),
-          surface_tangent_v_({{0.0f, 1.0f, 0.0f}})
+    dynlight_shader_c(MapObject *object, float r) : mo(object), radius(r)
     {
     }
 
@@ -82,34 +76,6 @@ class dynlight_shader_c : public AbstractShader
     }
 
   private:
-    inline void PrepareNormal(const HMM_Vec3 *normal)
-    {
-        float n_len = sqrt(normal->X * normal->X + normal->Y * normal->Y + normal->Z * normal->Z);
-
-        if (n_len < 0.0001f)
-            surface_normal_ = {{0.0f, 0.0f, 1.0f}};
-        else
-            surface_normal_ = {{normal->X / n_len, normal->Y / n_len, normal->Z / n_len}};
-
-        HMM_Vec3 guide = {{0.0f, 0.0f, 1.0f}};
-
-        if (fabs(surface_normal_.Z) >= fabs(surface_normal_.X) && fabs(surface_normal_.Z) >= fabs(surface_normal_.Y))
-            guide = {{1.0f, 0.0f, 0.0f}};
-
-        surface_tangent_u_ = HMM_NormV3(HMM_Cross(guide, surface_normal_));
-        surface_tangent_v_ = HMM_Cross(surface_normal_, surface_tangent_u_);
-    }
-
-    inline float TexCoord(HMM_Vec2 *texc, float r, const HMM_Vec3 *lit_pos)
-    {
-        HMM_Vec3 delta = {{lit_pos->X - mo->x, lit_pos->Y - mo->y, lit_pos->Z - MapObjectMidZ(mo)}};
-
-        texc->X = 0.5f + HMM_DotV3(delta, surface_tangent_u_) / r * 0.5f;
-        texc->Y = 0.5f + HMM_DotV3(delta, surface_tangent_v_) / r * 0.5f;
-
-        return fabs(HMM_DotV3(delta, surface_normal_)) / r;
-    }
-
     inline float WhatRadius()
     {
         return radius;
@@ -144,52 +110,6 @@ class dynlight_shader_c : public AbstractShader
         RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
-
-        if (new_col != kRGBABlack && L > 1 / 256.0)
-        {
-            if (WhatType() == kDynamicLightTypeAdd)
-                col->add_GIVE(new_col, L);
-            else
-                col->modulate_GIVE(new_col, L);
-        }
-    }
-
-    void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon)
-    {
-        float mx = mo->x;
-        float my = mo->y;
-        float mz = MapObjectMidZ(mo);
-
-        if (is_weapon)
-        {
-            mx += view_cosine * 24;
-            my += view_sine * 24;
-        }
-
-        float dx = mod_pos->x;
-        float dy = mod_pos->y;
-        float dz = MapObjectMidZ(mod_pos);
-
-        dx -= mx;
-        dy -= my;
-        dz -= mz;
-
-        float dist = sqrt(dx * dx + dy * dy + dz * dz);
-
-        dx /= dist;
-        dy /= dist;
-        dz /= dist;
-
-        dist = HMM_MAX(1.0, dist - mod_pos->radius_);
-
-        float L = 0.6 - 0.7 * (dx * nx + dy * ny + dz * nz);
-
-        L *= (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
-
-        if (WhatType() == kDynamicLightTypeNone)
-            return;
-
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         if (new_col != kRGBABlack && L > 1 / 256.0)
         {
@@ -264,13 +184,6 @@ class plane_glow_c : public AbstractShader
             return fabs(sec->ceiling_height - z); // kSectorGlowTypeCeiling
     }
 
-    inline void TexCoord(HMM_Vec2 *texc, float r, const Sector *sec, const HMM_Vec3 *lit_pos, const HMM_Vec3 *normal)
-    {
-        EPI_UNUSED(normal);
-        texc->X = 0.5;
-        texc->Y = 0.5 + Dist(sec, lit_pos->Z) / r / 2.0;
-    }
-
     inline float WhatRadius()
     {
         return radius;
@@ -301,49 +214,6 @@ class plane_glow_c : public AbstractShader
         RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
-
-        if (new_col != kRGBABlack && L > 1 / 256.0)
-        {
-            if (WhatType() == kDynamicLightTypeAdd)
-                col->add_GIVE(new_col, L);
-            else
-                col->modulate_GIVE(new_col, L);
-        }
-    }
-
-    void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon)
-    {
-        EPI_UNUSED(nx);
-        EPI_UNUSED(ny);
-        const Sector *sec = mo->sector_;
-
-        float dz = (mo->info_->glow_type_ == kSectorGlowTypeFloor) ? +1 : -1;
-        float dist;
-
-        if (is_weapon)
-        {
-            float weapon_z = mod_pos->z + mod_pos->height_ * mod_pos->info_->shotheight_;
-
-            if (mo->info_->glow_type_ == kSectorGlowTypeFloor)
-                dist = weapon_z - sec->floor_height;
-            else
-                dist = sec->ceiling_height - weapon_z;
-        }
-        else if (mo->info_->glow_type_ == kSectorGlowTypeFloor)
-            dist = mod_pos->z - sec->floor_height;
-        else
-            dist = sec->ceiling_height - (mod_pos->z + mod_pos->height_);
-
-        dist = HMM_MAX(1.0, fabs(dist));
-
-        float L = 0.6 - 0.7 * (dz * nz);
-
-        L *= (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
-
-        if (WhatType() == kDynamicLightTypeNone)
-            return;
-
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         if (new_col != kRGBABlack && L > 1 / 256.0)
         {
@@ -385,14 +255,6 @@ class wall_glow_c : public AbstractShader
         return (ld->vertex_1->X - x) * norm_x + (ld->vertex_1->Y - y) * norm_y;
     }
 
-    inline void TexCoord(HMM_Vec2 *texc, float r, const Sector *sec, const HMM_Vec3 *lit_pos, const HMM_Vec3 *normal)
-    {
-        EPI_UNUSED(sec);
-        EPI_UNUSED(normal);
-        texc->X = 0.5;
-        texc->Y = 0.5 + Dist(lit_pos->X, lit_pos->Y) / r / 2.0;
-    }
-
     inline float WhatRadius()
     {
         return radius;
@@ -425,32 +287,6 @@ class wall_glow_c : public AbstractShader
     {
         EPI_UNUSED(z);
         float dist = Dist(x, y);
-
-        float L = std::log1p(dist);
-
-        L *= (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
-
-        if (WhatType() == kDynamicLightTypeNone)
-            return;
-
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
-
-        if (new_col != kRGBABlack && L > 1 / 256.0)
-        {
-            if (WhatType() == kDynamicLightTypeAdd)
-                col->add_GIVE(new_col, L);
-            else
-                col->modulate_GIVE(new_col, L);
-        }
-    }
-
-    void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon = false)
-    {
-        EPI_UNUSED(nx);
-        EPI_UNUSED(ny);
-        EPI_UNUSED(nz);
-        EPI_UNUSED(is_weapon);
-        float dist = Dist(mod_pos->x, mod_pos->y);
 
         float L = std::log1p(dist);
 

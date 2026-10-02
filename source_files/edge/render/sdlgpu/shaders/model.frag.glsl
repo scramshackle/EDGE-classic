@@ -9,7 +9,7 @@ layout(set = 3, binding = 0) uniform ModelFragmentParameters
 {
     float alpha;
     float alpha_test;
-    float additive_pass;
+    float model_fragment_padding1;
 
     int   fog_mode;
     float fog_density;
@@ -204,9 +204,9 @@ void main()
         AccumulateGlows(modulate_sum, additive_sum);
     }
 
-    vec3 rgb = mix(texel.rgb * color, color, additive_pass);
+    vec3 rgb = texel.rgb * color;
 
-    rgb += (texel.rgb * modulate_sum + additive_sum) * (1.0 - additive_pass);
+    rgb += texel.rgb * modulate_sum + additive_sum;
 
     float fogf = FogFactor(length(vpos));
 

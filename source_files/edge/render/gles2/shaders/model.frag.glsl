@@ -26,7 +26,6 @@ uniform vec4  u_glow_additive;
 
 uniform float u_alpha;
 uniform float u_alpha_test;
-uniform float u_additive_pass;
 
 uniform float u_fog_mode;
 uniform vec4  u_fog_color;
@@ -109,7 +108,7 @@ void main()
         AccumulateGlows(v_eye_and_v.xyz, modulate_sum, additive_sum);
     }
 
-    vec3 rgb = mix(texel.rgb * v_color_and_u.rgb, v_color_and_u.rgb, u_additive_pass);
+    vec3 rgb = texel.rgb * v_color_and_u.rgb;
 
     float fog_factor = FogFactor();
 
@@ -118,7 +117,7 @@ void main()
         rgb = mix(rgb, u_fog_color.rgb, fog_factor);
     }
 
-    rgb += (texel.rgb * modulate_sum + additive_sum) * (1.0 - u_additive_pass);
+    rgb += texel.rgb * modulate_sum + additive_sum;
 
     vec4 fragment_color = vec4(rgb, texel.a * u_alpha);
 

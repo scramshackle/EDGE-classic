@@ -360,20 +360,6 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     dynamic_index_capacity_ = 0;
 
-    if (model_color_buffer_)
-    {
-        SDL_ReleaseGPUBuffer(device, model_color_buffer_);
-        model_color_buffer_ = nullptr;
-    }
-
-    if (model_color_transfer_)
-    {
-        SDL_ReleaseGPUTransferBuffer(device, model_color_transfer_);
-        model_color_transfer_ = nullptr;
-    }
-
-    model_color_capacity_ = 0;
-
     if (default_texture_)
     {
         SDL_ReleaseGPUTexture(device, default_texture_);
@@ -403,8 +389,6 @@ void GpuImmediate::BeginFrame()
     FlushDeletedStaticBuffers();
     vertex_parameters_.clear();
     fragment_parameters_.clear();
-    model_color_data_.clear();
-    pending_color_base_ = 0;
 
     model_vertex_parameters_.clear();
     model_fragment_parameters_.clear();
@@ -1839,98 +1823,6 @@ void GpuImmediate::DeleteModelMesh(uint32_t handle)
     EPI_CLEAR_MEMORY(mesh, GpuModelMesh, 1);
 }
 
-void GpuImmediate::UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count)
-{
-    pending_color_base_ = 0;
-
-    if (handle == 0 || handle > model_meshes_.size() || !colors || vertex_count <= 0 || !device_)
-        return;
-
-    GpuModelMesh *mesh = &model_meshes_[handle - 1];
-
-    if (vertex_count > mesh->vertex_count)
-        return;
-
-    size_t floats = (size_t)vertex_count * 6;
-
-    pending_color_base_ = (uint32_t)(model_color_data_.size() * sizeof(float));
-
-    model_color_data_.insert(model_color_data_.end(), colors, colors + floats);
-}
-
-void GpuImmediate::UploadModelColors()
-{
-    if (model_color_data_.empty())
-        return;
-
-    size_t bytes = model_color_data_.size() * sizeof(float);
-
-    if (bytes > model_color_capacity_ || !model_color_buffer_ || !model_color_transfer_)
-    {
-        size_t wanted = 65536;
-
-        while (wanted < bytes)
-            wanted *= 2;
-
-        if (model_color_buffer_)
-            SDL_ReleaseGPUBuffer(device_, model_color_buffer_);
-
-        if (model_color_transfer_)
-            SDL_ReleaseGPUTransferBuffer(device_, model_color_transfer_);
-
-        SDL_GPUBufferCreateInfo buffer_info;
-        EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
-
-        buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-        buffer_info.size  = (uint32_t)wanted;
-
-        model_color_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
-
-        SDL_GPUTransferBufferCreateInfo transfer_info;
-        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
-
-        transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        transfer_info.size  = (uint32_t)wanted;
-
-        model_color_transfer_ = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
-
-        if (!model_color_buffer_ || !model_color_transfer_)
-        {
-            LogPrint("GpuImmediate: model colour buffer allocation failed: %s\n", SDL_GetError());
-            model_color_capacity_ = 0;
-            return;
-        }
-
-        model_color_capacity_ = wanted;
-    }
-
-    void *mapped = SDL_MapGPUTransferBuffer(device_, model_color_transfer_, true);
-
-    if (!mapped)
-        return;
-
-    memcpy(mapped, model_color_data_.data(), bytes);
-
-    SDL_UnmapGPUTransferBuffer(device_, model_color_transfer_);
-
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(gpu_device.CommandBuffer());
-
-    SDL_GPUTransferBufferLocation source;
-    source.transfer_buffer = model_color_transfer_;
-    source.offset          = 0;
-
-    SDL_GPUBufferRegion destination;
-    destination.buffer = model_color_buffer_;
-    destination.offset = 0;
-    destination.size   = (uint32_t)bytes;
-
-    SDL_UploadToGPUBuffer(copy_pass, &source, &destination, true);
-
-    SDL_EndGPUCopyPass(copy_pass);
-
-    uploaded_bytes_ += bytes;
-}
-
 void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
                                    const GpuModelFragmentParameters &fragment_parameters)
 {
@@ -1980,15 +1872,12 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
 
     draw->texture_coordinate_offset = (uint32_t)((size_t)info.first_vertex * 2 * sizeof(float));
 
-    draw->color_offset = pending_color_base_ +
-                         (uint32_t)((size_t)info.first_vertex * 6 * sizeof(float) +
-                                    (info.additive_pass ? 3 * sizeof(float) : 0));
-
     draw->index_first = info.first_index;
     draw->index_count = info.index_count;
 
     draw->vertex_parameter_index   = (int32_t)model_vertex_parameters_.size() - 1;
     draw->fragment_parameter_index = (int32_t)model_fragment_parameters_.size() - 1;
+    draw->light_table_index        = SpriteLightTableIndex(info.light_table);
 
     draw->stencil_reference = stencil_reference_;
 
@@ -2522,7 +2411,6 @@ void GpuImmediate::Replay()
     UploadVertices();
     UploadIndices();
     UploadSpriteInstances();
-    UploadModelColors();
     GpuFlushLightBuffers();
 
     gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear);
@@ -2655,7 +2543,7 @@ void GpuImmediate::Replay()
                 bound_sampler_[b] = nullptr;
             }
 
-            SDL_GPUBufferBinding vertex_bindings[6];
+            SDL_GPUBufferBinding vertex_bindings[5];
 
             vertex_bindings[kGpuModelBufferSlotPositionFrame1].buffer = model->position_buffer;
             vertex_bindings[kGpuModelBufferSlotPositionFrame1].offset = model->position_frame1_offset;
@@ -2666,16 +2554,13 @@ void GpuImmediate::Replay()
             vertex_bindings[kGpuModelBufferSlotTextureCoordinates].buffer = model->texture_coordinate_buffer;
             vertex_bindings[kGpuModelBufferSlotTextureCoordinates].offset = model->texture_coordinate_offset;
 
-            vertex_bindings[kGpuModelBufferSlotColor].buffer = model_color_buffer_;
-            vertex_bindings[kGpuModelBufferSlotColor].offset = model->color_offset;
-
             vertex_bindings[kGpuModelBufferSlotNormalFrame1].buffer = model->normal_buffer;
             vertex_bindings[kGpuModelBufferSlotNormalFrame1].offset = model->normal_frame1_offset;
 
             vertex_bindings[kGpuModelBufferSlotNormalFrame2].buffer = model->normal_buffer;
             vertex_bindings[kGpuModelBufferSlotNormalFrame2].offset = model->normal_frame2_offset;
 
-            SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 6);
+            SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 5);
             binding_count_++;
 
             SDL_GPUBufferBinding model_index_binding;
@@ -2696,6 +2581,17 @@ void GpuImmediate::Replay()
 
             uniform_push_count_ += 2;
             uniform_bytes_ += sizeof(GpuModelVertexParameters) + sizeof(GpuModelFragmentParameters);
+
+            if (bound_light_table_index_ != model->light_table_index)
+            {
+                SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuSpriteUniformSlot,
+                                             &sprite_light_tables_[(size_t)model->light_table_index],
+                                             (uint32_t)sizeof(SpriteLightTable));
+
+                bound_light_table_index_ = model->light_table_index;
+                uniform_push_count_++;
+                uniform_bytes_ += sizeof(SpriteLightTable);
+            }
 
             bound_vertex_parameter_index_   = -1;
             bound_fragment_parameter_index_ = -1;

@@ -158,50 +158,6 @@ static OitPass CaptureDrawPass(BlendingMode blending)
     return kOitPassMasked;
 }
 
-static HMM_Vec3 PlaneGeometricNormal(const Sector *sec, int face_dir)
-{
-    HMM_Vec3 normal = {{0, 0, 1}};
-
-    if (sec)
-    {
-        if (face_dir > 0 && sec->floor_vertex_slope)
-            normal = sec->floor_vertex_slope_normal;
-        else if (face_dir < 0 && sec->ceiling_vertex_slope)
-            normal = sec->ceiling_vertex_slope_normal;
-        else
-        {
-            const SlopePlane *slope = (face_dir > 0) ? sec->floor_slope : sec->ceiling_slope;
-
-            if (slope)
-            {
-                float dx = slope->x2 - slope->x1;
-                float dy = slope->y2 - slope->y1;
-
-                float d_len = dx * dx + dy * dy;
-
-                if (d_len > 0.0f)
-                {
-                    float gradient = (slope->delta_z2 - slope->delta_z1) / HMM_SqrtF(d_len);
-
-                    HMM_Vec2 dir = {{dx, dy}};
-
-                    dir = HMM_NormV2(dir);
-
-                    normal = HMM_NormV3({{-gradient * dir.X, -gradient * dir.Y, 1.0f}});
-                }
-            }
-        }
-    }
-
-    if (normal.Z < 0.0f)
-        normal = {{-normal.X, -normal.Y, -normal.Z}};
-
-    if (face_dir < 0)
-        normal = {{-normal.X, -normal.Y, -normal.Z}};
-
-    return normal;
-}
-
 float LiquidLevelSeconds(void)
 {
     return ((float)level_time_elapsed + fractional_tic) / 35.0f;
@@ -225,23 +181,19 @@ struct WallCoordinateData
     float tx0, ty0;
     float tx_mul, ty_mul;
 
-    HMM_Vec3 normal;
-
     bool mid_masked;
 
     const RendererVertex *baked = nullptr;
     GLuint                shape = GL_POLYGON;
 };
 
-static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *normal,
-                          HMM_Vec3 *lit_pos)
+static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *lit_pos)
 {
     const WallCoordinateData *data = (WallCoordinateData *)d;
 
     if (data->baked)
     {
         *pos     = data->baked[v_idx].position;
-        *normal  = data->normal;
         *texc    = data->baked[v_idx].texture_coordinates[0];
         *lit_pos = *pos;
 
@@ -251,8 +203,7 @@ static void WallCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM
         return;
     }
 
-    *pos    = data->vertices[v_idx];
-    *normal = data->normal;
+    *pos = data->vertices[v_idx];
 
     *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
                          (uint8_t)(data->G * render_view_green_multiplier),
@@ -294,8 +245,6 @@ struct PlaneCoordinateData
     HMM_Vec2 x_mat;
     HMM_Vec2 y_mat;
 
-    HMM_Vec3 normal;
-
     // multiplier for plane_z_bob
     float bob_amount = 0;
 
@@ -307,15 +256,13 @@ struct PlaneCoordinateData
     GLuint                shape = GL_POLYGON;
 };
 
-static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *normal,
-                           HMM_Vec3 *lit_pos)
+static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *lit_pos)
 {
     PlaneCoordinateData *data = (PlaneCoordinateData *)d;
 
     if (data->baked)
     {
         *pos     = data->baked[v_idx].position;
-        *normal  = data->normal;
         *texc    = data->baked[v_idx].texture_coordinates[0];
         *lit_pos = *pos;
 
@@ -325,8 +272,7 @@ static void PlaneCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HM
         return;
     }
 
-    *pos    = data->vertices[v_idx];
-    *normal = data->normal;
+    *pos = data->vertices[v_idx];
 
     *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
                          (uint8_t)(data->G * render_view_green_multiplier),
@@ -556,8 +502,6 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     data.tx_mul = tx_mul;
     data.ty_mul = ty_mul;
 
-    data.normal = {{(y2 - y1), (x1 - x2), 0}};
-
     data.tex_id     = tex_id;
     data.pass       = 0;
     data.blending   = blending;
@@ -574,8 +518,8 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
         StaticMarkSectorDeclined(current_sector);
 
     if (capture)
-        StaticCaptureBegin(current_line_side, surf, image, props, current_sector, blending, lit_adjust, data.normal,
-                           data.div.x, data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
+        StaticCaptureBegin(current_line_side, surf, image, props, current_sector, blending, lit_adjust, data.div.x,
+                           data.div.y, data.div.delta_x, data.div.delta_y, mid_masked,
                            CaptureDrawPass(blending), {{surf->x_matrix.X / total_w, -ty_mul}},
                            current_region_extrafloor, current_surface_extrafloor);
 
@@ -1562,7 +1506,6 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
     data.image_h  = surf->image->ScaledHeight();
     data.x_mat    = surf->x_matrix;
     data.y_mat    = surf->y_matrix;
-    data.normal   = PlaneGeometricNormal(own_sec, face_dir);
     data.tex_id   = tex_id;
     data.pass     = 0;
     data.blending = blending;
@@ -1611,8 +1554,8 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
         data.vertices = sector_polygon_vertices.data() + offset;
 
         if (capture)
-            StaticCaptureBeginFlat(own_sec, face_dir, surf->image, props, data.blending, data.normal,
-                                   CaptureDrawPass(data.blending), surf, uv_scale, plane_ef);
+            StaticCaptureBeginFlat(own_sec, face_dir, surf->image, props, data.blending, CaptureDrawPass(data.blending),
+                                   surf, uv_scale, plane_ef);
 
         cmap_shader->WorldMix(GL_TRIANGLES, data.v_count, data.tex_id, trans, &data.pass, data.blending,
                               false /* masked */, &data, PlaneCoordFunc);
@@ -2278,24 +2221,20 @@ struct FloodEmulationData
     HMM_Vec2 x_mat;
     HMM_Vec2 y_mat;
 
-    HMM_Vec3 normal;
-
     int piece_row;
     int piece_col;
 
     float h1, dh;
 };
 
-static void FloodCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *normal,
-                           HMM_Vec3 *lit_pos)
+static void FloodCoordFunc(void *d, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc, HMM_Vec3 *lit_pos)
 {
     const FloodEmulationData *data = (FloodEmulationData *)d;
 
-    *pos    = data->vertices[v_idx];
-    *normal = data->normal;
-    *rgb    = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
-                            (uint8_t)(data->G * render_view_green_multiplier),
-                            (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
+    *pos = data->vertices[v_idx];
+    *rgb = epi::MakeRGBA((uint8_t)(data->R * render_view_red_multiplier),
+                         (uint8_t)(data->G * render_view_green_multiplier),
+                         (uint8_t)(data->B * render_view_blue_multiplier), epi::GetRGBAAlpha(*rgb));
 
     float along = (view_z - data->plane_h) / (view_z - pos->Z);
 
@@ -2356,8 +2295,6 @@ void EmulateFloodPlane(const DrawFloor *dfloor, const Sector *flood_ref, int fac
 
     data.x_mat = surf->x_matrix;
     data.y_mat = surf->y_matrix;
-
-    data.normal = {{0, 0, (float)face_dir}};
 
     // determine number of pieces to subdivide the area into.
     // The more the better, upto a limit of 64 pieces, and

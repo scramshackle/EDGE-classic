@@ -494,11 +494,6 @@ class Gles2RenderState : public RenderState
         gles2_immediate.DeleteModelMesh(handle);
     }
 
-    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
-    {
-        gles2_immediate.UpdateModelColors(handle, colors, vertex_count);
-    }
-
     void DrawModel(const ModelDrawInfo &info)
     {
         if (info.handle == 0 || info.index_count <= 0)
@@ -508,12 +503,7 @@ class Gles2RenderState : public RenderState
 
         if (oit_mode != kOitPassNone)
         {
-            OitPass model_pass = kOitPassMasked;
-
-            if (info.additive_pass)
-                model_pass = kOitPassAdditive;
-            else if (info.alpha < 1.0f)
-                model_pass = kOitPassAccumulate;
+            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
 
             bool wanted = (model_pass == oit_mode) ||
                           (model_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
@@ -547,7 +537,7 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetTextureTransform(info.texture_scale, info.texture_offset);
         gles2_model_program.SetAlpha(info.alpha);
         gles2_model_program.SetAlphaTest(info.alpha_test);
-        gles2_model_program.SetAdditivePass(info.additive_pass);
+        gles2_model_program.SetLighting(info);
         gles2_model_program.SetColorLookup(info.color_lookup);
         gles2_model_program.SetOit(
             (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage) ? (float)oit_mode : 0.0f,
