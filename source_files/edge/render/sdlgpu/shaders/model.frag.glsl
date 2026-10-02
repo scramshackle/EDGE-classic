@@ -59,15 +59,15 @@ layout(location = 1) in vec3 color;
 layout(location = 2) in vec3 vpos;
 layout(location = 3) in vec3 vnormal;
 
-const float kLightTileSize = 16.0;
+const float kLightClusterSize = 16.0;
 const int   kLightSlices   = 8;
 
 void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
 {
-    float tile_x = floor((gl_FragCoord.x - light_view.x) / kLightTileSize);
-    float tile_y = floor((light_view.y - gl_FragCoord.y) / kLightTileSize);
+    float cluster_x = floor((gl_FragCoord.x - light_view.x) / kLightClusterSize);
+    float cluster_y = floor((light_view.y - gl_FragCoord.y) / kLightClusterSize);
 
-    if (tile_x < 0.0 || tile_y < 0.0 || tile_x >= light_view.z || tile_y >= light_view.w)
+    if (cluster_x < 0.0 || cluster_y < 0.0 || cluster_x >= light_view.z || cluster_y >= light_view.w)
         return;
 
     float depth = max(-vpos.z, light_range.x);
@@ -76,7 +76,8 @@ void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
 
     int slice = clamp(int(ratio * float(kLightSlices)), 0, kLightSlices - 1);
 
-    int cluster = int(light_range.w) + (slice * int(light_view.w) + int(tile_y)) * int(light_view.z) + int(tile_x);
+    int cluster =
+        int(light_range.w) + (slice * int(light_view.w) + int(cluster_y)) * int(light_view.z) + int(cluster_x);
 
     uint entry  = gpu_clusters[cluster];
     uint offset = entry >> 8u;

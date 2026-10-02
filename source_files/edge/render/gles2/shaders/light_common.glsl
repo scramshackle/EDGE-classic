@@ -1,20 +1,24 @@
-const float kLightTileSize = 16.0;
+const float kLightClusterSize = 16.0;
 
 vec4 LightDataTexel(float index, float row)
 {
     return texture2D(u_light_data, vec2((index + 0.5) * u_light_data_step, (row + 0.5) * 0.25));
 }
 
-void AccumulateTileLights(vec3 surface_position, vec3 surface_normal, float use_normal, inout vec3 modulate_sum,
+void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float use_normal, inout vec3 modulate_sum,
                           inout vec3 additive_sum)
 {
-    float tile_x = floor((gl_FragCoord.x - u_light_view.x) / kLightTileSize);
-    float tile_y = floor((gl_FragCoord.y - u_light_view.y) / kLightTileSize);
+    float cluster_x = floor((gl_FragCoord.x - u_light_view.x) / kLightClusterSize);
+    float cluster_y = floor((gl_FragCoord.y - u_light_view.y) / kLightClusterSize);
 
-    if (tile_x < 0.0 || tile_y < 0.0)
+    if (cluster_x < 0.0 || cluster_y < 0.0)
         return;
 
-    vec4 header = texture2D(u_light_headers, vec2((tile_x + 0.5) * u_light_view.z, (tile_y + 0.5) * u_light_view.w));
+    float depth = max(-surface_position.z, 1.0);
+    float slice = clamp(floor((log(depth) - u_light_cluster.x) * u_light_cluster.y), 0.0, u_light_cluster.w);
+    float row   = slice * u_light_cluster.z + cluster_y;
+
+    vec4 header = texture2D(u_light_headers, vec2((cluster_x + 0.5) * u_light_view.z, (row + 0.5) * u_light_view.w));
 
     float count = floor(header.a * 255.0 + 0.5);
 
@@ -24,7 +28,7 @@ void AccumulateTileLights(vec3 surface_position, vec3 surface_normal, float use_
     float offset = floor(header.r * 255.0 + 0.5) * 65536.0 + floor(header.g * 255.0 + 0.5) * 256.0 +
                    floor(header.b * 255.0 + 0.5);
 
-    for (int slot = 0; slot < EDGE_LIGHT_MAX_PER_TILE; slot++)
+    for (int slot = 0; slot < EDGE_LIGHT_MAX_PER_CLUSTER; slot++)
     {
         if (float(slot) >= count)
             break;

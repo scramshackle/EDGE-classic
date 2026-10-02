@@ -202,8 +202,10 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kGles2LightDataWidth, kGles2LightDataHeight, GL_RGBA, GL_UNSIGNED_BYTE,
                     light_data_pixels.data());
 
-    int wanted_header_width  = NextPowerOfTwo(grid->tiles_x);
-    int wanted_header_height = NextPowerOfTwo(grid->tiles_y);
+    int header_rows = grid->clusters_y * kLightGridDepthSlices;
+
+    int wanted_header_width  = NextPowerOfTwo(grid->clusters_x);
+    int wanted_header_height = NextPowerOfTwo(header_rows);
 
     bool header_resized = (wanted_header_width != header_texture_width) ||
                           (wanted_header_height != header_texture_height);
@@ -222,16 +224,16 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     else
         memset(header_pixels.data(), 0, header_pixels.size());
 
-    for (int tile_y = 0; tile_y < grid->tiles_y; tile_y++)
+    for (int row = 0; row < header_rows; row++)
     {
-        for (int tile_x = 0; tile_x < grid->tiles_x; tile_x++)
+        for (int cluster_x = 0; cluster_x < grid->clusters_x; cluster_x++)
         {
-            int tile = tile_y * grid->tiles_x + tile_x;
+            int cluster = row * grid->clusters_x + cluster_x;
 
-            uint32_t offset = grid->tile_offsets[(size_t)tile];
-            uint32_t count  = grid->tile_counts[(size_t)tile];
+            uint32_t offset = grid->cluster_offsets[(size_t)cluster];
+            uint32_t count  = grid->cluster_counts[(size_t)cluster];
 
-            uint8_t *texel = header_pixels.data() + ((size_t)tile_y * header_texture_width + tile_x) * 4;
+            uint8_t *texel = header_pixels.data() + ((size_t)row * header_texture_width + cluster_x) * 4;
 
             texel[0] = (uint8_t)((offset >> 16) & 0xFF);
             texel[1] = (uint8_t)((offset >> 8) & 0xFF);
@@ -244,7 +246,7 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, header_texture_width, header_texture_height, GL_RGBA, GL_UNSIGNED_BYTE,
                     header_pixels.data());
 
-    size_t entry_total = grid->tile_list.size();
+    size_t entry_total = grid->cluster_list.size();
 
     int wanted_list_width  = 256;
     int wanted_list_height = NextPowerOfTwo((int)((entry_total + 255) / 256) + 1);
@@ -268,7 +270,7 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     size_t list_capacity = (size_t)list_texture_width * list_texture_height;
 
     for (size_t entry = 0; entry < entry_total && entry < list_capacity; entry++)
-        list_pixels[entry] = grid->tile_list[entry];
+        list_pixels[entry] = grid->cluster_list[entry];
 
     glBindTexture(GL_TEXTURE_2D, light_grid_state.list_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, list_texture_width, list_texture_height, GL_LUMINANCE, GL_UNSIGNED_BYTE,
@@ -281,6 +283,11 @@ void Gles2UploadLightGrid(const LightGrid *grid)
 
     light_grid_state.header_texel_step[0] = 1.0f / (float)header_texture_width;
     light_grid_state.header_texel_step[1] = 1.0f / (float)header_texture_height;
+
+    light_grid_state.cluster[0] = logf(grid->cluster_near);
+    light_grid_state.cluster[1] = (float)kLightGridDepthSlices / logf(grid->cluster_far / grid->cluster_near);
+    light_grid_state.cluster[2] = (float)grid->clusters_y;
+    light_grid_state.cluster[3] = (float)(kLightGridDepthSlices - 1);
 
     light_grid_state.list_width         = (float)list_texture_width;
     light_grid_state.list_texel_step[0] = 1.0f / (float)list_texture_width;

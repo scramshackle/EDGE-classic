@@ -12,8 +12,8 @@ static const char *Gles2ShaderDefines()
 {
     static char defines[128];
 
-    stbsp_snprintf(defines, sizeof(defines), "#define EDGE_LIGHT_MAX_PER_TILE %d\n#define EDGE_LIGHT_MAX_GLOWS %d\n",
-                   kLightGridMaximumPerTile, kLightGridMaximumGlows);
+    stbsp_snprintf(defines, sizeof(defines), "#define EDGE_LIGHT_MAX_PER_CLUSTER %d\n#define EDGE_LIGHT_MAX_GLOWS %d\n",
+                   kLightGridMaximumPerCluster, kLightGridMaximumGlows);
 
     return defines;
 }

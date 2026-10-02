@@ -192,6 +192,7 @@ bool Gles2Program::Init()
     uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
     uniform_light_list_            = glGetUniformLocation(program_, "u_light_list");
     uniform_light_view_            = glGetUniformLocation(program_, "u_light_view");
+    uniform_light_cluster_         = glGetUniformLocation(program_, "u_light_cluster");
     uniform_light_bounds_min_      = glGetUniformLocation(program_, "u_light_bounds_min");
     uniform_light_bounds_range_    = glGetUniformLocation(program_, "u_light_bounds_range");
     uniform_light_radius_scale_    = glGetUniformLocation(program_, "u_light_radius_scale");
@@ -332,6 +333,8 @@ void Gles2Program::SetLightGrid(const Gles2LightGridState *grid)
 
     glUniform4f(uniform_light_view_, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
                 grid->header_texel_step[1]);
+
+    glUniform4f(uniform_light_cluster_, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
 
     glUniform4f(uniform_light_list_, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
 
@@ -637,6 +640,7 @@ bool Gles2ModelProgram::Init()
     uniform_light_headers_         = glGetUniformLocation(program_, "u_light_headers");
     uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
     uniform_light_view_            = glGetUniformLocation(program_, "u_light_view");
+    uniform_light_cluster_         = glGetUniformLocation(program_, "u_light_cluster");
     uniform_light_list_            = glGetUniformLocation(program_, "u_light_list");
     uniform_light_bounds_min_      = glGetUniformLocation(program_, "u_light_bounds_min");
     uniform_light_bounds_range_    = glGetUniformLocation(program_, "u_light_bounds_range");
@@ -690,6 +694,8 @@ void Gles2ModelProgram::SetLightGrid(const Gles2LightGridState *grid)
 
     glUniform4f(uniform_light_view_, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
                 grid->header_texel_step[1]);
+
+    glUniform4f(uniform_light_cluster_, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
 
     glUniform4f(uniform_light_list_, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
 

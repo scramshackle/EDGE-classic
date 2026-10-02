@@ -173,11 +173,6 @@ class Gles2RenderBackend : public RenderBackend
         Gles2UploadLightGrid(grid);
     }
 
-    int LightGridBinningMode()
-    {
-        return kLightGridBinTiles;
-    }
-
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         render_state->Flush();

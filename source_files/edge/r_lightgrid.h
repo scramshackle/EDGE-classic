@@ -6,11 +6,11 @@
 
 #include "HandmadeMath.h"
 
-constexpr int kLightGridTileSize      = 16;
-constexpr int kLightGridMaximumLights = 254;
-constexpr int kLightGridMaximumPerTile = 64;
-constexpr int kLightGridDepthSlices   = 8;
-constexpr int kLightGridMaximumGlows  = 2;
+constexpr int kLightGridClusterSize       = 16;
+constexpr int kLightGridMaximumLights     = 254;
+constexpr int kLightGridMaximumPerCluster = 64;
+constexpr int kLightGridDepthSlices       = 8;
+constexpr int kLightGridMaximumGlows      = 2;
 
 struct LightGridLight
 {
@@ -40,17 +40,13 @@ struct LightGrid
 {
     std::vector<LightGridLight> lights;
 
-    int tiles_x = 0;
-    int tiles_y = 0;
+    int clusters_x = 0;
+    int clusters_y = 0;
 
     int view_x = 0;
     int view_y = 0;
     int view_width  = 0;
     int view_height = 0;
-
-    std::vector<uint32_t> tile_offsets;
-    std::vector<uint8_t>  tile_counts;
-    std::vector<uint8_t>  tile_list;
 
     std::vector<uint32_t> cluster_offsets;
     std::vector<uint8_t>  cluster_counts;
@@ -61,9 +57,7 @@ struct LightGrid
 
     uint32_t serial = 0;
 
-    int max_tile_count    = 0;
     int max_cluster_count = 0;
-    int dropped_tile      = 0;
     int dropped_cluster   = 0;
 
     bool Empty() const
@@ -71,22 +65,10 @@ struct LightGrid
         return lights.empty();
     }
 
-    int TileTotal() const
-    {
-        return tiles_x * tiles_y;
-    }
-
     int ClusterTotal() const
     {
-        return tiles_x * tiles_y * kLightGridDepthSlices;
+        return clusters_x * clusters_y * kLightGridDepthSlices;
     }
-};
-
-enum LightGridBinning
-{
-    kLightGridBinTiles,
-    kLightGridBinClusters,
-    kLightGridBinNone
 };
 
 struct Sector;

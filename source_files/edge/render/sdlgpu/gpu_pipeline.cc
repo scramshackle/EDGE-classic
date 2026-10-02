@@ -1,9 +1,5 @@
 #include "gpu_pipeline.h"
 
-#include "shaders/light_cull_spirv.h"
-
-#include "r_lightgrid.h"
-
 #include <stddef.h>
 
 #include <unordered_map>
@@ -419,40 +415,6 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
 
 static SDL_GPUGraphicsPipeline *movie_pipeline = nullptr;
 
-static SDL_GPUComputePipeline *light_cull_pipeline = nullptr;
-
-static_assert(kLightGridMaximumPerTile == 64, "light_cull.comp.glsl hardcodes kMaximumPerCluster = 64");
-
-SDL_GPUComputePipeline *GetLightCullPipeline(void)
-{
-    if (light_cull_pipeline)
-        return light_cull_pipeline;
-
-    if (!pipeline_device)
-        return nullptr;
-
-    SDL_GPUComputePipelineCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUComputePipelineCreateInfo, 1);
-
-    info.code                          = (const uint8_t *)kLightCullSpirv;
-    info.code_size                     = sizeof(kLightCullSpirv);
-    info.entrypoint                    = "main";
-    info.format                        = SDL_GPU_SHADERFORMAT_SPIRV;
-    info.num_readonly_storage_buffers  = kLightCullReadOnlyStorageBufferCount;
-    info.num_readwrite_storage_buffers = kLightCullReadWriteStorageBufferCount;
-    info.num_uniform_buffers           = kLightCullUniformBufferCount;
-    info.threadcount_x                 = 64;
-    info.threadcount_y                 = 1;
-    info.threadcount_z                 = 1;
-
-    light_cull_pipeline = SDL_CreateGPUComputePipeline(pipeline_device, &info);
-
-    if (!light_cull_pipeline)
-        LogPrint("GpuPipeline: SDL_CreateGPUComputePipeline (light cull) failed: %s\n", SDL_GetError());
-
-    return light_cull_pipeline;
-}
-
 SDL_GPUGraphicsPipeline *GetMoviePipeline(void)
 {
     if (movie_pipeline)
@@ -545,12 +507,6 @@ void ShutdownPipelines(SDL_GPUDevice *device)
     }
 
     pipelines.clear();
-
-    if (light_cull_pipeline)
-    {
-        SDL_ReleaseGPUComputePipeline(device, light_cull_pipeline);
-        light_cull_pipeline = nullptr;
-    }
 
     if (movie_pipeline)
     {

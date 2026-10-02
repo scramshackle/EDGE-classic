@@ -457,12 +457,11 @@ void FinishFrame(void)
         const LightGrid *grid = CurrentLightGrid();
 
         LogPrint("Light survey %d: %d render units, %d dynamic-light, %d glow, %u backend draws, "
-                 "%d walls, %d planes, %d things | grid %d lights, tile max %d drop %d, "
-                 "cluster max %d drop %d.\n",
+                 "%d walls, %d planes, %d things | grid %d lights, cluster max %d drop %d.\n",
                  light_survey_frame, ec_frame_stats.draw_render_units, ec_frame_stats.draw_light_dynamic,
                  ec_frame_stats.draw_light_glow, stats.num_draw_, ec_frame_stats.draw_wall_parts,
                  ec_frame_stats.draw_planes, ec_frame_stats.draw_things, (int)grid->lights.size(),
-                 grid->max_tile_count, grid->dropped_tile, grid->max_cluster_count, grid->dropped_cluster);
+                 grid->max_cluster_count, grid->dropped_cluster);
 
         LogPrint("Light grid time: collect %llu us, bin %llu us, upload %llu us.\n",
                  (unsigned long long)ec_frame_stats.light_grid_collect_us,

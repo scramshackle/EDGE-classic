@@ -132,6 +132,7 @@ class Gles2Program
     GLint uniform_light_indices_         = -1;
     GLint uniform_light_list_            = -1;
     GLint uniform_light_view_            = -1;
+    GLint uniform_light_cluster_         = -1;
     GLint uniform_light_bounds_min_      = -1;
     GLint uniform_light_bounds_range_    = -1;
     GLint uniform_light_radius_scale_    = -1;
@@ -273,6 +274,7 @@ class Gles2ModelProgram
     GLint uniform_light_headers_         = -1;
     GLint uniform_light_indices_         = -1;
     GLint uniform_light_view_            = -1;
+    GLint uniform_light_cluster_         = -1;
     GLint uniform_light_list_            = -1;
     GLint uniform_light_bounds_min_      = -1;
     GLint uniform_light_bounds_range_    = -1;

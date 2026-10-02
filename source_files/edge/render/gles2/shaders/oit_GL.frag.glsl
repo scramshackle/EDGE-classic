@@ -1,5 +1,5 @@
 #version 110
-#define EDGE_LIGHT_MAX_PER_TILE 64
+#define EDGE_LIGHT_MAX_PER_CLUSTER 64
 #define EDGE_LIGHT_MAX_GLOWS 2
 uniform sampler2D u_accumulation;
 uniform sampler2D u_revealage;

@@ -152,11 +152,6 @@ class GpuRenderBackend : public RenderBackend
         GpuUploadLightGrid(grid);
     }
 
-    int LightGridBinningMode()
-    {
-        return kLightGridBinNone;
-    }
-
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         if (!gpu_device.ReadColorTarget(width, height, stride, dest))

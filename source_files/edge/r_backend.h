@@ -192,8 +192,6 @@ class RenderBackend
 
     virtual void UploadColorLookup(int slot, const uint8_t *pixels) = 0;
 
-    virtual int LightGridBinningMode() = 0;
-
     virtual void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest) = 0;
 
     virtual void GetFrameStats(FrameStats &stats) = 0;

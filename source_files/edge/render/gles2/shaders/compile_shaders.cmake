@@ -15,15 +15,15 @@ set(STAGE_SYMBOLS Vertex Fragment)
 
 file(READ "${SHADER_DIR}/../../../r_lightgrid.h" LIGHT_GRID_HEADER)
 
-string(REGEX MATCH "kLightGridMaximumPerTile[ \t]*=[ \t]*([0-9]+)" LIGHT_GRID_MATCH "${LIGHT_GRID_HEADER}")
+string(REGEX MATCH "kLightGridMaximumPerCluster[ \t]*=[ \t]*([0-9]+)" LIGHT_GRID_MATCH "${LIGHT_GRID_HEADER}")
 
 if (NOT LIGHT_GRID_MATCH)
-  message(FATAL_ERROR "compile_shaders: could not read kLightGridMaximumPerTile from r_lightgrid.h")
+  message(FATAL_ERROR "compile_shaders: could not read kLightGridMaximumPerCluster from r_lightgrid.h")
 endif()
 
-set(LIGHT_MAX_PER_TILE "${CMAKE_MATCH_1}")
+set(LIGHT_MAX_PER_CLUSTER "${CMAKE_MATCH_1}")
 
-message(STATUS "compile_shaders: EDGE_LIGHT_MAX_PER_TILE = ${LIGHT_MAX_PER_TILE} (from r_lightgrid.h)")
+message(STATUS "compile_shaders: EDGE_LIGHT_MAX_PER_CLUSTER = ${LIGHT_MAX_PER_CLUSTER} (from r_lightgrid.h)")
 
 string(REGEX MATCH "kLightGridMaximumGlows[ \t]*=[ \t]*([0-9]+)" GLOW_MATCH "${LIGHT_GRID_HEADER}")
 
@@ -35,7 +35,7 @@ set(LIGHT_MAX_GLOWS "${CMAKE_MATCH_1}")
 
 message(STATUS "compile_shaders: EDGE_LIGHT_MAX_GLOWS = ${LIGHT_MAX_GLOWS} (from r_lightgrid.h)")
 
-set(SHARED_DEFINES "#define EDGE_LIGHT_MAX_PER_TILE ${LIGHT_MAX_PER_TILE}\n#define EDGE_LIGHT_MAX_GLOWS ${LIGHT_MAX_GLOWS}\n")
+set(SHARED_DEFINES "#define EDGE_LIGHT_MAX_PER_CLUSTER ${LIGHT_MAX_PER_CLUSTER}\n#define EDGE_LIGHT_MAX_GLOWS ${LIGHT_MAX_GLOWS}\n")
 
 set(GLES_VERTEX_PREAMBLE "#version 100\n${SHARED_DEFINES}")
 set(GLES_FRAGMENT_PREAMBLE "#version 100\n${SHARED_DEFINES}#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n")

@@ -28,6 +28,8 @@ struct Gles2LightGridState
     float bounds_range[3]   = {1.0f, 1.0f, 1.0f};
 
     float radius_scale = 1.0f;
+
+    float cluster[4] = {0.0f, 1.0f, 1.0f, 0.0f};
 };
 
 void Gles2CreateLightGridTextures(void);

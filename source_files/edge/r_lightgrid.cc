@@ -273,22 +273,94 @@ static bool LightGridScreenBounds(const HMM_Mat4 &view_projection, const LightGr
     return true;
 }
 
+struct LightGridSliceCoverage
+{
+    int light;
+    int slice;
+    int cluster_x1, cluster_y1, cluster_x2, cluster_y2;
+};
+
+static float LightGridSliceDepth(int slice, float near_plane, float far_plane)
+{
+    return near_plane * powf(far_plane / near_plane, (float)slice / (float)kLightGridDepthSlices);
+}
+
+static bool LightGridSliceRect(const LightGridLight &light, int slice, LightGridSliceCoverage *cover)
+{
+    float slice_near = LightGridSliceDepth(slice, current_light_grid.cluster_near, current_light_grid.cluster_far);
+    float slice_far  = LightGridSliceDepth(slice + 1, current_light_grid.cluster_near, current_light_grid.cluster_far);
+
+    slice_near *= 0.99f;
+    slice_far *= 1.01f;
+
+    float depth = -light.eye_position.Z;
+
+    float low  = HMM_MAX(slice_near, depth - light.radius);
+    float high = HMM_MIN(slice_far, depth + light.radius);
+
+    if (low > high)
+        return false;
+
+    float gap = 0.0f;
+
+    if (depth < low)
+        gap = low - depth;
+    else if (depth > high)
+        gap = depth - high;
+
+    float reach = sqrtf(HMM_MAX(0.0f, light.radius * light.radius - gap * gap)) + 1.0f;
+
+    float flip = fliplevels.d_ ? -1.0f : 1.0f;
+
+    float ndc_x[4];
+    float ndc_y[4];
+
+    for (int corner = 0; corner < 4; corner++)
+    {
+        float corner_depth = (corner & 1) ? high : low;
+        float side         = (corner & 2) ? reach : -reach;
+
+        ndc_x[corner] = (light.eye_position.X + side) / (corner_depth * view_x_slope) * flip;
+        ndc_y[corner] = (light.eye_position.Y + side) / (corner_depth * view_y_slope);
+    }
+
+    float minimum_x = HMM_MIN(HMM_MIN(ndc_x[0], ndc_x[1]), HMM_MIN(ndc_x[2], ndc_x[3]));
+    float maximum_x = HMM_MAX(HMM_MAX(ndc_x[0], ndc_x[1]), HMM_MAX(ndc_x[2], ndc_x[3]));
+    float minimum_y = HMM_MIN(HMM_MIN(ndc_y[0], ndc_y[1]), HMM_MIN(ndc_y[2], ndc_y[3]));
+    float maximum_y = HMM_MAX(HMM_MAX(ndc_y[0], ndc_y[1]), HMM_MAX(ndc_y[2], ndc_y[3]));
+
+    if (minimum_x > 1.0f || maximum_x < -1.0f || minimum_y > 1.0f || maximum_y < -1.0f)
+        return false;
+
+    float clusters_per_ndc_x = (float)current_light_grid.view_width / (2.0f * (float)kLightGridClusterSize);
+    float clusters_per_ndc_y = (float)current_light_grid.view_height / (2.0f * (float)kLightGridClusterSize);
+
+    int first_x = (int)floorf((HMM_MAX(minimum_x, -1.0f) + 1.0f) * clusters_per_ndc_x);
+    int last_x  = (int)floorf((HMM_MIN(maximum_x, 1.0f) + 1.0f) * clusters_per_ndc_x);
+    int first_y = (int)floorf((HMM_MAX(minimum_y, -1.0f) + 1.0f) * clusters_per_ndc_y);
+    int last_y  = (int)floorf((HMM_MIN(maximum_y, 1.0f) + 1.0f) * clusters_per_ndc_y);
+
+    cover->cluster_x1 = HMM_MAX(cover->cluster_x1, first_x);
+    cover->cluster_x2 = HMM_MIN(cover->cluster_x2, last_x);
+    cover->cluster_y1 = HMM_MAX(cover->cluster_y1, first_y);
+    cover->cluster_y2 = HMM_MIN(cover->cluster_y2, last_y);
+
+    cover->slice = slice;
+
+    return cover->cluster_x1 <= cover->cluster_x2 && cover->cluster_y1 <= cover->cluster_y2;
+}
+
 void ClearLightGrid(void)
 {
     current_light_grid.lights.clear();
-    current_light_grid.tile_counts.clear();
-    current_light_grid.tile_offsets.clear();
-    current_light_grid.tile_list.clear();
     current_light_grid.cluster_counts.clear();
     current_light_grid.cluster_offsets.clear();
     current_light_grid.cluster_list.clear();
 
-    current_light_grid.tiles_x = 0;
-    current_light_grid.tiles_y = 0;
+    current_light_grid.clusters_x = 0;
+    current_light_grid.clusters_y = 0;
 
-    current_light_grid.max_tile_count    = 0;
     current_light_grid.max_cluster_count = 0;
-    current_light_grid.dropped_tile      = 0;
     current_light_grid.dropped_cluster   = 0;
 }
 
@@ -343,28 +415,20 @@ void BuildLightGrid(void)
     current_light_grid.view_width  = view_window_width;
     current_light_grid.view_height = view_window_height;
 
-    current_light_grid.tiles_x = (view_window_width + kLightGridTileSize - 1) / kLightGridTileSize;
-    current_light_grid.tiles_y = (view_window_height + kLightGridTileSize - 1) / kLightGridTileSize;
+    current_light_grid.clusters_x = (view_window_width + kLightGridClusterSize - 1) / kLightGridClusterSize;
+    current_light_grid.clusters_y = (view_window_height + kLightGridClusterSize - 1) / kLightGridClusterSize;
 
     current_light_grid.cluster_near = HMM_MAX(1.0f, renderer_near_clip.f_);
     current_light_grid.cluster_far  = HMM_MAX(current_light_grid.cluster_near * 2.0f, renderer_far_clip.f_);
 
-    int binning = render_backend->LightGridBinningMode();
-
-    bool use_clusters = (binning == kLightGridBinClusters);
-
-    int tile_total    = (binning == kLightGridBinTiles) ? current_light_grid.TileTotal() : 0;
-    int cluster_total = use_clusters ? current_light_grid.ClusterTotal() : 0;
-
-    current_light_grid.tile_counts.assign((size_t)tile_total, 0);
-    current_light_grid.tile_offsets.assign((size_t)tile_total, 0);
+    int cluster_total = current_light_grid.ClusterTotal();
 
     current_light_grid.cluster_counts.assign((size_t)cluster_total, 0);
     current_light_grid.cluster_offsets.assign((size_t)cluster_total, 0);
 
     struct LightGridCoverage
     {
-        int tile_x1, tile_y1, tile_x2, tile_y2;
+        int cluster_x1, cluster_y1, cluster_x2, cluster_y2;
         int slice1, slice2;
     };
 
@@ -397,14 +461,14 @@ void BuildLightGrid(void)
 
         LightGridCoverage cover;
 
-        cover.tile_x1 = HMM_MAX(0, (int)floorf((minimum_x - (float)view_window_x) / (float)kLightGridTileSize));
-        cover.tile_y1 = HMM_MAX(0, (int)floorf((minimum_y - (float)view_window_y) / (float)kLightGridTileSize));
-        cover.tile_x2 = HMM_MIN(current_light_grid.tiles_x - 1,
-                                (int)floorf((maximum_x - (float)view_window_x) / (float)kLightGridTileSize));
-        cover.tile_y2 = HMM_MIN(current_light_grid.tiles_y - 1,
-                                (int)floorf((maximum_y - (float)view_window_y) / (float)kLightGridTileSize));
+        cover.cluster_x1 = HMM_MAX(0, (int)floorf((minimum_x - (float)view_window_x) / (float)kLightGridClusterSize));
+        cover.cluster_y1 = HMM_MAX(0, (int)floorf((minimum_y - (float)view_window_y) / (float)kLightGridClusterSize));
+        cover.cluster_x2 = HMM_MIN(current_light_grid.clusters_x - 1,
+                                   (int)floorf((maximum_x - (float)view_window_x) / (float)kLightGridClusterSize));
+        cover.cluster_y2 = HMM_MIN(current_light_grid.clusters_y - 1,
+                                   (int)floorf((maximum_y - (float)view_window_y) / (float)kLightGridClusterSize));
 
-        if (cover.tile_x1 > cover.tile_x2 || cover.tile_y1 > cover.tile_y2)
+        if (cover.cluster_x1 > cover.cluster_x2 || cover.cluster_y1 > cover.cluster_y2)
             continue;
 
         float depth = -eye.Z;
@@ -419,49 +483,47 @@ void BuildLightGrid(void)
         coverage.push_back(cover);
     }
 
-    for (size_t i = 0; binning != kLightGridBinNone && i < coverage.size(); i++)
+    static std::vector<LightGridSliceCoverage> slice_coverage;
+
+    slice_coverage.clear();
+
+    for (size_t i = 0; i < coverage.size(); i++)
     {
         const LightGridCoverage &cover = coverage[i];
 
-        for (int tile_y = cover.tile_y1; tile_y <= cover.tile_y2; tile_y++)
+        for (int slice = cover.slice1; slice <= cover.slice2; slice++)
         {
-            for (int tile_x = cover.tile_x1; tile_x <= cover.tile_x2; tile_x++)
-            {
-                if (!use_clusters)
-                {
-                    int tile = tile_y * current_light_grid.tiles_x + tile_x;
+            LightGridSliceCoverage slice_cover;
 
-                    if (current_light_grid.tile_counts[tile] < kLightGridMaximumPerTile)
-                        current_light_grid.tile_counts[tile]++;
-                    else
-                        current_light_grid.dropped_tile++;
+            slice_cover.light   = (int)i;
+            slice_cover.cluster_x1 = cover.cluster_x1;
+            slice_cover.cluster_y1 = cover.cluster_y1;
+            slice_cover.cluster_x2 = cover.cluster_x2;
+            slice_cover.cluster_y2 = cover.cluster_y2;
 
-                    continue;
-                }
-
-                for (int slice = cover.slice1; slice <= cover.slice2; slice++)
-                {
-                    int cluster = (slice * current_light_grid.tiles_y + tile_y) * current_light_grid.tiles_x + tile_x;
-
-                    if (current_light_grid.cluster_counts[cluster] < kLightGridMaximumPerTile)
-                        current_light_grid.cluster_counts[cluster]++;
-                    else
-                        current_light_grid.dropped_cluster++;
-                }
-            }
+            if (LightGridSliceRect(current_light_grid.lights[i], slice, &slice_cover))
+                slice_coverage.push_back(slice_cover);
         }
     }
 
-    uint32_t tile_running = 0;
-
-    for (int tile = 0; tile < tile_total; tile++)
+    for (size_t i = 0; i < slice_coverage.size(); i++)
     {
-        current_light_grid.tile_offsets[tile] = tile_running;
+        const LightGridSliceCoverage &cover = slice_coverage[i];
 
-        tile_running += current_light_grid.tile_counts[tile];
+        for (int cluster_y = cover.cluster_y1; cluster_y <= cover.cluster_y2; cluster_y++)
+        {
+            for (int cluster_x = cover.cluster_x1; cluster_x <= cover.cluster_x2; cluster_x++)
+            {
+                int row = cover.slice * current_light_grid.clusters_y + cluster_y;
 
-        if (current_light_grid.tile_counts[tile] > current_light_grid.max_tile_count)
-            current_light_grid.max_tile_count = current_light_grid.tile_counts[tile];
+                int cluster = row * current_light_grid.clusters_x + cluster_x;
+
+                if (current_light_grid.cluster_counts[cluster] < kLightGridMaximumPerCluster)
+                    current_light_grid.cluster_counts[cluster]++;
+                else
+                    current_light_grid.dropped_cluster++;
+            }
+        }
     }
 
     uint32_t cluster_running = 0;
@@ -476,43 +538,27 @@ void BuildLightGrid(void)
             current_light_grid.max_cluster_count = current_light_grid.cluster_counts[cluster];
     }
 
-    current_light_grid.tile_list.assign((size_t)tile_running, 0);
     current_light_grid.cluster_list.assign((size_t)cluster_running, 0);
 
-    static std::vector<uint8_t> tile_filled;
     static std::vector<uint8_t> cluster_filled;
 
-    tile_filled.assign((size_t)tile_total, 0);
     cluster_filled.assign((size_t)cluster_total, 0);
 
-    for (size_t i = 0; binning != kLightGridBinNone && i < coverage.size(); i++)
+    for (size_t i = 0; i < slice_coverage.size(); i++)
     {
-        const LightGridCoverage &cover = coverage[i];
+        const LightGridSliceCoverage &cover = slice_coverage[i];
 
-        for (int tile_y = cover.tile_y1; tile_y <= cover.tile_y2; tile_y++)
+        for (int cluster_y = cover.cluster_y1; cluster_y <= cover.cluster_y2; cluster_y++)
         {
-            for (int tile_x = cover.tile_x1; tile_x <= cover.tile_x2; tile_x++)
+            for (int cluster_x = cover.cluster_x1; cluster_x <= cover.cluster_x2; cluster_x++)
             {
-                if (!use_clusters)
-                {
-                    int tile = tile_y * current_light_grid.tiles_x + tile_x;
+                int row = cover.slice * current_light_grid.clusters_y + cluster_y;
 
-                    if (tile_filled[tile] < current_light_grid.tile_counts[tile])
-                        current_light_grid.tile_list[current_light_grid.tile_offsets[tile] + tile_filled[tile]++] =
-                            (uint8_t)i;
+                int cluster = row * current_light_grid.clusters_x + cluster_x;
 
-                    continue;
-                }
-
-                for (int slice = cover.slice1; slice <= cover.slice2; slice++)
-                {
-                    int cluster = (slice * current_light_grid.tiles_y + tile_y) * current_light_grid.tiles_x + tile_x;
-
-                    if (cluster_filled[cluster] < current_light_grid.cluster_counts[cluster])
-                        current_light_grid
-                            .cluster_list[current_light_grid.cluster_offsets[cluster] + cluster_filled[cluster]++] =
-                            (uint8_t)i;
-                }
+                if (cluster_filled[cluster] < current_light_grid.cluster_counts[cluster])
+                    current_light_grid.cluster_list[current_light_grid.cluster_offsets[cluster] +
+                                                    cluster_filled[cluster]++] = (uint8_t)cover.light;
             }
         }
     }

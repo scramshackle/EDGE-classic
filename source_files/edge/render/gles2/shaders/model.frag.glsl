@@ -11,6 +11,7 @@ uniform sampler2D u_light_indices;
 
 uniform float u_world_lit;
 uniform vec4  u_light_view;
+uniform vec4  u_light_cluster;
 uniform vec4  u_light_list;
 uniform vec3  u_light_bounds_min;
 uniform vec3  u_light_bounds_range;
@@ -100,7 +101,7 @@ void main()
 
     if (u_world_lit > 0.5)
     {
-        AccumulateTileLights(v_eye_and_v.xyz, normalize(v_normal), 1.0, modulate_sum, additive_sum);
+        AccumulateClusterLights(v_eye_and_v.xyz, normalize(v_normal), 1.0, modulate_sum, additive_sum);
     }
 
     if (u_glow_count > 0.5)
