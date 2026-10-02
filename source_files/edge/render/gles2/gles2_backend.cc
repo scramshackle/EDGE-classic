@@ -181,6 +181,10 @@ class Gles2RenderBackend : public RenderBackend
         for (int32_t y = 0; y < height; y++)
         {
             render_state->ReadPixels(0, y, width, 1, GL_RGBA, GL_UNSIGNED_BYTE, dest);
+
+            for (int32_t x = 0; x < width; x++)
+                dest[x * 4 + 3] = 255;
+
             dest += stride;
         }
     }

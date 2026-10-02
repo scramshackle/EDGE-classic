@@ -155,7 +155,18 @@ class GpuRenderBackend : public RenderBackend
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
         if (!gpu_device.ReadColorTarget(width, height, stride, dest))
+        {
             memset(dest, 0, (size_t)stride * (size_t)height);
+            return;
+        }
+
+        for (int32_t y = 0; y < height; y++)
+        {
+            uint8_t *row = dest + (size_t)y * (size_t)stride;
+
+            for (int32_t x = 0; x < width; x++)
+                row[x * 4 + 3] = 255;
+        }
     }
 
     void StartFrame(int32_t width, int32_t height)

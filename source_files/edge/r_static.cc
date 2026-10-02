@@ -1415,7 +1415,7 @@ void StaticMeshInvalidateSector(Sector *sec)
 
     NoteDynamicSector(sec);
 
-    StaticMarkSectorPending(sec);
+    MarkSectorNeighboursPending(sec);
 
     size_t index = (size_t)(sec - level_sectors);
 
