@@ -1592,6 +1592,12 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         for (std::list<DrawMirror *>::iterator MRI = dmirrors.begin(); MRI != dmirrors.end(); MRI++)
             RenderMirror(*MRI);
 
+        FinishUnitBatch();
+
+        FinishSkyOverpaint(for_mirror ? mirror_view.mirror : nullptr);
+
+        StartUnitBatch(solid_mode);
+
         RenderThings(dthings, transparent_things);
 
         FinishUnitBatch();

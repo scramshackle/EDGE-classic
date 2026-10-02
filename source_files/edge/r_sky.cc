@@ -278,9 +278,10 @@ struct SkySpanReference
 
 struct SkySection
 {
-    const Image *image   = nullptr;
-    MapSurface  *ref     = nullptr;
-    bool         flipped = false;
+    const Image *image     = nullptr;
+    MapSurface  *ref       = nullptr;
+    bool         flipped   = false;
+    bool         overpaint = false;
 
     std::vector<RendererVertex> vertices;
 
@@ -310,6 +311,10 @@ static bool     sky_mirror_active  = false;
 static HMM_Mat4 sky_mirror_inverse = {};
 
 static bool sky_backdrop_pass = false;
+
+static bool sky_overpaint_pass = false;
+
+static constexpr int kSkyPlaneFaces = kSkyPlaneOverpaint + 1;
 
 static int32_t SkyBucketFor(const DrawMirror *mir)
 {
@@ -375,7 +380,7 @@ static void SkyResidentReset(void)
 
     sky_sections.clear();
 
-    sky_plane_baked.assign((size_t)total_level_sectors * 2 * kHeightKeyTotal, 0);
+    sky_plane_baked.assign((size_t)total_level_sectors * kSkyPlaneFaces * kHeightKeyTotal, 0);
     sky_wall_baked.assign((size_t)total_level_lines * 2 * 3 * kHeightKeyTotal, 0);
     sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
 
@@ -408,7 +413,9 @@ static int SkyHeightKey(const Sector *front, const Sector *back)
 
 static size_t SkyPlaneSlot(const Sector *sector, int face, int height_key)
 {
-    return ((size_t)(sector - level_sectors) * 2 + (size_t)(face ? 1 : 0)) * (size_t)kHeightKeyTotal +
+    int clamped = (face < 0) ? 0 : ((face >= kSkyPlaneFaces) ? kSkyPlaneFaces - 1 : face);
+
+    return ((size_t)(sector - level_sectors) * kSkyPlaneFaces + (size_t)clamped) * (size_t)kHeightKeyTotal +
            (size_t)height_key;
 }
 
@@ -553,7 +560,7 @@ static void PushSkyVertex(int section, const HMM_Vec3 &position)
     sky_sections[section].vertices.push_back(vertex);
 }
 
-static int MarkSkySection(Sector *sky_owner)
+static int MarkSkySection(Sector *sky_owner, bool overpaint)
 {
     const Image *image   = (sky_owner && sky_owner->sky_image) ? sky_owner->sky_image : sky_image;
     MapSurface  *ref     = sky_owner ? sky_owner->sky_ref : nullptr;
@@ -561,7 +568,8 @@ static int MarkSkySection(Sector *sky_owner)
 
     for (size_t i = 0; i < sky_sections.size(); i++)
     {
-        if (sky_sections[i].image == image && sky_sections[i].ref == ref && sky_sections[i].flipped == flipped)
+        if (sky_sections[i].image == image && sky_sections[i].ref == ref && sky_sections[i].flipped == flipped &&
+            sky_sections[i].overpaint == overpaint)
         {
             sky_sections[i].used = true;
             return (int)i;
@@ -570,10 +578,11 @@ static int MarkSkySection(Sector *sky_owner)
 
     SkySection section;
 
-    section.image   = image;
-    section.ref     = ref;
-    section.flipped = flipped;
-    section.used    = true;
+    section.image     = image;
+    section.ref       = ref;
+    section.flipped   = flipped;
+    section.overpaint = overpaint;
+    section.used      = true;
 
     sky_sections.push_back(section);
 
@@ -597,6 +606,9 @@ void BeginSky(void)
 static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingMode blend,
                             RGBAColor fog_color, float fog_density, const SkyPassInfo *sky_pass_info)
 {
+    if (sky_overpaint_pass)
+        blend = (BlendingMode)(blend | kBlendingNoZBuffer);
+
     if (sky_backdrop_pass)
     {
         SkyPassInfo backdrop_info = *sky_pass_info;
@@ -929,7 +941,7 @@ void FinishSky(bool use_depth_mask)
         {
             const SkySection &section = sky_sections[i];
 
-            if (!section.used && section.resident_vertices.empty())
+            if (section.overpaint || (!section.used && section.resident_vertices.empty()))
                 continue;
 
             if (backdrop < 0 || (section.image == saved_sky_image && section.ref == nullptr && !section.flipped))
@@ -966,7 +978,7 @@ void FinishSky(bool use_depth_mask)
     {
         SkySection &section = sky_sections[i];
 
-        if (!section.used && section.resident_vertices.empty())
+        if (section.overpaint || (!section.used && section.resident_vertices.empty()))
             continue;
 
         sky_current_section = (int)i;
@@ -994,7 +1006,7 @@ void FinishSky(bool use_depth_mask)
         render_state->Enable(GL_DEPTH_TEST);
 }
 
-void FinishSkyForMirror(const DrawMirror *mir)
+static void RenderMirrorSkySections(const DrawMirror *mir, bool overpaint)
 {
     SkyMirrorBucket *bucket = nullptr;
 
@@ -1021,7 +1033,7 @@ void FinishSkyForMirror(const DrawMirror *mir)
 
     for (size_t i = 0; i < bucket->section_vertices.size() && i < sky_sections.size(); i++)
     {
-        if (bucket->section_vertices[i].empty())
+        if (bucket->section_vertices[i].empty() || sky_sections[i].overpaint != overpaint)
             continue;
 
         SkySection &section = sky_sections[i];
@@ -1054,6 +1066,58 @@ void FinishSkyForMirror(const DrawMirror *mir)
 
     sky_image = saved_sky_image;
     sky_ref   = saved_sky_ref;
+}
+
+void FinishSkyForMirror(const DrawMirror *mir)
+{
+    RenderMirrorSkySections(mir, false);
+}
+
+void FinishSkyOverpaint(const DrawMirror *mir)
+{
+    EDGE_ZoneScoped;
+
+    sky_overpaint_pass = true;
+
+    if (mir)
+    {
+        RenderMirrorSkySections(mir, true);
+
+        sky_overpaint_pass = false;
+        return;
+    }
+
+    const Image *saved_sky_image = sky_image;
+    MapSurface  *saved_sky_ref   = sky_ref;
+
+    for (size_t i = 0; i < sky_sections.size(); i++)
+    {
+        SkySection &section = sky_sections[i];
+
+        if (!section.overpaint || (!section.used && section.resident_vertices.empty()))
+            continue;
+
+        sky_current_section = (int)i;
+
+        sky_image = section.image ? section.image : saved_sky_image;
+        sky_ref   = section.ref;
+
+        StartUnitBatch(false);
+
+        UpdateSkyboxTextures();
+
+        if (custom_skybox)
+            RenderSkybox(section);
+        else
+            RenderSkyEquirect(section);
+
+        FinishUnitBatch();
+    }
+
+    sky_image = saved_sky_image;
+    sky_ref   = saved_sky_ref;
+
+    sky_overpaint_pass = false;
 }
 
 void SkyNoteResidentVisible(void)
@@ -1100,12 +1164,14 @@ void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMi
     if (bake && sky_plane_baked[plane_slot])
         return;
 
-    int group = MarkSkySection(sky_owner);
+    int group = MarkSkySection(sky_owner, face == kSkyPlaneOverpaint);
 
     if (bake)
     {
-        SkyCaptureBegin(group, (int)plane_slot, plane_key, sector, nullptr, face ? h : -FLT_MAX, face ? FLT_MAX : h,
-                        false);
+        bool floor_face = (face == 1);
+
+        SkyCaptureBegin(group, (int)plane_slot, plane_key, sector, nullptr, floor_face ? h : -FLT_MAX,
+                        floor_face ? FLT_MAX : h, false);
 
         SkyAddCaptureDependency(sector);
         SkyAddCaptureDependency(sky_owner);
@@ -1140,7 +1206,7 @@ void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, i
     if (bake && sky_wall_baked[wall_slot])
         return;
 
-    int group = MarkSkySection(sky_owner);
+    int group = MarkSkySection(sky_owner, false);
 
     if (bake)
     {

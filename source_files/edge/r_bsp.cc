@@ -451,10 +451,17 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
             EmitSkyPlane(sector, sector->sky_height, sector, 0, mir, resident);
         }
 
+        if (EDGE_IMAGE_IS_SKY(sector->ceiling) && !sector->ceiling_slope && !sector->ceiling_vertex_slope &&
+            (!mir || view_z < sector->interpolated_ceiling_height))
+        {
+            EmitSkyPlane(sector, sector->interpolated_ceiling_height, sector, kSkyPlaneOverpaint, mir, resident);
+        }
+
         return;
     }
 
     float floor_h = sector->interpolated_floor_height;
+    float ceil_h  = sector->height_sector->interpolated_ceiling_height;
 
     MapSurface *floor_s = &sector->floor;
     MapSurface *ceil_s  = &sector->ceiling;
@@ -462,12 +469,14 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
     if (view_height_zone == kHeightZoneA && view_z > sector->height_sector->interpolated_ceiling_height)
     {
         floor_h = sector->height_sector->interpolated_ceiling_height;
+        ceil_h  = sector->interpolated_ceiling_height;
         floor_s = &sector->height_sector->floor;
         ceil_s  = &sector->height_sector->ceiling;
     }
     else if (view_height_zone == kHeightZoneC && view_z < sector->height_sector->interpolated_floor_height)
     {
         floor_h = sector->interpolated_floor_height;
+        ceil_h  = sector->height_sector->interpolated_floor_height;
         floor_s = &sector->height_sector->floor;
         ceil_s  = &sector->height_sector->ceiling;
     }
@@ -484,6 +493,11 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
     if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sector->sky_height)
     {
         EmitSkyPlane(sector, sector->sky_height, sector->height_sector, 0, mir, resident);
+    }
+
+    if (EDGE_IMAGE_IS_SKY(*ceil_s) && (!mir || view_z < ceil_h))
+    {
+        EmitSkyPlane(sector, ceil_h, sector->height_sector, kSkyPlaneOverpaint, mir, resident);
     }
 }
 
