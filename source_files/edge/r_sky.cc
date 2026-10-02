@@ -309,6 +309,8 @@ static int32_t sky_current_bucket = -1;
 static bool     sky_mirror_active  = false;
 static HMM_Mat4 sky_mirror_inverse = {};
 
+static bool sky_backdrop_pass = false;
+
 static int32_t SkyBucketFor(const DrawMirror *mir)
 {
     if (!mir)
@@ -595,6 +597,31 @@ void BeginSky(void)
 static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingMode blend,
                             RGBAColor fog_color, float fog_density, const SkyPassInfo *sky_pass_info)
 {
+    if (sky_backdrop_pass)
+    {
+        SkyPassInfo backdrop_info = *sky_pass_info;
+        backdrop_info.is_geometry = 0;
+
+        static constexpr float kBackdropCorners[6][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f},
+                                                         {-1.0f, -1.0f}, {1.0f, 1.0f},  {-1.0f, 1.0f}};
+
+        RendererVertex *glvert = BeginRenderUnit(GL_TRIANGLES, 6, GL_MODULATE, texture,
+                                                 (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fog_color,
+                                                 fog_density, &backdrop_info);
+
+        for (int i = 0; i < 6; i++)
+        {
+            glvert[i]                        = RendererVertex{};
+            glvert[i].rgba                   = kRGBAWhite;
+            glvert[i].position               = {{kBackdropCorners[i][0], kBackdropCorners[i][1], 1.0f}};
+            glvert[i].texture_coordinates[0] = {{0.0f, 0.0f}};
+            glvert[i].texture_coordinates[1] = {{0.0f, 0.0f}};
+        }
+
+        EndRenderUnit(6);
+        return;
+    }
+
     SkySection &resident = sky_sections[sky_current_section];
 
     if (!sky_mirror_active && !resident.resident_vertices.empty())
@@ -893,6 +920,47 @@ void FinishSky(bool use_depth_mask)
 
     const Image *saved_sky_image = sky_image;
     MapSurface  *saved_sky_ref   = sky_ref;
+
+    if (draw_culling.d_)
+    {
+        int backdrop = -1;
+
+        for (size_t i = 0; i < sky_sections.size(); i++)
+        {
+            const SkySection &section = sky_sections[i];
+
+            if (!section.used && section.resident_vertices.empty())
+                continue;
+
+            if (backdrop < 0 || (section.image == saved_sky_image && section.ref == nullptr && !section.flipped))
+                backdrop = (int)i;
+        }
+
+        if (backdrop >= 0)
+        {
+            SkySection &section = sky_sections[backdrop];
+
+            sky_current_section = backdrop;
+
+            sky_image = section.image ? section.image : saved_sky_image;
+            sky_ref   = section.ref;
+
+            sky_backdrop_pass = true;
+
+            StartUnitBatch(false);
+
+            UpdateSkyboxTextures();
+
+            if (custom_skybox)
+                RenderSkybox(section);
+            else
+                RenderSkyEquirect(section);
+
+            FinishUnitBatch();
+
+            sky_backdrop_pass = false;
+        }
+    }
 
     for (size_t i = 0; i < sky_sections.size(); i++)
     {
