@@ -431,6 +431,8 @@ class Gles2RenderState : public RenderState
         glDepthFunc(GL_LEQUAL);
 
         glFrontFace(front_face_);
+        glCullFace(GL_BACK);
+        glBlendFunc(GL_ONE, GL_ZERO);
 
         glClearColor(epi::GetRGBARed(clear_color_) / 255.0f, epi::GetRGBAGreen(clear_color_) / 255.0f,
                      epi::GetRGBABlue(clear_color_) / 255.0f, epi::GetRGBAAlpha(clear_color_) / 255.0f);

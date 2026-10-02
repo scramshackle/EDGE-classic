@@ -83,7 +83,6 @@ static bool batch_sort;
 
 RGBAColor culling_fog_color;
 
-HMM_Vec2 static_batch_texture_offset = {{0, 0}};
 float    static_batch_light_row_offset = 0;
 
 bool     render_unit_whiten = false;
@@ -278,7 +277,7 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->scissor_enabled     = false;
     unit->static_buffer       = handle;
-    unit->texture_offset      = static_batch_texture_offset;
+    unit->texture_offset      = {{0, 0}};
     unit->light_row_offset    = static_batch_light_row_offset;
     unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
     unit->static_first        = first;

@@ -307,6 +307,14 @@ void GpuImmediate::Shutdown(SDL_GPUDevice *device)
 
     sprite_buffer_capacity_ = 0;
 
+    if (static_transfer_buffer_)
+    {
+        SDL_ReleaseGPUTransferBuffer(device, static_transfer_buffer_);
+        static_transfer_buffer_ = nullptr;
+    }
+
+    static_transfer_capacity_ = 0;
+
     for (size_t i = 0; i < deleted_static_buffers_.size(); i++)
         SDL_ReleaseGPUBuffer(device, deleted_static_buffers_[i]);
 
@@ -726,9 +734,78 @@ void GpuImmediate::QueueStaticUpload(SDL_GPUBuffer *buffer, uint32_t offset, con
     static_uploads_.push_back(upload);
 }
 
+bool GpuImmediate::RecordFrameStaticUploads()
+{
+    SDL_GPUCommandBuffer *command_buffer = gpu_device.CommandBuffer();
+
+    if (!command_buffer || gpu_device.RenderPass())
+        return false;
+
+    size_t bytes = static_upload_data_.size();
+
+    if (bytes > static_transfer_capacity_)
+    {
+        if (static_transfer_buffer_)
+            SDL_ReleaseGPUTransferBuffer(device_, static_transfer_buffer_);
+
+        size_t capacity = HMM_MAX(bytes, HMM_MAX(static_transfer_capacity_ * 2, (size_t)65536));
+
+        SDL_GPUTransferBufferCreateInfo transfer_info;
+        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+
+        transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transfer_info.size  = (uint32_t)capacity;
+
+        static_transfer_buffer_   = SDL_CreateGPUTransferBuffer(device_, &transfer_info);
+        static_transfer_capacity_ = static_transfer_buffer_ ? capacity : 0;
+
+        if (!static_transfer_buffer_)
+            return false;
+    }
+
+    void *mapped = SDL_MapGPUTransferBuffer(device_, static_transfer_buffer_, true);
+
+    if (!mapped)
+        return false;
+
+    memcpy(mapped, static_upload_data_.data(), bytes);
+
+    SDL_UnmapGPUTransferBuffer(device_, static_transfer_buffer_);
+
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    for (size_t i = 0; i < static_uploads_.size(); i++)
+    {
+        const PendingStaticUpload &upload = static_uploads_[i];
+
+        SDL_GPUTransferBufferLocation source;
+        SDL_GPUBufferRegion           destination;
+
+        source.transfer_buffer = static_transfer_buffer_;
+        source.offset          = (uint32_t)upload.data_offset;
+
+        destination.buffer = upload.buffer;
+        destination.offset = upload.offset;
+        destination.size   = (uint32_t)upload.bytes;
+
+        SDL_UploadToGPUBuffer(copy_pass, &source, &destination, false);
+    }
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    return true;
+}
+
 void GpuImmediate::FlushStaticUploads()
 {
     if (static_uploads_.empty() || !device_)
+    {
+        static_uploads_.clear();
+        static_upload_data_.clear();
+        return;
+    }
+
+    if (RecordFrameStaticUploads())
     {
         static_uploads_.clear();
         static_upload_data_.clear();

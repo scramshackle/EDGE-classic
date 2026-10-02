@@ -19,6 +19,9 @@
 #include "g_game.h"
 #include "i_defs_gl.h"
 #include "i_system.h"
+#include "n_network.h"
+#include "p_mobj.h"
+#include "p_tick.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
@@ -69,6 +72,10 @@ struct StaticSpan
     bool    mid_masked;
     bool    live;
 
+    const MapSurface *scroll_surface;
+    HMM_Vec2          scroll_scale;
+    HMM_Vec2          scroll_applied;
+
     HMM_Vec3 normal;
     float    low[3];
     float    high[3];
@@ -95,20 +102,19 @@ struct StaticBatch
     Sector           *sector;
     BlendingMode      blending;
     OitPass           draw_pass;
-
-    const MapSurface *scroll_surface;
-    HMM_Vec2          uv_scale;
+    bool              scrolling;
+    Sector           *glow_sector;
+    int               fog_sky;
 
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
+    std::vector<HMM_Vec2>       scroll_base;
 
     uint32_t gpu_handle   = 0;
     int      gpu_capacity = 0;
     int      gpu_count    = 0;
     int      dirty_low    = INT_MAX;
     int      dirty_high   = -1;
-    bool     is_wall      = false;
-    int      face_dir     = 0;
 
     std::vector<StaticRun> runs;
     bool                   runs_dirty       = true;
@@ -116,6 +122,7 @@ struct StaticBatch
 };
 
 static std::vector<StaticBatch> static_batches;
+static std::vector<int>         scrolling_batches;
 static std::vector<uint8_t>     sector_flat_baked;
 static int                      static_light_correction = 5;
 static std::vector<uint8_t>     line_side_wall_baked;
@@ -129,6 +136,7 @@ static std::vector<float>                     sector_fog_density_cache;
 static std::vector<const Colormap *>          sector_colormap_cache;
 static std::vector<StaticSectorChange>        static_sector_changes;
 static std::vector<uint8_t>                   sector_height_state;
+static std::vector<uint8_t>                   sector_batch_traits;
 
 int SectorHeightState(const Sector *sec)
 {
@@ -185,20 +193,48 @@ static int LiveHeightKey(const Sector *front, const Sector *back)
     return SectorHeightState(front) * kHeightStateTotal + SectorHeightState(back);
 }
 
-static const MapSurface *capture_flat_surface = nullptr;
+static const MapSurface *capture_scroll_surface = nullptr;
 static HMM_Vec2          capture_scroll_uv      = {{0, 0}};
 static HMM_Vec2          capture_uv_scale       = {{0, 0}};
+static bool              capture_flip_winding   = false;
+
+static bool SurfaceScrolls(const MapSurface *surf)
+{
+    return surf && surf->scrolls;
+}
+
+static HMM_Vec2 SurfaceScrollShift(const MapSurface *surf, const HMM_Vec2 &uv_scale)
+{
+    bool interpolate = !console_active && !paused && !menu_active && !time_stop_active && !erraticism_active;
+
+    float offset_x = surf->offset.X;
+    float offset_y = surf->offset.Y;
+
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.X, surf->offset.X))
+        offset_x = fmod(HMM_Lerp(surf->old_offset.X, fractional_tic, surf->offset.X), surf->image->width_);
+
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.Y, surf->offset.Y))
+        offset_y = fmod(HMM_Lerp(surf->old_offset.Y, fractional_tic, surf->offset.Y), surf->image->height_);
+
+    HMM_Vec2 shift;
+
+    shift.X = (offset_x - surf->base_offset.X) * uv_scale.X;
+    shift.Y = (offset_y - surf->base_offset.Y) * uv_scale.Y;
+
+    return shift;
+}
 
 static void SetCaptureScrollOffset(const MapSurface *surf, const HMM_Vec2 &uv_scale)
 {
-    capture_scroll_uv = {{0, 0}};
-    capture_uv_scale  = uv_scale;
+    capture_scroll_uv      = {{0, 0}};
+    capture_uv_scale       = uv_scale;
+    capture_scroll_surface = nullptr;
 
-    if (!surf)
+    if (!SurfaceScrolls(surf) || !surf->image)
         return;
 
-    capture_scroll_uv.X = (surf->offset.X - surf->base_offset.X) * uv_scale.X;
-    capture_scroll_uv.Y = (surf->offset.Y - surf->base_offset.Y) * uv_scale.Y;
+    capture_scroll_surface = surf;
+    capture_scroll_uv      = SurfaceScrollShift(surf, uv_scale);
 }
 
 static Sector *capture_back_sector = nullptr;
@@ -541,32 +577,12 @@ static bool StaticAnimationUniformSize(const Image *image)
     return true;
 }
 
-static HMM_Vec2 BatchScrollOffset(const StaticBatch &batch)
-{
-    HMM_Vec2 offset = {{0, 0}};
-
-    const MapSurface *surf = batch.scroll_surface;
-
-    if (!surf)
-        return offset;
-
-    offset.X = (surf->offset.X - surf->base_offset.X) * batch.uv_scale.X;
-    offset.Y = (surf->offset.Y - surf->base_offset.Y) * batch.uv_scale.Y;
-
-    return offset;
-}
-
 static bool HeightSectorStatic(const Sector *sec)
 {
     if (!sec || !sec->height_sector)
         return true;
 
     return !sec->height_sector->bake_dynamic && !sec->height_sector->movement_suppressed;
-}
-
-static bool SurfaceScrolls(const MapSurface *surf)
-{
-    return surf && surf->scrolls;
 }
 
 static int SectorDeclineReason(const Sector *sec, bool back)
@@ -787,18 +803,63 @@ bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *pla
     return sector_flat_baked[slot] != 0;
 }
 
-static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
-                     BlendingMode blending, OitPass draw_pass, const MapSurface *scroll_surf, bool is_wall,
-                     int face_dir)
+static uint8_t SectorBatchTraits(const Sector *sec)
 {
-    const MapSurface *scroller = SurfaceScrolls(scroll_surf) ? scroll_surf : nullptr;
+    uint8_t traits = 0;
+
+    if (sec->glow_things)
+        traits |= 1;
+
+    if (EDGE_IMAGE_IS_SKY(sec->ceiling))
+        traits |= 2;
+
+    return traits;
+}
+
+static int BatchFogSky(const RegionProperties *props, const Sector *sec)
+{
+    if (props->fog_color != kRGBANoValue)
+        return -1;
+
+    if (current_map->indoor_fog_color_ == current_map->outdoor_fog_color_ &&
+        epi::AlmostEquals(current_map->indoor_fog_density_, current_map->outdoor_fog_density_))
+        return -1;
+
+    return EDGE_IMAGE_IS_SKY(sec->ceiling) ? 1 : 0;
+}
+
+void StaticRefreshSectorTraits(void)
+{
+    if (!static_mesh_built || (int)sector_batch_traits.size() != total_level_sectors)
+        return;
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        Sector *sec = level_sectors + i;
+
+        uint8_t traits = SectorBatchTraits(sec);
+
+        if (traits == sector_batch_traits[i])
+            continue;
+
+        sector_batch_traits[i] = traits;
+
+        StaticMeshInvalidateSector(sec);
+    }
+}
+
+static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
+                     BlendingMode blending, OitPass draw_pass, bool scrolling)
+{
+    Sector *glow_sector = sec->glow_things ? sec : nullptr;
+    int     fog_sky     = BatchFogSky(props, sec);
 
     for (size_t i = 0; i < static_batches.size(); i++)
     {
         StaticBatch &b = static_batches[i];
 
         if (b.image == image && b.colormap == colormap && b.blending == blending && b.draw_pass == draw_pass &&
-            b.scroll_surface == scroller && b.is_wall == is_wall && b.face_dir == face_dir &&
+            b.scrolling == scrolling && b.glow_sector == glow_sector && b.fog_sky == fog_sky &&
             b.properties->fog_color == props->fog_color && b.properties->fog_density == props->fog_density)
             return (int)i;
     }
@@ -811,11 +872,12 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
     batch.sector     = sec;
     batch.blending   = blending;
     batch.draw_pass  = draw_pass;
-    batch.is_wall    = is_wall;
-    batch.face_dir   = face_dir;
+    batch.scrolling   = scrolling;
+    batch.glow_sector = glow_sector;
+    batch.fog_sky     = fog_sky;
 
-    batch.uv_scale       = capture_uv_scale;
-    batch.scroll_surface = scroller;
+    if (scrolling)
+        scrolling_batches.push_back((int)static_batches.size());
 
     static_batches.push_back(batch);
 
@@ -1071,8 +1133,10 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
     capture_back_sector = line_side ? line_side->back_sector : nullptr;
     capture_height_key  = LiveHeightKey(line_side ? line_side->front_sector : sector, capture_back_sector);
 
+    capture_flip_winding = false;
+
     capture_batch =
-        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, surf, line_side != nullptr, 0);
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
     capture_line_side = line_side;
     capture_surf      = surf;
     capture_sector    = sector;
@@ -1124,9 +1188,9 @@ void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, Re
                             BlendingMode blending, const HMM_Vec3 &normal, OitPass draw_pass, const MapSurface *surf,
                             const HMM_Vec2 &uv_scale, const Extrafloor *plane_ef)
 {
-    capture_flat_surface = surf;
-
     SetCaptureScrollOffset(surf, uv_scale);
+
+    capture_flip_winding = face_dir > 0;
 
     capture_normal = normal;
     capture_div[0] = capture_div[1] = capture_div[2] = capture_div[3] = 0;
@@ -1135,8 +1199,7 @@ void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, Re
     capture_height_key  = LiveHeightKey(sector, nullptr);
 
     capture_batch =
-        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_flat_surface, false,
-                  (face_dir > 0) ? 1 : -1);
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
     capture_line_side = nullptr;
     capture_surf      = nullptr;
     capture_sector    = sector;
@@ -1208,6 +1271,9 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
     span.is_wall      = capture_is_wall;
     span.mid_masked   = capture_mid_masked;
     span.live         = true;
+    span.scroll_surface = capture_scroll_surface;
+    span.scroll_scale   = capture_uv_scale;
+    span.scroll_applied = capture_scroll_uv;
     span.normal       = capture_normal;
     span.div_x        = capture_div[0];
     span.div_y        = capture_div[1];
@@ -1229,18 +1295,25 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
         }
     }
 
+    int second = capture_flip_winding ? 2 : 1;
+    int third  = capture_flip_winding ? 1 : 2;
+
     if (shape == GL_TRIANGLES)
     {
-        for (int v = 0, total = (count / 3) * 3; v < total; v++)
+        for (int v = 0, total = (count / 3) * 3; v < total; v += 3)
+        {
             batch.vertices.push_back(verts[v]);
+            batch.vertices.push_back(verts[v + second]);
+            batch.vertices.push_back(verts[v + third]);
+        }
     }
     else
     {
         for (int t = 1; t < count - 1; t++)
         {
             batch.vertices.push_back(verts[0]);
-            batch.vertices.push_back(verts[t]);
-            batch.vertices.push_back(verts[t + 1]);
+            batch.vertices.push_back(verts[t + second - 1]);
+            batch.vertices.push_back(verts[t + third - 1]);
         }
     }
 
@@ -1254,8 +1327,15 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 
         dest.texture_coordinates[1].Y = span_light_row;
 
-        dest.texture_coordinates[0].X -= capture_scroll_uv.X;
-        dest.texture_coordinates[0].Y -= capture_scroll_uv.Y;
+        if (batch.scrolling)
+        {
+            HMM_Vec2 base = dest.texture_coordinates[0];
+
+            base.X -= capture_scroll_uv.X;
+            base.Y -= capture_scroll_uv.Y;
+
+            batch.scroll_base.push_back(base);
+        }
     }
 
     span.count = (int)batch.vertices.size() - span.start;
@@ -1496,6 +1576,11 @@ void BuildStaticMesh(void)
 
     sector_height_state.assign((size_t)total_level_sectors, 0);
 
+    sector_batch_traits.resize((size_t)total_level_sectors);
+
+    for (int i = 0; i < total_level_sectors; i++)
+        sector_batch_traits[i] = SectorBatchTraits(level_sectors + i);
+
     sector_light_cache.resize((size_t)total_level_sectors);
 
     for (int i = 0; i < total_level_sectors; i++)
@@ -1537,11 +1622,13 @@ void DestroyStaticMesh(void)
     }
 
     static_batches.clear();
+    scrolling_batches.clear();
     sector_flat_baked.clear();
     line_side_wall_baked.clear();
     region_surface_baked.clear();
     sector_spans.clear();
     sector_light_cache.clear();
+    sector_batch_traits.clear();
     sector_fog_color_cache.clear();
     sector_fog_density_cache.clear();
     sector_colormap_cache.clear();
@@ -1630,6 +1717,38 @@ static void UploadStaticBatch(StaticBatch &batch)
     }
 }
 
+static void RefreshStaticScrolling(void)
+{
+    for (size_t i = 0; i < scrolling_batches.size(); i++)
+    {
+        StaticBatch &batch = static_batches[scrolling_batches[i]];
+
+        for (size_t k = 0; k < batch.spans.size(); k++)
+        {
+            StaticSpan &span = batch.spans[k];
+
+            if (!span.live || !span.scroll_surface)
+                continue;
+
+            HMM_Vec2 shift = SurfaceScrollShift(span.scroll_surface, span.scroll_scale);
+
+            if (epi::AlmostEquals(shift.X, span.scroll_applied.X) && epi::AlmostEquals(shift.Y, span.scroll_applied.Y))
+                continue;
+
+            span.scroll_applied = shift;
+
+            for (int v = span.start; v < span.start + span.count; v++)
+            {
+                batch.vertices[v].texture_coordinates[0].X = batch.scroll_base[v].X + shift.X;
+                batch.vertices[v].texture_coordinates[0].Y = batch.scroll_base[v].Y + shift.Y;
+            }
+
+            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
+            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
+        }
+    }
+}
+
 static void RebuildStaticRuns(StaticBatch &batch)
 {
     batch.runs.clear();
@@ -1691,6 +1810,8 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         RefreshStaticLighting();
 
+        RefreshStaticScrolling();
+
         if (r_static_mesh_resident.d_ != 0)
         {
             for (size_t i = 0; i < static_batches.size(); i++)
@@ -1717,8 +1838,6 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
         GLuint tex_id = ImageCache(batch.image, true);
 
-        static_batch_texture_offset = BatchScrollOffset(batch);
-
         int extra_light = render_view_extra_light;
 
         if (batch.properties->colourmap && (batch.properties->colourmap->special_ & kColorSpecialNoFlash) &&
@@ -1730,6 +1849,8 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         render_unit_liquid = LiquidShaderParameters(batch.image, LiquidLevelSeconds());
 
         AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
+
+        int glow_set = LightGridGlowSetForSector(batch.glow_sector);
 
         bool resident = r_static_mesh_resident.d_ != 0;
 
@@ -1744,9 +1865,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         BlendingMode blending = batch.blending;
 
         bool inverted   = mirror_view.reflective != (fliplevels.d_ != 0);
-        bool cull_front = (batch.face_dir > 0) != inverted;
-
-        blending = (BlendingMode)(blending | (cull_front ? kBlendingCullFront : kBlendingCullBack));
+        blending = (BlendingMode)(blending | (inverted ? kBlendingCullFront : kBlendingCullBack));
 
         for (size_t r = 0; r < batch.runs.size(); r++)
         {
@@ -1758,7 +1877,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
                 if (count > 0)
                     shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
-                                               blending);
+                                               blending, glow_set);
                 continue;
             }
 
@@ -1767,7 +1886,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
                 int count = HMM_MIN((int)kMaximumStaticRun, run.count - offset);
 
                 shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run.start + offset, count, tex_id, 1.0f,
-                                   &pass, blending);
+                                   &pass, blending, glow_set);
             }
         }
     }

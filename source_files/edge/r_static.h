@@ -116,6 +116,7 @@ bool StaticExtrafloorPlaneEligible(const Sector *sec, const Extrafloor *plane_ef
 
 
 void StaticMeshInvalidateSector(Sector *sec);
+void StaticRefreshSectorTraits(void);
 
 void    StaticPruneDynamicSectors(void);
 int     StaticDynamicSectorCount(void);

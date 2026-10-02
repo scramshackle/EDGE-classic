@@ -849,7 +849,7 @@ class ColormapShader : public AbstractShader
     }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
-                                    BlendingMode blending)
+                                    BlendingMode blending, int glow_set)
     {
         RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
@@ -869,13 +869,13 @@ class ColormapShader : public AbstractShader
         }
 
         AddStaticRenderUnit(handle, shape, first, count, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var,
-                            blending, fc_to_use, fd_to_use, nullptr, true, LightGridGlowSetForSector(sector_));
+                            blending, fc_to_use, fd_to_use, nullptr, true, glow_set);
 
         (*pass_var) += 1;
     }
 
     virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
-                            int *pass_var, BlendingMode blending)
+                            int *pass_var, BlendingMode blending, int glow_set)
     {
         RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
@@ -900,8 +900,7 @@ class ColormapShader : public AbstractShader
             EDGE_ZoneScopedN("WorldBaked BeginRenderUnit");
 
             glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var, blending,
-                                     fc_to_use, fd_to_use, nullptr, nullptr, true, true,
-                                     LightGridGlowSetForSector(sector_));
+                                     fc_to_use, fd_to_use, nullptr, nullptr, true, true, glow_set);
         }
 
         RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));

@@ -529,6 +529,10 @@ class GpuImmediate
 
     std::vector<PendingStaticUpload> static_uploads_;
     std::vector<uint8_t>             static_upload_data_;
+    SDL_GPUTransferBuffer           *static_transfer_buffer_   = nullptr;
+    size_t                           static_transfer_capacity_ = 0;
+
+    bool RecordFrameStaticUploads();
 
     void QueueStaticUpload(SDL_GPUBuffer *buffer, uint32_t offset, const void *data, size_t bytes);
     SDL_GPUBuffer               *bound_vertex_buffer_ = nullptr;

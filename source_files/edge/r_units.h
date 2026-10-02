@@ -68,7 +68,6 @@ extern HMM_Vec4 render_unit_sprite_view[2];
 
 extern RGBAColor culling_fog_color;
 
-extern HMM_Vec2 static_batch_texture_offset;
 extern float    static_batch_light_row_offset;
 
 extern bool     render_unit_whiten;

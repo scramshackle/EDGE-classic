@@ -375,6 +375,32 @@ void AddSpecialSector(Sector *sec)
     active_sector_animations.push_back(sec);
 }
 
+static void SetSurfaceScrolls(MapSurface *surf, Sector *owner)
+{
+    if (surf->scrolls)
+        return;
+
+    surf->scrolls = true;
+
+    if (StaticMeshBuilt())
+        StaticMeshInvalidateSector(owner);
+}
+
+static void SetLineScrolls(Line *ld)
+{
+    for (int s = 0; s < 2; s++)
+    {
+        Side *side = ld->side[s];
+
+        if (!side)
+            continue;
+
+        SetSurfaceScrolls(&side->top, side->sector);
+        SetSurfaceScrolls(&side->middle, side->sector);
+        SetSurfaceScrolls(&side->bottom, side->sector);
+    }
+}
+
 static void AdjustScrollParts(Side *side, bool left, ScrollingPart parts, float x_speed, float y_speed)
 {
     float xmul = (left && (parts & kScrollingPartLeftRevX)) ? -1 : 1;
@@ -393,19 +419,19 @@ static void AdjustScrollParts(Side *side, bool left, ScrollingPart parts, float 
     {
         side->top.scroll.X += x_speed * xmul;
         side->top.scroll.Y += y_speed * ymul;
-        side->top.scrolls = true;
+        SetSurfaceScrolls(&side->top, side->sector);
     }
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
     {
         side->middle.scroll.X += x_speed * xmul;
         side->middle.scroll.Y += y_speed * ymul;
-        side->middle.scrolls = true;
+        SetSurfaceScrolls(&side->middle, side->sector);
     }
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
     {
         side->bottom.scroll.X += x_speed * xmul;
         side->bottom.scroll.Y += y_speed * ymul;
-        side->bottom.scrolls = true;
+        SetSurfaceScrolls(&side->bottom, side->sector);
     }
 }
 
@@ -757,6 +783,7 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
             }
         }
         line_animations.push_back(anim);
+        SetLineScrolls(target);
         AddSpecialLine(target);
     }
 
@@ -816,6 +843,7 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
                 }
             }
             line_animations.push_back(anim);
+            SetLineScrolls(target);
             AddSpecialLine(target);
         }
     }
@@ -945,6 +973,8 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
         if (special->sector_effect_ & kSectorEffectTypePushThings)
             target->properties.push_constant = true;
         sector_animations.push_back(anim);
+        SetSurfaceScrolls(&target->floor, target);
+        SetSurfaceScrolls(&target->ceiling, target);
         AddSpecialSector(target);
     }
 

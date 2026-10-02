@@ -131,7 +131,7 @@ class AbstractShader
     }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
-                                    BlendingMode blending)
+                                    BlendingMode blending, int glow_set)
     {
         EPI_UNUSED(handle);
         EPI_UNUSED(shape);
@@ -140,10 +140,11 @@ class AbstractShader
         EPI_UNUSED(tex);
         EPI_UNUSED(pass_var);
         EPI_UNUSED(blending);
+        EPI_UNUSED(glow_set);
     }
 
     virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
-                            int *pass_var, BlendingMode blending)
+                            int *pass_var, BlendingMode blending, int glow_set)
     {
         EPI_UNUSED(shape);
         EPI_UNUSED(source);
@@ -152,6 +153,7 @@ class AbstractShader
         EPI_UNUSED(alpha);
         EPI_UNUSED(pass_var);
         EPI_UNUSED(blending);
+        EPI_UNUSED(glow_set);
     }
 
     virtual void SetRadius(float r) = 0;

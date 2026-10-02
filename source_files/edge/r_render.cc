@@ -1758,6 +1758,8 @@ void BakePendingStaticSectors(void)
     if (!StaticMeshBuilt())
         return;
 
+    StaticRefreshSectorTraits();
+
     StaticTakeSettledPendingSectors(pending_bake_sectors);
 
     if (pending_bake_sectors.empty())
