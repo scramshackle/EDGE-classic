@@ -1378,11 +1378,29 @@ void GpuImmediate::ScissorRect(int32_t x, int32_t y, int32_t width, int32_t heig
     commands_.push_back(command);
 }
 
-void GpuImmediate::BeginWorldTarget()
+static bool IsDrawCommand(GpuCommandType type)
+{
+    return type == kGpuCommandDraw || type == kGpuCommandModelDraw || type == kGpuCommandSpriteDraw ||
+           type == kGpuCommandLightDraw || type == kGpuCommandMovie;
+}
+
+bool GpuImmediate::HasDrawCommands() const
+{
+    for (size_t i = 0; i < commands_.size(); i++)
+    {
+        if (IsDrawCommand(commands_[i].type))
+            return true;
+    }
+
+    return false;
+}
+
+void GpuImmediate::BeginWorldTarget(bool direct)
 {
     GpuCommand command;
 
-    command.type = kGpuCommandBeginWorldTarget;
+    command.type                     = kGpuCommandBeginWorldTarget;
+    command.arguments.resolve.direct = direct;
 
     commands_.push_back(command);
 }
@@ -1393,16 +1411,34 @@ void GpuImmediate::BeginOitTarget()
 
     command.type = kGpuCommandBeginOitTarget;
 
+    oit_begin_command_ = commands_.size();
+
     commands_.push_back(command);
 }
 
-void GpuImmediate::EndOitTarget()
+bool GpuImmediate::EndOitTarget()
 {
+    if (oit_begin_command_ < commands_.size() && commands_[oit_begin_command_].type == kGpuCommandBeginOitTarget)
+    {
+        bool drawn = false;
+
+        for (size_t i = oit_begin_command_ + 1; i < commands_.size() && !drawn; i++)
+            drawn = IsDrawCommand(commands_[i].type);
+
+        if (!drawn)
+        {
+            commands_.erase(commands_.begin() + (ptrdiff_t)oit_begin_command_);
+            return false;
+        }
+    }
+
     GpuCommand command;
 
     command.type = kGpuCommandEndOitTarget;
 
     commands_.push_back(command);
+
+    return true;
 }
 
 void GpuImmediate::ResolveWorldTarget(const GpuResolveArguments &resolve)
@@ -2405,8 +2441,11 @@ void GpuImmediate::Replay()
     uniform_bytes_       = 0;
     uploaded_bytes_      = 0;
 
-    if (!gpu_device.FrameAcquired())
+    if (!gpu_device.ReplayTargetReady())
         return;
+
+    viewport_set_ = false;
+    scissor_set_  = false;
 
     UploadVertices();
     UploadIndices();
@@ -2722,8 +2761,10 @@ void GpuImmediate::Replay()
             }
             else if (command->type == kGpuCommandBeginWorldTarget)
             {
-                gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuLoadOperationClear,
-                                     kGpuPassTargetWorld);
+                gpu_device.SetWorldDirect(command->arguments.resolve.direct);
+
+                gpu_device.BeginPass(gpu_device.WorldDirect() ? kGpuLoadOperationLoad : kGpuLoadOperationClear,
+                                     kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuPassTargetWorld);
 
                 ResetTargetRectangles();
             }
@@ -2753,7 +2794,10 @@ void GpuImmediate::Replay()
                 destination.width  = resolve->destination_width;
                 destination.height = resolve->destination_height;
 
-                gpu_device.BlitWorldToMain(source, destination, resolve->smooth);
+                if (gpu_device.WorldDirect())
+                    gpu_device.SetWorldDirect(false);
+                else
+                    gpu_device.BlitWorldToMain(source, destination, resolve->smooth);
 
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetMain);

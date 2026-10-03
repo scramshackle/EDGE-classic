@@ -19,7 +19,7 @@ struct GpuLightRecord
 
 static std::vector<GpuLightRecord> frame_lights;
 static std::vector<uint32_t>       frame_clusters;
-static std::vector<uint32_t>       frame_indices;
+static std::vector<uint8_t>        frame_indices;
 
 static std::vector<GpuLightViewParameters> frame_views;
 
@@ -209,8 +209,8 @@ void GpuUploadLightGrid(const LightGrid *grid)
         uint32_t offset = (uint32_t)frame_indices.size();
 
         for (uint32_t k = 0; k < count; k++)
-            frame_indices.push_back((uint32_t)light_base +
-                                    grid->cluster_list[(size_t)grid->cluster_offsets[(size_t)cluster] + k]);
+            frame_indices.push_back(
+                (uint8_t)grid->cluster_list[(size_t)grid->cluster_offsets[(size_t)cluster] + k]);
 
         frame_clusters.push_back(count ? ((offset << 8) | count) : 0u);
     }
@@ -224,7 +224,7 @@ void GpuUploadLightGrid(const LightGrid *grid)
 
     view.light_range[0] = grid->cluster_near;
     view.light_range[1] = grid->cluster_far;
-    view.light_range[2] = 1.0f;
+    view.light_range[2] = 1.0f + (float)light_base;
     view.light_range[3] = (float)cluster_base;
 
     current_light_view = (int)frame_views.size();
@@ -272,12 +272,13 @@ void GpuFlushLightBuffers(void)
     if (frame_lights.empty() || frame_clusters.empty())
         return;
 
-    if (frame_indices.empty())
+    do
         frame_indices.push_back(0);
+    while (frame_indices.size() % sizeof(uint32_t) != 0);
 
     size_t light_bytes   = frame_lights.size() * sizeof(GpuLightRecord);
     size_t cluster_bytes = frame_clusters.size() * sizeof(uint32_t);
-    size_t index_bytes   = frame_indices.size() * sizeof(uint32_t);
+    size_t index_bytes   = frame_indices.size();
 
     if (!EnsureBuffer(&light_buffer, &light_transfer, &light_capacity, light_bytes, "lights") ||
         !EnsureBuffer(&cluster_buffer, &cluster_transfer, &cluster_capacity, cluster_bytes, "clusters") ||

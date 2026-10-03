@@ -263,7 +263,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         shader_kind == kGpuPipelineShaderSpriteOit)
     {
         color_target[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
-        color_target[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+        color_target[1].format = SDL_GPU_TEXTUREFORMAT_R16_FLOAT;
 
         SetupBlendState(&color_target[0].blend_state, GL_ONE, GL_ONE);
         SetupBlendState(&color_target[1].blend_state, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);

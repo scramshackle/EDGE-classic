@@ -63,6 +63,7 @@ struct GpuResolveArguments
     int32_t destination_height;
 
     bool smooth;
+    bool direct;
 };
 
 struct GpuDrawArguments
@@ -318,11 +319,13 @@ class GpuImmediate
 
     void ScissorRect(int32_t x, int32_t y, int32_t width, int32_t height);
 
-    void BeginWorldTarget();
+    void BeginWorldTarget(bool direct);
+
+    bool HasDrawCommands() const;
 
     void BeginOitTarget();
 
-    void EndOitTarget();
+    bool EndOitTarget();
 
     void ResolveWorldTarget(const GpuResolveArguments &resolve);
 
@@ -465,6 +468,7 @@ class GpuImmediate
     std::vector<RendererVertex>        vertices_;
     int32_t                            vertex_count_ = 0;
     std::vector<GpuCommand>            commands_;
+    size_t                             oit_begin_command_ = 0;
     std::vector<GpuVertexParameters>   vertex_parameters_;
     std::vector<GpuFragmentParameters> fragment_parameters_;
 

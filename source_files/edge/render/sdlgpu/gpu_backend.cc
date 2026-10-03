@@ -154,6 +154,9 @@ class GpuRenderBackend : public RenderBackend
 
     void CaptureScreen(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
     {
+        if (gpu_device.BeginReplay(false))
+            gpu_immediate.Replay();
+
         if (!gpu_device.ReadColorTarget(width, height, stride, dest))
         {
             memset(dest, 0, (size_t)stride * (size_t)height);
@@ -203,7 +206,8 @@ class GpuRenderBackend : public RenderBackend
 
     void FinishFrame()
     {
-        gpu_immediate.Replay();
+        if (gpu_device.BeginReplay(true))
+            gpu_immediate.Replay();
 
         gpu_device.SubmitFrame();
 
@@ -282,7 +286,7 @@ class GpuRenderBackend : public RenderBackend
 
         render_target_active_ = true;
 
-        gpu_immediate.BeginWorldTarget();
+        gpu_immediate.BeginWorldTarget(i == 0 && !render_target_scaled_ && !gpu_immediate.HasDrawCommands());
     }
 
     void FinishWorldRender()
@@ -320,6 +324,7 @@ class GpuRenderBackend : public RenderBackend
             resolve.destination_height = view_window_height;
 
             resolve.smooth = image_smoothing > 0;
+            resolve.direct = false;
 
             render_target_active_ = false;
 
@@ -350,14 +355,14 @@ class GpuRenderBackend : public RenderBackend
     {
         gpu_immediate.SetOitPipeline(false);
 
-        gpu_immediate.EndOitTarget();
+        bool drawn = gpu_immediate.EndOitTarget();
 
-        CompositeOit();
+        CompositeOit(drawn);
 
         oit_mode_ = 0;
     }
 
-    void CompositeOit()
+    void CompositeOit(bool drawn)
     {
         const GpuImage *accumulation = GetGpuImage(kGpuImageOitAccumulation);
         const GpuImage *revealage    = GetGpuImage(kGpuImageOitRevealage);
@@ -424,7 +429,8 @@ class GpuRenderBackend : public RenderBackend
         quad[3].position               = {{-1.0f, 1.0f, 0.0f}};
         quad[3].texture_coordinates[0] = {{u0, v_top}};
 
-        gpu_immediate.Draw(GL_QUADS, quad, 4);
+        if (drawn)
+            gpu_immediate.Draw(GL_QUADS, quad, 4);
 
         gpu_immediate.SetOitComposite(false);
 

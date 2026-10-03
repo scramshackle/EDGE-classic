@@ -54,6 +54,19 @@ bool GpuDevice::Init(SDL_Window *window)
     else
         FatalError("SDL_GPU: no depth-stencil format is supported by this device\n");
 
+    SDL_GPUTextureCreateInfo pair_info;
+    EPI_CLEAR_MEMORY(&pair_info, SDL_GPUTextureCreateInfo, 1);
+
+    pair_info.type                 = SDL_GPU_TEXTURETYPE_2D;
+    pair_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    pair_info.usage                = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+    pair_info.width                = 512;
+    pair_info.height               = 512;
+    pair_info.layer_count_or_depth = 1;
+    pair_info.num_levels           = 1;
+    pair_info.sample_count         = SDL_GPU_SAMPLECOUNT_1;
+
+    clear_pair_texture_ = SDL_CreateGPUTexture(device_, &pair_info);
 
     LogPrint("SDL_GPU: driver '%s'\n", SDL_GetGPUDeviceDriver(device_));
 #if (SDL_MINOR_VERSION >= 4)
@@ -96,6 +109,12 @@ void GpuDevice::Shutdown()
     }
 
     ReleaseOitTextures();
+
+    if (clear_pair_texture_)
+    {
+        SDL_ReleaseGPUTexture(device_, clear_pair_texture_);
+        clear_pair_texture_ = nullptr;
+    }
 
     world_width_  = 0;
     world_height_ = 0;
@@ -214,6 +233,13 @@ bool GpuDevice::AcquireFrame(int32_t width, int32_t height)
     if (!device_)
         return false;
 
+    if (command_buffer_)
+    {
+        EndPass();
+        SDL_SubmitGPUCommandBuffer(command_buffer_);
+        capture_only_ = false;
+    }
+
     command_buffer_ = SDL_AcquireGPUCommandBuffer(device_);
 
     if (!command_buffer_)
@@ -222,43 +248,81 @@ bool GpuDevice::AcquireFrame(int32_t width, int32_t height)
         return false;
     }
 
-    uint32_t swapchain_width  = 0;
-    uint32_t swapchain_height = 0;
+    swapchain_texture_ = nullptr;
+    main_texture_      = nullptr;
 
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer_, window_, &swapchain_texture_, &swapchain_width,
-                                               &swapchain_height))
+    int pixel_width  = 0;
+    int pixel_height = 0;
+
+    if (!SDL_GetWindowSizeInPixels(window_, &pixel_width, &pixel_height) || pixel_width < 1 || pixel_height < 1)
     {
-        LogPrint("GpuDevice: SDL_WaitAndAcquireGPUSwapchainTexture failed: %s\n", SDL_GetError());
-        SDL_CancelGPUCommandBuffer(command_buffer_);
-        command_buffer_ = nullptr;
-        return false;
+        pixel_width  = width;
+        pixel_height = height;
     }
 
-    if (!swapchain_texture_)
+    if (!CreateFrameTextures(pixel_width, pixel_height))
     {
         SDL_SubmitGPUCommandBuffer(command_buffer_);
         command_buffer_ = nullptr;
-        return false;
-    }
-
-    EPI_UNUSED(width);
-    EPI_UNUSED(height);
-
-    swapchain_width_  = (int32_t)swapchain_width;
-    swapchain_height_ = (int32_t)swapchain_height;
-
-    if (!CreateFrameTextures(swapchain_width_, swapchain_height_))
-    {
-        SDL_SubmitGPUCommandBuffer(command_buffer_);
-        command_buffer_    = nullptr;
-        swapchain_texture_ = nullptr;
         return false;
     }
 
     color_written_  = false;
+    world_direct_   = false;
     current_target_ = kGpuPassTargetMain;
 
     return true;
+}
+
+bool GpuDevice::BeginReplay(bool present)
+{
+    if (!command_buffer_ && !present && device_ && color_texture_)
+    {
+        command_buffer_    = SDL_AcquireGPUCommandBuffer(device_);
+        capture_only_      = command_buffer_ != nullptr;
+        swapchain_texture_ = nullptr;
+    }
+
+    if (!command_buffer_)
+        return false;
+
+    EndPass();
+
+    main_texture_ = nullptr;
+
+    if (present)
+    {
+        if (!swapchain_texture_)
+        {
+            uint32_t swapchain_width  = 0;
+            uint32_t swapchain_height = 0;
+
+            if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer_, window_, &swapchain_texture_, &swapchain_width,
+                                                       &swapchain_height))
+            {
+                LogPrint("GpuDevice: SDL_WaitAndAcquireGPUSwapchainTexture failed: %s\n", SDL_GetError());
+                swapchain_texture_ = nullptr;
+            }
+
+            swapchain_width_  = (int32_t)swapchain_width;
+            swapchain_height_ = (int32_t)swapchain_height;
+        }
+
+        if (!swapchain_texture_)
+            return false;
+
+        if (swapchain_width_ == target_width_ && swapchain_height_ == target_height_)
+            main_texture_ = swapchain_texture_;
+    }
+
+    if (!main_texture_)
+        main_texture_ = color_texture_;
+
+    color_written_  = false;
+    world_direct_   = false;
+    current_target_ = kGpuPassTargetMain;
+
+    return main_texture_ != nullptr;
 }
 
 bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
@@ -310,7 +374,10 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
     info.usage  = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
     oit_accumulation_texture_ = SDL_CreateGPUTexture(device_, &info);
-    oit_revealage_texture_    = SDL_CreateGPUTexture(device_, &info);
+
+    info.format = SDL_GPU_TEXTUREFORMAT_R16_FLOAT;
+
+    oit_revealage_texture_ = SDL_CreateGPUTexture(device_, &info);
 
     if (!oit_accumulation_texture_ || !oit_revealage_texture_)
     {
@@ -354,7 +421,7 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
 
 void GpuDevice::BlitWorldToMain(const GpuBlitRectangle &source, const GpuBlitRectangle &destination, bool smooth)
 {
-    if (!command_buffer_ || !world_color_texture_ || !color_texture_)
+    if (!command_buffer_ || !world_color_texture_ || !main_texture_)
         return;
 
     if (source.width < 1 || source.height < 1 || destination.width < 1 || destination.height < 1)
@@ -371,7 +438,7 @@ void GpuDevice::BlitWorldToMain(const GpuBlitRectangle &source, const GpuBlitRec
     blit.source.w       = (uint32_t)source.width;
     blit.source.h       = (uint32_t)source.height;
 
-    blit.destination.texture = color_texture_;
+    blit.destination.texture = main_texture_;
     blit.destination.x       = (uint32_t)destination.x;
     blit.destination.y       = (uint32_t)(target_height_ - destination.y - destination.height);
     blit.destination.w       = (uint32_t)destination.width;
@@ -407,7 +474,7 @@ void GpuDevice::ReleaseOitTextures(void)
 void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load,
                           GpuPassTarget target)
 {
-    if (!FrameAcquired())
+    if (!command_buffer_ || !main_texture_)
         return;
 
     if (target == kGpuPassTargetWorld && (!world_color_texture_ || !world_depth_texture_))
@@ -426,9 +493,9 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     if (target == kGpuPassTargetOit)
         color_target[0].texture = oit_accumulation_texture_;
     else if (target == kGpuPassTargetWorld)
-        color_target[0].texture = world_color_texture_;
+        color_target[0].texture = world_direct_ ? main_texture_ : world_color_texture_;
     else
-        color_target[0].texture = color_texture_;
+        color_target[0].texture = main_texture_;
 
     if (target == kGpuPassTargetMain && color_load == kGpuLoadOperationLoad && !color_written_)
         color_load = kGpuLoadOperationClear;
@@ -511,6 +578,9 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
         color_target_count = 2;
     }
 
+    if (color_target[0].load_op == SDL_GPU_LOADOP_CLEAR)
+        PairColorClear();
+
     render_pass_ = SDL_BeginGPURenderPass(command_buffer_, color_target, color_target_count, &depth_target);
 
     if (!render_pass_)
@@ -519,6 +589,24 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     if (target == kGpuPassTargetMain)
         color_written_ = true;
 
+}
+
+void GpuDevice::PairColorClear(void)
+{
+    if (!clear_pair_texture_)
+        return;
+
+    SDL_GPUColorTargetInfo pair_target;
+    EPI_CLEAR_MEMORY(&pair_target, SDL_GPUColorTargetInfo, 1);
+
+    pair_target.texture  = clear_pair_texture_;
+    pair_target.load_op  = SDL_GPU_LOADOP_CLEAR;
+    pair_target.store_op = SDL_GPU_STOREOP_STORE;
+
+    SDL_GPURenderPass *pair_pass = SDL_BeginGPURenderPass(command_buffer_, &pair_target, 1, nullptr);
+
+    if (pair_pass)
+        SDL_EndGPURenderPass(pair_pass);
 }
 
 void GpuDevice::EndPass()
@@ -561,7 +649,7 @@ void GpuDevice::SubmitFrame()
     if (!command_buffer_)
         return;
 
-    if (swapchain_texture_ && color_texture_)
+    if (swapchain_texture_ && main_texture_ == color_texture_ && color_texture_)
     {
         SDL_GPUBlitInfo blit;
         EPI_CLEAR_MEMORY(&blit, SDL_GPUBlitInfo, 1);
@@ -585,6 +673,7 @@ void GpuDevice::SubmitFrame()
 
     command_buffer_    = nullptr;
     swapchain_texture_ = nullptr;
+    main_texture_      = nullptr;
 }
 
 bool GpuDevice::ReadColorTarget(int32_t width, int32_t height, int32_t stride, uint8_t *dest)
@@ -637,7 +726,12 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
         download_buffer_capacity_ = bytes;
     }
 
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(device_);
+    bool frame_in_progress = command_buffer_ != nullptr;
+
+    if (frame_in_progress)
+        EndPass();
+
+    SDL_GPUCommandBuffer *command_buffer = frame_in_progress ? command_buffer_ : SDL_AcquireGPUCommandBuffer(device_);
 
     if (!command_buffer)
     {
@@ -669,6 +763,19 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
     SDL_EndGPUCopyPass(copy_pass);
 
     SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+
+    if (frame_in_progress)
+    {
+        bool continue_frame = !capture_only_;
+
+        command_buffer_    = continue_frame ? SDL_AcquireGPUCommandBuffer(device_) : nullptr;
+        swapchain_texture_ = nullptr;
+        main_texture_      = nullptr;
+        capture_only_      = false;
+
+        if (continue_frame && !command_buffer_)
+            LogPrint("GpuDevice: SDL_AcquireGPUCommandBuffer (after download) failed: %s\n", SDL_GetError());
+    }
 
     if (!fence)
     {

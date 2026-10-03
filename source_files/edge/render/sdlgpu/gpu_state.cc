@@ -477,6 +477,9 @@ class GpuRenderState : public RenderState
         if (format != GL_RGBA || type != GL_UNSIGNED_BYTE)
             FatalError("ReadPixels: unsupported format 0x%04x / type 0x%04x\n", format, type);
 
+        if (gpu_device.BeginReplay(false))
+            gpu_immediate.Replay();
+
         if (!gpu_device.ReadColorRegion(x, y, width, height, width * 4, (uint8_t *)pixels))
             memset(pixels, 0, (size_t)width * (size_t)height * 4);
     }
