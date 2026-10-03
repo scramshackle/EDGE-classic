@@ -80,10 +80,10 @@ void CreateThingBlockmap(void);
 void DestroyBlockmap(void);
 void BlockmapAddLine(Line *ld);
 
-void SetThingPosition(MapObject *mo);
+void SetThingPosition(MapObject *mo, Sector *known_sector = nullptr);
 void UnsetThingPosition(MapObject *mo);
 void UnsetThingFinal(MapObject *mo);
-void ChangeThingPosition(MapObject *mo, float x, float y, float z);
+void ChangeThingPosition(MapObject *mo, float x, float y, float z, Sector *known_sector = nullptr);
 void FreeSectorTouchNodes(Sector *sec);
 
 void GenerateBlockmap(int min_x, int min_y, int max_x, int max_y);

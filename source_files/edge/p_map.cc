@@ -1027,7 +1027,7 @@ static bool CheckRelativeThingCallback(MapObject *thing, void *data)
 //  speciallines[]
 //  numspeciallines
 //
-static bool CheckRelativePosition(MapObject *thing, float x, float y)
+static bool CheckRelativePosition(MapObject *thing, float x, float y, Sector **destination_sector = nullptr)
 {
     map_object_hit_sky = false;
     block_line         = nullptr;
@@ -1041,6 +1041,9 @@ static bool CheckRelativePosition(MapObject *thing, float x, float y)
     move_check.z = thing->z;
 
     move_check.sector = PointInSector(x, y);
+
+    if (destination_sector)
+        *destination_sector = move_check.sector;
 
     move_check.floor_slope_z   = 0;
     move_check.ceiling_slope_z = 0;
@@ -1128,8 +1131,10 @@ bool TryMove(MapObject *thing, float x, float y)
 
     float_ok = false;
 
+    Sector *destination_sector = nullptr;
+
     // solid wall or thing ?
-    if (!CheckRelativePosition(thing, x, y))
+    if (!CheckRelativePosition(thing, x, y, &destination_sector))
         return false;
 
     fell_off_thing = (thing->below_object_ && !move_check.below);
@@ -1199,7 +1204,7 @@ bool TryMove(MapObject *thing, float x, float y)
             z = thing->ceiling_z_ - thing->height_;
     }
 
-    ChangeThingPosition(thing, x, y, z);
+    ChangeThingPosition(thing, x, y, z, destination_sector);
         
     // -AJA- 1999/07/31: Ride that rawhide :->
     if (thing->above_object_ && !(thing->above_object_->flags_ & kMapObjectFlagFloat) &&

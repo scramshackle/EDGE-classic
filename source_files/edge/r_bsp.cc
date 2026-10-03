@@ -611,6 +611,19 @@ static std::vector<int>              sky_sector_candidates;
 static std::vector<SkyLineCandidate> sky_line_side_candidates;
 static std::vector<uint32_t>         sky_sector_done;
 static std::vector<uint64_t>         sky_line_side_done;
+static std::vector<int>              sky_sector_slot;
+static std::vector<int>              sky_sector_line_starts;
+static std::vector<int>              sky_sector_lines;
+static std::vector<int>              sky_sector_pending_lines;
+static std::vector<int>              sky_sector_pending_count;
+static std::vector<uint8_t>          sky_sector_candidate_pending;
+static std::vector<uint8_t>          sky_line_side_listed;
+static std::vector<uint32_t>         sky_line_side_visit;
+static uint32_t                      sky_line_side_visit_serial = 0;
+static std::vector<int>              sky_changed_sectors;
+static std::vector<int>              sky_walk_sectors;
+static std::vector<int>              sky_walk_sector_candidates;
+static std::vector<int>              sky_walk_line_side_candidates;
 static const Sector                 *sky_candidate_base       = nullptr;
 static uint32_t                      sky_candidate_generation = 0;
 static uint32_t                      sky_candidate_resident   = 0;
@@ -629,6 +642,58 @@ static uint8_t SectorSkyFlag(const Sector *sec)
         return 1;
 
     return 0;
+}
+
+static void SkyListLineSideIn(int candidate_index, int sector_index, uint8_t bit)
+{
+    if (sky_line_side_listed[(size_t)candidate_index] & bit)
+        return;
+
+    sky_line_side_listed[(size_t)candidate_index] |= bit;
+
+    int first = sky_sector_line_starts[(size_t)sector_index];
+
+    sky_sector_pending_lines[(size_t)(first + sky_sector_pending_count[(size_t)sector_index]++)] = candidate_index;
+}
+
+static void SkyListLineSide(int candidate_index)
+{
+    const SkyLineCandidate &candidate = sky_line_side_candidates[(size_t)candidate_index];
+
+    SkyListLineSideIn(candidate_index, candidate.front, 1);
+
+    if (candidate.back >= 0 && candidate.back != candidate.front)
+        SkyListLineSideIn(candidate_index, candidate.back, 2);
+}
+
+static void SkyListSector(int index)
+{
+    if (index < 0 || (size_t)index >= sky_sector_pending_count.size())
+        return;
+
+    if (sky_sector_slot[(size_t)index] >= 0)
+        sky_sector_candidate_pending[(size_t)index] = 1;
+
+    for (int k = sky_sector_line_starts[(size_t)index]; k < sky_sector_line_starts[(size_t)index + 1]; k++)
+        SkyListLineSide(sky_sector_lines[(size_t)k]);
+}
+
+static void SkyListEverything(void)
+{
+    for (size_t i = 0; i < sky_sector_pending_count.size(); i++)
+    {
+        sky_sector_candidate_pending[i] = (sky_sector_slot[i] >= 0) ? 1 : 0;
+        sky_sector_pending_count[i]     = sky_sector_line_starts[i + 1] - sky_sector_line_starts[i];
+    }
+
+    sky_sector_pending_lines = sky_sector_lines;
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    {
+        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+        sky_line_side_listed[c] = (candidate.back >= 0 && candidate.back != candidate.front) ? 3 : 1;
+    }
 }
 
 static void RefreshSkyCandidates(void)
@@ -694,6 +759,49 @@ static void RefreshSkyCandidates(void)
 
     sky_sector_done.assign(sky_sector_candidates.size(), 0);
     sky_line_side_done.assign(sky_line_side_candidates.size(), 0);
+
+    sky_sector_slot.assign((size_t)total_level_sectors, -1);
+
+    for (size_t c = 0; c < sky_sector_candidates.size(); c++)
+        sky_sector_slot[(size_t)sky_sector_candidates[c]] = (int)c;
+
+    sky_sector_line_starts.assign((size_t)total_level_sectors + 1, 0);
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    {
+        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+        sky_sector_line_starts[(size_t)candidate.front + 1]++;
+
+        if (candidate.back >= 0 && candidate.back != candidate.front)
+            sky_sector_line_starts[(size_t)candidate.back + 1]++;
+    }
+
+    for (size_t i = 1; i < sky_sector_line_starts.size(); i++)
+        sky_sector_line_starts[i] += sky_sector_line_starts[i - 1];
+
+    sky_sector_lines.assign((size_t)sky_sector_line_starts.back(), 0);
+
+    std::vector<int> cursor(sky_sector_line_starts.begin(), sky_sector_line_starts.end() - 1);
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    {
+        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+        sky_sector_lines[(size_t)cursor[(size_t)candidate.front]++] = (int)c;
+
+        if (candidate.back >= 0 && candidate.back != candidate.front)
+            sky_sector_lines[(size_t)cursor[(size_t)candidate.back]++] = (int)c;
+    }
+
+    sky_sector_pending_lines.assign(sky_sector_lines.size(), 0);
+    sky_sector_pending_count.assign((size_t)total_level_sectors, 0);
+    sky_sector_candidate_pending.assign((size_t)total_level_sectors, 0);
+    sky_line_side_listed.assign(sky_line_side_candidates.size(), 0);
+    sky_line_side_visit.assign(sky_line_side_candidates.size(), 0);
+    sky_line_side_visit_serial = 0;
+
+    SkyListEverything();
 }
 
 static bool SkySectorPlanesReachable(const Sector *sector)
@@ -713,66 +821,221 @@ static inline bool SectorIndexReached(int index)
            sector_reach_stamp[(size_t)index] == sector_reach_serial;
 }
 
+static bool SkyDecisionStable(const Sector *sector)
+{
+    return StaticSectorSettled(sector) && !sector->height_sector;
+}
+
+static uint64_t SkyLineSideStamp(const SkyLineCandidate &candidate, bool *ready)
+{
+    const Sector *front = level_sectors + candidate.front;
+    const Sector *back  = (candidate.back >= 0) ? level_sectors + candidate.back : nullptr;
+
+    *ready = SkyDecisionStable(front) && (!back || SkyDecisionStable(back));
+
+    uint64_t back_epoch = back ? StaticSectorEpoch(back) : 0;
+
+    return ((uint64_t)(StaticSectorEpoch(front) + 1) << 32) | back_epoch;
+}
+
+static bool SkySectorCandidateDone(size_t c)
+{
+    const Sector *sector = &level_sectors[sky_sector_candidates[c]];
+
+    return SkyDecisionStable(sector) && sky_sector_done[c] == StaticSectorEpoch(sector) + 1;
+}
+
+static bool SkyLineSideCandidateDone(size_t c)
+{
+    bool     ready = false;
+    uint64_t stamp = SkyLineSideStamp(sky_line_side_candidates[c], &ready);
+
+    return ready && sky_line_side_done[c] == stamp;
+}
+
+static bool SkyRunSectorCandidate(size_t c)
+{
+    Sector  *sector = &level_sectors[sky_sector_candidates[c]];
+    bool     ready  = SkyDecisionStable(sector);
+    uint32_t stamp  = StaticSectorEpoch(sector) + 1;
+
+
+    if (ready && sky_sector_done[c] == stamp)
+    {
+        return true;
+    }
+
+    SkyDecideSector(sector, nullptr, true);
+
+    if (ready && SkySectorPlanesReachable(sector))
+        sky_sector_done[c] = stamp;
+
+    return false;
+}
+
+static bool SkyRunLineSideCandidate(size_t c)
+{
+    const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+    bool     ready = false;
+    uint64_t stamp = SkyLineSideStamp(candidate, &ready);
+
+
+    if (ready && sky_line_side_done[c] == stamp)
+    {
+        return true;
+    }
+
+    SkyDecideLineSide(&level_line_sides[candidate.line_side], nullptr, true);
+
+    if (ready)
+        sky_line_side_done[c] = stamp;
+
+    return false;
+}
+
+static void SkyCompactSector(int index)
+{
+    if (sky_sector_candidate_pending[(size_t)index] && SkySectorCandidateDone((size_t)sky_sector_slot[(size_t)index]))
+        sky_sector_candidate_pending[(size_t)index] = 0;
+
+    int first = sky_sector_line_starts[(size_t)index];
+    int count = sky_sector_pending_count[(size_t)index];
+    int keep  = 0;
+
+    for (int k = 0; k < count; k++)
+    {
+        int c = sky_sector_pending_lines[(size_t)(first + k)];
+
+        if (SkyLineSideCandidateDone((size_t)c))
+        {
+            uint8_t bit = (sky_line_side_candidates[(size_t)c].front == index) ? 1 : 2;
+
+            sky_line_side_listed[(size_t)c] &= (uint8_t)~bit;
+            continue;
+        }
+
+        sky_sector_pending_lines[(size_t)(first + keep++)] = c;
+    }
+
+    sky_sector_pending_count[(size_t)index] = keep;
+}
+
 void EnumerateViewSky(void)
 {
     EDGE_ZoneScoped;
 
     RefreshSkyCandidates();
 
-    bool any_skipped = false;
-
-    for (size_t c = 0; c < sky_sector_candidates.size(); c++)
+    if (StaticTakeChangedSectors(sky_changed_sectors))
+        SkyListEverything();
+    else
     {
-        int index = sky_sector_candidates[c];
-
-        if (!SectorIndexReached(index))
-            continue;
-
-        Sector  *sector = &level_sectors[index];
-        bool     ready  = StaticSectorReady(sector);
-        uint32_t stamp  = StaticSectorEpoch(sector) + 1;
-
-        if (ready && sky_sector_done[c] == stamp)
-        {
-            any_skipped = true;
-            continue;
-        }
-
-        SkyDecideSector(sector, nullptr, true);
-
-        if (ready && SkySectorPlanesReachable(sector))
-            sky_sector_done[c] = stamp;
+        for (size_t i = 0; i < sky_changed_sectors.size(); i++)
+            SkyListSector(sky_changed_sectors[i]);
     }
 
-    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    bool any_skipped = false;
+
+
+    if (sector_reach_all || active_mirror_set.TotalActive() > 0 ||
+        sky_sector_pending_count.size() != (size_t)total_level_sectors)
     {
-        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
-
-        if (!SectorIndexReached(candidate.front) && !(candidate.back >= 0 && SectorIndexReached(candidate.back)))
-            continue;
-
-        const Sector *front = level_sectors + candidate.front;
-        const Sector *back  = (candidate.back >= 0) ? level_sectors + candidate.back : nullptr;
-
-        bool ready = StaticSectorReady(front) && (!back || StaticSectorReady(back));
-
-        uint64_t back_epoch = back ? StaticSectorEpoch(back) : 0;
-        uint64_t stamp      = ((uint64_t)(StaticSectorEpoch(front) + 1) << 32) | back_epoch;
-
-        if (ready && sky_line_side_done[c] == stamp)
+        for (size_t c = 0; c < sky_sector_candidates.size(); c++)
         {
-            any_skipped = true;
-            continue;
+
+            if (!SectorIndexReached(sky_sector_candidates[c]))
+                continue;
+
+            if (SkyRunSectorCandidate(c))
+                any_skipped = true;
         }
 
-        SkyDecideLineSide(&level_line_sides[candidate.line_side], nullptr, true);
+        for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+        {
+            const SkyLineCandidate &candidate = sky_line_side_candidates[c];
 
-        if (ready)
-            sky_line_side_done[c] = stamp;
+
+            if (!SectorIndexReached(candidate.front) && !(candidate.back >= 0 && SectorIndexReached(candidate.back)))
+                continue;
+
+            if (SkyRunLineSideCandidate(c))
+                any_skipped = true;
+        }
+    }
+    else
+    {
+        if (++sky_line_side_visit_serial == 0)
+        {
+            std::fill(sky_line_side_visit.begin(), sky_line_side_visit.end(), 0);
+            sky_line_side_visit_serial = 1;
+        }
+
+        sky_walk_sectors.clear();
+        sky_walk_sector_candidates.clear();
+        sky_walk_line_side_candidates.clear();
+
+        for (size_t r = 0; r < sector_reach_list.size(); r++)
+        {
+            int index = sector_reach_list[r];
+            int slot  = sky_sector_slot[(size_t)index];
+            int first = sky_sector_line_starts[(size_t)index];
+            int last  = sky_sector_line_starts[(size_t)index + 1];
+
+            if (slot < 0 && first == last)
+                continue;
+
+            bool sector_pending = slot >= 0 && sky_sector_candidate_pending[(size_t)index];
+            int  count          = sky_sector_pending_count[(size_t)index];
+
+            if ((slot >= 0 && !sector_pending) || count < last - first)
+                any_skipped = true;
+
+            if (!sector_pending && count == 0)
+            {
+                continue;
+            }
+
+            sky_walk_sectors.push_back(index);
+
+            if (sector_pending)
+                sky_walk_sector_candidates.push_back(slot);
+
+            for (int k = 0; k < count; k++)
+            {
+                int c = sky_sector_pending_lines[(size_t)(first + k)];
+
+                if (sky_line_side_visit[(size_t)c] == sky_line_side_visit_serial)
+                    continue;
+
+                sky_line_side_visit[(size_t)c] = sky_line_side_visit_serial;
+                sky_walk_line_side_candidates.push_back(c);
+            }
+        }
+
+        std::sort(sky_walk_sector_candidates.begin(), sky_walk_sector_candidates.end());
+        std::sort(sky_walk_line_side_candidates.begin(), sky_walk_line_side_candidates.end());
+
+
+        for (size_t i = 0; i < sky_walk_sector_candidates.size(); i++)
+        {
+            if (SkyRunSectorCandidate((size_t)sky_walk_sector_candidates[i]))
+                any_skipped = true;
+        }
+
+        for (size_t i = 0; i < sky_walk_line_side_candidates.size(); i++)
+        {
+            if (SkyRunLineSideCandidate((size_t)sky_walk_line_side_candidates[i]))
+                any_skipped = true;
+        }
+
+        for (size_t i = 0; i < sky_walk_sectors.size(); i++)
+            SkyCompactSector(sky_walk_sectors[i]);
     }
 
     if (any_skipped)
         SkyNoteResidentVisible();
+
 }
 
 static bool SectorBeyondFarClip(const Sector *sector)
@@ -1147,6 +1410,14 @@ static void GridViewSectors(void)
 
     double reach = (double)(view_grid_width + view_grid_height) * view_grid_cell * 2.0;
 
+    if (draw_culling.d_)
+    {
+        double half_scope = epi::RadiansFromBAM(clip_scope) * 0.5;
+        double far_reach  = (renderer_far_clip.f_ + 500.0 + 32.0) / cos(half_scope);
+
+        reach = HMM_MIN(reach, far_reach);
+    }
+
     double wedge_x[3] = {apex_x, apex_x + reach * cos(left), apex_x + reach * cos(right)};
     double wedge_y[3] = {apex_y, apex_y + reach * sin(left), apex_y + reach * sin(right)};
 
@@ -1347,14 +1618,25 @@ void EnumerateViewSectors(void)
         return;
     }
 
+    bool cull_far = draw_culling.d_ && active_mirror_set.TotalActive() == 0;
+
     if (active_mirror_set.TotalActive() == 0)
     {
-        sector_reach_all = true;
+        sector_reach_serial++;
+        sector_reach_all = !cull_far;
         sector_reach_list.clear();
     }
 
     for (int i = 0; i < total_level_sectors; i++)
     {
+        if (cull_far)
+        {
+            if (SectorBeyondFarClip(&level_sectors[i]))
+                continue;
+
+            sector_reach_stamp[(size_t)i] = sector_reach_serial;
+        }
+
         if (active_mirror_set.TotalActive() == 0)
             sector_reach_list.push_back(i);
 

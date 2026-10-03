@@ -68,6 +68,48 @@ static float grid_cell     = 128.0f;
 static int   grid_width    = 0;
 static int   grid_height   = 0;
 
+struct PolygonCellEdge
+{
+    float x1;
+    float y1;
+    float x2;
+    float y2;
+};
+
+enum PolygonCellMode
+{
+    kPolygonCellTest = 0,
+    kPolygonCellInside,
+    kPolygonCellFallback
+};
+
+struct PolygonCellEntry
+{
+    int     sector;
+    int     edge_first;
+    int     edge_count;
+    float   reference_x;
+    float   reference_y;
+    uint8_t reference_inside;
+    uint8_t mode;
+};
+
+struct PolygonCellHit
+{
+    int      cell;
+    int      sector;
+    uint32_t vertex_a;
+    uint32_t vertex_b;
+};
+
+static std::vector<int>              cell_entry_starts;
+static std::vector<PolygonCellEntry> cell_entries;
+static std::vector<PolygonCellEdge>  cell_edges;
+
+static constexpr double kPolygonCellMargin    = 1.0;
+static constexpr double kPolygonCellTolerance = 0.05;
+static constexpr double kPolygonCellClearance = 0.5;
+
 static std::vector<int> vertex_point_map;
 static std::vector<int> vertex_point_stamp;
 static int              vertex_point_serial = 0;
@@ -352,6 +394,10 @@ static void DestroySectorGrid(void)
     grid_starts.clear();
     grid_sectors.clear();
 
+    cell_entry_starts.clear();
+    cell_entries.clear();
+    cell_edges.clear();
+
     grid_width  = 0;
     grid_height = 0;
 }
@@ -442,19 +488,272 @@ static void BuildSectorGrid(void)
     }
 }
 
-int SectorPolygonAtPoint(float x, float y, int exclude_sector)
+static bool PolygonCellHitLess(const PolygonCellHit &a, const PolygonCellHit &b)
 {
-    if (grid_width <= 0)
+    if (a.cell != b.cell)
+        return a.cell < b.cell;
+
+    return a.sector < b.sector;
+}
+
+static bool SegmentTouchesRectangle(double ax, double ay, double bx, double by, double x0, double y0, double x1,
+                                    double y1)
+{
+    if (HMM_MAX(ax, bx) < x0 || HMM_MIN(ax, bx) > x1 || HMM_MAX(ay, by) < y0 || HMM_MIN(ay, by) > y1)
+        return false;
+
+    double dx = bx - ax;
+    double dy = by - ay;
+
+    double c0 = dx * (y0 - ay) - dy * (x0 - ax);
+    double c1 = dx * (y0 - ay) - dy * (x1 - ax);
+    double c2 = dx * (y1 - ay) - dy * (x0 - ax);
+    double c3 = dx * (y1 - ay) - dy * (x1 - ax);
+
+    if (c0 > 0.0 && c1 > 0.0 && c2 > 0.0 && c3 > 0.0)
+        return false;
+
+    if (c0 < 0.0 && c1 < 0.0 && c2 < 0.0 && c3 < 0.0)
+        return false;
+
+    return true;
+}
+
+static double PointSegmentDistance(double px, double py, double ax, double ay, double bx, double by)
+{
+    double dx     = bx - ax;
+    double dy     = by - ay;
+    double length = dx * dx + dy * dy;
+    double t      = (length > 0.0) ? ((px - ax) * dx + (py - ay) * dy) / length : 0.0;
+
+    t = HMM_MAX(0.0, HMM_MIN(1.0, t));
+
+    double nx = ax + t * dx - px;
+    double ny = ay + t * dy - py;
+
+    return sqrt(nx * nx + ny * ny);
+}
+
+static void BuildPolygonCellEdges(void)
+{
+    cell_entry_starts.clear();
+    cell_entries.clear();
+    cell_edges.clear();
+
+    if (grid_width <= 0 || grid_height <= 0)
+        return;
+
+    std::vector<PolygonCellHit> hits;
+
+    for (size_t i = 0; i < sector_polygons.size(); i++)
+    {
+        const SectorPolygon *poly = &sector_polygons[i];
+
+        for (size_t loop = 0; loop + 1 < poly->loop_starts.size(); loop++)
+        {
+            uint32_t begin = poly->loop_starts[loop];
+            uint32_t count = poly->loop_starts[loop + 1] - begin;
+
+            for (uint32_t k = 0; k < count; k++)
+            {
+                uint32_t vertex_a = poly->loop_points[begin + k];
+                uint32_t vertex_b = poly->loop_points[begin + (k + 1) % count];
+
+                const Vertex *a = level_vertexes + vertex_a;
+                const Vertex *b = level_vertexes + vertex_b;
+
+                if (epi::AlmostEquals(a->X, b->X) && epi::AlmostEquals(a->Y, b->Y))
+                    continue;
+
+                double low_x  = HMM_MIN(a->X, b->X) - kPolygonCellMargin;
+                double low_y  = HMM_MIN(a->Y, b->Y) - kPolygonCellMargin;
+                double high_x = HMM_MAX(a->X, b->X) + kPolygonCellMargin;
+                double high_y = HMM_MAX(a->Y, b->Y) + kPolygonCellMargin;
+
+                int x0 = HMM_MAX(0, (int)floor((low_x - grid_origin_x) / grid_cell));
+                int y0 = HMM_MAX(0, (int)floor((low_y - grid_origin_y) / grid_cell));
+                int x1 = HMM_MIN(grid_width - 1, (int)floor((high_x - grid_origin_x) / grid_cell));
+                int y1 = HMM_MIN(grid_height - 1, (int)floor((high_y - grid_origin_y) / grid_cell));
+
+                for (int y = y0; y <= y1; y++)
+                {
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        double cell_x0 = grid_origin_x + x * (double)grid_cell - kPolygonCellMargin;
+                        double cell_y0 = grid_origin_y + y * (double)grid_cell - kPolygonCellMargin;
+                        double cell_x1 = cell_x0 + grid_cell + 2.0 * kPolygonCellMargin;
+                        double cell_y1 = cell_y0 + grid_cell + 2.0 * kPolygonCellMargin;
+
+                        if (!SegmentTouchesRectangle(a->X, a->Y, b->X, b->Y, cell_x0, cell_y0, cell_x1, cell_y1))
+                            continue;
+
+                        hits.push_back(PolygonCellHit{y * grid_width + x, (int)i, vertex_a, vertex_b});
+                    }
+                }
+            }
+        }
+    }
+
+    std::sort(hits.begin(), hits.end(), PolygonCellHitLess);
+
+    static const float reference_fractions[9][2] = {{0.5f, 0.5f},   {0.25f, 0.25f}, {0.75f, 0.25f},
+                                                    {0.25f, 0.75f}, {0.75f, 0.75f}, {0.5f, 0.25f},
+                                                    {0.5f, 0.75f},  {0.25f, 0.5f},  {0.75f, 0.5f}};
+
+    size_t cells = (size_t)grid_width * (size_t)grid_height;
+    size_t h     = 0;
+
+    cell_entry_starts.assign(cells + 1, 0);
+
+    for (size_t cell = 0; cell < cells; cell++)
+    {
+        cell_entry_starts[cell] = (int)cell_entries.size();
+
+        float cell_x = grid_origin_x + (float)(cell % (size_t)grid_width) * grid_cell;
+        float cell_y = grid_origin_y + (float)(cell / (size_t)grid_width) * grid_cell;
+
+        for (int g = grid_starts[cell]; g < grid_starts[cell + 1]; g++)
+        {
+            int index = grid_sectors[(size_t)g];
+
+            while (h < hits.size() && (hits[h].cell < (int)cell || (hits[h].cell == (int)cell && hits[h].sector < index)))
+                h++;
+
+            PolygonCellEntry entry;
+
+            entry.sector           = index;
+            entry.edge_first       = (int)cell_edges.size();
+            entry.edge_count       = 0;
+            entry.reference_x      = cell_x + grid_cell * 0.5f;
+            entry.reference_y      = cell_y + grid_cell * 0.5f;
+            entry.reference_inside = 0;
+            entry.mode             = kPolygonCellFallback;
+
+            while (h < hits.size() && hits[h].cell == (int)cell && hits[h].sector == index)
+            {
+                const Vertex *a = level_vertexes + hits[h].vertex_a;
+                const Vertex *b = level_vertexes + hits[h].vertex_b;
+
+                cell_edges.push_back(PolygonCellEdge{a->X, a->Y, b->X, b->Y});
+                entry.edge_count++;
+                h++;
+            }
+
+            const SectorPolygon *poly = &sector_polygons[(size_t)index];
+
+            if (entry.edge_count == 0)
+            {
+                if (!PolygonSectorContains(poly, entry.reference_x, entry.reference_y))
+                    continue;
+
+                entry.reference_inside = 1;
+                entry.mode             = kPolygonCellInside;
+
+                cell_entries.push_back(entry);
+                continue;
+            }
+
+            for (int r = 0; r < 9; r++)
+            {
+                float rx = cell_x + grid_cell * reference_fractions[r][0];
+                float ry = cell_y + grid_cell * reference_fractions[r][1];
+
+                bool clear = true;
+
+                for (int e = 0; e < entry.edge_count && clear; e++)
+                {
+                    const PolygonCellEdge &edge = cell_edges[(size_t)(entry.edge_first + e)];
+
+                    if (PointSegmentDistance(rx, ry, edge.x1, edge.y1, edge.x2, edge.y2) < kPolygonCellClearance)
+                        clear = false;
+                }
+
+                if (!clear)
+                    continue;
+
+                entry.reference_x      = rx;
+                entry.reference_y      = ry;
+                entry.reference_inside = PolygonSectorContains(poly, rx, ry) ? 1 : 0;
+                entry.mode             = kPolygonCellTest;
+                break;
+            }
+
+            cell_entries.push_back(entry);
+        }
+    }
+
+    cell_entry_starts[cells] = (int)cell_entries.size();
+}
+
+static int PolygonCellCrossings(const PolygonCellEntry *entry, float px, float py)
+{
+    double rx  = entry->reference_x;
+    double ry  = entry->reference_y;
+    double rpx = px - rx;
+    double rpy = py - ry;
+
+    double rp_length = sqrt(rpx * rpx + rpy * rpy);
+
+    if (rp_length < kPolygonCellTolerance)
         return -1;
 
-    int cx = (int)((x - grid_origin_x) / grid_cell);
-    int cy = (int)((y - grid_origin_y) / grid_cell);
+    double low_x  = HMM_MIN(rx, (double)px) - kPolygonCellTolerance;
+    double low_y  = HMM_MIN(ry, (double)py) - kPolygonCellTolerance;
+    double high_x = HMM_MAX(rx, (double)px) + kPolygonCellTolerance;
+    double high_y = HMM_MAX(ry, (double)py) + kPolygonCellTolerance;
 
-    if (cx < 0 || cy < 0 || cx >= grid_width || cy >= grid_height)
-        return -1;
+    int crossings = 0;
 
-    size_t cell = (size_t)cy * grid_width + cx;
+    for (int e = 0; e < entry->edge_count; e++)
+    {
+        const PolygonCellEdge &edge = cell_edges[(size_t)(entry->edge_first + e)];
 
+        if (HMM_MAX(edge.x1, edge.x2) < low_x || HMM_MIN(edge.x1, edge.x2) > high_x ||
+            HMM_MAX(edge.y1, edge.y2) < low_y || HMM_MIN(edge.y1, edge.y2) > high_y)
+            continue;
+
+        double ex = (double)edge.x2 - edge.x1;
+        double ey = (double)edge.y2 - edge.y1;
+
+        double e_length = sqrt(ex * ex + ey * ey);
+
+        double d1 = ex * (ry - edge.y1) - ey * (rx - edge.x1);
+        double d2 = ex * (py - edge.y1) - ey * (px - edge.x1);
+        double d3 = rpx * (edge.y1 - ry) - rpy * (edge.x1 - rx);
+        double d4 = rpx * (edge.y2 - ry) - rpy * (edge.x2 - rx);
+
+        if (fabs(d1) <= kPolygonCellTolerance * e_length || fabs(d2) <= kPolygonCellTolerance * e_length ||
+            fabs(d3) <= kPolygonCellTolerance * rp_length || fabs(d4) <= kPolygonCellTolerance * rp_length)
+            return -1;
+
+        if ((d1 > 0.0) != (d2 > 0.0) && (d3 > 0.0) != (d4 > 0.0))
+            crossings++;
+    }
+
+    return crossings;
+}
+
+static bool PolygonCellContains(const PolygonCellEntry *entry, const SectorPolygon *poly, float px, float py)
+{
+    if (px < poly->bounds[0] || px > poly->bounds[2] || py < poly->bounds[1] || py > poly->bounds[3])
+        return false;
+
+    if (entry->mode == kPolygonCellInside)
+        return true;
+
+    if (entry->mode == kPolygonCellTest)
+    {
+        int crossings = PolygonCellCrossings(entry, px, py);
+
+        if (crossings >= 0)
+            return ((crossings & 1) != 0) != (entry->reference_inside != 0);
+    }
+
+    return PolygonSectorContains(poly, px, py);
+}
+
+static int SectorPolygonAtPointScan(size_t cell, float x, float y, int exclude_sector)
+{
     int    best      = -1;
     double best_area = 0.0;
 
@@ -475,6 +774,49 @@ int SectorPolygonAtPoint(float x, float y, int exclude_sector)
         if (best < 0 || area < best_area)
         {
             best      = index;
+            best_area = area;
+        }
+    }
+
+    return best;
+}
+
+int SectorPolygonAtPoint(float x, float y, int exclude_sector)
+{
+    if (grid_width <= 0)
+        return -1;
+
+    int cx = (int)((x - grid_origin_x) / grid_cell);
+    int cy = (int)((y - grid_origin_y) / grid_cell);
+
+    if (cx < 0 || cy < 0 || cx >= grid_width || cy >= grid_height)
+        return -1;
+
+    size_t cell = (size_t)cy * grid_width + cx;
+
+    if (cell_entry_starts.empty())
+        return SectorPolygonAtPointScan(cell, x, y, exclude_sector);
+
+    int    best      = -1;
+    double best_area = 0.0;
+
+    for (int i = cell_entry_starts[cell]; i < cell_entry_starts[cell + 1]; i++)
+    {
+        const PolygonCellEntry *entry = &cell_entries[(size_t)i];
+
+        if (entry->sector == exclude_sector)
+            continue;
+
+        const SectorPolygon *poly = &sector_polygons[(size_t)entry->sector];
+
+        if (!PolygonCellContains(entry, poly, x, y))
+            continue;
+
+        double area = (double)(poly->bounds[2] - poly->bounds[0]) * (double)(poly->bounds[3] - poly->bounds[1]);
+
+        if (best < 0 || area < best_area)
+        {
+            best      = entry->sector;
             best_area = area;
         }
     }
@@ -1252,6 +1594,8 @@ void BuildSectorPolygons(void)
     polygon_self_reference_probe.clear();
     polygon_self_reference_owned.clear();
     polygon_self_reference_only.clear();
+
+    BuildPolygonCellEdges();
 
     polygon_build_microseconds = GetMicroseconds() - mark;
 

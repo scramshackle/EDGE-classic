@@ -422,6 +422,33 @@ static std::vector<uint8_t>  sector_bake_clean;
 static std::vector<uint8_t>  sector_bake_pending;
 static std::vector<uint32_t> sector_bake_epoch;
 static std::vector<int>     sector_pending_list;
+static std::vector<uint8_t>  sector_change_flag;
+static std::vector<int>      sector_change_list;
+static bool                  sector_change_all = true;
+
+static void NoteSectorChange(size_t index)
+{
+    if (index >= sector_change_flag.size() || sector_change_flag[index])
+        return;
+
+    sector_change_flag[index] = 1;
+    sector_change_list.push_back((int)index);
+}
+
+bool StaticTakeChangedSectors(std::vector<int> &out)
+{
+    bool all = sector_change_all;
+
+    out.clear();
+    out.swap(sector_change_list);
+
+    for (size_t i = 0; i < out.size(); i++)
+        sector_change_flag[(size_t)out[i]] = 0;
+
+    sector_change_all = false;
+
+    return all;
+}
 
 void StaticBakeSectorBegin(const Sector *sec)
 {
@@ -429,6 +456,8 @@ void StaticBakeSectorBegin(const Sector *sec)
 
     if (index < sector_bake_clean.size())
         sector_bake_clean[index] = 1;
+
+    NoteSectorChange(index);
 }
 
 void StaticBakeSectorEnd(const Sector *sec)
@@ -437,6 +466,8 @@ void StaticBakeSectorEnd(const Sector *sec)
 
     if (index < sector_bake_pending.size())
         sector_bake_pending[index] = 0;
+
+    NoteSectorChange(index);
 }
 
 void StaticMarkSectorDeclined(const Sector *sec)
@@ -448,6 +479,8 @@ void StaticMarkSectorDeclined(const Sector *sec)
 
     if (index < sector_bake_clean.size())
         sector_bake_clean[index] = 0;
+
+    NoteSectorChange(index);
 }
 
 void StaticMarkSectorPending(const Sector *sec)
@@ -459,6 +492,8 @@ void StaticMarkSectorPending(const Sector *sec)
 
     if (index < sector_bake_epoch.size())
         sector_bake_epoch[index]++;
+
+    NoteSectorChange(index);
 
     if (index >= sector_bake_pending.size() || sector_bake_pending[index])
         return;
@@ -475,6 +510,16 @@ bool StaticSectorReady(const Sector *sec)
         return false;
 
     return sector_bake_clean[index] && !sector_bake_pending[index];
+}
+
+bool StaticSectorSettled(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_pending.size())
+        return false;
+
+    return !sector_bake_pending[index];
 }
 
 uint32_t StaticSectorEpoch(const Sector *sec)
@@ -1599,6 +1644,9 @@ void BuildStaticMesh(void)
     sector_bake_pending.assign((size_t)total_level_sectors, 0);
     sector_bake_epoch.assign((size_t)total_level_sectors, 0);
     sector_pending_list.clear();
+    sector_change_flag.assign((size_t)total_level_sectors, 0);
+    sector_change_list.clear();
+    sector_change_all = true;
 
     static_mesh_built = true;
 
@@ -1631,6 +1679,9 @@ void DestroyStaticMesh(void)
     sector_bake_pending.clear();
     sector_bake_epoch.clear();
     sector_pending_list.clear();
+    sector_change_flag.clear();
+    sector_change_list.clear();
+    sector_change_all = true;
 
     StaticCaptureEnd();
 

@@ -492,7 +492,7 @@ static bool CheckSectorCallback(Line *ld, void *data)
 // Links a thing into both a block and a subsector
 // based on it's x y.
 //
-void SetThingPosition(MapObject *mo)
+void SetThingPosition(MapObject *mo, Sector *known_sector)
 {
     Sector *ss;
     int     blockx;
@@ -509,7 +509,7 @@ void SetThingPosition(MapObject *mo)
     EPI_ASSERT(!(mo->dynamic_light_next_ || mo->dynamic_light_previous_));
 
     // link into subsector
-    ss          = PointInSector(mo->x, mo->y);
+    ss          = known_sector ? known_sector : PointInSector(mo->x, mo->y);
     mo->sector_ = ss;
 
     // determine properties
@@ -638,7 +638,7 @@ void SetThingPosition(MapObject *mo)
 // when moving a thing, rather than fiddling with the coordinates
 // directly (or even P_UnsetThingPos/P_SetThingPos pairs).
 //
-void ChangeThingPosition(MapObject *mo, float x, float y, float z)
+void ChangeThingPosition(MapObject *mo, float x, float y, float z, Sector *known_sector)
 {
     UnsetThingPosition(mo);
     {
@@ -646,7 +646,7 @@ void ChangeThingPosition(MapObject *mo, float x, float y, float z)
         mo->y = y;
         mo->z = z;
     }
-    SetThingPosition(mo);
+    SetThingPosition(mo, known_sector);
 }
 
 //

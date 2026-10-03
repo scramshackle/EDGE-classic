@@ -23,6 +23,8 @@ bool GpuDevice::Init(SDL_Window *window)
 #endif
 #ifdef EDGE_EXTRA_CHECKS
     SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, true);
+#else
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, false);
 #endif
 
     device_ = SDL_CreateGPUDeviceWithProperties(props);

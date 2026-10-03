@@ -44,8 +44,10 @@ void StaticBakeSectorEnd(const Sector *sec);
 void StaticMarkSectorDeclined(const Sector *sec);
 void StaticMarkSectorPending(const Sector *sec);
 bool StaticSectorReady(const Sector *sec);
+bool StaticSectorSettled(const Sector *sec);
 uint32_t StaticSectorEpoch(const Sector *sec);
 void StaticTakeSettledPendingSectors(std::vector<Sector *> &out);
+bool StaticTakeChangedSectors(std::vector<int> &out);
 
 enum HeightRenderState
 {
