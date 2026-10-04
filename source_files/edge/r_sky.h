@@ -56,9 +56,7 @@ void FinishSky(bool use_depth_mask);
 
 void FinishSkyForMirror(const DrawMirror *mir);
 
-void FinishSkyOverpaint(const DrawMirror *mir);
-
-constexpr int kSkyWallPartOverpaint = 3;
+constexpr int kSkyWallPartEntry = 3;
 
 void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMirror *mir);
 void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);

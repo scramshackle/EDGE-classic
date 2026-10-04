@@ -201,7 +201,7 @@ void SkyDecideLineSide(LineSide *line_side, DrawMirror *mir, bool resident)
             }
             else if (b_ch < fsector->sky_height)
             {
-                EmitSkyWall(line_side, b_ch, fsector->sky_height, fsector, kSkyWallPartOverpaint, mir, resident);
+                EmitSkyWall(line_side, b_ch, fsector->sky_height, fsector, kSkyWallPartEntry, mir, resident);
             }
         }
     }
@@ -704,6 +704,12 @@ bool SkyEntryClipNeeded(const Sector *entered, const Sector *from)
 
     if (from && entered->properties.light_level == from->properties.light_level)
         return false;
+
+    if (from && (entered->sky_image != from->sky_image || entered->sky_ref != from->sky_ref ||
+                 entered->sky_flipped != from->sky_flipped))
+    {
+        return true;
+    }
 
     size_t index = (size_t)(entered - level_sectors);
 
