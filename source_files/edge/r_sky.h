@@ -58,7 +58,7 @@ void FinishSkyForMirror(const DrawMirror *mir);
 
 void FinishSkyOverpaint(const DrawMirror *mir);
 
-constexpr int kSkyPlaneOverpaint = 2;
+constexpr int kSkyWallPartOverpaint = 3;
 
 void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMirror *mir);
 void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);
@@ -83,6 +83,8 @@ bool SkyResidentEnabled(void);
 void SkyNoteResidentVisible(void);
 
 bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner);
+
+bool SkyEntryClipNeeded(const Sector *entered, const Sector *from);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

@@ -199,6 +199,10 @@ void SkyDecideLineSide(LineSide *line_side, DrawMirror *mir, bool resident)
             {
                 EmitSkyWall(line_side, max_f, fsector->sky_height, fsector, 1, mir, resident);
             }
+            else if (b_ch < fsector->sky_height)
+            {
+                EmitSkyWall(line_side, b_ch, fsector->sky_height, fsector, kSkyWallPartOverpaint, mir, resident);
+            }
         }
     }
     // -AJA- 2004/08/29: Emulate Sky-Flooding TRICK
@@ -451,17 +455,10 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
             EmitSkyPlane(sector, sector->sky_height, sector, 0, mir, resident);
         }
 
-        if (EDGE_IMAGE_IS_SKY(sector->ceiling) && !sector->ceiling_slope && !sector->ceiling_vertex_slope &&
-            (!mir || view_z < sector->interpolated_ceiling_height))
-        {
-            EmitSkyPlane(sector, sector->interpolated_ceiling_height, sector, kSkyPlaneOverpaint, mir, resident);
-        }
-
         return;
     }
 
     float floor_h = sector->interpolated_floor_height;
-    float ceil_h  = sector->height_sector->interpolated_ceiling_height;
 
     MapSurface *floor_s = &sector->floor;
     MapSurface *ceil_s  = &sector->ceiling;
@@ -469,14 +466,12 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
     if (view_height_zone == kHeightZoneA && view_z > sector->height_sector->interpolated_ceiling_height)
     {
         floor_h = sector->height_sector->interpolated_ceiling_height;
-        ceil_h  = sector->interpolated_ceiling_height;
         floor_s = &sector->height_sector->floor;
         ceil_s  = &sector->height_sector->ceiling;
     }
     else if (view_height_zone == kHeightZoneC && view_z < sector->height_sector->interpolated_floor_height)
     {
         floor_h = sector->interpolated_floor_height;
-        ceil_h  = sector->height_sector->interpolated_floor_height;
         floor_s = &sector->height_sector->floor;
         ceil_s  = &sector->height_sector->ceiling;
     }
@@ -493,11 +488,6 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
     if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sector->sky_height)
     {
         EmitSkyPlane(sector, sector->sky_height, sector->height_sector, 0, mir, resident);
-    }
-
-    if (EDGE_IMAGE_IS_SKY(*ceil_s) && (!mir || view_z < ceil_h))
-    {
-        EmitSkyPlane(sector, ceil_h, sector->height_sector, kSkyPlaneOverpaint, mir, resident);
     }
 }
 
@@ -630,6 +620,103 @@ static uint32_t                      sky_candidate_resident   = 0;
 static int                           sky_candidate_countdown  = 0;
 
 static constexpr int kSkyCandidateRescanFrames = 64;
+
+static constexpr int32_t kSkyTallerNone = -1;
+static constexpr int32_t kSkyTallerMany = -2;
+
+static std::vector<int32_t> sky_taller_neighbour;
+static const Sector        *sky_taller_base = nullptr;
+
+static int32_t SkyFindTallerNeighbour(const Sector *sector)
+{
+    if (!EDGE_IMAGE_IS_SKY(sector->ceiling))
+        return kSkyTallerNone;
+
+    if (sector->height_sector || sector->extrafloor_used > 0)
+        return kSkyTallerMany;
+
+    float   ceiling = sector->interpolated_ceiling_height;
+    int32_t found   = kSkyTallerNone;
+
+    for (int i = 0; i < sector->line_count; i++)
+    {
+        const Line   *line  = sector->lines[i];
+        const Sector *other = (line->front_sector == sector) ? line->back_sector : line->front_sector;
+
+        if (!other || other == sector || !EDGE_IMAGE_IS_SKY(other->ceiling))
+            continue;
+
+        if (!other->height_sector && other->interpolated_ceiling_height <= ceiling)
+            continue;
+
+        int32_t index = (int32_t)(other - level_sectors);
+
+        if (found >= 0 && found != index)
+            return kSkyTallerMany;
+
+        found = index;
+    }
+
+    return found;
+}
+
+static void SkyRefreshTallerNeighbours(const std::vector<int> &changed, bool everything)
+{
+    if (everything || sky_taller_base != level_sectors ||
+        sky_taller_neighbour.size() != (size_t)total_level_sectors)
+    {
+        sky_taller_base = level_sectors;
+        sky_taller_neighbour.resize((size_t)total_level_sectors);
+
+        for (int i = 0; i < total_level_sectors; i++)
+            sky_taller_neighbour[(size_t)i] = SkyFindTallerNeighbour(level_sectors + i);
+
+        return;
+    }
+
+    for (size_t c = 0; c < changed.size(); c++)
+    {
+        if (changed[c] < 0 || changed[c] >= total_level_sectors)
+            continue;
+
+        const Sector *sector = level_sectors + changed[c];
+
+        sky_taller_neighbour[(size_t)changed[c]] = SkyFindTallerNeighbour(sector);
+
+        for (int i = 0; i < sector->line_count; i++)
+        {
+            const Line   *line     = sector->lines[i];
+            const Sector *sides[2] = {line->front_sector, line->back_sector};
+
+            for (int k = 0; k < 2; k++)
+            {
+                if (sides[k] && sides[k] != sector)
+                    sky_taller_neighbour[(size_t)(sides[k] - level_sectors)] = SkyFindTallerNeighbour(sides[k]);
+            }
+        }
+    }
+}
+
+bool SkyEntryClipNeeded(const Sector *entered, const Sector *from)
+{
+    if (!entered)
+        return false;
+
+    if (from && entered->properties.light_level == from->properties.light_level)
+        return false;
+
+    size_t index = (size_t)(entered - level_sectors);
+
+    if (sky_taller_base != level_sectors || index >= sky_taller_neighbour.size())
+        return true;
+
+    int32_t taller = sky_taller_neighbour[index];
+
+    if (taller == kSkyTallerMany)
+        return true;
+
+    return taller >= 0 && (!from || taller != (int32_t)(from - level_sectors));
+}
 
 static uint8_t SectorSkyFlag(const Sector *sec)
 {
@@ -928,11 +1015,16 @@ void EnumerateViewSky(void)
     RefreshSkyCandidates();
 
     if (StaticTakeChangedSectors(sky_changed_sectors))
+    {
         SkyListEverything();
+        SkyRefreshTallerNeighbours(sky_changed_sectors, true);
+    }
     else
     {
         for (size_t i = 0; i < sky_changed_sectors.size(); i++)
             SkyListSector(sky_changed_sectors[i]);
+
+        SkyRefreshTallerNeighbours(sky_changed_sectors, false);
     }
 
     bool any_skipped = false;

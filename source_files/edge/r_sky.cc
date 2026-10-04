@@ -268,6 +268,8 @@ struct SkySpan
     float         view_z_maximum;
     bool          is_wall;
     bool          live;
+
+    const LineSide *facing_side;
 };
 
 struct SkySpanReference
@@ -314,7 +316,7 @@ static bool sky_backdrop_pass = false;
 
 static bool sky_overpaint_pass = false;
 
-static constexpr int kSkyPlaneFaces = kSkyPlaneOverpaint + 1;
+static constexpr int kSkyWallParts = kSkyWallPartOverpaint + 1;
 
 static int32_t SkyBucketFor(const DrawMirror *mir)
 {
@@ -356,6 +358,8 @@ static float         sky_capture_view_z_minimum = -FLT_MAX;
 static float         sky_capture_view_z_maximum = FLT_MAX;
 static bool          sky_capture_is_wall        = false;
 
+static const LineSide *sky_capture_facing_side = nullptr;
+
 static constexpr int kMaximumSkyDependencies = 8;
 
 static int sky_capture_dependencies[kMaximumSkyDependencies];
@@ -380,8 +384,8 @@ static void SkyResidentReset(void)
 
     sky_sections.clear();
 
-    sky_plane_baked.assign((size_t)total_level_sectors * kSkyPlaneFaces * kHeightKeyTotal, 0);
-    sky_wall_baked.assign((size_t)total_level_lines * 2 * 3 * kHeightKeyTotal, 0);
+    sky_plane_baked.assign((size_t)total_level_sectors * 2 * kHeightKeyTotal, 0);
+    sky_wall_baked.assign((size_t)total_level_lines * 2 * kSkyWallParts * kHeightKeyTotal, 0);
     sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
 
     sky_capture_active = false;
@@ -413,22 +417,21 @@ static int SkyHeightKey(const Sector *front, const Sector *back)
 
 static size_t SkyPlaneSlot(const Sector *sector, int face, int height_key)
 {
-    int clamped = (face < 0) ? 0 : ((face >= kSkyPlaneFaces) ? kSkyPlaneFaces - 1 : face);
-
-    return ((size_t)(sector - level_sectors) * kSkyPlaneFaces + (size_t)clamped) * (size_t)kHeightKeyTotal +
+    return ((size_t)(sector - level_sectors) * 2 + (size_t)(face ? 1 : 0)) * (size_t)kHeightKeyTotal +
            (size_t)height_key;
 }
 
 static size_t SkyWallSlot(const LineSide *line_side, int part, int height_key)
 {
-    int clamped = (part < 0) ? 0 : ((part > 2) ? 2 : part);
+    int clamped = (part < 0) ? 0 : ((part >= kSkyWallParts) ? kSkyWallParts - 1 : part);
 
-    return ((size_t)(line_side - level_line_sides) * 3 + (size_t)clamped) * (size_t)kHeightKeyTotal +
+    return ((size_t)(line_side - level_line_sides) * kSkyWallParts + (size_t)clamped) * (size_t)kHeightKeyTotal +
            (size_t)height_key;
 }
 
 static void SkyCaptureBegin(int section, int flag_slot, int height_key, const Sector *height_front,
-                            const Sector *height_back, float view_z_minimum, float view_z_maximum, bool is_wall)
+                            const Sector *height_back, float view_z_minimum, float view_z_maximum, bool is_wall,
+                            const LineSide *facing_side)
 {
     sky_capture_active           = true;
     sky_capture_section          = section;
@@ -440,6 +443,7 @@ static void SkyCaptureBegin(int section, int flag_slot, int height_key, const Se
     sky_capture_start            = (int)sky_sections[section].resident_vertices.size();
     sky_capture_flag_slot        = flag_slot;
     sky_capture_is_wall          = is_wall;
+    sky_capture_facing_side      = facing_side;
     sky_capture_dependency_count = 0;
 }
 
@@ -469,6 +473,7 @@ static void SkyCaptureEnd(void)
     span.view_z_maximum = sky_capture_view_z_maximum;
     span.is_wall        = sky_capture_is_wall;
     span.live           = true;
+    span.facing_side    = sky_capture_facing_side;
 
     section.spans.push_back(span);
 
@@ -530,6 +535,19 @@ void SkyResidentInvalidateSector(Sector *sec)
 
 
     refs.clear();
+}
+
+static bool SkyEntryClipLive(const LineSide *line_side)
+{
+    float x1 = line_side->vertex_1->X;
+    float y1 = line_side->vertex_1->Y;
+    float x2 = line_side->vertex_2->X;
+    float y2 = line_side->vertex_2->Y;
+
+    if ((view_x - x1) * (y2 - y1) - (view_y - y1) * (x2 - x1) <= 0.0f)
+        return false;
+
+    return SkyEntryClipNeeded(line_side->back_sector, line_side->front_sector);
 }
 
 static void PushSkyVertex(int section, const HMM_Vec3 &position)
@@ -664,6 +682,11 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
                 }
 
                 if (live && (view_z <= resident.spans[k].view_z_minimum || view_z >= resident.spans[k].view_z_maximum))
+                {
+                    live = false;
+                }
+
+                if (live && resident.spans[k].facing_side && !SkyEntryClipLive(resident.spans[k].facing_side))
                 {
                     live = false;
                 }
@@ -1164,14 +1187,12 @@ void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMi
     if (bake && sky_plane_baked[plane_slot])
         return;
 
-    int group = MarkSkySection(sky_owner, face == kSkyPlaneOverpaint);
+    int group = MarkSkySection(sky_owner, false);
 
     if (bake)
     {
-        bool floor_face = (face == 1);
-
-        SkyCaptureBegin(group, (int)plane_slot, plane_key, sector, nullptr, floor_face ? h : -FLT_MAX,
-                        floor_face ? FLT_MAX : h, false);
+        SkyCaptureBegin(group, (int)plane_slot, plane_key, sector, nullptr, face ? h : -FLT_MAX, face ? FLT_MAX : h,
+                        false, nullptr);
 
         SkyAddCaptureDependency(sector);
         SkyAddCaptureDependency(sky_owner);
@@ -1206,12 +1227,20 @@ void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, i
     if (bake && sky_wall_baked[wall_slot])
         return;
 
-    int group = MarkSkySection(sky_owner, false);
+    bool overpaint = (part == kSkyWallPartOverpaint);
+
+    if (overpaint && (mir || !bake) &&
+        (view_z >= h1 || !SkyEntryClipNeeded(line_side->back_sector, line_side->front_sector)))
+    {
+        return;
+    }
+
+    int group = MarkSkySection(sky_owner, overpaint);
 
     if (bake)
     {
         SkyCaptureBegin(group, (int)wall_slot, wall_key, line_side->front_sector, line_side->back_sector, -FLT_MAX,
-                        FLT_MAX, true);
+                        overpaint ? h1 : FLT_MAX, true, overpaint ? line_side : nullptr);
 
         SkyAddCaptureDependency(sky_owner);
         SkyAddCaptureDependency(line_side->front_sector);

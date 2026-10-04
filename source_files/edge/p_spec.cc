@@ -2684,6 +2684,74 @@ void SpawnMapSpecials1(void)
     }
 }
 
+static bool SkyCeilingUnmarked(const Sector *sector, const Sector **source)
+{
+    *source = nullptr;
+
+    for (int i = 0; i < sector->line_count; i++)
+    {
+        const Line   *line  = sector->lines[i];
+        const Sector *other = (line->front_sector == sector) ? line->back_sector : line->front_sector;
+
+        if (!other)
+            return false;
+
+        if (other == sector)
+            continue;
+
+        if (!EDGE_IMAGE_IS_SKY(other->ceiling) || other->properties.light_level != sector->properties.light_level)
+            return false;
+
+        if (!other->sky_ref)
+            continue;
+
+        if (*source && ((*source)->sky_image != other->sky_image || (*source)->sky_flipped != other->sky_flipped))
+            return false;
+
+        if (!*source)
+            *source = other;
+    }
+
+    return *source != nullptr;
+}
+
+static void InheritUnmarkedSkies(void)
+{
+    bool changed = false;
+
+    for (int pass = 0; pass < 8; pass++)
+    {
+        bool progress = false;
+
+        for (int i = 0; i < total_level_sectors; i++)
+        {
+            Sector *sector = &level_sectors[i];
+
+            if (sector->sky_ref || !EDGE_IMAGE_IS_SKY(sector->ceiling))
+                continue;
+
+            const Sector *source = nullptr;
+
+            if (!SkyCeilingUnmarked(sector, &source))
+                continue;
+
+            sector->sky_image   = source->sky_image;
+            sector->sky_ref     = source->sky_ref;
+            sector->sky_flipped = source->sky_flipped;
+
+            progress = true;
+        }
+
+        if (!progress)
+            break;
+
+        changed = true;
+    }
+
+    if (changed)
+        ComputeSkyHeights();
+}
+
 void SpawnMapSpecials2(int autotag)
 {
     Sector           *sector;
@@ -2846,6 +2914,8 @@ void SpawnMapSpecials2(int autotag)
             light_animations.push_back(anim);
         }
     }
+
+    InheritUnmarkedSkies();
 }
 
 //
