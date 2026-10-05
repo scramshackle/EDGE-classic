@@ -910,7 +910,7 @@ static void RenderSkybox(const SkySection &section)
 
     sky_pass_info.viewport_origin = {{(float)view_window_x, (float)view_window_y}};
     sky_pass_info.viewport_size   = {{(float)view_window_width, (float)view_window_height}};
-    sky_pass_info.fog_depth       = renderer_far_clip.f_ * 2.0f;
+    sky_pass_info.fog_depth       = renderer_far_clip.f_ / 2.0f;
     sky_pass_info.cube_texture    = current_fake_box->cubemap;
     sky_pass_info.is_box          = 1;
     sky_pass_info.is_geometry     = 1;
