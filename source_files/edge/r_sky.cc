@@ -741,16 +741,21 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
     }
 }
 
-static void RenderSkyEquirect(const SkySection &section)
+static void UpdateSkyStretch(void)
 {
-    GLuint sky_tex_id = ImageCache(sky_image, true);
-
     if (current_map->forced_skystretch_ > kSkyStretchUnset)
         current_sky_stretch = current_map->forced_skystretch_;
     else if (!level_flags.mouselook)
         current_sky_stretch = kSkyStretchVanilla;
     else
         current_sky_stretch = (SkyStretch)sky_stretch_mode.d_;
+}
+
+static void RenderSkyEquirect(const SkySection &section)
+{
+    GLuint sky_tex_id = ImageCache(sky_image, true);
+
+    UpdateSkyStretch();
 
     SkyPassInfo sky_pass_info;
 
@@ -878,6 +883,8 @@ static void RenderSkyEquirect(const SkySection &section)
 static void RenderSkybox(const SkySection &section)
 {
     EPI_ASSERT(current_fake_box);
+
+    UpdateSkyStretch();
 
     RGBAColor    fc_to_use = current_map->outdoor_fog_color_;
     float        fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -1169,8 +1176,7 @@ void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, i
 
     bool entry = (part == kSkyWallPartEntry);
 
-    if (entry && (mir || !bake) &&
-        (view_z >= h1 || !SkyEntryClipNeeded(line_side->back_sector, line_side->front_sector)))
+    if (entry && (mir || !bake) && !SkyEntryClipNeeded(line_side->back_sector, line_side->front_sector))
     {
         return;
     }
@@ -1180,7 +1186,7 @@ void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, i
     if (bake)
     {
         SkyCaptureBegin(group, (int)wall_slot, wall_key, line_side->front_sector, line_side->back_sector, -FLT_MAX,
-                        entry ? h1 : FLT_MAX, true, entry ? line_side : nullptr);
+                        FLT_MAX, true, entry ? line_side : nullptr);
 
         SkyAddCaptureDependency(sky_owner);
         SkyAddCaptureDependency(line_side->front_sector);

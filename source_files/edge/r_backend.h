@@ -207,6 +207,11 @@ class RenderBackend
         return max_texture_size_;
     }
 
+    bool SupportsFullNonPowerOfTwoTextures() const
+    {
+        return full_non_power_of_two_textures_;
+    }
+
     int32_t RenderTargetWidth() const
     {
         return render_target_width_;
@@ -267,6 +272,8 @@ class RenderBackend
     int32_t oit_mode_         = 0;
     int64_t frame_number_;
     bool    units_locked_ = false;
+
+    bool full_non_power_of_two_textures_ = true;
 
     int32_t render_target_width_   = 0;
     int32_t render_target_height_  = 0;

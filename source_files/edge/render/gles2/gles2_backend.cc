@@ -124,6 +124,10 @@ class Gles2RenderBackend : public RenderBackend
 
         LogPrint("OpenGL: Max Texture Size: %d\n", max_texture_size_);
 
+        full_non_power_of_two_textures_ = Gles2HasFullNonPowerOfTwoTextures();
+
+        LogPrint("OpenGL: Non-power-of-two textures: %s\n", full_non_power_of_two_textures_ ? "full" : "restricted");
+
 
 
         int32_t varying_vectors = Gles2MaxVaryingVectors();

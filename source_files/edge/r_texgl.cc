@@ -105,17 +105,18 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     int total_w = img->width_;
     int total_h = img->height_;
 
-#ifndef EDGE_SDL_GPU
-    int power_of_two_w = 1;
-    while (power_of_two_w < total_w)
-        power_of_two_w <<= 1;
-    total_w = power_of_two_w;
+    if (!render_backend->SupportsFullNonPowerOfTwoTextures() && (!clamp || !nomip))
+    {
+        int power_of_two_w = 1;
+        while (power_of_two_w < total_w)
+            power_of_two_w <<= 1;
+        total_w = power_of_two_w;
 
-    int power_of_two_h = 1;
-    while (power_of_two_h < total_h)
-        power_of_two_h <<= 1;
-    total_h = power_of_two_h;
-#endif
+        int power_of_two_h = 1;
+        while (power_of_two_h < total_h)
+            power_of_two_h <<= 1;
+        total_h = power_of_two_h;
+    }
 
     int new_w, new_h;
 
@@ -160,13 +161,6 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     // minification mode
     int mip_level = HMM_Clamp(0, image_mipmapping, 2);
 
-    // special logic for mid-masked textures.  The kUploadThresh flag
-    // guarantees that each texture level has simple alpha (0 or 255),
-    // but we must also disable Trilinear Mipmapping because it will
-    // produce partial alpha values when interpolating between mips.
-    if (flags & kUploadThresh)
-        mip_level = HMM_Clamp(0, mip_level, 1);
-
     static GLuint minif_modes[2 * 3] = {GL_NEAREST, GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_LINEAR,
 
                                         GL_LINEAR,  GL_LINEAR_MIPMAP_NEAREST,  GL_LINEAR_MIPMAP_LINEAR};
@@ -187,7 +181,7 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
                 img->ShrinkMasked(new_w, new_h);
 
             if (flags & kUploadThresh)
-                img->ThresholdAlpha((mip & 1) ? 96 : 144);
+                img->ThresholdAlpha(144);
         }
 
         render_state->TexImage2D(GL_TEXTURE_2D, mip, img->depth_ == 3 ? GL_RGB : GL_RGBA, new_w, new_h, 0,

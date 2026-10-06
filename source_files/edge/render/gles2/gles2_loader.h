@@ -122,6 +122,8 @@ void Gles2LoadEntryPoints();
 
 bool Gles2HasFramebufferObjects();
 
+bool Gles2HasFullNonPowerOfTwoTextures();
+
 int32_t Gles2MaxVaryingVectors();
 
 const char *Gles2ShaderPreamble(bool fragment_stage);

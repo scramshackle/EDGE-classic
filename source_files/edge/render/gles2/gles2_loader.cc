@@ -110,6 +110,11 @@ bool Gles2HasFramebufferObjects()
     return gles2_framebuffer_objects_available;
 }
 
+bool Gles2HasFullNonPowerOfTwoTextures()
+{
+    return true;
+}
+
 int32_t Gles2MaxVaryingVectors()
 {
     GLint varying_floats = 0;
@@ -140,6 +145,19 @@ void Gles2LoadEntryPoints()
 bool Gles2HasFramebufferObjects()
 {
     return true;
+}
+
+bool Gles2HasFullNonPowerOfTwoTextures()
+{
+    int major = 0;
+    int minor = 0;
+
+    const char *version = (const char *)glGetString(GL_VERSION);
+
+    if (version)
+        sscanf(version, "OpenGL ES %d.%d", &major, &minor);
+
+    return major >= 3 || SDL_GL_ExtensionSupported("GL_OES_texture_npot");
 }
 
 int32_t Gles2MaxVaryingVectors()

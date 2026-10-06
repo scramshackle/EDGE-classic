@@ -1225,11 +1225,12 @@ static int IM_PixelLimit()
 
 static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 {
-    bool clamp  = IM_ShouldClamp(rim);
-    bool mip    = IM_ShouldMipmap(rim);
-    bool smooth = IM_ShouldSmooth();
-    bool flip   = false;
-    bool invert = false;
+    bool clamp         = IM_ShouldClamp(rim);
+    bool mip           = IM_ShouldMipmap(rim);
+    bool mip_requested = false;
+    bool smooth        = IM_ShouldSmooth();
+    bool flip          = false;
+    bool invert        = false;
 
     if (rim->source_type_ == kImageSourceUser)
     {
@@ -1237,7 +1238,10 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
             clamp = true;
 
         if (rim->source_user_.def->special_ & kImageSpecialMip)
-            mip = !rim->is_sky_;
+        {
+            mip           = !rim->is_sky_;
+            mip_requested = mip;
+        }
         else if (rim->source_user_.def->special_ & kImageSpecialNoMip)
             mip = false;
 
@@ -1256,7 +1260,10 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
             clamp = true;
 
         if (rim->source_graphic_.special & kImageSpecialMip)
-            mip = true;
+        {
+            mip           = true;
+            mip_requested = true;
+        }
         else if (rim->source_graphic_.special & kImageSpecialNoMip)
             mip = false;
 
@@ -1343,6 +1350,14 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 
         delete tmp_img;
         tmp_img = scaled_img;
+    }
+
+    if (rim->opacity_ == kOpacityMasked && mip)
+    {
+        if (mip_requested)
+            LogWarning("Image [%s] is masked: ignoring MIP\n", rim->name_.c_str());
+
+        mip = false;
     }
 
     *upload_flags = (clamp ? kUploadClamp : 0) | (mip ? kUploadMipMap : 0) | (smooth ? kUploadSmooth : 0) |
