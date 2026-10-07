@@ -832,15 +832,28 @@ void SkyResidentOrganize(void)
         int64_t columns = (int64_t)((limit_x - origin_x) / kSkyCellSize) + 1;
 
         std::vector<int64_t> keys(total);
+        std::vector<int>     groups(total);
+        std::vector<float>   angles(total);
 
         for (size_t k = 0; k < total; k++)
         {
-            const float *b = &span_bounds[k * 4];
+            const float   *b    = &span_bounds[k * 4];
+            const SkySpan &span = section.spans[k];
 
             int64_t column = (int64_t)(((b[0] + b[2]) * 0.5f - origin_x) / kSkyCellSize);
             int64_t row    = (int64_t)(((b[1] + b[3]) * 0.5f - origin_y) / kSkyCellSize);
 
-            keys[k] = row * columns + column;
+            keys[k]   = row * columns + column;
+            angles[k] = 0.0f;
+
+            if (span.facing_side)
+            {
+                groups[k] = span.entry_needed ? 2 : 3;
+                angles[k] = atan2f(span.facing_side->vertex_2->Y - span.facing_side->vertex_1->Y,
+                                   span.facing_side->vertex_2->X - span.facing_side->vertex_1->X);
+            }
+            else
+                groups[k] = SkySpanHeightVaries(span) ? 1 : 0;
         }
 
         std::vector<int> order(total);
@@ -848,7 +861,15 @@ void SkyResidentOrganize(void)
         for (size_t k = 0; k < total; k++)
             order[k] = (int)k;
 
-        std::stable_sort(order.begin(), order.end(), [&keys](int a, int b) { return keys[(size_t)a] < keys[(size_t)b]; });
+        std::stable_sort(order.begin(), order.end(), [&keys, &groups, &angles](int a, int b) {
+            if (keys[(size_t)a] != keys[(size_t)b])
+                return keys[(size_t)a] < keys[(size_t)b];
+
+            if (groups[(size_t)a] != groups[(size_t)b])
+                return groups[(size_t)a] < groups[(size_t)b];
+
+            return angles[(size_t)a] < angles[(size_t)b];
+        });
 
         std::vector<RendererVertex> vertices;
         std::vector<SkySpan>        spans;
