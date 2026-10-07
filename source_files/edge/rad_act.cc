@@ -49,6 +49,7 @@
 #include "r_modes.h"
 #include "r_render.h"
 #include "r_sky.h"
+#include "r_static.h"
 #include "rad_trig.h"
 #include "s_music.h"
 #include "s_sound.h"
@@ -725,7 +726,7 @@ void ScriptPlaySound(RADScriptTrigger *R, void *param)
     R->sound_effects_origin.y = ambient->y;
 
     if (epi::AlmostEquals(ambient->z, kOnFloorZ))
-        R->sound_effects_origin.z = PointInSubsector(ambient->x, ambient->y)->sector->floor_height;
+        R->sound_effects_origin.z = PointInSector(ambient->x, ambient->y)->floor_height;
     else
         R->sound_effects_origin.z = ambient->z;
 
@@ -785,9 +786,10 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
             {
                 for (int i = 0; i < total_level_sectors; i++)
                 {
-                    level_sectors[i].sky_image = image;
+                    level_sectors[i].sky_image   = image;
                     MarkImageAsSky(image);
-                    level_sectors[i].sky_ref   = nullptr;
+                    level_sectors[i].sky_ref     = nullptr;
+                    level_sectors[i].sky_flipped = false;
                 }
 
                 sky_image = image;
@@ -814,9 +816,10 @@ void ScriptChangeTexture(RADScriptTrigger *R, void *param)
                             continue;
                     }
 
-                    tsec->sky_image = image;
+                    tsec->sky_image   = image;
                     MarkImageAsSky(image);
-                    tsec->sky_ref   = nullptr;
+                    tsec->sky_ref     = nullptr;
+                    tsec->sky_flipped = false;
                 }
             }
 
@@ -1046,18 +1049,12 @@ void ScriptFogSector(RADScriptTrigger *R, void *param)
                 else
                     level_sectors[i].properties.fog_density = 0.01f * t->density;
             }
+            StaticMarkSectorPending(&level_sectors[i]);
+
             for (int j = 0; j < level_sectors[i].line_count; j++)
             {
-                for (int k = 0; k < 2; k++)
-                {
-                    Side *side_check = level_sectors[i].lines[j]->side[k];
-                    if (side_check && side_check->middle.fog_wall)
-                    {
-                        side_check->middle.image = nullptr; // will be rebuilt with proper color later
-                                                            // don't delete the image in case other
-                                                            // fogwalls use the same color
-                    }
-                }
+                StaticMarkSectorPending(level_sectors[i].lines[j]->front_sector);
+                StaticMarkSectorPending(level_sectors[i].lines[j]->back_sector);
             }
         }
     }

@@ -49,7 +49,6 @@ static const DDFCommandList image_commands[] = {
     DDF_FIELD("ROTATE_HUE", dummy_image, hsv_rotation_, DDFMainGetNumeric),
     DDF_FIELD("SATURATION", dummy_image, hsv_saturation_, DDFMainGetNumeric),
     DDF_FIELD("BRIGHTNESS", dummy_image, hsv_value_, DDFMainGetNumeric),
-    DDF_FIELD("BLUR_FACTOR", dummy_image, blur_factor_, DDFMainGetFloat),
 
     {nullptr, nullptr, 0, nullptr}};
 
@@ -142,6 +141,9 @@ static void ImageParseField(const char *field, const char *contents, int index, 
     EPI_UNUSED(is_last);
     if (DDFMainParseField(image_commands, field, contents, (uint8_t *)dynamic_image))
         return; // OK
+
+    if (DDFCompareName(field, "BLUR_FACTOR") == 0)
+        return;
 
     DDFError("Unknown images.ddf command: %s\n", field);
 }
@@ -377,7 +379,6 @@ void ImageDefinition::CopyDetail(const ImageDefinition &src)
     hsv_rotation_   = src.hsv_rotation_;
     hsv_saturation_ = src.hsv_saturation_;
     hsv_value_      = src.hsv_value_;
-    blur_factor_    = src.blur_factor_;
 }
 
 void ImageDefinition::Default()
@@ -398,7 +399,6 @@ void ImageDefinition::Default()
     hsv_rotation_   = 0;
     hsv_saturation_ = -1;
     hsv_value_      = 0;
-    blur_factor_    = 0.0f;
 }
 
 // ---> imagedef_container_c class

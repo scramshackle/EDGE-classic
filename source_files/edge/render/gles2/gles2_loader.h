@@ -33,6 +33,7 @@
     X(PFNGLUNIFORM1FPROC, glUniform1f)                                                                                  \
     X(PFNGLUNIFORM1IPROC, glUniform1i)                                                                                  \
     X(PFNGLUNIFORM2FPROC, glUniform2f)                                                                                  \
+    X(PFNGLUNIFORM3FPROC, glUniform3f)                                                                                  \
     X(PFNGLUNIFORM4FPROC, glUniform4f)                                                                                  \
     X(PFNGLUNIFORM4FVPROC, glUniform4fv)                                                                                \
     X(PFNGLUNIFORMMATRIX4FVPROC, glUniformMatrix4fv)                                                                    \
@@ -82,6 +83,7 @@ EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glUniform1f                ec_glUniform1f
 #define glUniform1i                ec_glUniform1i
 #define glUniform2f                ec_glUniform2f
+#define glUniform3f                ec_glUniform3f
 #define glUniform4f                ec_glUniform4f
 #define glUniform4fv               ec_glUniform4fv
 #define glUniformMatrix4fv         ec_glUniformMatrix4fv
@@ -99,15 +101,28 @@ EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glGenRenderbuffers         ec_glGenRenderbuffers
 #define glRenderbufferStorage      ec_glRenderbufferStorage
 
+typedef void(APIENTRY *Gles2DrawElementsInstancedFunction)(GLenum mode, GLsizei count, GLenum type,
+                                                           const void *indices, GLsizei instance_count);
+typedef void(APIENTRY *Gles2VertexAttribDivisorFunction)(GLuint index, GLuint divisor);
+
 #else
 
 #include <GLES2/gl2.h>
 
+typedef void(GL_APIENTRY *Gles2DrawElementsInstancedFunction)(GLenum mode, GLsizei count, GLenum type,
+                                                              const void *indices, GLsizei instance_count);
+typedef void(GL_APIENTRY *Gles2VertexAttribDivisorFunction)(GLuint index, GLuint divisor);
+
 #endif
+
+extern Gles2DrawElementsInstancedFunction gles2_draw_elements_instanced;
+extern Gles2VertexAttribDivisorFunction   gles2_vertex_attrib_divisor;
 
 void Gles2LoadEntryPoints();
 
 bool Gles2HasFramebufferObjects();
+
+bool Gles2HasFullNonPowerOfTwoTextures();
 
 int32_t Gles2MaxVaryingVectors();
 

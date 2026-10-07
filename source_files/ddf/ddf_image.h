@@ -107,7 +107,6 @@ class ImageDefinition
     int hsv_value_;
 
     // Gaussian blurring
-    float blur_factor_;
 
   private:
     // disable copy construct and assignment operator

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -7,8 +9,11 @@
 #include "epi.h"
 #include "epi_math.h"
 #include "gles2_immediate.h"
+#include "gles2_lights.h"
+#include "gles2_program.h"
 #include "i_defs_gl.h"
 #include "r_backend.h"
+#include "r_colormap.h"
 #include "r_gldefs.h"
 #include "r_misc.h"
 #include "r_state.h"
@@ -42,16 +47,29 @@ struct RendererUnit
 
     bool        sky_pass_enabled = false;
     bool        light_depth_enabled = false;
+    bool        world_lit_enabled   = false;
+    int         glow_set            = -1;
+    int         color_lookup        = 0;
+    bool        whiten              = false;
+    int         filter              = -1;
+    HMM_Vec4    blur                = {{0, 0, 0, 0}};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
+    HMM_Vec2 texture_offset = {{0, 0}};
+    float    light_row_offset = 0;
+    HMM_Vec4 liquid         = {{0, 0, 0, 0}};
     SkyPassInfo sky_pass;
+
+    bool                    sprite             = false;
+    const SpriteLightTable *sprite_light_table = nullptr;
+    uint8_t                 sprite_alpha       = 255;
+    uint32_t                sprite_buffer      = 0;
+    HMM_Vec4                sprite_view[2];
 
     bool            scissor_enabled = false;
     RendererScissor scissor;
 
-    bool              light_pass_enabled = false;
-    RendererLightPass light_pass;
 };
 
 static constexpr int32_t kMaximumMergedIndices = kMaximumLocalVertices * 3;
@@ -68,6 +86,110 @@ static int current_render_unit;
 static bool batch_sort;
 
 RGBAColor culling_fog_color;
+
+float    static_batch_light_row_offset = 0;
+
+bool     render_unit_whiten = false;
+int      render_unit_filter = -1;
+HMM_Vec4 render_unit_blur   = {{0, 0, 0, 0}};
+HMM_Vec4 render_unit_liquid = {{0, 0, 0, 0}};
+HMM_Vec4 render_unit_sprite_view[2] = {{{0, 0, 0, 0}}, {{0, 0, 0, 0}}};
+
+
+
+static uint8_t UnitAlpha(const RendererUnit *unit)
+{
+    if (unit->sprite)
+        return unit->sprite_alpha;
+
+    return epi::GetRGBAAlpha(local_verts[unit->first].rgba);
+}
+
+static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
+{
+    OitPass unit_pass = kOitPassMasked;
+
+    if ((unit->blending & kBlendingAdd) || unit->pass > 0)
+        unit_pass = kOitPassAdditive;
+    else if (unit->blending & kBlendingAlpha)
+        unit_pass = kOitPassAccumulate;
+
+    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+}
+
+static bool                        retain_units = false;
+static std::vector<RendererVertex> retained_verts;
+static std::vector<RendererUnit>   retained_units;
+
+static void RetainCurrentUnits(void)
+{
+    int base = (int)retained_verts.size();
+
+    retained_verts.insert(retained_verts.end(), local_verts, local_verts + current_render_vert);
+
+    for (int j = 0; j < current_render_unit; j++)
+    {
+        RendererUnit unit = local_units[j];
+
+        if (!unit.static_buffer && !unit.sprite)
+            unit.first += base;
+
+        retained_units.push_back(unit);
+    }
+
+    current_render_vert = current_render_unit = 0;
+}
+
+void BeginRetainedUnits(void)
+{
+    retained_verts.clear();
+    retained_units.clear();
+
+    retain_units = true;
+}
+
+void EndRetainedUnits(void)
+{
+    RetainCurrentUnits();
+
+    retain_units = false;
+}
+
+void ReplayRetainedUnits(void)
+{
+    int32_t oit_mode = render_backend->OitMode();
+
+    for (size_t i = 0; i < retained_units.size(); i++)
+    {
+        const RendererUnit &source = retained_units[i];
+
+        if (oit_mode != kOitPassNone && !UnitWantedInOitPass(&source, oit_mode))
+            continue;
+
+        int vertices = (source.static_buffer || source.sprite) ? 0 : source.count;
+
+        if (current_render_vert + vertices >= kMaximumLocalVertices || current_render_unit >= kMaximumLocalUnits)
+            RenderCurrentUnits();
+
+        RendererUnit *dest = local_units + current_render_unit;
+
+        *dest = source;
+
+        if (!source.static_buffer && !source.sprite)
+        {
+            dest->first = current_render_vert;
+
+            memcpy(local_verts + current_render_vert, retained_verts.data() + source.first,
+                   sizeof(RendererVertex) * (size_t)vertices);
+
+            current_render_vert += vertices;
+        }
+
+        current_render_unit++;
+    }
+
+    RenderCurrentUnits();
+}
 
 void StartUnitBatch(bool sort_em)
 {
@@ -95,7 +217,21 @@ void FinishUnitBatch(void)
 
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
 {
-    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count);
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, count);
+}
+
+uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity)
+{
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, capacity);
+}
+
+void UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+{
+    gles2_immediate.UpdateStaticBuffer((GLuint)handle, first, vertices, count);
+}
+
+void FlushStaticVertexUploads(void)
+{
 }
 
 void DeleteStaticVertexBuffer(uint32_t handle)
@@ -105,7 +241,7 @@ void DeleteStaticVertexBuffer(uint32_t handle)
 
 void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                          GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                         const SkyPassInfo *sky_pass)
+                         const SkyPassInfo *sky_pass, bool world_lit, int glow_set)
 {
     if (!handle || count <= 0)
         return;
@@ -137,13 +273,22 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->fog_density         = fog_density;
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = true;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->filter              = -1;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
     unit->scissor_enabled     = false;
-    unit->light_pass_enabled  = false;
     unit->index_first         = 0;
     unit->index_count         = 0;
     unit->static_buffer       = handle;
     unit->static_first        = first;
     unit->count               = count;
+    unit->texture_offset      = {{0, 0}};
+    unit->light_row_offset    = static_batch_light_row_offset;
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
+    unit->sprite              = false;
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -151,10 +296,89 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     current_render_unit++;
 }
 
+uint32_t CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity)
+{
+    if (!instances || count <= 0)
+        return 0;
+
+    if (capacity < count)
+        capacity = count;
+
+    return (uint32_t)gles2_immediate.CreateStaticBytes(instances, (size_t)count * sizeof(SpriteInstance),
+                                                 (size_t)capacity * sizeof(SpriteInstance));
+}
+
+void UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count)
+{
+    if (!instances || count <= 0 || first < 0)
+        return;
+
+    gles2_immediate.UpdateStaticBytes((GLuint)handle, (size_t)first * sizeof(SpriteInstance), instances,
+                                (size_t)count * sizeof(SpriteInstance));
+}
+
+SpriteInstance *ReserveSpriteInstances(int count, int *first)
+{
+    return gles2_immediate.ReserveSpriteInstances(count, first);
+}
+
+void AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_texture, BlendingMode blending,
+                         RGBAColor fog_color, float fog_density, int color_lookup, bool world_lit, int glow_set,
+                         const SpriteLightTable *light_table, uint8_t alpha, uint32_t buffer)
+{
+    if (count <= 0)
+        return;
+
+    if (render_backend->RenderUnitsLocked())
+        FatalError("AddSpriteRenderUnit - Render units are locked");
+
+    if (current_render_unit >= kMaximumLocalUnits)
+        RenderCurrentUnits();
+
+    RendererUnit *unit = local_units + current_render_unit;
+
+    unit->shape               = GL_QUADS;
+    unit->environment_mode[0] = GL_MODULATE;
+    unit->environment_mode[1] = fuzz_texture ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable;
+    unit->texture[0]          = texture;
+    unit->texture[1]          = fuzz_texture;
+    unit->pass                = 0;
+    unit->blending            = blending;
+    unit->first               = first;
+    unit->count               = count;
+    unit->line_width          = 1.0f;
+    unit->fog_color           = fog_color;
+    unit->fog_density         = fog_density;
+    unit->sky_pass_enabled    = false;
+    unit->light_depth_enabled = false;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->color_lookup        = color_lookup;
+    unit->whiten              = false;
+    unit->filter              = -1;
+    unit->blur                = {{0, 0, 0, 0}};
+    unit->scissor_enabled     = false;
+    unit->index_first         = 0;
+    unit->index_count         = 0;
+    unit->static_buffer       = 0;
+    unit->static_first        = 0;
+    unit->texture_offset      = {{0, 0}};
+    unit->light_row_offset    = 0;
+    unit->liquid              = {{0, 0, 0, 0}};
+    unit->sprite              = true;
+    unit->sprite_light_table  = light_table;
+    unit->sprite_alpha        = alpha;
+    unit->sprite_buffer       = buffer;
+    unit->sprite_view[0]      = render_unit_sprite_view[0];
+    unit->sprite_view[1]      = render_unit_sprite_view[1];
+
+    current_render_unit++;
+}
+
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
                                 const SkyPassInfo *sky_pass, const RendererScissor *scissor,
-                                const RendererLightPass *light_pass, bool light_depth)
+                                bool light_depth, bool world_lit, int glow_set)
 {
     if (render_backend->RenderUnitsLocked())
     {
@@ -196,6 +420,15 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
 
     unit->sky_pass_enabled    = (sky_pass != nullptr);
     unit->light_depth_enabled = light_depth;
+    unit->world_lit_enabled   = world_lit;
+    unit->glow_set            = glow_set;
+    unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
+    unit->whiten              = tex1 ? render_unit_whiten : false;
+    unit->filter              = tex1 ? render_unit_filter : -1;
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
+    unit->texture_offset      = {{0, 0}};
+    unit->light_row_offset    = 0;
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
 
     if (sky_pass)
         unit->sky_pass = *sky_pass;
@@ -205,13 +438,11 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     if (scissor)
         unit->scissor = *scissor;
 
-    unit->light_pass_enabled = (light_pass != nullptr);
 
-    if (light_pass)
-        unit->light_pass = *light_pass;
 
     unit->static_buffer = 0;
     unit->static_first  = 0;
+    unit->sprite        = false;
 
     return local_verts + current_render_vert;
 }
@@ -259,6 +490,15 @@ struct Compare_Unit_pred
 
         if (A->environment_mode[1] != B->environment_mode[1])
             return A->environment_mode[1] < B->environment_mode[1];
+
+        if (A->color_lookup != B->color_lookup)
+            return A->color_lookup < B->color_lookup;
+
+        if (A->whiten != B->whiten)
+            return A->whiten < B->whiten;
+
+        if (A->filter != B->filter)
+            return A->filter < B->filter;
 
         return A->blending < B->blending;
     }
@@ -351,9 +591,6 @@ static int32_t ExpandUnitIndices(GLuint shape, int first, int count, uint16_t *o
 
 static void PromoteSecondTexture(RendererUnit *unit, RendererVertex *verts)
 {
-    if (unit->light_pass_enabled)
-        return;
-
     if ((unit->texture[0] && unit->environment_mode[0] != kTextureEnvironmentDisable) || !unit->texture[1] ||
         unit->environment_mode[1] == kTextureEnvironmentDisable)
         return;
@@ -381,11 +618,16 @@ static bool UnitsCanMerge(const RendererUnit *a, const RendererUnit *b, const Re
     if (a->pass != b->pass || a->texture[0] != b->texture[0] || a->texture[1] != b->texture[1] ||
         a->environment_mode[0] != b->environment_mode[0] || a->environment_mode[1] != b->environment_mode[1] ||
         a->blending != b->blending || a->fog_color != b->fog_color || a->sky_pass_enabled || b->sky_pass_enabled ||
-        a->light_depth_enabled != b->light_depth_enabled || a->static_buffer || b->static_buffer ||
+        !epi::AlmostEquals(a->texture_offset.X, b->texture_offset.X) ||
+        !epi::AlmostEquals(a->texture_offset.Y, b->texture_offset.Y) ||
+        !epi::AlmostEquals(a->light_row_offset, b->light_row_offset) ||
+        !epi::AlmostEquals(a->liquid.X, b->liquid.X) || !epi::AlmostEquals(a->liquid.Y, b->liquid.Y) ||
+        !epi::AlmostEquals(a->liquid.Z, b->liquid.Z) || !epi::AlmostEquals(a->liquid.W, b->liquid.W) ||
+        a->light_depth_enabled != b->light_depth_enabled || a->world_lit_enabled != b->world_lit_enabled || a->glow_set != b->glow_set ||
+        a->color_lookup != b->color_lookup || a->whiten != b->whiten || a->filter != b->filter ||
+        !epi::AlmostEquals(a->blur.X, b->blur.X) ||
+        a->static_buffer || b->static_buffer || a->sprite || b->sprite ||
         !epi::AlmostEquals(a->fog_density, b->fog_density))
-        return false;
-
-    if (a->light_pass_enabled || b->light_pass_enabled)
         return false;
 
     if (a->scissor_enabled != b->scissor_enabled)
@@ -422,40 +664,6 @@ static void ApplyUnitEnvironment(int32_t texture_unit, GLuint environment)
     }
 }
 
-static void DrawLightPassUnit(const RendererUnit *unit, int32_t run_index_count)
-{
-    const RendererLightPass &light_pass = unit->light_pass;
-
-    render_state->ActiveTexture(GL_TEXTURE1);
-    render_state->Enable(GL_TEXTURE_2D);
-    render_state->BindTexture(unit->texture[1]);
-    render_state->TextureWrapS(GL_CLAMP_TO_EDGE);
-    render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
-
-    render_state->ActiveTexture(GL_TEXTURE0);
-    render_state->Enable(GL_TEXTURE_2D);
-    render_state->BindTexture(unit->texture[0]);
-
-    Gles2ApplyRenderState();
-
-    gles2_light_program.Use();
-
-    gles2_light_program.SetModelViewProjection(render_backend->WorldViewProjection());
-
-    gles2_light_program.SetSurfaceMode(light_pass.surface_mode);
-    gles2_light_program.SetAlpha(light_pass.alpha);
-    gles2_light_program.SetAlphaTest(light_pass.alpha_test);
-
-    gles2_light_program.SetSurfaceNormal(light_pass.surface_normal[0], light_pass.surface_normal[1],
-                                         light_pass.surface_normal[2], light_pass.surface_normal[3],
-                                         light_pass.normal_is_horizontal);
-
-    gles2_light_program.SetLights(light_pass.position_radius, light_pass.color, light_pass.count);
-
-    gles2_immediate.DrawMergedWithoutMatrices(unit->index_first, run_index_count);
-
-    gles2_program.Use();
-}
 
 static void BindUnitTextures(const RendererUnit *unit)
 {
@@ -480,6 +688,12 @@ static void BindUnitTextures(const RendererUnit *unit)
     }
 
     render_state->ActiveTexture(GL_TEXTURE0);
+
+    if (unit->filter >= 0 && unit->texture[0])
+    {
+        render_state->TextureMinFilter(unit->filter > 0 ? GL_LINEAR : GL_NEAREST);
+        render_state->TextureMagFilter(unit->filter > 0 ? GL_LINEAR : GL_NEAREST);
+    }
 }
 
 static void ApplyUnitClamping(const RendererUnit *unit, GLint &old_clamp_s, GLint &old_clamp_t)
@@ -612,6 +826,12 @@ void RenderCurrentUnits(void)
         FatalError("RenderCurrentUnits - Render units are locked");
     }
 
+    if (retain_units)
+    {
+        RetainCurrentUnits();
+        return;
+    }
+
     if (current_render_unit == 0)
         return;
 
@@ -625,7 +845,7 @@ void RenderCurrentUnits(void)
 
     for (int j = 0; j < current_render_unit; j++)
     {
-        if (local_unit_map[j]->static_buffer)
+        if (local_unit_map[j]->static_buffer || local_unit_map[j]->sprite)
             continue;
 
         PromoteSecondTexture(local_unit_map[j], local_verts);
@@ -637,7 +857,7 @@ void RenderCurrentUnits(void)
     {
         RendererUnit *unit = local_unit_map[j];
 
-        if (unit->static_buffer)
+        if (unit->static_buffer || unit->sprite)
         {
             unit->index_first = merged_index_total;
             unit->index_count = 0;
@@ -656,6 +876,8 @@ void RenderCurrentUnits(void)
         gles2_immediate.UploadMergedIndices(merged_indices, merged_index_total);
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
+
+    int32_t oit_mode = render_backend->OitMode();
 
     ec_frame_stats.draw_render_units += current_render_unit;
 
@@ -740,7 +962,35 @@ void RenderCurrentUnits(void)
         else if (!culling || (unit->blending & kBlendingNoFog))
             render_state->Disable(GL_FOG);
 
-        if (unit->blending & kBlendingAdd)
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass unit_pass = kOitPassMasked;
+
+            if ((unit->blending & kBlendingAdd) || unit->pass > 0)
+                unit_pass = kOitPassAdditive;
+            else if (unit->blending & kBlendingAlpha)
+                unit_pass = kOitPassAccumulate;
+
+            bool wanted = (unit_pass == oit_mode) ||
+                          (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+
+            if (!wanted)
+            {
+                j = run_end;
+                continue;
+            }
+        }
+
+        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage)
+        {
+            render_state->Enable(GL_BLEND);
+
+            if (oit_mode == kOitPassRevealage)
+                render_state->BlendFunction(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+            else
+                render_state->BlendFunction(GL_ONE, GL_ONE);
+        }
+        else if (unit->blending & kBlendingAdd)
         {
             render_state->Enable(GL_BLEND);
             render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
@@ -776,7 +1026,9 @@ void RenderCurrentUnits(void)
         else
             render_state->Disable(GL_CULL_FACE);
 
-        render_state->DepthMask((unit->blending & kBlendingNoZBuffer) ? false : true);
+        bool oit_blend_pass = (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage);
+
+        render_state->DepthMask((oit_blend_pass || (unit->blending & kBlendingNoZBuffer)) ? false : true);
 
         if (unit->blending & kBlendingLess)
         {
@@ -790,14 +1042,14 @@ void RenderCurrentUnits(void)
         else if (unit->blending & kBlendingGEqual)
         {
             render_state->Enable(GL_ALPHA_TEST);
-            render_state->AlphaFunction(GL_GEQUAL, 1.0f - (epi::GetRGBAAlpha(local_verts[unit->first].rgba) / 255.0f));
+            render_state->AlphaFunction(GL_GEQUAL, 1.0f - (UnitAlpha(unit) / 255.0f));
         }
         else
             render_state->Disable(GL_ALPHA_TEST);
 
         if (unit->blending & kBlendingLess)
         {
-            float a = epi::GetRGBAAlpha(local_verts[unit->first].rgba) / 255.0f;
+            float a = UnitAlpha(unit) / 255.0f;
             render_state->AlphaFunction(GL_GREATER, a * 0.66f);
         }
 
@@ -849,18 +1101,56 @@ void RenderCurrentUnits(void)
 
         gles2_program.SetSkyPass(unit->sky_pass_enabled ? &unit->sky_pass : nullptr);
         gles2_program.SetLightDepth(unit->light_depth_enabled);
+        gles2_program.SetLightFalloff(unit->environment_mode[1] == (GLuint)kTextureEnvironmentLightFalloff);
 
-        if (unit->light_depth_enabled)
+        const Gles2LightGridState *light_grid = Gles2CurrentLightGrid();
+
+        bool world_lit = unit->world_lit_enabled && light_grid->active;
+
+        if (world_lit)
+        {
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightData);
+            glBindTexture(GL_TEXTURE_2D, light_grid->data_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightHeaders);
+            glBindTexture(GL_TEXTURE_2D, light_grid->header_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightIndices);
+            glBindTexture(GL_TEXTURE_2D, light_grid->list_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
+
+            gles2_program.SetLightGrid(light_grid);
+        }
+
+        gles2_program.SetWorldLit(world_lit);
+        gles2_program.SetGlowSet(unit->glow_set);
+        gles2_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
+        gles2_program.SetTextureOffset(unit->texture_offset);
+        gles2_program.SetLightRowOffset(unit->light_row_offset);
+        gles2_program.SetLiquid(unit->liquid);
+        gles2_program.SetColorLookup(unit->color_lookup);
+        gles2_program.SetWhiten(unit->whiten);
+        gles2_program.SetBlur(unit->blur);
+        gles2_program.SetSpriteMode(unit->sprite);
+
+        if (unit->sprite)
+        {
+            gles2_program.SetSpriteLightTable(unit->sprite_light_table);
+            gles2_program.SetSpriteView(unit->sprite_view);
+        }
+
+        if (unit->light_depth_enabled || unit->sprite)
             gles2_program.SetViewTint(render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier);
         else
             gles2_program.SetViewTint(1.0f, 1.0f, 1.0f);
 
         Gles2ApplyRenderState();
 
-        if (unit->static_buffer)
+        if (unit->sprite)
+            gles2_immediate.DrawSprites(unit->first, unit->count, (GLuint)unit->sprite_buffer);
+        else if (unit->static_buffer)
             gles2_immediate.DrawStatic(unit->static_buffer, unit->shape, unit->static_first, unit->count);
-        else if (unit->light_pass_enabled)
-            DrawLightPassUnit(unit, run_index_count);
         else
             gles2_immediate.DrawMerged(unit->index_first, run_index_count);
 
@@ -894,6 +1184,11 @@ void RenderCurrentUnits(void)
     }
 
     render_state->ActiveTexture(GL_TEXTURE0);
+
+    gles2_program.SetColorLookup(0);
+    gles2_program.SetWhiten(false);
+    gles2_program.SetBlur({{0, 0, 0, 0}});
+    gles2_program.SetSpriteMode(false);
 
     gles2_immediate.InvalidateBatch();
 

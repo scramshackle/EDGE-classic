@@ -44,25 +44,16 @@
 extern int     total_level_vertexes;
 extern Vertex *level_vertexes;
 
-extern Vertex *level_gl_vertexes;
-
-extern int  total_level_segs;
-extern Seg *level_segs;
-
 extern int     total_level_sectors;
 extern Sector *level_sectors;
-
-extern int        total_level_subsectors;
-extern Subsector *level_subsectors;
 
 extern int         total_level_extrafloors;
 extern Extrafloor *level_extrafloors;
 
-extern int      total_level_nodes;
-extern BSPNode *level_nodes;
-
 extern int   total_level_lines;
 extern Line *level_lines;
+
+extern LineSide *level_line_sides;
 
 extern int   total_level_sides;
 extern Side *level_sides;
@@ -97,6 +88,11 @@ extern float view_x_slope, view_y_slope;
 struct ECFrameStats
 {
 	int draw_render_units;
+	uint64_t light_grid_collect_us;
+	uint64_t light_grid_bin_us;
+	uint64_t light_grid_upload_us;
+	int draw_light_dynamic;
+	int draw_light_glow;
 	int draw_planes;
 	int draw_wall_parts;
 	int draw_things;
@@ -104,6 +100,11 @@ struct ECFrameStats
 	void Clear()
 	{
 		draw_render_units = 0;
+		light_grid_collect_us = 0;
+		light_grid_bin_us = 0;
+		light_grid_upload_us = 0;
+		draw_light_dynamic = 0;
+		draw_light_glow = 0;
 		draw_wall_parts = 0;
 		draw_planes = 0;
 		draw_things = 0;
@@ -140,8 +141,6 @@ class RenderState
 
     virtual void StencilWriteMask(GLuint mask) = 0;
 
-    virtual bool HasStencilBuffer() = 0;
-
     virtual void CullFace(GLenum mode) = 0;
 
     virtual void AlphaFunction(GLenum func, GLfloat ref) = 0;
@@ -149,8 +148,6 @@ class RenderState
     virtual void ActiveTexture(GLenum activeTexture) = 0;
 
     virtual void BindTexture(GLuint textureid) = 0;
-
-    virtual void ClipPlane(GLenum plane, GLdouble *equation) = 0;
 
     virtual void PolygonOffset(GLfloat factor, GLfloat units) = 0;
 
@@ -233,11 +230,11 @@ class RenderState
 
     virtual void DrawModelIndexed(int index_first, int index_count) = 0;
 
+    virtual void SetColorLookup(int slot) = 0;
+
     virtual uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count) = 0;
 
     virtual void DeleteModelMesh(uint32_t handle) = 0;
-
-    virtual void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count) = 0;
 
     virtual void DrawModel(const ModelDrawInfo &info) = 0;
 };

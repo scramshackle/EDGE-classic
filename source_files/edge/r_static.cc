@@ -1,8 +1,12 @@
 #include "r_static.h"
+#include "r_backend.h"
+#include "r_misc.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 
+#include <unordered_map>
 #include <vector>
 
 #include "con_var.h"
@@ -14,17 +18,24 @@
 #include "edge_profiling.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
+#include "i_system.h"
+#include "n_network.h"
+#include "p_mobj.h"
+#include "p_tick.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
+#include "r_lightgrid.h"
 #include "r_image.h"
+#include "r_mirror.h"
 #include "r_misc.h"
 #include "r_shader.h"
 #include "r_state.h"
 #include "r_units.h"
 
-EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh, "1", kConsoleVariableFlagArchive)
 EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh_resident, "1", kConsoleVariableFlagArchive)
+
+extern ConsoleVariable sector_brightness_correction;
 
 static constexpr size_t kMaximumStaticRun = 3 * 4096;
 
@@ -48,19 +59,32 @@ static inline BlendingMode StaticSurfaceBlending(float alpha, ImageOpacity opaci
 struct StaticSpan
 {
     Sector *sector;
+    Sector *back_sector;
+    Sector *light_sector;
+    int     height_key;
     int     start;
     int     count;
     int     baked_light;
     int     light_adjust;
-    int     flag_slot;
+    int      flag_slot;
+    uint64_t hash_key;
     bool    is_wall;
     bool    mid_masked;
     bool    live;
 
-    HMM_Vec3 normal;
-    float    low[3];
-    float    high[3];
-    float    div_x, div_y, div_delta_x, div_delta_y;
+    const MapSurface *scroll_surface;
+    HMM_Vec2          scroll_scale;
+    HMM_Vec2          scroll_applied;
+
+    float low[3];
+    float high[3];
+    float div_x, div_y, div_delta_x, div_delta_y;
+};
+
+struct StaticRun
+{
+    int start;
+    int count;
 };
 
 struct SpanReference
@@ -76,23 +100,145 @@ struct StaticBatch
     RegionProperties *properties;
     Sector           *sector;
     BlendingMode      blending;
+    OitPass           draw_pass;
+    bool              scrolling;
+    Sector           *glow_sector;
+    int               fog_sky;
 
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
+    std::vector<HMM_Vec2>       scroll_base;
 
-    uint32_t gpu_handle = 0;
-    bool     gpu_dirty  = true;
+    uint32_t gpu_handle   = 0;
+    int      gpu_capacity = 0;
+    int      gpu_count    = 0;
+    int      dirty_low    = INT_MAX;
+    int      dirty_high   = -1;
+
+    std::vector<StaticRun> runs;
+    bool                   runs_dirty       = true;
+    bool                   height_sensitive = false;
 };
 
 static std::vector<StaticBatch> static_batches;
-static std::vector<uint8_t>     subsector_flat_baked;
-static std::vector<uint8_t>     seg_wall_baked;
+static std::vector<int>         scrolling_batches;
+static std::vector<uint8_t>     sector_flat_baked;
+static int                      static_light_correction = 5;
+static std::vector<uint8_t>     line_side_wall_baked;
+static std::unordered_map<uint64_t, uint8_t> region_surface_baked;
 static bool                     static_mesh_built = false;
 
 static std::vector<std::vector<SpanReference>> sector_spans;
 static std::vector<int>                       sector_light_cache;
+static std::vector<RGBAColor>                 sector_fog_color_cache;
+static std::vector<float>                     sector_fog_density_cache;
+static std::vector<const Colormap *>          sector_colormap_cache;
+static std::vector<StaticSectorChange>        static_sector_changes;
+static std::vector<uint8_t>                   sector_height_state;
+static std::vector<uint8_t>                   sector_batch_traits;
 
-static int capture_dependencies[2 + kVertexSectorListMaximum * 2];
+int SectorHeightState(const Sector *sec)
+{
+    if (!sec || !sec->height_sector)
+        return kHeightStateNormal;
+
+    if (view_height_zone == kHeightZoneA && view_z > sec->height_sector->interpolated_ceiling_height)
+        return kHeightStateAbove;
+
+    if (view_height_zone == kHeightZoneC && view_z < sec->height_sector->interpolated_floor_height)
+        return kHeightStateBelow;
+
+    return kHeightStateNormal;
+}
+
+static bool RefreshSectorHeightStates(void)
+{
+    bool changed = false;
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        uint8_t state = (uint8_t)SectorHeightState(level_sectors + i);
+
+        if (state != sector_height_state[i])
+        {
+            sector_height_state[i] = state;
+            changed                = true;
+        }
+    }
+
+    return changed;
+}
+
+static int CachedHeightState(const Sector *sec)
+{
+    if (!sec)
+        return kHeightStateNormal;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index >= sector_height_state.size())
+        return kHeightStateNormal;
+
+    return sector_height_state[index];
+}
+
+int StaticHeightKey(const Sector *front, const Sector *back)
+{
+    return CachedHeightState(front) * kHeightStateTotal + CachedHeightState(back);
+}
+
+static int LiveHeightKey(const Sector *front, const Sector *back)
+{
+    return SectorHeightState(front) * kHeightStateTotal + SectorHeightState(back);
+}
+
+static const MapSurface *capture_scroll_surface = nullptr;
+static HMM_Vec2          capture_scroll_uv      = {{0, 0}};
+static HMM_Vec2          capture_uv_scale       = {{0, 0}};
+static bool              capture_flip_winding   = false;
+
+static bool SurfaceScrolls(const MapSurface *surf)
+{
+    return surf && surf->scrolls;
+}
+
+static HMM_Vec2 SurfaceScrollShift(const MapSurface *surf, const HMM_Vec2 &uv_scale)
+{
+    bool interpolate = !console_active && !paused && !menu_active && !time_stop_active && !erraticism_active;
+
+    float offset_x = surf->offset.X;
+    float offset_y = surf->offset.Y;
+
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.X, surf->offset.X))
+        offset_x = fmod(HMM_Lerp(surf->old_offset.X, fractional_tic, surf->offset.X), surf->image->width_);
+
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.Y, surf->offset.Y))
+        offset_y = fmod(HMM_Lerp(surf->old_offset.Y, fractional_tic, surf->offset.Y), surf->image->height_);
+
+    HMM_Vec2 shift;
+
+    shift.X = (offset_x - surf->base_offset.X) * uv_scale.X;
+    shift.Y = (offset_y - surf->base_offset.Y) * uv_scale.Y;
+
+    return shift;
+}
+
+static void SetCaptureScrollOffset(const MapSurface *surf, const HMM_Vec2 &uv_scale)
+{
+    capture_scroll_uv      = {{0, 0}};
+    capture_uv_scale       = uv_scale;
+    capture_scroll_surface = nullptr;
+
+    if (!SurfaceScrolls(surf) || !surf->image)
+        return;
+
+    capture_scroll_surface = surf;
+    capture_scroll_uv      = SurfaceScrollShift(surf, uv_scale);
+}
+
+static Sector *capture_back_sector = nullptr;
+static int      capture_height_key  = 0;
+static int capture_dependencies[6 + kVertexSectorListMaximum * 2];
 static int capture_dependency_count = 0;
 
 static void AddCaptureDependency(const Sector *sec)
@@ -114,6 +260,58 @@ static void AddCaptureDependency(const Sector *sec)
     capture_dependencies[capture_dependency_count++] = index;
 }
 
+static std::unordered_map<const RegionProperties *, Sector *> properties_owner;
+
+static void BuildPropertiesOwnerMap(void)
+{
+    properties_owner.clear();
+
+    for (int i = 0; i < total_level_sectors; i++)
+        properties_owner[&level_sectors[i].properties] = level_sectors + i;
+}
+
+static Sector *LookupPropertiesOwner(const RegionProperties *props)
+{
+    std::unordered_map<const RegionProperties *, Sector *>::const_iterator it = properties_owner.find(props);
+
+    return (it == properties_owner.end()) ? nullptr : it->second;
+}
+
+bool StaticPropertiesResolvable(const Sector *sec, const RegionProperties *props)
+{
+    if (!sec || !props || props == &sec->properties)
+        return true;
+
+    return LookupPropertiesOwner(props) != nullptr;
+}
+
+static Sector *ResolvePropertiesOwner(Sector *sec, const RegionProperties *props)
+{
+    if (!sec || !props || props == &sec->properties)
+        return sec;
+
+    for (int pass = 0; pass < 2; pass++)
+    {
+        const Extrafloor *C = (pass == 0) ? sec->bottom_extrafloor : sec->bottom_liquid;
+
+        for (; C; C = C->higher)
+        {
+            if (!C->extrafloor_line || !C->extrafloor_line->front_sector)
+                continue;
+
+            if (props == &C->extrafloor_line->front_sector->properties)
+                return C->extrafloor_line->front_sector;
+        }
+    }
+
+    if (sec->height_sector && props == &sec->height_sector->properties)
+        return sec->height_sector;
+
+    Sector *owner = LookupPropertiesOwner(props);
+
+    return owner ? owner : sec;
+}
+
 static void AddCaptureDependencyList(const VertexSectorList *seclist)
 {
     if (!seclist)
@@ -124,127 +322,655 @@ static void AddCaptureDependencyList(const VertexSectorList *seclist)
 }
 
 static int  capture_batch      = -1;
-static int  capture_flag_slot  = -1;
-static bool capture_is_wall    = false;
-static bool capture_mid_masked = false;
-static HMM_Vec3 capture_normal = {{0, 0, 1}};
+static int      capture_flag_slot = -1;
+static uint64_t capture_hash_key  = 0;
+static bool capture_is_wall       = false;
+static bool capture_mid_masked    = false;
+
 static float capture_div[4]    = {0, 0, 0, 0};
 static int  capture_light      = 0;
+static Sector *capture_light_sector = nullptr;
 static int  capture_adjust     = 0;
 static Sector *capture_sector  = nullptr;
-static const Seg        *capture_seg  = nullptr;
+static const LineSide   *capture_line_side = nullptr;
 static const MapSurface *capture_surf = nullptr;
 
-static int WallPartIndex(const Seg *seg, const MapSurface *surf)
+static int WallPartIndex(const LineSide *line_side, const MapSurface *surf)
 {
-    if (!seg || !seg->sidedef || !surf)
+    if (!line_side || !line_side->sidedef || !surf)
         return -1;
 
-    if (surf == &seg->sidedef->bottom)
+    if (surf == &line_side->sidedef->bottom)
         return 0;
-    if (surf == &seg->sidedef->middle)
+    if (surf == &line_side->sidedef->middle)
         return 1;
-    if (surf == &seg->sidedef->top)
+    if (surf == &line_side->sidedef->top)
         return 2;
 
     return -1;
 }
 
-bool StaticMeshEnabled(void)
+static int ExtrafloorIndex(const Extrafloor *ef)
 {
-    return r_static_mesh.d_ != 0;
+    if (!ef || !level_extrafloors)
+        return -1;
+
+    return (int)(ef - level_extrafloors);
 }
 
-bool StaticFlatBakeEligible(const Sector *sec, int face_dir)
+static bool BuildRegionWallKey(const LineSide *line_side, int part, const Extrafloor *region_ef,
+                               const Extrafloor *surface_ef, int height_key, uint64_t *out)
 {
-    if (!r_static_mesh.d_ || !static_mesh_built || !sec || sec->bake_dynamic || sec->movement_suppressed)
-    {
+    uint64_t index = (uint64_t)(line_side - level_line_sides);
+
+    if (index >= ((uint64_t)1 << 24))
         return false;
+
+    uint64_t region  = (uint64_t)(ExtrafloorIndex(region_ef) + 1);
+    uint64_t surface = (uint64_t)(ExtrafloorIndex(surface_ef) + 1);
+
+    if (region >= ((uint64_t)1 << 16) || surface >= ((uint64_t)1 << 16))
+        return false;
+
+    uint64_t slot = (part < 0) ? 3 : (uint64_t)part;
+
+    *out = ((uint64_t)1 << 63) | (index << 38) | (region << 22) | (surface << 6) | (slot << 4) | (uint64_t)height_key;
+
+    return true;
+}
+
+static bool BuildRegionFlatKey(const Sector *sec, int face_dir, const Extrafloor *plane_ef, int height_key,
+                               uint64_t *out)
+{
+    uint64_t index = (uint64_t)(sec - level_sectors);
+
+    if (index >= ((uint64_t)1 << 24))
+        return false;
+
+    uint64_t plane = (uint64_t)(ExtrafloorIndex(plane_ef) + 1);
+
+    if (plane >= ((uint64_t)1 << 16))
+        return false;
+
+    uint64_t face = (face_dir > 0) ? 0 : 1;
+
+    *out = ((uint64_t)1 << 63) | ((uint64_t)1 << 62) | (index << 37) | (plane << 21) | (face << 20) |
+           (uint64_t)height_key;
+
+    return true;
+}
+
+bool StaticMeshBuilt(void)
+{
+    return static_mesh_built;
+}
+
+static bool static_bake_active = false;
+static bool static_bake_deferred = false;
+
+void StaticBakeSetDeferred(bool deferred)
+{
+    static_bake_deferred = deferred;
+}
+
+bool StaticBakeDeferred(void)
+{
+    return static_bake_deferred;
+}
+
+static std::vector<uint8_t>  sector_bake_clean;
+static std::vector<uint8_t>  sector_bake_pending;
+static std::vector<uint8_t>  sector_bake_whole_declined;
+static std::vector<uint8_t>  line_side_bake_declined;
+static std::vector<uint32_t> sector_bake_epoch;
+static std::vector<int>     sector_pending_list;
+static std::vector<uint8_t>  sector_change_flag;
+static std::vector<int>      sector_change_list;
+static bool                  sector_change_all = true;
+
+static void NoteSectorChange(size_t index)
+{
+    if (index >= sector_change_flag.size() || sector_change_flag[index])
+        return;
+
+    sector_change_flag[index] = 1;
+    sector_change_list.push_back((int)index);
+}
+
+bool StaticTakeChangedSectors(std::vector<int> &out)
+{
+    bool all = sector_change_all;
+
+    out.clear();
+    out.swap(sector_change_list);
+
+    for (size_t i = 0; i < out.size(); i++)
+        sector_change_flag[(size_t)out[i]] = 0;
+
+    sector_change_all = false;
+
+    return all;
+}
+
+void StaticBakeSectorBegin(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_clean.size())
+        sector_bake_clean[index] = 1;
+
+    if (index < sector_bake_whole_declined.size())
+        sector_bake_whole_declined[index] = 0;
+
+    for (int i = 0; i < sec->line_count; i++)
+    {
+        const Line *line = sec->lines[i];
+
+        for (int side = 0; side < 2; side++)
+        {
+            size_t slot = (size_t)(line - level_lines) * 2 + (size_t)side;
+
+            if (slot < line_side_bake_declined.size() && level_line_sides[slot].front_sector == sec)
+                line_side_bake_declined[slot] = 0;
+        }
     }
 
-    if (sec->floor_slope || sec->ceiling_slope || sec->floor_vertex_slope || sec->ceiling_vertex_slope)
+    NoteSectorChange(index);
+}
+
+void StaticBakeSectorEnd(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_pending.size())
+        sector_bake_pending[index] = 0;
+
+    NoteSectorChange(index);
+}
+
+void StaticMarkSectorDeclined(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_clean.size())
+        sector_bake_clean[index] = 0;
+
+    NoteSectorChange(index);
+}
+
+void StaticMarkLineSideDeclined(const LineSide *line_side, const Sector *sec)
+{
+    if (line_side)
     {
-        return false;
+        size_t slot = (size_t)(line_side - level_line_sides);
+
+        if (slot < line_side_bake_declined.size())
+            line_side_bake_declined[slot] = 1;
+    }
+    else if (sec)
+    {
+        size_t index = (size_t)(sec - level_sectors);
+
+        if (index < sector_bake_whole_declined.size())
+            sector_bake_whole_declined[index] = 1;
     }
 
-    if (sec->height_sector || sec->bottom_extrafloor || sec->top_extrafloor)
-    {
+    StaticMarkSectorDeclined(sec);
+}
+
+void StaticMarkSectorWholeDeclined(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_whole_declined.size())
+        sector_bake_whole_declined[index] = 1;
+
+    StaticMarkSectorDeclined(sec);
+}
+
+void StaticMarkSectorPending(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_epoch.size())
+        sector_bake_epoch[index]++;
+
+    NoteSectorChange(index);
+
+    if (index >= sector_bake_pending.size() || sector_bake_pending[index])
+        return;
+
+    sector_bake_pending[index] = 1;
+    sector_pending_list.push_back((int)index);
+}
+
+bool StaticSectorReady(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_clean.size())
         return false;
+
+    return sector_bake_clean[index] && !sector_bake_pending[index];
+}
+
+bool StaticSectorSettled(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_pending.size())
+        return false;
+
+    return !sector_bake_pending[index];
+}
+
+bool StaticSectorPartlyReady(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_whole_declined.size())
+        return false;
+
+    return !sector_bake_pending[index] && !sector_bake_whole_declined[index];
+}
+
+bool StaticLineSideDeclined(const LineSide *line_side)
+{
+    size_t slot = (size_t)(line_side - level_line_sides);
+
+    return slot >= line_side_bake_declined.size() || line_side_bake_declined[slot] != 0;
+}
+
+uint32_t StaticSectorEpoch(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    return (index < sector_bake_epoch.size()) ? sector_bake_epoch[index] : 0;
+}
+
+void StaticTakeSettledPendingSectors(std::vector<Sector *> &out)
+{
+    out.clear();
+
+    size_t keep = 0;
+
+    for (size_t i = 0; i < sector_pending_list.size(); i++)
+    {
+        int     index = sector_pending_list[i];
+        Sector *sec   = level_sectors + index;
+
+        if (!sector_bake_pending[(size_t)index] || sec->bake_dynamic)
+            continue;
+
+        if (sec->movement_suppressed)
+        {
+            sector_pending_list[keep++] = index;
+            continue;
+        }
+
+        out.push_back(sec);
     }
 
-    const MapSurface &surf = (face_dir > 0) ? sec->floor : sec->ceiling;
+    sector_pending_list.resize(keep);
+}
 
+static void MarkSectorNeighboursPending(const Sector *sec)
+{
+    StaticMarkSectorPending(sec);
+
+    for (int i = 0; i < sec->line_count; i++)
+    {
+        const Line *ld = sec->lines[i];
+
+        StaticMarkSectorPending(ld->front_sector);
+        StaticMarkSectorPending(ld->back_sector);
+
+        for (int side = 0; side < 2; side++)
+        {
+            const LineSide *line_side = &level_line_sides[(ld - level_lines) * 2 + side];
+
+            for (int v = 0; v < 2; v++)
+            {
+                const VertexSectorList *seclist = line_side->vertex_sectors[v];
+
+                if (!seclist)
+                    continue;
+
+                for (int k = 0; k < seclist->total; k++)
+                    StaticMarkSectorPending(level_sectors + seclist->sectors[k]);
+            }
+        }
+    }
+}
+
+void StaticBakeBegin(void)
+{
+    static_bake_active = true;
+}
+
+void StaticBakeEnd(void)
+{
+    static_bake_active = false;
+}
+
+bool StaticBakeActive(void)
+{
+    return static_bake_active;
+}
+
+static bool StaticAnimationUniformSize(const Image *image)
+{
+    if (!image || image->animation_.speed == 0)
+        return true;
+
+    float width  = image->ScaledWidth();
+    float height = image->ScaledHeight();
+
+    const Image *frame = image->animation_.next;
+
+    for (int guard = 0; frame && frame != image && guard < 64; guard++)
+    {
+        if (!epi::AlmostEquals(frame->ScaledWidth(), width) || !epi::AlmostEquals(frame->ScaledHeight(), height))
+            return false;
+
+        frame = frame->animation_.next;
+    }
+
+    return true;
+}
+
+static bool HeightSectorStatic(const Sector *sec)
+{
+    if (!sec || !sec->height_sector)
+        return true;
+
+    return !sec->height_sector->bake_dynamic && !sec->height_sector->movement_suppressed;
+}
+
+static int SectorDeclineReason(const Sector *sec, bool back)
+{
+    bool dynamic    = sec->bake_dynamic;
+    bool suppressed = sec->movement_suppressed;
+    bool height     = !HeightSectorStatic(sec);
+
+    if (!dynamic && !suppressed && !height)
+        return kStaticBakeAccepted;
+
+    if (height)
+        return back ? kStaticBakeBackHeightSector : kStaticBakeHeightSector;
+
+    if (dynamic && sec->properties.special &&
+        (sec->properties.special->f_.scroll_speed_ > 0 || sec->properties.special->c_.scroll_speed_ > 0))
+        return back ? kStaticBakeBackScrolls : kStaticBakeSectorScrolls;
+
+    if (dynamic && (sec->bottom_extrafloor || sec->top_extrafloor))
+        return back ? kStaticBakeBackExtrafloor : kStaticBakeExtrafloor;
+
+    if (dynamic)
+        return back ? kStaticBakeBackDynamic : kStaticBakeSectorDynamic;
+
+    return back ? kStaticBakeBackSuppressed : kStaticBakeSectorSuppressed;
+}
+
+static int FlatSurfaceDecline(const MapSurface &surf, const Sector *owner, int face_dir)
+{
     if (EDGE_IMAGE_IS_SKY(surf))
     {
-        return false;
+        return kStaticBakeSky;
     }
 
-    if (surf.override_properties || surf.boom_colormap)
+    if (surf.override_properties && !StaticPropertiesResolvable(owner, surf.override_properties))
     {
-        return false;
+        return kStaticBakeOverrideProperties;
     }
 
     const Image *image = surf.image;
 
     if (!image)
     {
-        return false;
+        return kStaticBakeNoImage;
     }
 
-    if (image->liquid_type_ != kLiquidImageNone)
+    if (surf.rotation && SurfaceScrolls(&surf))
     {
-        return false;
+        return kStaticBakeRotatedScroll;
     }
 
-    if (image->animation_.speed != 0)
+    if (!StaticAnimationUniformSize(image))
     {
-        return false;
+        return kStaticBakeAnimationSize;
     }
 
     if ((ImageOpacity)image->opacity_ == kOpacityComplex)
     {
-        return false;
+        return kStaticBakeComplexOpacity;
     }
 
-    if (surf.translucency < 0.99f)
+    if (owner && owner->properties.special)
     {
-        return false;
-    }
-
-    if (sec->properties.special)
-    {
-        float bob = (face_dir > 0) ? sec->properties.special->floor_bob_ : sec->properties.special->ceiling_bob_;
+        float bob = (face_dir > 0) ? owner->properties.special->floor_bob_ : owner->properties.special->ceiling_bob_;
 
         if (bob > 0)
         {
-            return false;
+            return kStaticBakeSurfaceBob;
         }
     }
 
-    return true;
+    return kStaticBakeAccepted;
 }
 
-bool StaticMeshCoversFlat(const Subsector *sub, int face_dir)
+int StaticFlatBakeDeclineSurface(const Sector *sec, const MapSurface *surf, const Sector *surf_owner, int face_dir)
 {
-    if (!r_static_mesh.d_ || !static_mesh_built || !sub)
+    if (!static_mesh_built)
+    {
+        return kStaticBakeMeshDisabled;
+    }
+
+    if (!sec || !surf)
+    {
+        return kStaticBakeNoSurface;
+    }
+
+    int sector_reason = SectorDeclineReason(sec, false);
+
+    if (sector_reason != kStaticBakeAccepted)
+    {
+        return sector_reason;
+    }
+
+    if (surf_owner && surf_owner != sec)
+    {
+        int owner_reason = SectorDeclineReason(surf_owner, true);
+
+        if (owner_reason != kStaticBakeAccepted)
+        {
+            return owner_reason;
+        }
+    }
+
+    return FlatSurfaceDecline(*surf, surf_owner, face_dir);
+}
+
+bool StaticFlatBakeEligibleSurface(const Sector *sec, const MapSurface *surf, const Sector *surf_owner, int face_dir)
+{
+    return StaticFlatBakeDeclineSurface(sec, surf, surf_owner, face_dir) == kStaticBakeAccepted;
+}
+
+int StaticFlatBakeDecline(const Sector *sec, int face_dir)
+{
+    if (!sec)
+    {
+        return kStaticBakeNoSurface;
+    }
+
+    return StaticFlatBakeDeclineSurface(sec, (face_dir > 0) ? &sec->floor : &sec->ceiling, sec, face_dir);
+}
+
+static Sector *ExtrafloorControlSector(const Extrafloor *ef)
+{
+    if (!ef || !ef->extrafloor_line)
+        return nullptr;
+
+    return ef->extrafloor_line->front_sector;
+}
+
+int StaticExtrafloorPlaneDecline(const Sector *sec, const Extrafloor *plane_ef, int face_dir)
+{
+    if (!static_mesh_built)
+    {
+        return kStaticBakeMeshDisabled;
+    }
+
+    if (!sec || !plane_ef)
+    {
+        return kStaticBakeNoSurface;
+    }
+
+    int sector_reason = SectorDeclineReason(sec, false);
+
+    if (sector_reason != kStaticBakeAccepted)
+    {
+        return sector_reason;
+    }
+
+    Sector *control = ExtrafloorControlSector(plane_ef);
+
+    if (!control)
+    {
+        return kStaticBakeNoSurface;
+    }
+
+    int control_reason = SectorDeclineReason(control, true);
+
+    if (control_reason != kStaticBakeAccepted)
+    {
+        return control_reason;
+    }
+
+    const MapSurface *surf = (face_dir > 0) ? plane_ef->top : plane_ef->bottom;
+
+    if (!surf)
+    {
+        return kStaticBakeNoSurface;
+    }
+
+    int surface_reason = FlatSurfaceDecline(*surf, control, face_dir);
+
+    if (surface_reason != kStaticBakeAccepted)
+    {
+        return surface_reason;
+    }
+
+    uint64_t key;
+
+    if (!BuildRegionFlatKey(sec, face_dir, plane_ef, LiveHeightKey(sec, nullptr), &key))
+    {
+        return kStaticBakeKeyOverflow;
+    }
+
+    return kStaticBakeAccepted;
+}
+
+bool StaticExtrafloorPlaneEligible(const Sector *sec, const Extrafloor *plane_ef, int face_dir)
+{
+    return StaticExtrafloorPlaneDecline(sec, plane_ef, face_dir) == kStaticBakeAccepted;
+}
+bool StaticFlatBakeEligible(const Sector *sec, int face_dir)
+{
+    return StaticFlatBakeDecline(sec, face_dir) == kStaticBakeAccepted;
+}
+
+bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *plane_ef)
+{
+    if (!static_mesh_built || !sec)
         return false;
 
-    size_t slot = (size_t)(sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1);
+    int key = LiveHeightKey(sec, nullptr);
 
-    if (slot >= subsector_flat_baked.size())
+    if (plane_ef)
+    {
+        uint64_t hash_key;
+
+        if (!BuildRegionFlatKey(sec, face_dir, plane_ef, key, &hash_key))
+            return false;
+
+        return region_surface_baked.find(hash_key) != region_surface_baked.end();
+    }
+
+    size_t slot = ((size_t)(sec - level_sectors) * 2 + (face_dir > 0 ? 0 : 1)) * kHeightKeyTotal + (size_t)key;
+
+    if (slot >= sector_flat_baked.size())
         return false;
 
-    return subsector_flat_baked[slot] != 0;
+    return sector_flat_baked[slot] != 0;
+}
+
+static uint8_t SectorBatchTraits(const Sector *sec)
+{
+    uint8_t traits = 0;
+
+    if (sec->glow_things)
+        traits |= 1;
+
+    if (EDGE_IMAGE_IS_SKY(sec->ceiling))
+        traits |= 2;
+
+    return traits;
+}
+
+static int BatchFogSky(const RegionProperties *props, const Sector *sec)
+{
+    if (props->fog_color != kRGBANoValue)
+        return -1;
+
+    if (current_map->indoor_fog_color_ == current_map->outdoor_fog_color_ &&
+        epi::AlmostEquals(current_map->indoor_fog_density_, current_map->outdoor_fog_density_))
+        return -1;
+
+    return EDGE_IMAGE_IS_SKY(sec->ceiling) ? 1 : 0;
+}
+
+void StaticRefreshSectorTraits(void)
+{
+    if (!static_mesh_built || (int)sector_batch_traits.size() != total_level_sectors)
+        return;
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        Sector *sec = level_sectors + i;
+
+        uint8_t traits = SectorBatchTraits(sec);
+
+        if (traits == sector_batch_traits[i])
+            continue;
+
+        sector_batch_traits[i] = traits;
+
+        StaticMeshInvalidateSector(sec);
+    }
 }
 
 static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
-                     BlendingMode blending)
+                     BlendingMode blending, OitPass draw_pass, bool scrolling)
 {
+    Sector *glow_sector = sec->glow_things ? sec : nullptr;
+    int     fog_sky     = BatchFogSky(props, sec);
+
     for (size_t i = 0; i < static_batches.size(); i++)
     {
         StaticBatch &b = static_batches[i];
 
-        if (b.image == image && b.colormap == colormap && b.blending == blending &&
+        if (b.image == image && b.colormap == colormap && b.blending == blending && b.draw_pass == draw_pass &&
+            b.scrolling == scrolling && b.glow_sector == glow_sector && b.fog_sky == fog_sky &&
             b.properties->fog_color == props->fog_color && b.properties->fog_density == props->fog_density)
             return (int)i;
     }
@@ -256,6 +982,13 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
     batch.properties = props;
     batch.sector     = sec;
     batch.blending   = blending;
+    batch.draw_pass  = draw_pass;
+    batch.scrolling   = scrolling;
+    batch.glow_sector = glow_sector;
+    batch.fog_sky     = fog_sky;
+
+    if (scrolling)
+        scrolling_batches.push_back((int)static_batches.size());
 
     static_batches.push_back(batch);
 
@@ -278,208 +1011,354 @@ static bool SectorListStatic(const VertexSectorList *seclist)
     return true;
 }
 
-static bool StaticImageEligible(const Image *image, float translucency)
+int StaticWallBakeDecline(const LineSide *line_side, const MapSurface *surf, bool mid_masked,
+                          const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
-    if (!image)
-        return false;
-
-    if (image->liquid_type_ != kLiquidImageNone)
-        return false;
-
-    if (image->animation_.speed != 0)
-        return false;
-
-    if ((ImageOpacity)image->opacity_ == kOpacityComplex)
-        return false;
-
-    if (translucency < 0.99f)
-        return false;
-
-    return true;
-}
-
-bool StaticWallBakeEligible(const Seg *seg, const MapSurface *surf, bool mid_masked, BlendingMode blending)
-{
-    if (!r_static_mesh.d_ || !static_mesh_built || !seg || seg->miniseg || !seg->sidedef || !surf)
+    if (!static_mesh_built)
     {
-        return false;
+        return kStaticBakeMeshDisabled;
     }
 
-    if (mid_masked && (blending & kBlendingAlpha))
+    if (!line_side || !surf)
     {
-        return false;
+        return kStaticBakeNoSurface;
     }
 
-    if (mid_masked && seg->linedef && seg->linedef->special && seg->linedef->special->glass_)
+    if (!line_side->sidedef)
     {
-        return false;
+        return kStaticBakeNoSidedef;
     }
 
-    if (WallPartIndex(seg, surf) < 0)
+    if (mid_masked && line_side->linedef->special && line_side->linedef->special->glass_)
     {
-        return false;
+        return kStaticBakeGlass;
     }
 
-    const Side *side = seg->sidedef;
+    if (WallPartIndex(line_side, surf) < 0 && !surface_ef)
+    {
+        return kStaticBakeNotSidedefPart;
+    }
+
+    if ((line_side->linedef->flags & kLineFlagMirror))
+    {
+        return kStaticBakeMirrorLine;
+    }
+
+    if (line_side->linedef->portal_pair)
+    {
+        return kStaticBakePortalLine;
+    }
+
+    if (line_side->linedef->slide_door)
+    {
+        return kStaticBakeSlideDoor;
+    }
+
+    const Side *side = line_side->sidedef;
 
     if (side->bake_dynamic)
     {
-        return false;
+        return kStaticBakeSideDynamic;
     }
 
-    const Sector *front = seg->front_sector;
-    const Sector *back  = seg->back_sector;
+    const Sector *front = line_side->front_sector;
+    const Sector *back  = line_side->back_sector;
 
-    if (!front || front->bake_dynamic || front->movement_suppressed)
+    if (!front)
     {
-        return false;
+        return kStaticBakeNoSurface;
     }
 
-    if (front->floor_slope || front->ceiling_slope || front->floor_vertex_slope || front->ceiling_vertex_slope)
-    {
-        return false;
-    }
+    int front_reason = SectorDeclineReason(front, false);
 
-    if (front->height_sector || front->bottom_extrafloor || front->top_extrafloor)
+    if (front_reason != kStaticBakeAccepted)
     {
-        return false;
+        return front_reason;
     }
 
     if (back)
     {
-        if (back->bake_dynamic || back->movement_suppressed)
-        {
-            return false;
-        }
+        int back_reason = SectorDeclineReason(back, true);
 
-        if (back->floor_slope || back->ceiling_slope || back->floor_vertex_slope || back->ceiling_vertex_slope)
+        if (back_reason != kStaticBakeAccepted)
         {
-            return false;
-        }
-
-        if (back->height_sector || back->bottom_extrafloor || back->top_extrafloor)
-        {
-            return false;
+            return back_reason;
         }
     }
 
-    if (seg->linedef && (seg->linedef->flags & kLineFlagMirror))
+    if (!SectorListStatic(line_side->vertex_sectors[0]) || !SectorListStatic(line_side->vertex_sectors[1]))
     {
-        return false;
+        return kStaticBakeVertexSector;
     }
 
-    if (seg->linedef && seg->linedef->portal_pair)
+    if (surface_ef)
     {
-        return false;
+        Sector *control = ExtrafloorControlSector(surface_ef);
+
+        if (!control)
+        {
+            return kStaticBakeNoSurface;
+        }
+
+        int control_reason = SectorDeclineReason(control, true);
+
+        if (control_reason != kStaticBakeAccepted)
+        {
+            return control_reason;
+        }
     }
 
-    if (seg->linedef && seg->linedef->slide_door)
+    if (surf->override_properties && !StaticPropertiesResolvable(line_side->front_sector, surf->override_properties))
     {
-        return false;
-    }
-
-    if (!SectorListStatic(seg->vertex_sectors[0]) || !SectorListStatic(seg->vertex_sectors[1]))
-    {
-        return false;
-    }
-
-    if (surf->override_properties || surf->boom_colormap)
-    {
-        return false;
+        return kStaticBakeOverrideProperties;
     }
 
     if (EDGE_IMAGE_IS_SKY(*surf))
     {
-        return false;
+        return kStaticBakeSky;
     }
 
-    if (!StaticImageEligible(surf->image, surf->translucency))
+    if (!surf->image)
     {
-        return false;
+        return kStaticBakeNoImage;
     }
 
-    return true;
+    if (!StaticAnimationUniformSize(surf->image))
+    {
+        return kStaticBakeAnimationSize;
+    }
+
+    if ((ImageOpacity)surf->image->opacity_ == kOpacityComplex)
+    {
+        return kStaticBakeComplexOpacity;
+    }
+
+    if (region_ef || surface_ef)
+    {
+        uint64_t key;
+
+        if (!BuildRegionWallKey(line_side, WallPartIndex(line_side, surf), region_ef, surface_ef,
+                                LiveHeightKey(front, back), &key))
+        {
+            return kStaticBakeKeyOverflow;
+        }
+    }
+
+    return kStaticBakeAccepted;
 }
 
-bool StaticMeshCoversWall(const Seg *seg, const MapSurface *surf)
+bool StaticWallBakeEligible(const LineSide *line_side, const MapSurface *surf, bool mid_masked,
+                            const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
-    if (!r_static_mesh.d_ || !static_mesh_built || !seg)
-        return false;
-
-    int part = WallPartIndex(seg, surf);
-
-    if (part < 0)
-        return false;
-
-    size_t slot = (size_t)(seg - level_segs) * 3 + (size_t)part;
-
-    if (slot >= seg_wall_baked.size())
-        return false;
-
-    return seg_wall_baked[slot] != 0;
+    return StaticWallBakeDecline(line_side, surf, mid_masked, region_ef, surface_ef) == kStaticBakeAccepted;
 }
 
-void StaticCaptureBegin(const Seg *seg, const MapSurface *surf, const Image *image, RegionProperties *props,
-                        Sector *sector, BlendingMode blending, int light_adjust, const HMM_Vec3 &normal,
-                        float div_x, float div_y, float div_delta_x, float div_delta_y, bool mid_masked)
+static const char *const static_bake_decline_names[kStaticBakeDeclineTotal] = {"resident",
+                                                                              "mesh disabled",
+                                                                              "no surface",
+                                                                              "no sidedef",
+                                                                              "not a sidedef part",
+                                                                              "glass linedef",
+                                                                              "side is dynamic",
+                                                                              "sector is dynamic",
+                                                                              "sector scrolls",
+                                                                              "sector movement suppressed",
+                                                                              "sector has extrafloors",
+                                                                              "height sector not static",
+                                                                              "back sector is dynamic",
+                                                                              "back sector scrolls",
+                                                                              "back movement suppressed",
+                                                                              "back has extrafloors",
+                                                                              "back height sector not static",
+                                                                              "mirror linedef",
+                                                                              "portal linedef",
+                                                                              "slide door",
+                                                                              "vertex sector not static",
+                                                                              "override properties",
+                                                                              "sky",
+                                                                              "no image",
+                                                                              "animation frame sizes differ",
+                                                                              "complex opacity",
+                                                                              "rotated and scrolling",
+                                                                              "surface bob",
+                                                                              "not the sector own plane",
+                                                                              "residency key overflow"};
+
+const char *StaticBakeDeclineName(int reason)
 {
+    if (reason < 0 || reason >= kStaticBakeDeclineTotal)
+        return "unknown";
+
+    return static_bake_decline_names[reason];
+}
+
+
+
+bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, const Extrafloor *region_ef,
+                          const Extrafloor *surface_ef)
+{
+    if (!static_mesh_built || !line_side)
+        return false;
+
+    int part = WallPartIndex(line_side, surf);
+
+    if (part < 0 && !surface_ef)
+        return false;
+
+    int key = LiveHeightKey(line_side->front_sector, line_side->back_sector);
+
+    if (region_ef || surface_ef)
+    {
+        uint64_t hash_key;
+
+        if (!BuildRegionWallKey(line_side, part, region_ef, surface_ef, key, &hash_key))
+            return false;
+
+        return region_surface_baked.find(hash_key) != region_surface_baked.end();
+    }
+
+    size_t slot = ((size_t)(line_side - level_line_sides) * 3 + (size_t)part) * kHeightKeyTotal + (size_t)key;
+
+    if (slot >= line_side_wall_baked.size())
+        return false;
+
+    return line_side_wall_baked[slot] != 0;
+}
+
+void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
+                        Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
+                        float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
+                        const HMM_Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef)
+{
+    SetCaptureScrollOffset(surf, uv_scale);
+
     capture_mid_masked = mid_masked;
 
-    capture_normal = normal;
     capture_div[0] = div_x;
     capture_div[1] = div_y;
     capture_div[2] = div_delta_x;
     capture_div[3] = div_delta_y;
 
-    capture_batch  = FindBatch(image, props->colourmap, props, sector, blending);
-    capture_seg    = seg;
-    capture_surf   = surf;
-    capture_sector = sector;
-    capture_adjust = light_adjust;
-    capture_light  = sector->properties.light_level;
+    capture_back_sector = line_side ? line_side->back_sector : nullptr;
+    capture_height_key  = LiveHeightKey(line_side ? line_side->front_sector : sector, capture_back_sector);
+
+    capture_flip_winding = false;
+
+    capture_batch =
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
+    capture_line_side = line_side;
+    capture_surf      = surf;
+    capture_sector    = sector;
+    capture_adjust    = light_adjust;
+
+    capture_light_sector = ResolvePropertiesOwner(sector, props);
+    capture_light        = capture_light_sector->properties.light_level;
 
     capture_dependency_count = 0;
 
     AddCaptureDependency(sector);
+    AddCaptureDependency(sector->height_sector);
+    AddCaptureDependency(capture_light_sector);
 
-    if (seg)
+    if (line_side)
     {
         capture_is_wall = true;
 
-        int part = WallPartIndex(seg, surf);
+        int part = WallPartIndex(line_side, surf);
 
-        capture_flag_slot = (part < 0) ? -1 : (int)((seg - level_segs) * 3 + part);
+        capture_flag_slot = (part < 0) ? -1 : (int)((line_side - level_line_sides) * 3 + part);
+        capture_hash_key  = 0;
 
-        AddCaptureDependency(seg->front_sector);
-        AddCaptureDependency(seg->back_sector);
-        AddCaptureDependencyList(seg->vertex_sectors[0]);
-        AddCaptureDependencyList(seg->vertex_sectors[1]);
+        if (region_ef || surface_ef)
+        {
+            capture_flag_slot = -1;
+
+            if (!BuildRegionWallKey(line_side, part, region_ef, surface_ef, capture_height_key, &capture_hash_key))
+                capture_hash_key = 0;
+        }
+
+        AddCaptureDependency(ExtrafloorControlSector(region_ef));
+        AddCaptureDependency(ExtrafloorControlSector(surface_ef));
+
+        AddCaptureDependency(line_side->front_sector);
+        AddCaptureDependency(line_side->back_sector);
+
+        if (line_side->front_sector)
+            AddCaptureDependency(line_side->front_sector->height_sector);
+
+        if (line_side->back_sector)
+            AddCaptureDependency(line_side->back_sector->height_sector);
+        AddCaptureDependencyList(line_side->vertex_sectors[0]);
+        AddCaptureDependencyList(line_side->vertex_sectors[1]);
     }
 }
 
-void StaticCaptureBeginFlat(const Subsector *sub, int face_dir, const Image *image, RegionProperties *props,
-                            Sector *sector, BlendingMode blending, const HMM_Vec3 &normal)
+void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
+                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const HMM_Vec2 &uv_scale,
+                            const Extrafloor *plane_ef)
 {
-    capture_normal = normal;
+    SetCaptureScrollOffset(surf, uv_scale);
+
+    capture_flip_winding = face_dir > 0;
+
     capture_div[0] = capture_div[1] = capture_div[2] = capture_div[3] = 0;
 
-    capture_batch  = FindBatch(image, props->colourmap, props, sector, blending);
-    capture_seg    = nullptr;
-    capture_surf   = nullptr;
-    capture_sector = sector;
-    capture_adjust = 0;
-    capture_light  = sector->properties.light_level;
+    capture_back_sector = nullptr;
+    capture_height_key  = LiveHeightKey(sector, nullptr);
+
+    capture_batch =
+        FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
+    capture_line_side = nullptr;
+    capture_surf      = nullptr;
+    capture_sector    = sector;
+    capture_adjust    = 0;
+
+    capture_light_sector = ResolvePropertiesOwner(sector, props);
+    capture_light        = capture_light_sector->properties.light_level;
 
     capture_is_wall    = false;
     capture_mid_masked = false;
-    capture_flag_slot = (int)((sub - level_subsectors) * 2 + (face_dir > 0 ? 0 : 1));
+    capture_flag_slot  = (int)((sector - level_sectors) * 2 + (face_dir > 0 ? 0 : 1));
+    capture_hash_key   = 0;
+
+    if (plane_ef)
+    {
+        capture_flag_slot = -1;
+
+        if (!BuildRegionFlatKey(sector, face_dir, plane_ef, capture_height_key, &capture_hash_key))
+            capture_hash_key = 0;
+    }
 
     capture_dependency_count = 0;
 
     AddCaptureDependency(sector);
+    AddCaptureDependency(sector->height_sector);
+    AddCaptureDependency(sector->deep_water_reference);
+    AddCaptureDependency(capture_light_sector);
+    AddCaptureDependency(ExtrafloorControlSector(plane_ef));
 }
 
-void StaticCaptureVertices(const RendererVertex *verts, int count)
+static void MarkBakedSlot(const StaticSpan &span, uint8_t value)
+{
+    if (span.flag_slot < 0)
+        return;
+
+    size_t slot = (size_t)span.flag_slot * kHeightKeyTotal + (size_t)span.height_key;
+
+    std::vector<uint8_t> &baked = span.is_wall ? line_side_wall_baked : sector_flat_baked;
+
+    if (slot < baked.size())
+        baked[slot] = value;
+}
+
+static float StaticLightRow(int light, int adjust)
+{
+    int lit = light + adjust + (sector_brightness_correction.d_ - 5) * 10;
+
+    return (floorf((float)lit / 4.0f) + 0.5f) / 64.0f;
+}
+
+void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 {
     if (capture_batch < 0 || count < 3)
         return;
@@ -489,14 +1368,20 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
     StaticSpan span;
 
     span.sector       = capture_sector;
+    span.back_sector  = capture_back_sector;
+    span.light_sector = capture_light_sector;
+    span.height_key   = capture_height_key;
     span.start        = (int)batch.vertices.size();
     span.baked_light  = capture_light;
     span.light_adjust = capture_adjust;
     span.flag_slot    = capture_flag_slot;
+    span.hash_key     = capture_hash_key;
     span.is_wall      = capture_is_wall;
     span.mid_masked   = capture_mid_masked;
     span.live         = true;
-    span.normal       = capture_normal;
+    span.scroll_surface = capture_scroll_surface;
+    span.scroll_scale   = capture_uv_scale;
+    span.scroll_applied = capture_scroll_uv;
     span.div_x        = capture_div[0];
     span.div_y        = capture_div[1];
     span.div_delta_x  = capture_div[2];
@@ -517,23 +1402,55 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
         }
     }
 
-    for (int t = 1; t < count - 1; t++)
+    int second = capture_flip_winding ? 2 : 1;
+    int third  = capture_flip_winding ? 1 : 2;
+
+    if (shape == GL_TRIANGLES)
     {
-        batch.vertices.push_back(verts[0]);
-        batch.vertices.push_back(verts[t]);
-        batch.vertices.push_back(verts[t + 1]);
+        for (int v = 0, total = (count / 3) * 3; v < total; v += 3)
+        {
+            batch.vertices.push_back(verts[v]);
+            batch.vertices.push_back(verts[v + second]);
+            batch.vertices.push_back(verts[v + third]);
+        }
     }
+    else
+    {
+        for (int t = 1; t < count - 1; t++)
+        {
+            batch.vertices.push_back(verts[0]);
+            batch.vertices.push_back(verts[t + second - 1]);
+            batch.vertices.push_back(verts[t + third - 1]);
+        }
+    }
+
+    float span_light_row = StaticLightRow(capture_light, capture_adjust);
 
     for (int v = span.start; v < (int)batch.vertices.size(); v++)
     {
         RendererVertex &dest = batch.vertices[v];
 
         dest.rgba = epi::MakeRGBA(255, 255, 255, epi::GetRGBAAlpha(dest.rgba));
+
+        dest.texture_coordinates[1].Y = span_light_row;
+
+        if (batch.scrolling)
+        {
+            HMM_Vec2 base = dest.texture_coordinates[0];
+
+            base.X -= capture_scroll_uv.X;
+            base.Y -= capture_scroll_uv.Y;
+
+            batch.scroll_base.push_back(base);
+        }
     }
 
     span.count = (int)batch.vertices.size() - span.start;
 
-    batch.gpu_dirty = true;
+    batch.runs_dirty = true;
+
+    if ((span.sector && span.sector->height_sector) || (span.back_sector && span.back_sector->height_sector))
+        batch.height_sensitive = true;
 
     SpanReference ref;
 
@@ -545,22 +1462,73 @@ void StaticCaptureVertices(const RendererVertex *verts, int count)
     for (int i = 0; i < capture_dependency_count; i++)
         sector_spans[capture_dependencies[i]].push_back(ref);
 
-    if (span.flag_slot >= 0)
+    if (span.hash_key != 0)
+        region_surface_baked[span.hash_key] = 1;
+    else
+        MarkBakedSlot(span, 1);
+}
+
+static std::vector<Sector *> dynamic_sector_list;
+static std::vector<uint8_t>  dynamic_sector_mark;
+
+static void NoteDynamicSector(Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if ((int)dynamic_sector_mark.size() != total_level_sectors)
+        dynamic_sector_mark.assign((size_t)total_level_sectors, 0);
+
+    if (index >= dynamic_sector_mark.size() || dynamic_sector_mark[index])
+        return;
+
+    dynamic_sector_mark[index] = 1;
+
+    dynamic_sector_list.push_back(sec);
+}
+
+void StaticPruneDynamicSectors(void)
+{
+    size_t keep = 0;
+
+    for (size_t i = 0; i < dynamic_sector_list.size(); i++)
     {
-        if (span.is_wall)
+        Sector *sec = dynamic_sector_list[i];
+
+        if (sec->bake_dynamic || sec->movement_suppressed)
         {
-            if ((size_t)span.flag_slot < seg_wall_baked.size())
-                seg_wall_baked[span.flag_slot] = 1;
+            dynamic_sector_list[keep++] = sec;
+            continue;
         }
-        else if ((size_t)span.flag_slot < subsector_flat_baked.size())
-            subsector_flat_baked[span.flag_slot] = 1;
+
+        dynamic_sector_mark[(size_t)(sec - level_sectors)] = 0;
+
+        MarkSectorNeighboursPending(sec);
     }
+
+    dynamic_sector_list.resize(keep);
+}
+
+int StaticDynamicSectorCount(void)
+{
+    return (int)dynamic_sector_list.size();
+}
+
+Sector *StaticDynamicSector(int index)
+{
+    if (index < 0 || index >= (int)dynamic_sector_list.size())
+        return nullptr;
+
+    return dynamic_sector_list[(size_t)index];
 }
 
 void StaticMeshInvalidateSector(Sector *sec)
 {
     if (!static_mesh_built || !sec)
         return;
+
+    NoteDynamicSector(sec);
+
+    MarkSectorNeighboursPending(sec);
 
     size_t index = (size_t)(sec - level_sectors);
 
@@ -579,16 +1547,17 @@ void StaticMeshInvalidateSector(Sector *sec)
 
         span.live = false;
 
-        if (span.flag_slot < 0)
-            continue;
+        batch.runs_dirty = true;
 
-        if (span.is_wall)
+        StaticMarkSectorPending(span.sector);
+
+        if (span.hash_key != 0)
         {
-            if ((size_t)span.flag_slot < seg_wall_baked.size())
-                seg_wall_baked[span.flag_slot] = 0;
+            region_surface_baked.erase(span.hash_key);
+            continue;
         }
-        else if ((size_t)span.flag_slot < subsector_flat_baked.size())
-            subsector_flat_baked[span.flag_slot] = 0;
+
+        MarkBakedSlot(span, 0);
     }
 
     refs.clear();
@@ -596,19 +1565,53 @@ void StaticMeshInvalidateSector(Sector *sec)
 
 void StaticCaptureEnd(void)
 {
-    capture_batch  = -1;
-    capture_seg    = nullptr;
-    capture_surf   = nullptr;
-    capture_sector = nullptr;
+    capture_batch        = -1;
+    capture_hash_key     = 0;
+    capture_line_side    = nullptr;
+    capture_surf         = nullptr;
+    capture_sector       = nullptr;
+    capture_light_sector = nullptr;
 }
 
 static void RefreshStaticLighting(void)
 {
+    if (sector_brightness_correction.d_ != static_light_correction)
+    {
+        static_light_correction = sector_brightness_correction.d_;
+
+        for (size_t i = 0; i < sector_light_cache.size(); i++)
+            sector_light_cache[i] = INT_MIN;
+    }
+
+    static_sector_changes.clear();
+
     for (size_t i = 0; i < sector_light_cache.size(); i++)
     {
         Sector *sec = level_sectors + i;
 
         int current = sec->properties.light_level;
+
+        RGBAColor       fog_color   = sec->properties.fog_color;
+        float           fog_density = sec->properties.fog_density;
+        const Colormap *colormap    = sec->properties.colourmap;
+
+        bool appearance = fog_color != sector_fog_color_cache[i] ||
+                          !epi::AlmostEquals(fog_density, sector_fog_density_cache[i]) ||
+                          colormap != sector_colormap_cache[i];
+
+        if (current == sector_light_cache[i] && !appearance)
+            continue;
+
+        StaticSectorChange change;
+
+        change.sector     = (int)i;
+        change.appearance = appearance;
+
+        static_sector_changes.push_back(change);
+
+        sector_fog_color_cache[i]   = fog_color;
+        sector_fog_density_cache[i] = fog_density;
+        sector_colormap_cache[i]    = colormap;
 
         if (current == sector_light_cache[i])
             continue;
@@ -622,16 +1625,38 @@ static void RefreshStaticLighting(void)
             StaticBatch &batch = static_batches[refs[r].batch];
             StaticSpan  &span  = batch.spans[refs[r].span];
 
-            if (!span.live || span.sector != sec)
+            if (!span.live || span.light_sector != sec)
                 continue;
 
-            float light = ((float)((current + span.light_adjust) / 4) + 0.5f) / 64.0f;
+            float light = StaticLightRow(current, span.light_adjust);
 
             for (int v = span.start; v < span.start + span.count; v++)
                 batch.vertices[v].texture_coordinates[1].Y = light;
 
-            batch.gpu_dirty = true;
+            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
+            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
         }
+    }
+}
+
+const std::vector<StaticSectorChange> &StaticSectorChanges(void)
+{
+    return static_sector_changes;
+}
+
+void SnapshotSurfaceBaseOffsets(void)
+{
+    for (int i = 0; i < total_level_sides; i++)
+    {
+        level_sides[i].top.base_offset    = level_sides[i].top.offset;
+        level_sides[i].middle.base_offset = level_sides[i].middle.offset;
+        level_sides[i].bottom.base_offset = level_sides[i].bottom.offset;
+    }
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        level_sectors[i].floor.base_offset   = level_sectors[i].floor.offset;
+        level_sectors[i].ceiling.base_offset = level_sectors[i].ceiling.offset;
     }
 }
 
@@ -639,16 +1664,65 @@ void BuildStaticMesh(void)
 {
     DestroyStaticMesh();
 
-    subsector_flat_baked.assign((size_t)total_level_subsectors * 2, 0);
-    seg_wall_baked.assign((size_t)total_level_segs * 3, 0);
+    BuildPropertiesOwnerMap();
+
+    dynamic_sector_list.clear();
+    dynamic_sector_mark.assign((size_t)total_level_sectors, 0);
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        if (level_sectors[i].bake_dynamic || level_sectors[i].movement_suppressed)
+            NoteDynamicSector(level_sectors + i);
+    }
+
+    sector_flat_baked.assign((size_t)total_level_sectors * 2 * kHeightKeyTotal, 0);
+    line_side_wall_baked.assign((size_t)total_level_lines * 2 * 3 * kHeightKeyTotal, 0);
+
+    region_surface_baked.clear();
     sector_spans.assign((size_t)total_level_sectors, std::vector<SpanReference>());
+
+    sector_height_state.assign((size_t)total_level_sectors, 0);
+
+    sector_batch_traits.resize((size_t)total_level_sectors);
+
+    for (int i = 0; i < total_level_sectors; i++)
+        sector_batch_traits[i] = SectorBatchTraits(level_sectors + i);
 
     sector_light_cache.resize((size_t)total_level_sectors);
 
     for (int i = 0; i < total_level_sectors; i++)
         sector_light_cache[i] = level_sectors[i].properties.light_level;
 
+    sector_fog_color_cache.resize((size_t)total_level_sectors);
+    sector_fog_density_cache.resize((size_t)total_level_sectors);
+    sector_colormap_cache.resize((size_t)total_level_sectors);
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        sector_fog_color_cache[i]   = level_sectors[i].properties.fog_color;
+        sector_fog_density_cache[i] = level_sectors[i].properties.fog_density;
+        sector_colormap_cache[i]    = level_sectors[i].properties.colourmap;
+    }
+
+    static_sector_changes.clear();
+
+    static_light_correction = sector_brightness_correction.d_;
+
+    sector_bake_clean.assign((size_t)total_level_sectors, 0);
+    sector_bake_pending.assign((size_t)total_level_sectors, 0);
+    sector_bake_whole_declined.assign((size_t)total_level_sectors, 0);
+    line_side_bake_declined.assign((size_t)total_level_lines * 2, 0);
+    sector_bake_epoch.assign((size_t)total_level_sectors, 0);
+    sector_pending_list.clear();
+    sector_change_flag.assign((size_t)total_level_sectors, 0);
+    sector_change_list.clear();
+    sector_change_all = true;
+
     static_mesh_built = true;
+
+    for (int i = 0; i < total_level_sectors; i++)
+        StaticMarkSectorPending(level_sectors + i);
+
 }
 
 void DestroyStaticMesh(void)
@@ -660,10 +1734,26 @@ void DestroyStaticMesh(void)
     }
 
     static_batches.clear();
-    subsector_flat_baked.clear();
-    seg_wall_baked.clear();
+    scrolling_batches.clear();
+    sector_flat_baked.clear();
+    line_side_wall_baked.clear();
+    region_surface_baked.clear();
     sector_spans.clear();
     sector_light_cache.clear();
+    sector_batch_traits.clear();
+    sector_fog_color_cache.clear();
+    sector_fog_density_cache.clear();
+    sector_colormap_cache.clear();
+    static_sector_changes.clear();
+    sector_bake_clean.clear();
+    sector_bake_pending.clear();
+    sector_bake_whole_declined.clear();
+    line_side_bake_declined.clear();
+    sector_bake_epoch.clear();
+    sector_pending_list.clear();
+    sector_change_flag.clear();
+    sector_change_list.clear();
+    sector_change_all = true;
 
     StaticCaptureEnd();
 
@@ -694,119 +1784,231 @@ void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertic
     }
 }
 
-void DrawStaticMesh(void)
+static void UploadStaticBatch(StaticBatch &batch)
 {
-    if (!r_static_mesh.d_ || !static_mesh_built)
+    int total = (int)batch.vertices.size();
+
+    if (total == 0)
+        return;
+
+    if (!batch.gpu_handle || total > batch.gpu_capacity)
+    {
+        EDGE_ZoneScopedN("StaticMesh upload");
+
+        if (batch.gpu_handle)
+            DeleteStaticVertexBuffer(batch.gpu_handle);
+
+        int capacity = HMM_MAX(total + total / 2, 4096);
+
+        batch.gpu_handle   = CreateStaticVertexBufferWithCapacity(batch.vertices.data(), total, capacity);
+        batch.gpu_capacity = batch.gpu_handle ? capacity : 0;
+        batch.gpu_count    = batch.gpu_handle ? total : 0;
+        batch.dirty_low    = INT_MAX;
+        batch.dirty_high   = -1;
+
+        return;
+    }
+
+    if (total > batch.gpu_count)
+    {
+        EDGE_ZoneScopedN("StaticMesh append");
+
+        UpdateStaticVertexBuffer(batch.gpu_handle, batch.gpu_count, batch.vertices.data() + batch.gpu_count,
+                                 total - batch.gpu_count);
+
+        batch.gpu_count = total;
+    }
+
+    if (batch.dirty_high > batch.dirty_low)
+    {
+        EDGE_ZoneScopedN("StaticMesh range update");
+
+        int low  = batch.dirty_low;
+        int high = HMM_MIN(batch.dirty_high, batch.gpu_count);
+
+        if (high > low)
+            UpdateStaticVertexBuffer(batch.gpu_handle, low, batch.vertices.data() + low, high - low);
+
+        batch.dirty_low  = INT_MAX;
+        batch.dirty_high = -1;
+    }
+}
+
+static void RefreshStaticScrolling(void)
+{
+    for (size_t i = 0; i < scrolling_batches.size(); i++)
+    {
+        StaticBatch &batch = static_batches[scrolling_batches[i]];
+
+        for (size_t k = 0; k < batch.spans.size(); k++)
+        {
+            StaticSpan &span = batch.spans[k];
+
+            if (!span.live || !span.scroll_surface)
+                continue;
+
+            HMM_Vec2 shift = SurfaceScrollShift(span.scroll_surface, span.scroll_scale);
+
+            if (epi::AlmostEquals(shift.X, span.scroll_applied.X) && epi::AlmostEquals(shift.Y, span.scroll_applied.Y))
+                continue;
+
+            span.scroll_applied = shift;
+
+            for (int v = span.start; v < span.start + span.count; v++)
+            {
+                batch.vertices[v].texture_coordinates[0].X = batch.scroll_base[v].X + shift.X;
+                batch.vertices[v].texture_coordinates[0].Y = batch.scroll_base[v].Y + shift.Y;
+            }
+
+            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
+            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
+        }
+    }
+}
+
+static void RebuildStaticRuns(StaticBatch &batch)
+{
+    batch.runs.clear();
+
+    int run_start = -1;
+    int run_end   = -1;
+
+    for (size_t k = 0; k < batch.spans.size(); k++)
+    {
+        const StaticSpan &span = batch.spans[k];
+
+        bool live = span.live && span.height_key == StaticHeightKey(span.sector, span.back_sector);
+
+        if (!live)
+            continue;
+
+        if (run_start >= 0 && span.start == run_end)
+        {
+            run_end += span.count;
+            continue;
+        }
+
+        if (run_start >= 0)
+            batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+
+        run_start = span.start;
+        run_end   = span.start + span.count;
+    }
+
+    if (run_start >= 0)
+        batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+
+    batch.runs_dirty = false;
+}
+
+void DrawStaticMesh(OitPass draw_pass, bool refresh)
+{
+    if (!static_mesh_built)
         return;
 
     EDGE_ZoneScoped;
 
+    if (refresh && draw_pass == kOitPassNone)
     {
         EDGE_ZoneScopedN("StaticMesh RefreshLighting");
 
+
+        StaticPruneDynamicSectors();
+
+        if (RefreshSectorHeightStates())
+        {
+            for (size_t i = 0; i < static_batches.size(); i++)
+            {
+                if (static_batches[i].height_sensitive)
+                    static_batches[i].runs_dirty = true;
+            }
+        }
+
+
         RefreshStaticLighting();
+
+        RefreshStaticScrolling();
+
+        if (r_static_mesh_resident.d_ != 0)
+        {
+            for (size_t i = 0; i < static_batches.size(); i++)
+            {
+                if (!static_batches[i].spans.empty())
+                    UploadStaticBatch(static_batches[i]);
+            }
+
+            FlushStaticVertexUploads();
+        }
+
     }
 
     for (size_t i = 0; i < static_batches.size(); i++)
     {
         StaticBatch &batch = static_batches[i];
 
-        if (batch.spans.empty())
+        bool wanted = (batch.draw_pass == draw_pass) ||
+                      (batch.draw_pass == kOitPassAccumulate && draw_pass == kOitPassRevealage);
+
+        if (batch.spans.empty() || !wanted)
             continue;
 
-        GLuint tex_id = ImageCache(batch.image, true, render_view_effect_colormap);
+
+        GLuint tex_id = ImageCache(batch.image, true);
+
+        int extra_light = render_view_extra_light;
+
+        if (batch.properties->colourmap && (batch.properties->colourmap->special_ & kColorSpecialNoFlash) &&
+            extra_light <= 250)
+            extra_light = 0;
+
+        static_batch_light_row_offset = (float)(extra_light / 4) / 64.0f;
+
+        render_unit_liquid = LiquidShaderParameters(batch.image, LiquidLevelSeconds());
 
         AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
 
+        int glow_set = LightGridGlowSetForSector(batch.glow_sector);
+
         bool resident = r_static_mesh_resident.d_ != 0;
 
-        if (resident && batch.gpu_dirty)
-        {
-            EDGE_ZoneScopedN("StaticMesh upload");
-
-            if (batch.gpu_handle)
-                DeleteStaticVertexBuffer(batch.gpu_handle);
-
-            batch.gpu_handle = CreateStaticVertexBuffer(batch.vertices.data(), (int)batch.vertices.size());
-            batch.gpu_dirty  = false;
-        }
-
         if (resident && !batch.gpu_handle)
-            resident = false;
+            continue;
+
+        if (batch.runs_dirty)
+            RebuildStaticRuns(batch);
 
         int pass = 0;
 
-        int run_start = -1;
-        int run_end   = -1;
+        BlendingMode blending = batch.blending;
 
-        for (size_t k = 0; k <= batch.spans.size(); k++)
+        bool inverted   = mirror_view.reflective != (fliplevels.d_ != 0);
+        blending = (BlendingMode)(blending | (inverted ? kBlendingCullFront : kBlendingCullBack));
+
+        for (size_t r = 0; r < batch.runs.size(); r++)
         {
-            bool live = (k < batch.spans.size()) && batch.spans[k].live;
+            const StaticRun &run = batch.runs[r];
 
-            bool contiguous = live && run_start >= 0 && batch.spans[k].start == run_end &&
-                              (size_t)(run_end + batch.spans[k].count - run_start) <= kMaximumStaticRun;
-
-            if (contiguous)
+            if (resident)
             {
-                run_end += batch.spans[k].count;
+                int count = HMM_MIN(run.count, batch.gpu_count - run.start);
+
+                if (count > 0)
+                    shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
+                                               blending, glow_set);
                 continue;
             }
 
-            if (run_start >= 0)
+            for (int offset = 0; offset < run.count; offset += (int)kMaximumStaticRun)
             {
-                if (resident)
-                    shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run_start, run_end - run_start, tex_id,
-                                               &pass, batch.blending);
-                else
-                    shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run_start, run_end - run_start, tex_id,
-                                       1.0f, &pass, batch.blending);
+                int count = HMM_MIN((int)kMaximumStaticRun, run.count - offset);
 
-                run_start = -1;
-                run_end   = -1;
+                shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run.start + offset, count, tex_id, 1.0f,
+                                   &pass, blending, glow_set);
             }
-
-            if (live)
-            {
-                run_start = batch.spans[k].start;
-                run_end   = batch.spans[k].start + batch.spans[k].count;
-            }
-        }
-
-        if (!use_dynamic_lights)
-            continue;
-
-        EDGE_ZoneScopedN("StaticMesh lights");
-
-        for (size_t k = 0; k < batch.spans.size(); k++)
-        {
-            const StaticSpan &span = batch.spans[k];
-
-            if (!span.live)
-                continue;
-
-            StaticSpanLighting info;
-
-            info.vertices = batch.vertices.data() + span.start;
-            info.count    = span.count;
-            info.normal   = span.normal;
-            info.is_wall    = span.is_wall;
-            info.mid_masked = span.mid_masked;
-            info.sector   = span.sector;
-            info.tex_id   = tex_id;
-            info.blending = batch.blending;
-
-            info.div_x       = span.div_x;
-            info.div_y       = span.div_y;
-            info.div_delta_x = span.div_delta_x;
-            info.div_delta_y = span.div_delta_y;
-
-            for (int axis = 0; axis < 3; axis++)
-            {
-                info.low[axis]  = span.low[axis];
-                info.high[axis] = span.high[axis];
-            }
-
-            EmitStaticSpanLights(info);
         }
     }
+
+    render_unit_liquid = {{0, 0, 0, 0}};
+
+    static_batch_light_row_offset = 0;
 }

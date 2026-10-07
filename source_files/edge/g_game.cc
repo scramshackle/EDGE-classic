@@ -54,6 +54,8 @@
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_sky.h"
+#include "r_static.h"
+#include "r_things.h"
 #include "rad_trig.h"
 #include "s_music.h"
 #include "s_sound.h"
@@ -832,6 +834,8 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
         current_hub_first = globs->hub_first ? LookupMap(globs->hub_first) : nullptr;
     }
 
+    StaticBakeSetDeferred(true);
+
     LoadLevel_Bits();
 
     // -- Check LEVEL consistency (crc) --
@@ -879,6 +883,13 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
 
     FinishSaveGameLoad();
     SaveFileCloseRead();
+
+    StaticBakeSetDeferred(false);
+
+    BuildStaticMesh();
+    BakeStaticLevel();
+
+    ResidentThingsReset();
 
     return true; // OK
 }

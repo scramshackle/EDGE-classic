@@ -47,11 +47,12 @@
 #include "r_image.h"
 #include "r_mdcommon.h"
 #include "r_mdl.h"
+
+#include "r_lightgrid.h"
 #include "r_mdmesh.h"
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
-#include "r_shader.h"
 #include "r_state.h"
 #include "r_texgl.h"
 #include "r_units.h"
@@ -159,9 +160,6 @@ struct MDLFrame
     MDLVertex *vertices;
 
     const char *name;
-
-    // list of normals which are used.  Terminated by -1.
-    short *used_normals;
 };
 
 struct MDLPoint
@@ -209,9 +207,8 @@ class MDLModel
     }
 };
 
-static HMM_Vec3  render_position;
-static RGBAColor render_rgba;
-static HMM_Vec2  render_texture_coordinates;
+static HMM_Vec3 render_position;
+static HMM_Vec2 render_texture_coordinates;
 
 static std::vector<RendererVertex> model_vertices;
 
@@ -264,9 +261,11 @@ static void MDLUploadMesh(MDLModel *md)
         return;
 
     std::vector<float> frame_positions;
+    std::vector<float> frame_normals;
     std::vector<float> texture_coordinates;
 
     frame_positions.resize((size_t)vertex_count * (size_t)md->total_frames_ * 3);
+    frame_normals.resize((size_t)vertex_count * (size_t)md->total_frames_ * 3);
     texture_coordinates.resize((size_t)vertex_count * 2);
 
     for (int f = 0; f < md->total_frames_; f++)
@@ -274,6 +273,7 @@ static void MDLUploadMesh(MDLModel *md)
         const MDLVertex *frame_vertices = md->frames_[f].vertices;
 
         float *destination = frame_positions.data() + (size_t)f * (size_t)vertex_count * 3;
+        float *normal_destination = frame_normals.data() + (size_t)f * (size_t)vertex_count * 3;
 
         for (int v = 0; v < vertex_count; v++)
         {
@@ -282,6 +282,12 @@ static void MDLUploadMesh(MDLModel *md)
             destination[v * 3 + 0] = vert->x;
             destination[v * 3 + 1] = vert->y;
             destination[v * 3 + 2] = vert->z;
+
+            const HMM_Vec3 &normal = md_normals[vert->normal_idx];
+
+            normal_destination[v * 3 + 0] = normal.X;
+            normal_destination[v * 3 + 1] = normal.Y;
+            normal_destination[v * 3 + 2] = normal.Z;
         }
     }
 
@@ -294,14 +300,12 @@ static void MDLUploadMesh(MDLModel *md)
     ModelMeshData data;
 
     data.frame_positions     = frame_positions.data();
+    data.frame_normals       = frame_normals.data();
     data.texture_coordinates = texture_coordinates.data();
     data.frame_count         = md->total_frames_;
     data.vertex_count        = vertex_count;
 
     mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_.data(), mesh.TotalIndices());
-
-    if (mesh.gpu_handle_ != 0)
-        mesh.colors_.resize((size_t)vertex_count * 6);
 
     LogDebug("  mesh gpu handle: %u\n", mesh.gpu_handle_);
 }
@@ -318,28 +322,6 @@ static const char *CopyFrameName(RawMDLSimpleFrame *frm)
     str[16] = 0;
 
     return str;
-}
-
-static short *CreateNormalList(uint8_t *which_normals)
-{
-    int count = 0;
-    int i;
-
-    for (i = 0; i < kTotalMDFormatNormals; i++)
-        if (which_normals[i])
-            count++;
-
-    short *n_list = new short[count + 1];
-
-    count = 0;
-
-    for (i = 0; i < kTotalMDFormatNormals; i++)
-        if (which_normals[i])
-            n_list[count++] = i;
-
-    n_list[count] = -1;
-
-    return n_list;
 }
 
 MDLModel *MDLLoad(epi::File *f, float &radius)
@@ -468,8 +450,6 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
 
     /* PARSE FRAMES */
 
-    uint8_t which_normals[kTotalMDFormatNormals];
-
     uint32_t raw_scale[3];
     uint32_t raw_translate[3];
 
@@ -503,8 +483,6 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
 
         md->frames_[i].vertices = new MDLVertex[md->vertices_per_frame_];
 
-        EPI_CLEAR_MEMORY(which_normals, uint8_t, kTotalMDFormatNormals);
-
         for (int v = 0; v < md->vertices_per_frame_; v++)
         {
             RawMDLVertex *raw_V  = raw_verts + v;
@@ -525,8 +503,6 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
                 good_V->normal_idx = (good_V->normal_idx % kTotalMDFormatNormals);
             }
 
-            which_normals[good_V->normal_idx] = 1;
-
             HMM_Vec3 vr = {{good_V->x, good_V->y, good_V->z}};
             float    r  = HMM_Len(vr);
 
@@ -535,8 +511,6 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
                 radius = r;
             }
         }
-
-        md->frames_[i].used_normals = CreateNormalList(which_normals);
     }
 
     delete[] texcoords;
@@ -598,18 +572,6 @@ class MDLCoordinateData
     HMM_Vec2 rotation_vector_x_;
     HMM_Vec2 rotation_vector_y_;
 
-    ColorMixer normal_colors_[kTotalMDFormatNormals];
-
-    float rotated_x_[kTotalMDFormatNormals];
-    float rotated_y_[kTotalMDFormatNormals];
-    float rotated_z_[kTotalMDFormatNormals];
-
-    int rotated_count_;
-
-    short *used_normals_;
-
-    bool is_additive_;
-
   public:
     void CalculatePosition(HMM_Vec3 &pos, float x1, float y1, float z1) const
     {
@@ -626,173 +588,6 @@ class MDLCoordinateData
         pos.Z = z_ + z2;
     }
 };
-
-static void InitializeNormalColors(MDLCoordinateData *data)
-{
-    short *n_list = data->used_normals_;
-
-    for (; *n_list >= 0; n_list++)
-    {
-        data->normal_colors_[*n_list].Clear();
-    }
-}
-
-static void RotateUsedNormals(MDLCoordinateData *data)
-{
-    int count = 0;
-
-    for (short *n_list = data->used_normals_; *n_list >= 0; n_list++)
-        count++;
-
-    data->rotated_count_ = count;
-
-    epi::SimdF32x4 mouselook_x_x = epi::SplatF32x4(data->mouselook_x_vector_.X);
-    epi::SimdF32x4 mouselook_x_y = epi::SplatF32x4(data->mouselook_x_vector_.Y);
-    epi::SimdF32x4 mouselook_z_x = epi::SplatF32x4(data->mouselook_z_vector_.X);
-    epi::SimdF32x4 mouselook_z_y = epi::SplatF32x4(data->mouselook_z_vector_.Y);
-    epi::SimdF32x4 rotation_x_x  = epi::SplatF32x4(data->rotation_vector_x_.X);
-    epi::SimdF32x4 rotation_x_y  = epi::SplatF32x4(data->rotation_vector_x_.Y);
-    epi::SimdF32x4 rotation_y_x  = epi::SplatF32x4(data->rotation_vector_y_.X);
-    epi::SimdF32x4 rotation_y_y  = epi::SplatF32x4(data->rotation_vector_y_.Y);
-
-    const short *list = data->used_normals_;
-
-    int i = 0;
-
-    for (; i + 4 <= count; i += 4)
-    {
-        int n0 = list[i];
-        int n1 = list[i + 1];
-        int n2 = list[i + 2];
-        int n3 = list[i + 3];
-
-        epi::SimdF32x4 nx1 =
-            epi::SetF32x4(md_normals[n0].X, md_normals[n1].X, md_normals[n2].X, md_normals[n3].X);
-        epi::SimdF32x4 ny1 =
-            epi::SetF32x4(md_normals[n0].Y, md_normals[n1].Y, md_normals[n2].Y, md_normals[n3].Y);
-        epi::SimdF32x4 nz1 =
-            epi::SetF32x4(md_normals[n0].Z, md_normals[n1].Z, md_normals[n2].Z, md_normals[n3].Z);
-
-        epi::SimdF32x4 nx2 = epi::AddF32x4(epi::MulF32x4(nx1, mouselook_x_x), epi::MulF32x4(nz1, mouselook_x_y));
-        epi::SimdF32x4 nz2 = epi::AddF32x4(epi::MulF32x4(nx1, mouselook_z_x), epi::MulF32x4(nz1, mouselook_z_y));
-
-        epi::StoreF32x4(data->rotated_x_ + i,
-                        epi::AddF32x4(epi::MulF32x4(nx2, rotation_x_x), epi::MulF32x4(ny1, rotation_x_y)));
-        epi::StoreF32x4(data->rotated_y_ + i,
-                        epi::AddF32x4(epi::MulF32x4(nx2, rotation_y_x), epi::MulF32x4(ny1, rotation_y_y)));
-        epi::StoreF32x4(data->rotated_z_ + i, nz2);
-    }
-
-    for (; i < count; i++)
-    {
-        int n = list[i];
-
-        float nx1 = md_normals[n].X;
-        float ny1 = md_normals[n].Y;
-        float nz1 = md_normals[n].Z;
-
-        float nx2 = nx1 * data->mouselook_x_vector_.X + nz1 * data->mouselook_x_vector_.Y;
-        float nz2 = nx1 * data->mouselook_z_vector_.X + nz1 * data->mouselook_z_vector_.Y;
-
-        data->rotated_x_[i] = nx2 * data->rotation_vector_x_.X + ny1 * data->rotation_vector_x_.Y;
-        data->rotated_y_[i] = nx2 * data->rotation_vector_y_.X + ny1 * data->rotation_vector_y_.Y;
-        data->rotated_z_[i] = nz2;
-    }
-}
-
-static void ShadeNormals(AbstractShader *shader, MDLCoordinateData *data, bool skip_calc)
-{
-    short *n_list = data->used_normals_;
-
-    for (int i = 0; *n_list >= 0; n_list++, i++)
-    {
-        short n = *n_list;
-
-        if (skip_calc)
-        {
-            shader->Corner(data->normal_colors_ + n, 0.0f, 0.0f, 0.0f, data->map_object_, data->is_weapon);
-            continue;
-        }
-
-        shader->Corner(data->normal_colors_ + n, data->rotated_x_[i], data->rotated_y_[i], data->rotated_z_[i],
-                       data->map_object_, data->is_weapon);
-    }
-}
-
-static void MDLDynamicLightCallback(MapObject *mo, void *dataptr)
-{
-    MDLCoordinateData *data = (MDLCoordinateData *)dataptr;
-
-    // dynamic lights do not light themselves up!
-    if (mo == data->map_object_)
-        return;
-
-    EPI_ASSERT(mo->dynamic_light_.shader);
-
-    ShadeNormals(mo->dynamic_light_.shader, data, false);
-}
-
-static int MDLMulticolorMaximumRGB(MDLCoordinateData *data, bool additive)
-{
-    int result = 0;
-
-    short *n_list = data->used_normals_;
-
-    for (; *n_list >= 0; n_list++)
-    {
-        ColorMixer *col = &data->normal_colors_[*n_list];
-
-        int mx = additive ? col->add_MAX() : col->mod_MAX();
-
-        result = HMM_MAX(result, mx);
-    }
-
-    return result;
-}
-
-static inline void ModelCoordFunc(MDLCoordinateData *data, const ModelMeshVertex *point)
-{
-    const MDLFrame *frame1 = data->frame1_;
-    const MDLFrame *frame2 = data->frame2_;
-
-    const MDLVertex *vert1 = &frame1->vertices[point->vert_idx];
-    const MDLVertex *vert2 = &frame2->vertices[point->vert_idx];
-
-    float x1 = HMM_Lerp(vert1->x, data->lerp_, vert2->x);
-    float y1 = HMM_Lerp(vert1->y, data->lerp_, vert2->y);
-    float z1 = HMM_Lerp(vert1->z, data->lerp_, vert2->z) + data->bias_;
-
-    if (render_mirror_set.Reflective())
-        y1 = -y1;
-
-    data->CalculatePosition(render_position, x1, y1, z1);
-
-    if (data->is_fuzzy_)
-    {
-        render_texture_coordinates.X = point->skin_s * data->fuzz_multiplier_ + data->fuzz_add_.X;
-        render_texture_coordinates.Y = point->skin_t * data->fuzz_multiplier_ + data->fuzz_add_.Y;
-
-        render_rgba = kRGBABlack;
-        return;
-    }
-
-    render_texture_coordinates = {{point->skin_s, point->skin_t}};
-
-    ColorMixer *col = &data->normal_colors_[(data->lerp_ < 0.5) ? vert1->normal_idx : vert2->normal_idx];
-
-    if (!data->is_additive_)
-    {
-        render_rgba = epi::MakeRGBAClamped(col->modulate_red_ * render_view_red_multiplier,
-                                           col->modulate_green_ * render_view_green_multiplier,
-                                           col->modulate_blue_ * render_view_blue_multiplier);
-    }
-    else
-    {
-        render_rgba = epi::MakeRGBAClamped(col->add_red_ * render_view_red_multiplier,
-                                           col->add_green_ * render_view_green_multiplier,
-                                           col->add_blue_ * render_view_blue_multiplier);
-    }
-}
 
 void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float lerp, float x, float y, float z,
                     MapObject *mo, RegionProperties *props, float scale, float aspect, float bias, int rotation)
@@ -832,7 +627,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     if (mo->hyper_flags_ & kHyperFlagNoZBufferUpdate)
         blending = (BlendingMode)(blending | kBlendingNoZBuffer);
 
-    if (render_mirror_set.Reflective())
+    if (mirror_view.reflective)
     {
         if (fliplevels.d_)
             blending = (BlendingMode)(blending | kBlendingCullBack);
@@ -861,8 +656,8 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
     data.is_weapon = is_weapon;
 
-    data.xy_scale_ = scale * aspect * render_mirror_set.XYScale();
-    data.z_scale_  = scale * render_mirror_set.ZScale();
+    data.xy_scale_ = scale * aspect;
+    data.z_scale_  = scale;
     data.bias_     = bias;
 
     bool tilt = is_weapon || (mo->flags_ & kMapObjectFlagMissile) || (mo->hyper_flags_ & kHyperFlagForceModelTilt);
@@ -883,20 +678,19 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
             BAMAngleToMatrix(tilt ? ~mo->vertical_angle_ : 0, &data.mouselook_x_vector_, &data.mouselook_z_vector_);
             ang = mo->angle_ + rotation;
         }
-        render_mirror_set.Angle(ang);
         BAMAngleToMatrix(~ang, &data.rotation_vector_x_, &data.rotation_vector_y_);
     }
     else
     {
         BAMAngleToMatrix(tilt ? ~mo->vertical_angle_ : 0, &data.mouselook_x_vector_, &data.mouselook_z_vector_);
         BAMAngle ang = mo->angle_ + rotation;
-        render_mirror_set.Angle(ang);
         BAMAngleToMatrix(~ang, &data.rotation_vector_x_, &data.rotation_vector_y_);
     }
 
-    data.used_normals_ = (lerp < 0.5) ? data.frame1_->used_normals : data.frame2_->used_normals;
+    int light_level = 255;
 
-    InitializeNormalColors(&data);
+    const SpriteLightTable *light_table = GetModelLightTable(
+        props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->sector_, &light_level);
 
     GLuint skin_tex = 0;
 
@@ -939,77 +733,18 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
         if (skin_tex == 0)
             FatalError("MDL Frame %s missing skins?\n", md->frames_[frame1].name);
-
-        AbstractShader *shader =
-            GetColormapShader(props, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->subsector_->sector);
-
-        ShadeNormals(shader, &data, true);
-
-        if (use_dynamic_lights && render_view_extra_light < 250)
-        {
-            RotateUsedNormals(&data);
-
-            float r = mo->radius_;
-
-            DynamicLightIterator(mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r, mo->z + mo->height_,
-                                 MDLDynamicLightCallback, &data);
-
-            SectorGlowIterator(mo->subsector_->sector, mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r,
-                               mo->z + mo->height_, MDLDynamicLightCallback, &data);
-        }
     }
 
     /* draw the model */
 
     ModelMesh &mesh = md->mesh_;
 
-    int total_vertices = mesh.TotalVertices();
-
-    float normal_color_table[kTotalMDFormatNormals][6];
-
-    if (data.is_fuzzy_)
-    {
-        EPI_CLEAR_MEMORY(&normal_color_table[0][0], float, kTotalMDFormatNormals * 6);
-    }
-    else
-    {
-        for (short *n_list = data.used_normals_; *n_list >= 0; n_list++)
-        {
-            const ColorMixer *col = &data.normal_colors_[*n_list];
-
-            float *entry = normal_color_table[*n_list];
-
-            entry[0] = col->modulate_red_ * render_view_red_multiplier / 255.0f;
-            entry[1] = col->modulate_green_ * render_view_green_multiplier / 255.0f;
-            entry[2] = col->modulate_blue_ * render_view_blue_multiplier / 255.0f;
-
-            entry[3] = col->add_red_ * render_view_red_multiplier / 255.0f;
-            entry[4] = col->add_green_ * render_view_green_multiplier / 255.0f;
-            entry[5] = col->add_blue_ * render_view_blue_multiplier / 255.0f;
-        }
-    }
-
-    bool use_frame2 = (lerp >= 0.5f);
-
-    const MDLVertex *normal_frame = use_frame2 ? data.frame2_->vertices : data.frame1_->vertices;
-
-    for (int v = 0; v < total_vertices; v++)
-    {
-        int normal_idx = normal_frame[mesh.vertices_[(size_t)v].vert_idx].normal_idx;
-
-        memcpy(&mesh.colors_[(size_t)v * 6], normal_color_table[normal_idx], 6 * sizeof(float));
-    }
-
-    render_state->UpdateModelColors(mesh.gpu_handle_, mesh.colors_.data(), total_vertices);
-
-    int num_pass = (!data.is_fuzzy_ && MDLMulticolorMaximumRGB(&data, true) > 0) ? 2 : 1;
-
-    RGBAColor fc_to_use = mo->subsector_->sector->properties.fog_color;
-    float     fd_to_use = mo->subsector_->sector->properties.fog_density;
+    RGBAColor fc_to_use = mo->sector_->properties.fog_color;
+    float     fd_to_use = mo->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
     {
-        if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling))
+        if (EDGE_IMAGE_IS_SKY(mo->sector_->ceiling))
         {
             fc_to_use = current_map->outdoor_fog_color_;
             fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -1067,127 +802,128 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     else
         render_state->Disable(GL_FOG);
 
-    for (int pass = 0; pass < num_pass; pass++)
+    render_state->PolygonOffset(0, 0);
+
+    if (blending & kBlendingLess)
     {
-        if (pass == 1)
+        render_state->Enable(GL_ALPHA_TEST);
+    }
+    else if (blending & kBlendingMasked)
+    {
+        render_state->Enable(GL_ALPHA_TEST);
+        render_state->AlphaFunction(GL_GREATER, 0);
+    }
+    else
+        render_state->Disable(GL_ALPHA_TEST);
+
+    if (blending & kBlendingAdd)
+    {
+        render_state->Enable(GL_BLEND);
+        render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
+    }
+    else if (blending & kBlendingAlpha)
+    {
+        render_state->Enable(GL_BLEND);
+        render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    else
+        render_state->Disable(GL_BLEND);
+
+    if (blending & (kBlendingCullBack | kBlendingCullFront))
+    {
+        render_state->Enable(GL_CULL_FACE);
+        render_state->CullFace((blending & kBlendingCullFront) ? GL_FRONT : GL_BACK);
+    }
+    else
+        render_state->Disable(GL_CULL_FACE);
+
+    render_state->DepthMask((blending & kBlendingNoZBuffer) ? false : true);
+
+    if (blending & kBlendingLess)
+    {
+        // NOTE: assumes alpha is constant over whole model
+        render_state->AlphaFunction(GL_GREATER, trans * 0.66f);
+    }
+
+    render_state->ActiveTexture(GL_TEXTURE1);
+    render_state->Disable(GL_TEXTURE_2D);
+    render_state->ActiveTexture(GL_TEXTURE0);
+    render_state->Enable(GL_TEXTURE_2D);
+    render_state->BindTexture(skin_tex);
+
+    GLint old_clamp = kDummyClamp;
+
+    if (blending & kBlendingClampY)
+    {
+        auto existing = texture_clamp_t.find(skin_tex);
+        if (existing != texture_clamp_t.end())
         {
-            blending = (BlendingMode)(blending & ~kBlendingAlpha);
-            blending = (BlendingMode)(blending | kBlendingAdd);
-            render_state->Disable(GL_FOG);
+            old_clamp = existing->second;
         }
 
-        data.is_additive_ = (pass > 0);
+        render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
+    }
 
-        render_state->PolygonOffset(0, -pass);
+    render_state->SetPipeline(0);
 
-        if (blending & kBlendingLess)
-        {
-            render_state->Enable(GL_ALPHA_TEST);
-        }
-        else if (blending & kBlendingMasked)
-        {
-            render_state->Enable(GL_ALPHA_TEST);
-            render_state->AlphaFunction(GL_GREATER, 0);
-        }
-        else
-            render_state->Disable(GL_ALPHA_TEST);
+    ModelDrawInfo info;
 
-        if (blending & kBlendingAdd)
-        {
-            render_state->Enable(GL_BLEND);
-            render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
-        }
-        else if (blending & kBlendingAlpha)
-        {
-            render_state->Enable(GL_BLEND);
-            render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        }
-        else
-            render_state->Disable(GL_BLEND);
+    info.handle = mesh.gpu_handle_;
 
-        if (blending & (kBlendingCullBack | kBlendingCullFront))
-        {
-            render_state->Enable(GL_CULL_FACE);
-            render_state->CullFace((blending & kBlendingCullFront) ? GL_FRONT : GL_BACK);
-        }
-        else
-            render_state->Disable(GL_CULL_FACE);
 
-        render_state->DepthMask((blending & kBlendingNoZBuffer) ? false : true);
+    info.world_lit = use_dynamic_lights && render_view_extra_light < 250 && !data.is_fuzzy_;
 
-        if (blending & kBlendingLess)
-        {
-            // NOTE: assumes alpha is constant over whole model
-            render_state->AlphaFunction(GL_GREATER, trans * 0.66f);
-        }
+    info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
 
-        render_state->ActiveTexture(GL_TEXTURE1);
-        render_state->Disable(GL_TEXTURE_2D);
-        render_state->ActiveTexture(GL_TEXTURE0);
-        render_state->Enable(GL_TEXTURE_2D);
-        render_state->BindTexture(skin_tex);
+    info.color_lookup = data.is_fuzzy_ ? 0 : render_unit_color_lookup;
 
-        GLint old_clamp = kDummyClamp;
+    info.frame1 = frame1;
+    info.frame2 = frame2;
+    info.lerp   = lerp;
 
-        if (blending & kBlendingClampY)
-        {
-            auto existing = texture_clamp_t.find(skin_tex);
-            if (existing != texture_clamp_t.end())
-            {
-                old_clamp = existing->second;
-            }
+    info.transform =
+        ModelBuildTransform(data.xy_scale_, data.z_scale_, data.bias_, data.mouselook_x_vector_,
+                            data.mouselook_z_vector_, data.rotation_vector_x_, data.rotation_vector_y_, data.x_,
+                            data.y_, data.z_);
 
-            render_state->TextureWrapT(GL_CLAMP_TO_EDGE);
-        }
+    info.alpha = trans;
 
-        render_state->SetPipeline(0);
+    info.light_table       = light_table;
+    info.light_level       = (float)light_level;
+    info.light_depth_fixed = is_weapon;
+    info.light_fixed_depth = is_weapon ? WeaponModelLightDepth(mo) : 0.0f;
+    info.fuzzy             = data.is_fuzzy_;
+    info.tint = {{render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier}};
 
-        ModelDrawInfo info;
+    if (blending & kBlendingLess)
+        info.alpha_test = trans * 0.66f;
+    else if (blending & kBlendingMasked)
+        info.alpha_test = 1.0f / 255.0f;
+    else
+        info.alpha_test = 0.0f;
 
-        info.handle = mesh.gpu_handle_;
+    if (data.is_fuzzy_)
+    {
+        info.texture_scale  = {{data.fuzz_multiplier_, data.fuzz_multiplier_}};
+        info.texture_offset = data.fuzz_add_;
+    }
 
-        info.frame1 = frame1;
-        info.frame2 = frame2;
-        info.lerp   = lerp;
+    for (size_t s = 0; s < mesh.submeshes_.size(); s++)
+    {
+        const ModelMeshSubmesh &submesh = mesh.submeshes_[s];
 
-        info.transform =
-            ModelBuildTransform(data.xy_scale_, data.z_scale_, data.bias_, render_mirror_set.Reflective(),
-                                data.mouselook_x_vector_, data.mouselook_z_vector_, data.rotation_vector_x_,
-                                data.rotation_vector_y_, data.x_, data.y_, data.z_);
+        info.first_vertex = submesh.first_vertex;
+        info.vertex_count = submesh.vertex_count;
+        info.first_index  = submesh.first_index;
+        info.index_count  = submesh.index_count;
 
-        info.alpha         = trans;
-        info.additive_pass = data.is_additive_;
+        render_state->DrawModel(info);
+    }
 
-        if (blending & kBlendingLess)
-            info.alpha_test = trans * 0.66f;
-        else if (blending & kBlendingMasked)
-            info.alpha_test = 1.0f / 255.0f;
-        else
-            info.alpha_test = 0.0f;
-
-        if (data.is_fuzzy_)
-        {
-            info.texture_scale  = {{data.fuzz_multiplier_, data.fuzz_multiplier_}};
-            info.texture_offset = data.fuzz_add_;
-        }
-
-        for (size_t s = 0; s < mesh.submeshes_.size(); s++)
-        {
-            const ModelMeshSubmesh &submesh = mesh.submeshes_[s];
-
-            info.first_vertex = submesh.first_vertex;
-            info.vertex_count = submesh.vertex_count;
-            info.first_index  = submesh.first_index;
-            info.index_count  = submesh.index_count;
-
-            render_state->DrawModel(info);
-        }
-
-        // restore the clamping mode
-        if (old_clamp != kDummyClamp)
-        {
-            render_state->TextureWrapT(old_clamp);
-        }
+    // restore the clamping mode
+    if (old_clamp != kDummyClamp)
+    {
+        render_state->TextureWrapT(old_clamp);
     }
 }
 

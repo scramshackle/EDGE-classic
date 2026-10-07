@@ -31,6 +31,7 @@
 #include "g_game.h"
 #include "p_local.h"
 #include "r_state.h"
+#include "r_static.h"
 #include "s_sound.h"
 #include "w_texture.h"
 
@@ -153,7 +154,8 @@ void ChangeSwitchTexture(Line *line, bool useAgain, LineSpecial specials, bool n
 
             if (pos != kButtonNone)
             {
-                DemoteSideToDynamic(side);
+                if (side->sector)
+                    StaticMeshInvalidateSector(side->sector);
 
                 // -KM- 98/07/31 Implement sounds
                 if (!noSound && sw->on_sfx_)
@@ -215,7 +217,8 @@ void UpdateButtons(void)
 
         if (b->button_timer == 0)
         {
-            DemoteSideToDynamic(b->line->side[0]);
+            if (b->line->side[0]->sector)
+                StaticMeshInvalidateSector(b->line->side[0]->sector);
 
             switch (b->where)
             {

@@ -6,6 +6,9 @@
 #include "gpu_device.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
+#include "gpu_lights.h"
+
+#include "r_lightgrid.h"
 #include "gpu_pipeline.h"
 #include "i_system.h"
 #include "r_backend.h"
@@ -127,18 +130,6 @@ class GpuRenderState : public RenderState
         case GL_STENCIL_TEST:
             enable_stencil_test_ = enabled;
             break;
-        case GL_CLIP_PLANE0:
-        case GL_CLIP_PLANE1:
-        case GL_CLIP_PLANE2:
-        case GL_CLIP_PLANE3:
-        case GL_CLIP_PLANE4:
-        case GL_CLIP_PLANE5:
-            if (clip_planes_[cap - GL_CLIP_PLANE0].enabled_ != enabled)
-            {
-                clip_planes_[cap - GL_CLIP_PLANE0].enabled_ = enabled;
-                clip_planes_[cap - GL_CLIP_PLANE0].dirty_   = true;
-            }
-            break;
         default:
             break;
         }
@@ -161,10 +152,7 @@ class GpuRenderState : public RenderState
 
     void ColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
     {
-        EPI_UNUSED(red);
-        EPI_UNUSED(green);
-        EPI_UNUSED(blue);
-        EPI_UNUSED(alpha);
+        color_write_enabled_ = (red || green || blue || alpha);
     }
 
     void StencilFunction(GLenum func, GLint ref, GLuint mask)
@@ -188,11 +176,6 @@ class GpuRenderState : public RenderState
         stencil_write_mask_ = mask;
     }
 
-    bool HasStencilBuffer()
-    {
-        return gpu_device.HasStencil();
-    }
-
     void CullFace(GLenum mode)
     {
         cull_face_ = mode;
@@ -214,16 +197,6 @@ class GpuRenderState : public RenderState
         bind_texture_2d_[active_texture_ - GL_TEXTURE0] = textureid;
     }
 
-    void ClipPlane(GLenum plane, GLdouble *equation)
-    {
-        int index = plane - GL_CLIP_PLANE0;
-
-        for (int i = 0; i < 4; i++)
-            clip_planes_[index].equation_[i] = equation[i];
-
-        clip_planes_[index].dirty_ = true;
-    }
-
     void PolygonOffset(GLfloat factor, GLfloat units)
     {
         polygon_offset_factor_ = factor;
@@ -235,7 +208,7 @@ class GpuRenderState : public RenderState
         if (mask & GL_DEPTH_BUFFER_BIT)
             gpu_immediate.ClearDepth();
 
-        if ((mask & GL_STENCIL_BUFFER_BIT) && gpu_device.HasStencil())
+        if (mask & GL_STENCIL_BUFFER_BIT)
             gpu_immediate.ClearStencil();
     }
 
@@ -475,15 +448,18 @@ class GpuRenderState : public RenderState
         EPI_UNUSED(format);
         EPI_UNUSED(type);
 
-        if (level != 0 || xoffset != 0 || yoffset != 0)
-            FatalError("TexSubImage2D: only full-image updates of level 0 are supported");
+        if (level != 0)
+            FatalError("TexSubImage2D: only updates of level 0 are supported");
 
         GLuint texture_id = bind_texture_2d_[active_texture_ - GL_TEXTURE0];
 
         if (!texture_id)
             FatalError("TexSubImage2D: no texture bound on update");
 
-        if (!UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+        if (xoffset == 0 && yoffset == 0 && UpdateGpuImage(gpu_device.Handle(), texture_id, width, height, pixels))
+            return;
+
+        if (!UpdateGpuImageRegion(gpu_device.Handle(), texture_id, xoffset, yoffset, width, height, pixels))
             FatalError("TexSubImage2D: failed to update texture %u", texture_id);
     }
 
@@ -500,6 +476,9 @@ class GpuRenderState : public RenderState
 
         if (format != GL_RGBA || type != GL_UNSIGNED_BYTE)
             FatalError("ReadPixels: unsupported format 0x%04x / type 0x%04x\n", format, type);
+
+        if (gpu_device.BeginReplay(false))
+            gpu_immediate.Replay();
 
         if (!gpu_device.ReadColorRegion(x, y, width, height, width * 4, (uint8_t *)pixels))
             memset(pixels, 0, (size_t)width * (size_t)height * 4);
@@ -518,6 +497,8 @@ class GpuRenderState : public RenderState
         enable_fog_          = false;
         enable_stencil_test_ = false;
 
+        color_write_enabled_ = true;
+
         depth_mask_     = true;
         depth_function_ = GL_LEQUAL;
 
@@ -535,15 +516,6 @@ class GpuRenderState : public RenderState
             enable_texture_2d_[i] = false;
             bind_texture_2d_[i]   = 0;
         }
-
-        for (int i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            clip_planes_[i].enabled_ = false;
-            clip_planes_[i].dirty_   = false;
-        }
-
-        scissor_.enabled_ = false;
-        scissor_.dirty_   = false;
     }
 
     void SetPipeline(uint32_t flags)
@@ -556,7 +528,7 @@ class GpuRenderState : public RenderState
         if (depth_function_ == GL_GREATER)
             pipeline_flags |= kGpuPipelineDepthGreater;
 
-        if (enable_depth_test_)
+        if (enable_depth_test_ && depth_function_ != GL_ALWAYS)
             pipeline_flags |= kGpuPipelineDepthTest;
 
         if (enable_blend_)
@@ -570,13 +542,24 @@ class GpuRenderState : public RenderState
                 pipeline_flags |= kGpuPipelineCullFront;
         }
 
-        if (enable_stencil_test_ && gpu_device.HasStencil())
+        if (enable_stencil_test_)
         {
-            if (stencil_write_mask_ != 0 && stencil_pass_operation_ == GL_REPLACE)
-                pipeline_flags |= kGpuPipelineStencilWrite;
-            else if (stencil_function_ == GL_EQUAL)
+            if (stencil_function_ == GL_EQUAL)
                 pipeline_flags |= kGpuPipelineStencilTest;
+
+            if (stencil_write_mask_ != 0)
+            {
+                if (stencil_pass_operation_ == GL_REPLACE)
+                    pipeline_flags |= kGpuPipelineStencilWrite;
+                else if (stencil_pass_operation_ == GL_INCR)
+                    pipeline_flags |= kGpuPipelineStencilIncrement;
+                else if (stencil_pass_operation_ == GL_DECR)
+                    pipeline_flags |= kGpuPipelineStencilDecrement;
+            }
         }
+
+        if (!color_write_enabled_)
+            pipeline_flags |= kGpuPipelineNoColorWrite;
 
         pipeline_flags |= flags;
 
@@ -614,17 +597,6 @@ class GpuRenderState : public RenderState
                 gpu_immediate.ScissorRect(0, 0, pass_info.width_, pass_info.height_);
             }
         }
-
-        for (int i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            if (!clip_planes_[i].dirty_)
-                continue;
-
-            clip_planes_[i].dirty_ = false;
-
-            gpu_immediate.SetClipPlaneEnabled(i, clip_planes_[i].enabled_);
-            gpu_immediate.SetClipPlane(i, clip_planes_[i].equation_);
-        }
     }
 
     void SetVertexArrays(const RendererVertex *vertices, int count)
@@ -653,15 +625,29 @@ class GpuRenderState : public RenderState
         gpu_immediate.DeleteModelMesh(handle);
     }
 
-    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
-    {
-        gpu_immediate.UpdateModelColors(handle, colors, vertex_count);
-    }
-
     void DrawModel(const ModelDrawInfo &info)
     {
         if (info.handle == 0 || info.index_count <= 0)
             return;
+
+        int32_t oit_mode = render_backend->OitMode();
+
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
+
+            if (model_pass != oit_mode)
+                return;
+        }
+
+        if (oit_mode == kOitPassAccumulate)
+        {
+            Enable(GL_BLEND);
+            BlendFunction(GL_ONE, GL_ONE);
+            DepthMask(false);
+
+            SetPipeline(0);
+        }
 
         ApplyTextureBindings();
 
@@ -682,23 +668,21 @@ class GpuRenderState : public RenderState
         vertex_parameters.texture_offset[0] = info.texture_offset.X;
         vertex_parameters.texture_offset[1] = info.texture_offset.Y;
 
+        vertex_parameters.light[0] = info.light_level;
+        vertex_parameters.light[1] = info.light_fixed_depth;
+        vertex_parameters.light[2] = info.light_depth_fixed ? 1.0f : 0.0f;
+        vertex_parameters.light[3] = info.fuzzy ? 1.0f : 0.0f;
+
+        vertex_parameters.tint[0] = info.tint.X;
+        vertex_parameters.tint[1] = info.tint.Y;
+        vertex_parameters.tint[2] = info.tint.Z;
+        vertex_parameters.tint[3] = 1.0f;
+
         GpuModelFragmentParameters fragment_parameters;
         EPI_CLEAR_MEMORY(&fragment_parameters, GpuModelFragmentParameters, 1);
 
-        fragment_parameters.alpha         = info.alpha;
-        fragment_parameters.alpha_test    = info.alpha_test;
-        fragment_parameters.additive_pass = info.additive_pass ? 1.0f : 0.0f;
-
-        for (int32_t i = 0; i < kGpuMaximumClipPlanes; i++)
-        {
-            if (!clip_planes_[i].enabled_)
-                continue;
-
-            fragment_parameters.clipplanes |= (1 << i);
-
-            for (int32_t e = 0; e < 4; e++)
-                vertex_parameters.clipplane[i][e] = (float)clip_planes_[i].equation_[e];
-        }
+        fragment_parameters.alpha      = info.alpha;
+        fragment_parameters.alpha_test = info.alpha_test;
 
         if (enable_fog_)
         {
@@ -714,6 +698,40 @@ class GpuRenderState : public RenderState
             fragment_parameters.fog_start   = fog_start_;
             fragment_parameters.fog_end     = fog_end_;
         }
+
+        int light_view_index = info.world_lit ? GpuCurrentLightView() : -1;
+
+        const GpuLightViewParameters *light_view = GpuLightView(light_view_index);
+
+        if (light_view)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                fragment_parameters.light_view[i]  = light_view->light_view[i];
+                fragment_parameters.light_range[i] = light_view->light_range[i];
+            }
+        }
+
+        const LightGridGlowSet *glow_set = info.world_lit ? LightGridGlowSetAt(info.glow_set) : nullptr;
+
+        fragment_parameters.glow_additive[3] = (glow_set && glow_set->count > 0) ? (float)glow_set->count : 0.0f;
+
+        for (int i = 0; i < 2; i++)
+        {
+            bool live = glow_set && i < glow_set->count;
+
+            for (int e = 0; e < 4; e++)
+                fragment_parameters.glow_plane[i][e] = live ? glow_set->glows[i].plane[e] : 0.0f;
+
+            fragment_parameters.glow_color[i][0] = live ? glow_set->glows[i].color[0] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][1] = live ? glow_set->glows[i].color[1] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][2] = live ? glow_set->glows[i].color[2] / 255.0f : 0.0f;
+            fragment_parameters.glow_color[i][3] = live ? glow_set->glows[i].radius : 1.0f;
+
+            fragment_parameters.glow_additive[i] = live ? glow_set->glows[i].additive : 0.0f;
+        }
+
+        fragment_parameters.color_lookup[0] = gpu_immediate.SetColorLookup(info.color_lookup) ? 1.0f : 0.0f;
 
         gpu_immediate.RecordModelDraw(info, vertex_parameters, fragment_parameters);
     }
@@ -734,7 +752,16 @@ class GpuRenderState : public RenderState
 
         ApplyTextureBindings();
 
+        gpu_immediate.SetColorLookup(color_lookup_slot_);
+
         gpu_immediate.DrawIndexed(vertex_array_base_, vertex_array_count_, model_indices_ + index_first, index_count);
+
+        gpu_immediate.SetColorLookup(0);
+    }
+
+    void SetColorLookup(int slot)
+    {
+        color_lookup_slot_ = slot;
     }
 
   private:
@@ -771,13 +798,6 @@ class GpuRenderState : public RenderState
         mip_levels_.clear();
     }
 
-    struct GpuClipPlane
-    {
-        bool     enabled_;
-        bool     dirty_;
-        GLdouble equation_[4];
-    };
-
     struct GpuScissor
     {
         bool    enabled_;
@@ -799,6 +819,8 @@ class GpuRenderState : public RenderState
     bool enable_depth_test_   = false;
     bool enable_stencil_test_ = false;
 
+    bool color_write_enabled_ = true;
+
     GLenum  stencil_function_       = GL_ALWAYS;
     GLenum  stencil_pass_operation_ = GL_KEEP;
     uint8_t stencil_reference_      = 0;
@@ -807,7 +829,6 @@ class GpuRenderState : public RenderState
 
     GLenum depth_function_ = GL_LEQUAL;
 
-    GpuClipPlane clip_planes_[kGpuMaximumClipPlanes] = {};
 
     GpuScissor scissor_ = {};
 
@@ -854,6 +875,8 @@ class GpuRenderState : public RenderState
 
     const uint16_t *model_indices_     = nullptr;
     int             model_index_count_ = 0;
+
+    int color_lookup_slot_ = 0;
 };
 
 static GpuRenderState state;

@@ -35,6 +35,7 @@
 #include "w_epk.h"
 
 struct TextureDefinition;
+class ImageData;
 
 // the transparent pixel value we use
 constexpr uint8_t kTransparentPixelIndex = 247;
@@ -84,8 +85,6 @@ class Image
 
     LiquidImageType liquid_type_;
 
-    int swirled_game_tic_;
-
     bool is_font_;
 
     // For fully transparent images
@@ -99,8 +98,6 @@ class Image
     int hsv_saturation_ = -1;
     int hsv_value_      = 0;
 
-    Image *blurred_version_ = nullptr;
-    float  blur_sigma_      = 0.0f;
 
     // --- information about where this image came from ---
     std::string name_;
@@ -150,6 +147,10 @@ class Image
     // --- information about caching ---
 
     std::vector<struct CachedImage *> cache_;
+
+    bool  atlas_checked_      = false;
+    int   atlas_page_         = -1;
+    float atlas_rectangle_[4] = {0.0f, 0.0f, 1.0f, 1.0f};
 
     // --- animation info ---
 
@@ -220,7 +221,7 @@ const Image *ImageLookup(const char *name, ImageNamespace = kImageNamespaceGraph
 const Image *ImageForDummySprite(void);
 const Image *ImageForDummySkin(void);
 const Image *ImageForHomDetect(void);
-const Image *ImageForFogWall(RGBAColor fog_color);
+const Image *ImageForFogWall(void);
 
 // savegame code (Only)
 const Image *ImageParseSaveString(char type, const char *name);
@@ -232,17 +233,21 @@ void         ImageMakeSaveString(const Image *image, char *type, char *namebuf);
 
 extern int image_mipmapping;
 extern int image_smoothing;
-extern int hq2x_scaling;
+extern int image_upscaling;
 
 enum LiquidSwirl
 {
-    kLiquidSwirlVanilla   = 0,
-    kLiquidSwirlSmmu      = 1,
-    kLiquidSwirlSmmuSlosh = 2,
-    kLiquidSwirlParallax  = 3
+    kLiquidSwirlVanilla    = 0,
+    kLiquidSwirlLegacySmmu = 1,
+    kLiquidSwirlSwirl      = 2,
+    kLiquidSwirlParallax   = 3,
+    kLiquidSwirlScanline   = 4
 };
 
 extern LiquidSwirl swirling_flats;
+
+void     NormalizeLiquidSwirl(void);
+HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds);
 
 bool InitializeImages(void);
 void AnimationTicker(void);
@@ -259,7 +264,9 @@ void         AnimateImageSet(const Image **images, int number, int speed);
 void CreateFallbackFlat(void);
 void CreateFallbackTexture(void);
 
-GLuint ImageCache(const Image *image, bool anim = true, const Colormap *trans = nullptr, bool do_whiten = false);
+GLuint ImageCache(const Image *image, bool anim = true);
+
+ImageData *LoadAtlasImageData(Image *rim, bool *smooth);
 void   MarkImageAsSky(const Image *image);
 void   ImagePrecache(const Image *image);
 
@@ -267,7 +274,6 @@ void   ImagePrecache(const Image *image);
 const Image **GetUserSprites(int *count);
 
 // Store a duplicate version of the image_c with smoothing forced
-void StoreBlurredImage(const Image *image);
 
 enum ImageSource
 {

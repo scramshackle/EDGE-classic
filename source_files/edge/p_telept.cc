@@ -42,12 +42,9 @@ MapObject *FindTeleportMan(int tag, const MapObjectDefinition *info)
         if (level_sectors[i].tag != tag)
             continue;
 
-        for (Subsector *sub = level_sectors[i].subsectors; sub; sub = sub->sector_next)
-        {
-            for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
-                if (mo->info_ == info && !(mo->extended_flags_ & kExtendedFlagNeverTarget))
-                    return mo;
-        }
+        for (MapObject *mo = level_sectors[i].thing_list; mo; mo = mo->sector_next_)
+            if (mo->info_ == info && !(mo->extended_flags_ & kExtendedFlagNeverTarget))
+                return mo;
     }
 
     return nullptr; // not found

@@ -50,10 +50,16 @@ enum SkyboxFace
 void ComputeSkyHeights(void);
 
 void BeginSky(void);
+struct DrawMirror;
+
 void FinishSky(bool use_depth_mask);
 
-void RenderSkyPlane(Subsector *sub, float h, Sector *sky_owner, int face);
-void RenderSkyWall(Seg *seg, float h1, float h2, Sector *sky_owner, int part);
+void FinishSkyForMirror(const DrawMirror *mir);
+
+constexpr int kSkyWallPartEntry = 3;
+
+void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMirror *mir);
+void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir);
 
 void UpdateSkyboxTextures(void);
 
@@ -68,8 +74,19 @@ void ShutdownSky(void);
 
 void SkyResidentInvalidateSector(Sector *sec);
 
-bool SkyPlaneIsBaked(const Subsector *sub, int face);
-bool SkyWallIsBaked(const Seg *seg, int part);
+uint32_t SkyResidentGeneration(void);
+
+bool SkyResidentEnabled(void);
+
+void SkyNoteResidentVisible(void);
+
+bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner);
+
+void SkyEntryNoteSectorChanged(int index);
+
+void SkyResidentOrganize(void);
+
+bool SkyEntryClipNeeded(const Sector *entered, const Sector *from);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

@@ -127,7 +127,11 @@ uint32_t GetAtomicU32(SystemAtomicU32 *atomic)
 
 uint32_t AddAtomicU32(SystemAtomicU32 *atomic, int32_t delta)
 {
+#if (SDL_MINOR_VERSION < 4)
+    return (uint32_t)SDL_AddAtomicInt((SDL_AtomicInt *)atomic, delta);
+#else
     return SDL_AddAtomicU32((SDL_AtomicU32 *)atomic, (Uint32)delta);
+#endif
 }
 
 int TotalSystemCPUs(void)

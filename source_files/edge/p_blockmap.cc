@@ -24,6 +24,8 @@
 //----------------------------------------------------------------------------
 
 #include <float.h>
+#include <math.h>
+#include <stdlib.h>
 
 #include <algorithm>
 #include <unordered_set>
@@ -37,6 +39,7 @@
 #include "i_defs_gl.h" // needed for r_shader.h
 #include "i_system.h"
 #include "m_bbox.h"
+#include "m_math.h"
 #include "p_local.h"
 #include "p_spec.h"
 #include "r_gldefs.h"
@@ -49,7 +52,6 @@ extern AbstractShader *MakeDLightShader(MapObject *mo, float r);
 extern AbstractShader *MakePlaneGlow(MapObject *mo, float r);
 extern AbstractShader *MakeWallGlow(MapObject *mo, float r);
 
-extern unsigned int root_node;
 
 // BLOCKMAP
 //
@@ -237,37 +239,37 @@ void UnsetThingPosition(MapObject *mo)
     {
         // (inert things don't need to be in subsector list)
 
-        if (mo->subsector_next_)
+        if (mo->sector_next_)
         {
-            if (mo->subsector_next_->subsector_previous_)
+            if (mo->sector_next_->sector_previous_)
             {
-                EPI_ASSERT(mo->subsector_next_->subsector_previous_ == mo);
+                EPI_ASSERT(mo->sector_next_->sector_previous_ == mo);
 
-                mo->subsector_next_->subsector_previous_ = mo->subsector_previous_;
+                mo->sector_next_->sector_previous_ = mo->sector_previous_;
             }
         }
 
-        if (mo->subsector_previous_)
+        if (mo->sector_previous_)
         {
-            if (mo->subsector_previous_->subsector_next_)
+            if (mo->sector_previous_->sector_next_)
             {
-                EPI_ASSERT(mo->subsector_previous_->subsector_next_ == mo);
+                EPI_ASSERT(mo->sector_previous_->sector_next_ == mo);
 
-                mo->subsector_previous_->subsector_next_ = mo->subsector_next_;
+                mo->sector_previous_->sector_next_ = mo->sector_next_;
             }
         }
         else
         {
-            if (mo->subsector_->thing_list)
+            if (mo->sector_->thing_list)
             {
-                EPI_ASSERT(mo->subsector_->thing_list == mo);
+                EPI_ASSERT(mo->sector_->thing_list == mo);
 
-                mo->subsector_->thing_list = mo->subsector_next_;
+                mo->sector_->thing_list = mo->sector_next_;
             }
         }
 
-        mo->subsector_next_     = nullptr;
-        mo->subsector_previous_ = nullptr;
+        mo->sector_next_     = nullptr;
+        mo->sector_previous_ = nullptr;
     }
 
     // unlink from touching list.
@@ -366,7 +368,7 @@ void UnsetThingPosition(MapObject *mo)
     if (mo->info_ && (mo->info_->dlight_.type_ != kDynamicLightTypeNone) &&
         (mo->info_->glow_type_ != kSectorGlowTypeNone))
     {
-        Sector *sec = mo->subsector_->sector;
+        Sector *sec = mo->sector_;
 
         if (mo->dynamic_light_next_)
         {
@@ -475,10 +477,10 @@ static bool CheckSectorCallback(Line *ld, void *data)
     // The sector containing the thing's subsector is skipped here,
     // as that is manually linked afterwards
 
-    if (ld->front_sector != pos->thing->subsector_->sector)
+    if (ld->front_sector != pos->thing->sector_)
         AddSectorNode(ld->front_sector, pos->thing);
 
-    if (ld->back_sector && ld->back_sector != ld->front_sector && ld->back_sector != pos->thing->subsector_->sector)
+    if (ld->back_sector && ld->back_sector != ld->front_sector && ld->back_sector != pos->thing->sector_)
         AddSectorNode(ld->back_sector, pos->thing);
 
     return true;
@@ -490,36 +492,36 @@ static bool CheckSectorCallback(Line *ld, void *data)
 // Links a thing into both a block and a subsector
 // based on it's x y.
 //
-void SetThingPosition(MapObject *mo)
+void SetThingPosition(MapObject *mo, Sector *known_sector)
 {
-    Subsector *ss;
-    int        blockx;
-    int        blocky;
-    int        bnum;
+    Sector *ss;
+    int     blockx;
+    int     blocky;
+    int     bnum;
 
     BSPThingPosition pos;
     TouchNode       *tn;
 
     // -ES- 1999/12/04 The position must be unset before it's set again.
-    if (mo->subsector_next_ || mo->subsector_previous_ || mo->blockmap_next_ || mo->blockmap_previous_)
+    if (mo->sector_next_ || mo->sector_previous_ || mo->blockmap_next_ || mo->blockmap_previous_)
         FatalError("INTERNAL ERROR: Double SetThingPosition call.");
 
     EPI_ASSERT(!(mo->dynamic_light_next_ || mo->dynamic_light_previous_));
 
     // link into subsector
-    ss             = PointInSubsector(mo->x, mo->y);
-    mo->subsector_ = ss;
+    ss          = known_sector ? known_sector : PointInSector(mo->x, mo->y);
+    mo->sector_ = ss;
 
     // determine properties
     mo->region_properties_ = GetPointProperties(ss, mo->z + mo->height_ / 2);
 
     if (!(mo->flags_ & kMapObjectFlagNoSector))
     {
-        mo->subsector_next_     = ss->thing_list;
-        mo->subsector_previous_ = nullptr;
+        mo->sector_next_     = ss->thing_list;
+        mo->sector_previous_ = nullptr;
 
         if (ss->thing_list)
-            ss->thing_list->subsector_previous_ = mo;
+            ss->thing_list->sector_previous_ = mo;
 
         ss->thing_list = mo;
     }
@@ -534,7 +536,7 @@ void SetThingPosition(MapObject *mo)
     BlockmapLineIterator(pos.bbox[kBoundingBoxLeft], pos.bbox[kBoundingBoxBottom], pos.bbox[kBoundingBoxRight],
                          pos.bbox[kBoundingBoxTop], CheckSectorCallback, &pos);
 
-    AddSectorNode(ss->sector, mo);
+    AddSectorNode(ss, mo);
 
     // handle any left-over unused touch nodes
     for (tn = mo->touch_sectors_; tn && tn->map_object; tn = tn->map_object_next)
@@ -616,7 +618,7 @@ void SetThingPosition(MapObject *mo)
     if (mo->info_ && (mo->info_->dlight_.type_ != kDynamicLightTypeNone) &&
         (mo->info_->glow_type_ != kSectorGlowTypeNone))
     {
-        Sector *sec = mo->subsector_->sector;
+        Sector *sec = mo->sector_;
 
         mo->dynamic_light_previous_ = nullptr;
         mo->dynamic_light_next_     = sec->glow_things;
@@ -636,7 +638,7 @@ void SetThingPosition(MapObject *mo)
 // when moving a thing, rather than fiddling with the coordinates
 // directly (or even P_UnsetThingPos/P_SetThingPos pairs).
 //
-void ChangeThingPosition(MapObject *mo, float x, float y, float z)
+void ChangeThingPosition(MapObject *mo, float x, float y, float z, Sector *known_sector)
 {
     UnsetThingPosition(mo);
     {
@@ -644,7 +646,7 @@ void ChangeThingPosition(MapObject *mo, float x, float y, float z)
         mo->y = y;
         mo->z = z;
     }
-    SetThingPosition(mo);
+    SetThingPosition(mo, known_sector);
 }
 
 //
@@ -724,6 +726,145 @@ bool BlockmapLineIterator(float x1, float y1, float x2, float y2, bool (*func)(L
 
     // everything was checked
     return true;
+}
+
+bool BlockmapSegmentLineIterator(float x1, float y1, float x2, float y2, bool (*func)(Line *, void *), void *data)
+{
+    valid_count++;
+
+    if (!blockmap_lines || blockmap_width <= 0 || blockmap_height <= 0)
+        return true;
+
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+
+    int cell_x = (int)floorf((x1 - blockmap_origin_x) / kBlockmapUnitSize);
+    int cell_y = (int)floorf((y1 - blockmap_origin_y) / kBlockmapUnitSize);
+    int end_x  = (int)floorf((x2 - blockmap_origin_x) / kBlockmapUnitSize);
+    int end_y  = (int)floorf((y2 - blockmap_origin_y) / kBlockmapUnitSize);
+
+    int step_x = (end_x > cell_x) ? 1 : ((end_x < cell_x) ? -1 : 0);
+    int step_y = (end_y > cell_y) ? 1 : ((end_y < cell_y) ? -1 : 0);
+
+    float next_x  = FLT_MAX;
+    float next_y  = FLT_MAX;
+    float delta_x = FLT_MAX;
+    float delta_y = FLT_MAX;
+
+    if (step_x != 0)
+    {
+        float boundary = blockmap_origin_x + (float)(cell_x + (step_x > 0 ? 1 : 0)) * kBlockmapUnitSize;
+
+        next_x  = (boundary - x1) / dx;
+        delta_x = kBlockmapUnitSize / fabsf(dx);
+    }
+
+    if (step_y != 0)
+    {
+        float boundary = blockmap_origin_y + (float)(cell_y + (step_y > 0 ? 1 : 0)) * kBlockmapUnitSize;
+
+        next_y  = (boundary - y1) / dy;
+        delta_y = kBlockmapUnitSize / fabsf(dy);
+    }
+
+    int remaining = abs(end_x - cell_x) + abs(end_y - cell_y);
+
+    for (;;)
+    {
+        if (cell_x >= 0 && cell_x < blockmap_width && cell_y >= 0 && cell_y < blockmap_height)
+        {
+            std::list<Line *> *lset = blockmap_lines[cell_y * blockmap_width + cell_x];
+
+            if (lset)
+            {
+                for (std::list<Line *>::iterator LI = lset->begin(); LI != lset->end(); LI++)
+                {
+                    Line *ld = *LI;
+
+                    if (ld->valid_count == valid_count)
+                        continue;
+
+                    ld->valid_count = valid_count;
+
+                    if (!func(ld, data))
+                        return false;
+                }
+            }
+        }
+
+        if (remaining-- <= 0)
+            break;
+
+        bool advance_x = (cell_y == end_y) || (cell_x != end_x && next_x < next_y);
+
+        if (advance_x)
+        {
+            cell_x += step_x;
+            next_x += delta_x;
+        }
+        else
+        {
+            cell_y += step_y;
+            next_y += delta_y;
+        }
+    }
+
+    return true;
+}
+
+Line *BlockmapNearestLine(float x, float y)
+{
+    if (!blockmap_lines || blockmap_width <= 0 || blockmap_height <= 0)
+        return nullptr;
+
+    int center_x = HMM_MIN(HMM_MAX(BlockmapGetX(x), 0), blockmap_width - 1);
+    int center_y = HMM_MIN(HMM_MAX(BlockmapGetY(y), 0), blockmap_height - 1);
+
+    int max_ring = HMM_MAX(blockmap_width, blockmap_height);
+
+    Line *best      = nullptr;
+    float best_dist = FLT_MAX;
+
+    for (int ring = 0; ring <= max_ring; ring++)
+    {
+        if (best && best_dist <= (float)((ring - 1) * kBlockmapUnitSize))
+            break;
+
+        for (int by = center_y - ring; by <= center_y + ring; by++)
+        {
+            if (by < 0 || by >= blockmap_height)
+                continue;
+
+            bool edge_row = (by == center_y - ring || by == center_y + ring);
+
+            for (int bx = center_x - ring; bx <= center_x + ring; bx += (edge_row || ring == 0) ? 1 : ring * 2)
+            {
+                if (bx < 0 || bx >= blockmap_width)
+                    continue;
+
+                std::list<Line *> *lset = blockmap_lines[by * blockmap_width + bx];
+
+                if (!lset)
+                    continue;
+
+                for (std::list<Line *>::iterator LI = lset->begin(); LI != lset->end(); LI++)
+                {
+                    Line *ld = *LI;
+
+                    float dist = PointToSegDistance({{ld->vertex_1->X, ld->vertex_1->Y}},
+                                                    {{ld->vertex_2->X, ld->vertex_2->Y}}, {{x, y}});
+
+                    if (dist < best_dist)
+                    {
+                        best      = ld;
+                        best_dist = dist;
+                    }
+                }
+            }
+        }
+    }
+
+    return best;
 }
 
 bool BlockmapThingIterator(float x1, float y1, float x2, float y2, bool (*func)(MapObject *, void *), void *data)

@@ -127,6 +127,21 @@ bool Gles2Immediate::Init()
         return false;
     }
 
+    const float corners[12] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+
+    glGenBuffers(1, &sprite_corner_buffer_);
+    glGenBuffers(1, &sprite_instance_buffer_);
+
+    if (!sprite_corner_buffer_ || !sprite_instance_buffer_)
+    {
+        return false;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, sprite_corner_buffer_);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)sizeof(corners), corners, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+
     for (int32_t i = 0; i < kGles2MatrixModeTotal; i++)
     {
         matrix_top_[i]       = 0;
@@ -154,6 +169,18 @@ void Gles2Immediate::Shutdown()
     {
         glDeleteBuffers(1, &quad_index_buffer_);
         quad_index_buffer_ = 0;
+    }
+
+    if (sprite_corner_buffer_)
+    {
+        glDeleteBuffers(1, &sprite_corner_buffer_);
+        sprite_corner_buffer_ = 0;
+    }
+
+    if (sprite_instance_buffer_)
+    {
+        glDeleteBuffers(1, &sprite_instance_buffer_);
+        sprite_instance_buffer_ = 0;
     }
 
     if (merged_index_buffer_)
@@ -184,6 +211,8 @@ void Gles2Immediate::Shutdown()
 void Gles2Immediate::BeginFrame()
 {
     vertex_buffer_offset_ = 0;
+
+    sprite_instance_count_ = 0;
 
     InvalidateBatch();
 
@@ -387,10 +416,13 @@ void Gles2Immediate::BindVertexAttributesFrom(GLuint buffer)
                           (const void *)offsetof(RendererVertex, rgba));
 }
 
-GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count)
+GLuint Gles2Immediate::CreateStaticBytes(const void *data, size_t bytes, size_t capacity)
 {
-    if (!vertices || count <= 0)
+    if (!data || bytes == 0)
         return 0;
+
+    if (capacity < bytes)
+        capacity = bytes;
 
     GLuint buffer = 0;
 
@@ -400,11 +432,65 @@ GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int co
         return 0;
 
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)capacity, nullptr, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)bytes, data);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+
+    return buffer;
+}
+
+void Gles2Immediate::UpdateStaticBytes(GLuint buffer, size_t offset, const void *data, size_t bytes)
+{
+    if (!buffer || !data || bytes == 0)
+        return;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes, data);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+}
+
+GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
+{
+    if (!vertices || count <= 0)
+        return 0;
+
+    if (capacity < count)
+        capacity = count;
+
+    GLuint buffer = 0;
+
+    glGenBuffers(1, &buffer);
+
+    if (!buffer)
+        return 0;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    if (capacity == count)
+    {
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+    }
+    else
+    {
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)capacity * sizeof(RendererVertex)), nullptr,
+                     GL_STATIC_DRAW);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 
     return buffer;
+}
+
+void Gles2Immediate::UpdateStaticBuffer(GLuint buffer, int first, const RendererVertex *vertices, int count)
+{
+    if (!buffer || !vertices || count <= 0 || first < 0)
+        return;
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)((size_t)first * sizeof(RendererVertex)),
+                    (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 }
 
 void Gles2Immediate::DeleteStaticBuffer(GLuint buffer)
@@ -427,6 +513,104 @@ void Gles2Immediate::DrawStatic(GLuint buffer, GLuint shape, int first, int coun
     BindVertexAttributesFrom(buffer);
 
     glDrawArrays(shape, first, count);
+
+    draw_count_++;
+
+    BindVertexAttributes(batch_offset_);
+}
+
+SpriteInstance *Gles2Immediate::ReserveSpriteInstances(int32_t count, int32_t *first)
+{
+    EPI_ASSERT(count > 0);
+
+    size_t required = (size_t)sprite_instance_count_ + (size_t)count;
+
+    if (required > sprite_instances_.size())
+    {
+        size_t capacity = sprite_instances_.empty() ? (size_t)4096 : sprite_instances_.size();
+
+        while (capacity < required)
+            capacity *= 2;
+
+        sprite_instances_.resize(capacity);
+    }
+
+    *first = sprite_instance_count_;
+
+    sprite_instance_count_ += count;
+
+    return sprite_instances_.data() + *first;
+}
+
+void Gles2Immediate::DrawSprites(int32_t first, int32_t count, GLuint buffer)
+{
+    if (count <= 0 || first < 0)
+        return;
+
+    if (!buffer && first + count > sprite_instance_count_)
+        return;
+
+    ApplyMatrices();
+
+    size_t base = 0;
+
+    if (buffer)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+        base = (size_t)first * sizeof(SpriteInstance);
+    }
+    else
+    {
+        size_t bytes = (size_t)count * sizeof(SpriteInstance);
+
+        glBindBuffer(GL_ARRAY_BUFFER, sprite_instance_buffer_);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, sprite_instances_.data() + first, GL_STREAM_DRAW);
+
+        uploaded_bytes_ += bytes;
+        upload_count_++;
+    }
+
+    glVertexAttribPointer(kGles2AttributeTextureCoordinates, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, texture_coordinates)));
+    glVertexAttribPointer(kGles2AttributeColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, rgba)));
+    glVertexAttribPointer(kGles2AttributeSpriteOrigin, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, origin)));
+    glVertexAttribPointer(kGles2AttributeSpriteExtent, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, extent)));
+    glVertexAttribPointer(kGles2AttributeSpriteFuzz, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, fuzz)));
+    glVertexAttribPointer(kGles2AttributeSpriteLight, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteInstance),
+                          (const void *)(base + offsetof(SpriteInstance, light)));
+
+    glBindBuffer(GL_ARRAY_BUFFER, sprite_corner_buffer_);
+
+    glVertexAttribPointer(kGles2AttributePosition, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (const void *)0);
+
+    const GLuint instanced[6] = {kGles2AttributeTextureCoordinates, kGles2AttributeColor,
+                                 kGles2AttributeSpriteOrigin,       kGles2AttributeSpriteExtent,
+                                 kGles2AttributeSpriteFuzz,         kGles2AttributeSpriteLight};
+
+    for (int i = 0; i < 6; i++)
+    {
+        if (i >= 2)
+            glEnableVertexAttribArray(instanced[i]);
+
+        gles2_vertex_attrib_divisor(instanced[i], 1);
+    }
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_index_buffer_);
+
+    gles2_draw_elements_instanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *)0, count);
+
+    for (int i = 0; i < 6; i++)
+    {
+        gles2_vertex_attrib_divisor(instanced[i], 0);
+
+        if (i >= 2)
+            glDisableVertexAttribArray(instanced[i]);
+    }
 
     draw_count_++;
 
@@ -521,7 +705,7 @@ void Gles2Immediate::DrawModelIndexed(int32_t index_offset, int32_t index_count)
 
 uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count)
 {
-    if (!data.frame_positions || !data.texture_coordinates || !indices)
+    if (!data.frame_positions || !data.frame_normals || !data.texture_coordinates || !indices)
         return 0;
 
     if (data.vertex_count <= 0 || data.frame_count <= 0 || index_count <= 0)
@@ -533,11 +717,11 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
     mesh.frame_count  = data.frame_count;
 
     glGenBuffers(1, &mesh.position_buffer);
+    glGenBuffers(1, &mesh.normal_buffer);
     glGenBuffers(1, &mesh.texture_coordinate_buffer);
-    glGenBuffers(1, &mesh.color_buffer);
     glGenBuffers(1, &mesh.index_buffer);
 
-    if (!mesh.position_buffer || !mesh.texture_coordinate_buffer || !mesh.color_buffer || !mesh.index_buffer)
+    if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer)
         return 0;
 
     size_t position_bytes = (size_t)data.vertex_count * (size_t)data.frame_count * 3 * sizeof(float);
@@ -545,13 +729,12 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
     glBindBuffer(GL_ARRAY_BUFFER, mesh.position_buffer);
     glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)position_bytes, data.frame_positions, GL_STATIC_DRAW);
 
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.normal_buffer);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)position_bytes, data.frame_normals, GL_STATIC_DRAW);
+
     glBindBuffer(GL_ARRAY_BUFFER, mesh.texture_coordinate_buffer);
     glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)data.vertex_count * 2 * sizeof(float)),
                  data.texture_coordinates, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh.color_buffer);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)data.vertex_count * 6 * sizeof(float)), nullptr,
-                 GL_STREAM_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)index_count * sizeof(uint16_t)), indices,
@@ -578,32 +761,13 @@ void Gles2Immediate::DeleteModelMesh(uint32_t handle)
     if (mesh->texture_coordinate_buffer)
         glDeleteBuffers(1, &mesh->texture_coordinate_buffer);
 
-    if (mesh->color_buffer)
-        glDeleteBuffers(1, &mesh->color_buffer);
+    if (mesh->normal_buffer)
+        glDeleteBuffers(1, &mesh->normal_buffer);
 
     if (mesh->index_buffer)
         glDeleteBuffers(1, &mesh->index_buffer);
 
     EPI_CLEAR_MEMORY(mesh, Gles2ModelMesh, 1);
-}
-
-void Gles2Immediate::UpdateModelColors(uint32_t handle, const float *colors, int32_t vertex_count)
-{
-    if (handle == 0 || handle > model_meshes_.size() || !colors || vertex_count <= 0)
-        return;
-
-    Gles2ModelMesh *mesh = &model_meshes_[handle - 1];
-
-    if (!mesh->color_buffer || vertex_count > mesh->vertex_count)
-        return;
-
-    size_t bytes = (size_t)vertex_count * 6 * sizeof(float);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->color_buffer);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)bytes, colors);
-
-    uploaded_bytes_ += bytes;
-    upload_count_++;
 }
 
 void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
@@ -621,17 +785,18 @@ void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
     glVertexAttribPointer(kGles2AttributeModelPositionFrame2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                           (const void *)((size_t)info.frame2 * frame_stride + vertex_base));
 
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->normal_buffer);
+
+    glVertexAttribPointer(kGles2AttributeModelNormalFrame1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                          (const void *)((size_t)info.frame1 * frame_stride + vertex_base));
+
+    glVertexAttribPointer(kGles2AttributeModelNormalFrame2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                          (const void *)((size_t)info.frame2 * frame_stride + vertex_base));
+
     glBindBuffer(GL_ARRAY_BUFFER, mesh->texture_coordinate_buffer);
 
     glVertexAttribPointer(kGles2AttributeModelTextureCoordinates, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
                           (const void *)((size_t)info.first_vertex * 2 * sizeof(float)));
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->color_buffer);
-
-    size_t color_offset = (size_t)info.first_vertex * 6 * sizeof(float) + (info.additive_pass ? 3 * sizeof(float) : 0);
-
-    glVertexAttribPointer(kGles2AttributeModelColor, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                          (const void *)color_offset);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
 }
@@ -646,14 +811,16 @@ void Gles2Immediate::DrawModelMesh(const ModelDrawInfo &info)
     if (!mesh->position_buffer || info.frame1 >= mesh->frame_count || info.frame2 >= mesh->frame_count)
         return;
 
-    glEnableVertexAttribArray(kGles2AttributeModelColor);
+    glEnableVertexAttribArray(kGles2AttributeModelNormalFrame1);
+    glEnableVertexAttribArray(kGles2AttributeModelNormalFrame2);
 
     BindModelMesh(info);
 
     glDrawElements(GL_TRIANGLES, info.index_count, GL_UNSIGNED_SHORT,
                    (const void *)((size_t)info.first_index * sizeof(uint16_t)));
 
-    glDisableVertexAttribArray(kGles2AttributeModelColor);
+    glDisableVertexAttribArray(kGles2AttributeModelNormalFrame2);
+    glDisableVertexAttribArray(kGles2AttributeModelNormalFrame1);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -695,21 +862,20 @@ bool Gles2Immediate::AttachRenderTargetDepth(int32_t width, int32_t height)
         GLenum internal_format;
         GLenum attachment;
         bool   separate_stencil;
-        bool   has_stencil;
+        bool   split_buffers;
     };
 
-    static const Gles2DepthFormat formats[4] = {{GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, false, true},
-                                                {GL_DEPTH_STENCIL, GL_DEPTH_STENCIL_ATTACHMENT, false, true},
-                                                {GL_DEPTH24_STENCIL8, GL_DEPTH_ATTACHMENT, true, true},
-                                                {GL_DEPTH_COMPONENT16, GL_DEPTH_ATTACHMENT, false, false}};
+    static const Gles2DepthFormat formats[4] = {{GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, false, false},
+                                                {GL_DEPTH_STENCIL, GL_DEPTH_STENCIL_ATTACHMENT, false, false},
+                                                {GL_DEPTH24_STENCIL8, GL_DEPTH_ATTACHMENT, true, false},
+                                                {GL_DEPTH_COMPONENT16, GL_DEPTH_ATTACHMENT, true, true}};
+
+    static const char *format_names[4] = {"depth24-stencil8 packed", "depth-stencil packed",
+                                          "depth24-stencil8 split", "depth16 + stencil8 (LOW PRECISION)"};
 
     for (int32_t i = 0; i < 4; i++)
     {
-        if (render_target_depth_)
-        {
-            glDeleteRenderbuffers(1, &render_target_depth_);
-            render_target_depth_ = 0;
-        }
+        DestroyRenderTargetDepth();
 
         glGenRenderbuffers(1, &render_target_depth_);
 
@@ -721,23 +887,50 @@ bool Gles2Immediate::AttachRenderTargetDepth(int32_t width, int32_t height)
 
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, formats[i].attachment, GL_RENDERBUFFER, render_target_depth_);
 
+        if (formats[i].split_buffers)
+        {
+            glGenRenderbuffers(1, &render_target_stencil_);
+
+            if (!render_target_stencil_)
+                return false;
+
+            glBindRenderbuffer(GL_RENDERBUFFER, render_target_stencil_);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, width, height);
+        }
+
         if (formats[i].separate_stencil)
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, render_target_depth_);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
+                                      render_target_stencil_ ? render_target_stencil_ : render_target_depth_);
 
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
         {
-            render_target_has_stencil_ = formats[i].has_stencil;
+            render_target_depth_attachment_ = formats[i].attachment;
+            render_target_separate_stencil_ = formats[i].separate_stencil;
+
+            LogPrint("OpenGL: world depth buffer: %s\n", format_names[i]);
+
             return true;
         }
     }
 
+    DestroyRenderTargetDepth();
+
+    return false;
+}
+
+void Gles2Immediate::DestroyRenderTargetDepth()
+{
     if (render_target_depth_)
     {
         glDeleteRenderbuffers(1, &render_target_depth_);
         render_target_depth_ = 0;
     }
 
-    return false;
+    if (render_target_stencil_)
+    {
+        glDeleteRenderbuffers(1, &render_target_stencil_);
+        render_target_stencil_ = 0;
+    }
 }
 
 bool Gles2Immediate::EnsureRenderTarget(int32_t width, int32_t height)
@@ -791,6 +984,12 @@ bool Gles2Immediate::CreateRenderTarget(int32_t width, int32_t height, int32_t t
         return false;
     }
 
+    if (!CreateOitTargets(texture_width, texture_height))
+    {
+        DestroyRenderTarget();
+        return false;
+    }
+
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
@@ -804,6 +1003,8 @@ bool Gles2Immediate::CreateRenderTarget(int32_t width, int32_t height, int32_t t
 
 void Gles2Immediate::DestroyRenderTarget()
 {
+    DestroyOitTargets();
+
     if (render_target_framebuffer_)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -817,17 +1018,215 @@ void Gles2Immediate::DestroyRenderTarget()
         render_target_color_ = 0;
     }
 
-    if (render_target_depth_)
-    {
-        glDeleteRenderbuffers(1, &render_target_depth_);
-        render_target_depth_ = 0;
-    }
+    DestroyRenderTargetDepth();
 
     render_target_width_          = 0;
     render_target_height_         = 0;
     render_target_texture_width_  = 0;
     render_target_texture_height_ = 0;
-    render_target_has_stencil_    = false;
+
+    render_target_depth_attachment_ = 0;
+    render_target_separate_stencil_ = false;
+}
+
+bool Gles2Immediate::CreateOitTarget(GLuint &framebuffer, GLuint &texture, GLint internal_format, GLenum format,
+                                    GLenum type, int32_t texture_width, int32_t texture_height)
+{
+    glGenFramebuffers(1, &framebuffer);
+
+    if (!framebuffer)
+        return false;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+    glGenTextures(1, &texture);
+
+    if (!texture)
+        return false;
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, texture_width, texture_height, 0, format, type, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, render_target_depth_attachment_, GL_RENDERBUFFER, render_target_depth_);
+
+    if (render_target_separate_stencil_)
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
+                                  render_target_stencil_ ? render_target_stencil_ : render_target_depth_);
+
+    if (glGetError() != GL_NO_ERROR)
+        return false;
+
+    return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+}
+
+bool Gles2Immediate::CreateOitTargets(int32_t texture_width, int32_t texture_height)
+{
+    struct Gles2OitFormat
+    {
+        GLint  internal_format;
+        GLenum format;
+        GLenum type;
+        float  scale;
+    };
+
+    static const Gles2OitFormat formats[3] = {{GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f},
+                                              {GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f},
+                                              {GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 1.0f / 3000.0f}};
+
+    static const char *format_names[3] = {"rgba16f", "rgba half-float", "rgba8 (LOW PRECISION)"};
+
+    for (int32_t i = 0; i < 3; i++)
+    {
+        DestroyOitTargets();
+
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+
+        if (CreateOitTarget(oit_accumulation_framebuffer_, oit_accumulation_texture_, formats[i].internal_format,
+                            formats[i].format, formats[i].type, texture_width, texture_height) &&
+            CreateOitTarget(oit_revealage_framebuffer_, oit_revealage_texture_, formats[i].internal_format,
+                            formats[i].format, formats[i].type, texture_width, texture_height))
+        {
+            oit_scale_ = formats[i].scale;
+
+            LogPrint("OpenGL: transparency buffers: %s\n", format_names[i]);
+
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+
+            return true;
+        }
+    }
+
+    DestroyOitTargets();
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+
+    return false;
+}
+
+void Gles2Immediate::DestroyOitTargets()
+{
+    if (oit_accumulation_framebuffer_)
+    {
+        glDeleteFramebuffers(1, &oit_accumulation_framebuffer_);
+        oit_accumulation_framebuffer_ = 0;
+    }
+
+    if (oit_accumulation_texture_)
+    {
+        glDeleteTextures(1, &oit_accumulation_texture_);
+        oit_accumulation_texture_ = 0;
+    }
+
+    if (oit_revealage_framebuffer_)
+    {
+        glDeleteFramebuffers(1, &oit_revealage_framebuffer_);
+        oit_revealage_framebuffer_ = 0;
+    }
+
+    if (oit_revealage_texture_)
+    {
+        glDeleteTextures(1, &oit_revealage_texture_);
+        oit_revealage_texture_ = 0;
+    }
+
+    oit_scale_ = 1.0f;
+}
+
+void Gles2Immediate::BindOitTarget(int32_t mode)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, (mode == 2) ? oit_revealage_framebuffer_ : oit_accumulation_framebuffer_);
+}
+
+void Gles2Immediate::ClearOitTargets()
+{
+    glDisable(GL_SCISSOR_TEST);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, oit_accumulation_framebuffer_);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, oit_revealage_framebuffer_);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+}
+
+void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_STENCIL_TEST);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    glDepthMask(GL_FALSE);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    gles2_oit_program.Use();
+    gles2_oit_program.SetScale(oit_scale_);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, oit_revealage_texture_);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, oit_accumulation_texture_);
+
+    float u0 = (float)view.x / (float)render_target_texture_width_;
+    float v0 = (float)view.y / (float)render_target_texture_height_;
+    float u1 = (float)(view.x + view.width) / (float)render_target_texture_width_;
+    float v1 = (float)(view.y + view.height) / (float)render_target_texture_height_;
+
+    RendererVertex quad[4];
+
+    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+
+    for (int32_t i = 0; i < 4; i++)
+        quad[i].rgba = kRGBAWhite;
+
+    quad[0].position               = {{-1.0f, -1.0f, 0.0f}};
+    quad[0].texture_coordinates[0] = {{u0, v0}};
+
+    quad[1].position               = {{1.0f, -1.0f, 0.0f}};
+    quad[1].texture_coordinates[0] = {{u1, v0}};
+
+    quad[2].position               = {{1.0f, 1.0f, 0.0f}};
+    quad[2].texture_coordinates[0] = {{u1, v1}};
+
+    quad[3].position               = {{-1.0f, 1.0f, 0.0f}};
+    quad[3].texture_coordinates[0] = {{u0, v1}};
+
+    size_t offset = StreamVertices(quad, 4);
+
+    BindVertexAttributes(offset);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_index_buffer_);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *)0);
+
+    InvalidateBatch();
+
+    draw_count_++;
+
+    gles2_program.Use();
+    gles2_program.ForceOitReset();
+
+    MarkMatrixDirty();
 }
 
 void Gles2Immediate::BindRenderTarget()
@@ -867,9 +1266,6 @@ void Gles2Immediate::ResolveRenderTarget(const Gles2ResolveRect &source, const G
     gles2_program.SetAlphaTest(0.0f);
     gles2_program.SetFog(kGles2FogModeNone, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     gles2_program.SetSkyPass(nullptr);
-
-    for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
-        gles2_program.SetClipPlaneEnabled(i, false);
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, default_texture_);

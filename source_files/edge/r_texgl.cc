@@ -105,17 +105,18 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     int total_w = img->width_;
     int total_h = img->height_;
 
-#ifndef EDGE_SDL_GPU
-    int power_of_two_w = 1;
-    while (power_of_two_w < total_w)
-        power_of_two_w <<= 1;
-    total_w = power_of_two_w;
+    if (!render_backend->SupportsFullNonPowerOfTwoTextures() && (!clamp || !nomip))
+    {
+        int power_of_two_w = 1;
+        while (power_of_two_w < total_w)
+            power_of_two_w <<= 1;
+        total_w = power_of_two_w;
 
-    int power_of_two_h = 1;
-    while (power_of_two_h < total_h)
-        power_of_two_h <<= 1;
-    total_h = power_of_two_h;
-#endif
+        int power_of_two_h = 1;
+        while (power_of_two_h < total_h)
+            power_of_two_h <<= 1;
+        total_h = power_of_two_h;
+    }
 
     int new_w, new_h;
 
@@ -160,13 +161,6 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     // minification mode
     int mip_level = HMM_Clamp(0, image_mipmapping, 2);
 
-    // special logic for mid-masked textures.  The kUploadThresh flag
-    // guarantees that each texture level has simple alpha (0 or 255),
-    // but we must also disable Trilinear Mipmapping because it will
-    // produce partial alpha values when interpolating between mips.
-    if (flags & kUploadThresh)
-        mip_level = HMM_Clamp(0, mip_level, 1);
-
     static GLuint minif_modes[2 * 3] = {GL_NEAREST, GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_LINEAR,
 
                                         GL_LINEAR,  GL_LINEAR_MIPMAP_NEAREST,  GL_LINEAR_MIPMAP_LINEAR};
@@ -187,7 +181,7 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
                 img->ShrinkMasked(new_w, new_h);
 
             if (flags & kUploadThresh)
-                img->ThresholdAlpha((mip & 1) ? 96 : 144);
+                img->ThresholdAlpha(144);
         }
 
         render_state->TexImage2D(GL_TEXTURE_2D, mip, img->depth_ == 3 ? GL_RGB : GL_RGBA, new_w, new_h, 0,
@@ -207,102 +201,6 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
 }
 
 //----------------------------------------------------------------------------
-
-void PaletteRemapRGBA(const ImageData *img, const uint8_t *new_pal, const uint8_t *old_pal)
-{
-    const int max_prev = 16;
-
-    // cache of previously looked-up colours (in pairs)
-    uint8_t previous[max_prev * 6];
-    int     num_prev = 0;
-
-    for (int y = 0; y < img->height_; y++)
-        for (int x = 0; x < img->width_; x++)
-        {
-            uint8_t *cur = img->PixelAt(x, y);
-
-            // skip completely transparent pixels
-            if (img->depth_ == 4 && cur[3] == 0)
-                continue;
-
-            // optimisation: if colour matches previous one, don't need
-            // to compute the remapping again.
-            int i;
-            for (i = 0; i < num_prev; i++)
-            {
-                if (previous[i * 6 + 0] == cur[0] && previous[i * 6 + 1] == cur[1] && previous[i * 6 + 2] == cur[2])
-                {
-                    break;
-                }
-            }
-
-            if (i < num_prev)
-            {
-                // move to front (Most Recently Used)
-                if (i != 0)
-                {
-                    uint8_t tmp[6];
-
-                    memcpy(tmp, previous, 6);
-                    memcpy(previous, previous + i * 6, 6);
-                    memcpy(previous + i * 6, tmp, 6);
-                }
-
-                cur[0] = previous[3];
-                cur[1] = previous[4];
-                cur[2] = previous[5];
-
-                continue;
-            }
-
-            if (num_prev < max_prev)
-            {
-                memmove(previous + 6, previous, num_prev * 6);
-                num_prev++;
-            }
-
-            // most recent lookup is at the head
-            previous[0] = cur[0];
-            previous[1] = cur[1];
-            previous[2] = cur[2];
-
-            int best      = 0;
-            int best_dist = (1 << 30);
-
-            int R = int(cur[0]);
-            int G = int(cur[1]);
-            int B = int(cur[2]);
-
-            for (int p = 0; p < 256; p++)
-            {
-                int dR = int(old_pal[p * 3 + 0]) - R;
-                int dG = int(old_pal[p * 3 + 1]) - G;
-                int dB = int(old_pal[p * 3 + 2]) - B;
-
-                int dist = dR * dR + dG * dG + dB * dB;
-
-                if (dist < best_dist)
-                {
-                    best_dist = dist;
-                    best      = p;
-                }
-            }
-
-            // if this colour is not affected by the colourmap, then
-            // keep the original colour (which has more precision).
-            if (old_pal[best * 3 + 0] != new_pal[best * 3 + 0] || old_pal[best * 3 + 1] != new_pal[best * 3 + 1] ||
-                old_pal[best * 3 + 2] != new_pal[best * 3 + 2])
-            {
-                cur[0] = new_pal[best * 3 + 0];
-                cur[1] = new_pal[best * 3 + 1];
-                cur[2] = new_pal[best * 3 + 2];
-            }
-
-            previous[3] = cur[0];
-            previous[4] = cur[1];
-            previous[5] = cur[2];
-        }
-}
 
 int DetermineOpacity(const ImageData *img, bool *is_empty_)
 {

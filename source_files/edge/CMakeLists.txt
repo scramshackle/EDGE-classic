@@ -9,7 +9,6 @@ set (EDGE_SOURCE_FILES
   i_sound.cc
   am_map.cc
   bot_nav.cc
-  bsp.cc
   bot_think.cc
   con_con.cc
   con_main.cc
@@ -60,8 +59,10 @@ set (EDGE_SOURCE_FILES
   rad_act.cc
   rad_pars.cc
   rad_trig.cc
+  r_atlas.cc
   r_bsp.cc
   r_draw.cc
+  r_lightgrid.cc
   r_shader.cc
   r_static.cc
   r_render.cc
@@ -72,6 +73,7 @@ set (EDGE_SOURCE_FILES
   r_mdmesh.cc
   r_mirror.cc
   r_occlude.cc
+  r_polygon.cc
   r_things.cc
   r_units.cc
   r_wipe.cc
@@ -122,6 +124,7 @@ set (EDGE_SOURCE_FILES
 set (EDGE_GLES2_SOURCE_FILES
   render/gles2/gles2_backend.cc
   render/gles2/gles2_immediate.cc
+  render/gles2/gles2_lights.cc
   render/gles2/gles2_loader.cc
   render/gles2/gles2_movie.cc
   render/gles2/gles2_program.cc
@@ -134,6 +137,7 @@ set (EDGE_SDL_GPU_SOURCE_FILES
   render/sdlgpu/gpu_backend.cc
   render/sdlgpu/gpu_device.cc
   render/sdlgpu/gpu_images.cc
+  render/sdlgpu/gpu_lights.cc
   render/sdlgpu/gpu_immediate.cc
   render/sdlgpu/gpu_movie.cc
   render/sdlgpu/gpu_pipeline.cc
@@ -194,6 +198,7 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ddf
   dr_libs
+  earcut
   edge_tracy
   edgetracker
   epi

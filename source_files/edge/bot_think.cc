@@ -938,20 +938,20 @@ BotFollowPathResult DeathBot::FollowPath(bool do_look)
 
     if (flags & kBotPathNodeDoor)
     {
-        task_       = kBotTaskOpenDoor;
-        door_stage_ = kBotOpenDoorTaskApproach;
-        door_seg_   = path_->nodes_[path_->along_].seg;
-        door_time_  = 5 * kTicRate;
-        EPI_ASSERT(door_seg_ != nullptr);
+        task_           = kBotTaskOpenDoor;
+        door_stage_     = kBotOpenDoorTaskApproach;
+        door_line_side_ = path_->nodes_[path_->along_].line_side;
+        door_time_      = 5 * kTicRate;
+        EPI_ASSERT(door_line_side_ != nullptr);
         return kBotFollowPathResultOK;
     }
     else if (flags & kBotPathNodeLift)
     {
-        task_       = kBotTaskUseLift;
-        lift_stage_ = kBotUseLiftTaskApproach;
-        lift_seg_   = path_->nodes_[path_->along_].seg;
-        lift_time_  = 5 * kTicRate;
-        EPI_ASSERT(lift_seg_ != nullptr);
+        task_           = kBotTaskUseLift;
+        lift_stage_     = kBotUseLiftTaskApproach;
+        lift_line_side_ = path_->nodes_[path_->along_].line_side;
+        lift_time_      = 5 * kTicRate;
+        EPI_ASSERT(lift_line_side_ != nullptr);
         return kBotFollowPathResultOK;
     }
     else if (flags & kBotPathNodeLift)
@@ -1172,7 +1172,7 @@ void DeathBot::ThinkOpenDoor()
         }
 
         float    dist = DistTo(path_->CurrentDestination());
-        BAMAngle ang  = path_->nodes_[path_->along_].seg->angle + kBAMAngle90;
+        BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + kBAMAngle90;
         BAMAngle diff = ang - pl_->map_object_->angle_;
 
         if (diff > kBAMAngle180)
@@ -1198,7 +1198,7 @@ void DeathBot::ThinkOpenDoor()
         }
 
         // if closing, try to re-open
-        const Sector     *sector = door_seg_->back_subsector->sector;
+        const Sector     *sector = door_line_side_->back_sector;
         const PlaneMover *pm     = sector->ceiling_move;
 
         if (pm != nullptr && pm->direction < 0)
@@ -1239,7 +1239,7 @@ void DeathBot::ThinkUseLift()
         }
 
         float    dist = DistTo(path_->CurrentDestination());
-        BAMAngle ang  = path_->nodes_[path_->along_].seg->angle + kBAMAngle90;
+        BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + kBAMAngle90;
         BAMAngle diff = ang - pl_->map_object_->angle_;
 
         if (diff > kBAMAngle180)
@@ -1265,7 +1265,7 @@ void DeathBot::ThinkUseLift()
         }
 
         // if lift is raising, try to re-lower
-        const Sector     *sector = lift_seg_->back_subsector->sector;
+        const Sector     *sector = lift_line_side_->back_sector;
         const PlaneMover *pm     = sector->floor_move;
 
         if (pm != nullptr && pm->direction > 0)
@@ -1276,7 +1276,7 @@ void DeathBot::ThinkUseLift()
         }
 
         // already lowered?
-        if (sector->floor_height < lift_seg_->front_subsector->sector->floor_height + 24.0f)
+        if (sector->floor_height < lift_line_side_->front_sector->floor_height + 24.0f)
         {
             // navigation code added a place to stand
             path_->along_ += 1;
@@ -1307,7 +1307,7 @@ void DeathBot::ThinkUseLift()
 
         WalkToward(path_->CurrentDestination());
 
-        const Sector *lift_sec = lift_seg_->back_subsector->sector;
+        const Sector *lift_sec = lift_line_side_->back_sector;
 
         if (lift_sec->floor_move != nullptr)
         {

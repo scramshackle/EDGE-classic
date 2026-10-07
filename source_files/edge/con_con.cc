@@ -383,24 +383,32 @@ static RendererVertex *StartText()
     {
         // Always whiten the font when used with console output
         const ImageFont *con_font = (ImageFont *)console_font;
-        tex_id                    = ImageCache(con_font->font_image_, true, (const Colormap *)0, true);
+        tex_id                    = ImageCache(con_font->font_image_, true);
         blend                     = kBlendingMasked;
     }
     else if (console_font->definition_->type_ == kFontTypeTrueType)
     {
         const TTFFont *con_font = (TTFFont *)console_font;
-        if ((image_smoothing &&
-             con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-            con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-            tex_id = con_font->truetype_smoothed_texture_id_[current_font_size];
-        else
-            tex_id = con_font->truetype_texture_id_[current_font_size];
+        tex_id                  = con_font->truetype_texture_id_[current_font_size];
+
+        bool smooth = (image_smoothing &&
+                       con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
+                      con_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways;
+
+        render_unit_filter = smooth ? 1 : 0;
 
         blend = kBlendingAlpha;
     }
 
-    return BeginRenderUnit(GL_QUADS, kMaximumLocalVertices, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0,
-                           0, blend);
+    render_unit_whiten = (console_font->definition_->type_ == kFontTypeImage);
+
+    RendererVertex *glvert = BeginRenderUnit(GL_QUADS, kMaximumLocalVertices, GL_MODULATE, tex_id,
+                                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
+
+    render_unit_whiten = false;
+    render_unit_filter = -1;
+
+    return glvert;
 }
 
 static void AddChar(float x, float y, char ch, RendererVertex *&glvert, RGBAColor col)
@@ -637,9 +645,11 @@ void ConsoleDrawer(void)
         EndRenderUnit(console_verts);
         console_verts            = 0;
         const ImageFont *en_font = (const ImageFont *)endoom_font;
+        render_unit_whiten       = true;
         console_glvert           = BeginRenderUnit(GL_QUADS, kENDOOMTotalVerts, GL_MODULATE,
-                                                   ImageCache(en_font->font_image_, true, (const Colormap *)0, true),
+                                                   ImageCache(en_font->font_image_, true),
                                                    (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingMasked);
+        render_unit_whiten       = false;
         int enwidth              = RoundToInteger((float)en_font->image_monospace_width_ *
                                                   ((float)FNSZ / en_font->image_monospace_width_) / 2);
 
@@ -1637,7 +1647,7 @@ void ConsoleShowPosition(void)
     else
         y = current_screen_height - FNSZ * 15;
 
-    SolidBox(x, y - FNSZ * 11, XMUL * 16, FNSZ * 11 + 2, kRGBABlack, 0.5);
+    SolidBox(x, y - FNSZ * 10, XMUL * 16, FNSZ * 10 + 2, kRGBABlack, 0.5);
 
     RendererVertex *console_glvert = StartText();
     uint16_t        console_verts  = 0;
@@ -1676,11 +1686,7 @@ void ConsoleShowPosition(void)
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "  sec: %d", (int)(p->map_object_->subsector_->sector - level_sectors));
-    console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
-
-    y -= FNSZ;
-    stbsp_sprintf(textbuf, "  sub: %d", (int)(p->map_object_->subsector_ - level_subsectors));
+    stbsp_sprintf(textbuf, "  sec: %d", (int)(p->map_object_->sector_ - level_sectors));
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     EndRenderUnit(console_verts);

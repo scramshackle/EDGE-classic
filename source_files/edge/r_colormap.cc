@@ -25,6 +25,10 @@
 
 #include "r_colormap.h"
 
+#include <limits.h>
+
+#include <vector>
+
 #include "ddf_colormap.h"
 #include "ddf_game.h"
 #include "ddf_main.h"
@@ -39,10 +43,13 @@
 #include "i_defs_gl.h"
 #include "i_system.h"
 #include "m_argv.h"
+#include "r_backend.h"
 #include "r_gldefs.h"
 #include "r_image.h"
+#include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
+#include "r_lightgrid.h"
 #include "r_shader.h"
 #include "r_static.h"
 #include "r_texgl.h"
@@ -142,6 +149,8 @@ void InitializePalette(void)
     LogPrint("Loaded global palette.\n");
 
     LogDebug("Black:%d White:%d Gray:%d\n", playpal_black, playpal_white, playpal_gray);
+
+    ResetColorLookups();
 }
 
 static int cur_palette = -1;
@@ -259,6 +268,140 @@ void TranslatePalette(uint8_t *new_pal, const uint8_t *old_pal, const Colormap *
             new_pal[j * 3 + 2] = old_pal[k * 3 + 2];
         }
     }
+}
+
+int render_unit_color_lookup = 0;
+
+static std::vector<uint8_t> color_lookup_nearest;
+static const Colormap      *color_lookup_owners[kColorLookupMaximum];
+static int                  color_lookup_next = 1;
+
+static std::vector<const Colormap *> color_lookup_identities;
+
+static void BuildColorLookupNearest(void)
+{
+    color_lookup_nearest.resize((size_t)kColorLookupSize * kColorLookupSize * kColorLookupSize);
+
+    int step_max = kColorLookupSize - 1;
+
+    for (int b = 0; b < kColorLookupSize; b++)
+    {
+        int blue = (b * 255 + step_max / 2) / step_max;
+
+        for (int g = 0; g < kColorLookupSize; g++)
+        {
+            int green = (g * 255 + step_max / 2) / step_max;
+
+            for (int r = 0; r < kColorLookupSize; r++)
+            {
+                int red = (r * 255 + step_max / 2) / step_max;
+
+                int best_distance = INT_MAX;
+                int best_index    = 0;
+
+                for (int k = 0; k < 256; k++)
+                {
+                    int dr = playpal_data[0][k][0] - red;
+                    int dg = playpal_data[0][k][1] - green;
+                    int db = playpal_data[0][k][2] - blue;
+
+                    int distance = dr * dr + dg * dg + db * db;
+
+                    if (distance < best_distance)
+                    {
+                        best_distance = distance;
+                        best_index    = k;
+                    }
+                }
+
+                color_lookup_nearest[((size_t)b * kColorLookupSize + g) * kColorLookupSize + r] = (uint8_t)best_index;
+            }
+        }
+    }
+}
+
+bool ColormapTintFactors(const Colormap *colmap, float *r, float *g, float *b)
+{
+    if (!colmap || colmap->length_ != 0)
+        return false;
+
+    *r = (epi::GetRGBARed(colmap->gl_color_) + 1) / 256.0f;
+    *g = (epi::GetRGBAGreen(colmap->gl_color_) + 1) / 256.0f;
+    *b = (epi::GetRGBABlue(colmap->gl_color_) + 1) / 256.0f;
+
+    return true;
+}
+
+void ResetColorLookups(void)
+{
+    color_lookup_nearest.clear();
+
+    for (int i = 0; i < kColorLookupMaximum; i++)
+        color_lookup_owners[i] = nullptr;
+
+    color_lookup_identities.clear();
+
+    color_lookup_next = 1;
+
+    render_unit_color_lookup = 0;
+}
+
+int ColorLookupForColormap(const Colormap *colmap)
+{
+    if (!colmap)
+        return 0;
+
+    for (int i = 1; i < kColorLookupMaximum; i++)
+    {
+        if (color_lookup_owners[i] == colmap)
+            return i;
+    }
+
+    for (const Colormap *identity : color_lookup_identities)
+    {
+        if (identity == colmap)
+            return 0;
+    }
+
+    uint8_t translated[256 * 3];
+
+    TranslatePalette(translated, &playpal_data[0][0][0], colmap);
+
+    if (memcmp(translated, &playpal_data[0][0][0], sizeof(translated)) == 0)
+    {
+        color_lookup_identities.push_back(colmap);
+        return 0;
+    }
+
+    if (color_lookup_nearest.empty())
+        BuildColorLookupNearest();
+
+    size_t cells = color_lookup_nearest.size();
+
+    std::vector<uint8_t> pixels(cells * 4);
+
+    for (size_t i = 0; i < cells; i++)
+    {
+        const uint8_t *source = &translated[color_lookup_nearest[i] * 3];
+
+        pixels[i * 4 + 0] = source[0];
+        pixels[i * 4 + 1] = source[1];
+        pixels[i * 4 + 2] = source[2];
+        pixels[i * 4 + 3] = 255;
+    }
+
+    int slot = color_lookup_next;
+
+    color_lookup_next++;
+
+    if (color_lookup_next >= kColorLookupMaximum)
+        color_lookup_next = 1;
+
+    color_lookup_owners[slot] = colmap;
+
+    render_backend->UploadColorLookup(slot, pixels.data());
+
+    return slot;
 }
 
 static int AnalyseColourmap(const uint8_t *table, int alpha, int *r, int *g, int *b)
@@ -526,6 +669,15 @@ void PaletteTicker(void)
 //  COLORMAP SHADERS
 //----------------------------------------------------------------------------
 
+static float ViewPlaneDistance(float x, float y, float z)
+{
+    float dx = (x - mirror_view.view_position.X) * mirror_view.view_plane.X;
+    float dy = (y - mirror_view.view_position.Y) * mirror_view.view_plane.Y;
+    float dz = (z - mirror_view.view_position.Z) * mirror_view.view_plane.Z;
+
+    return dx + dy + dz;
+}
+
 static int DoomLightingEquation(int L, float dist)
 {
     /* L in the range 0 to 63 */
@@ -551,11 +703,15 @@ class ColormapShader : public AbstractShader
 
     RGBAColor whites_[32];
 
+    SpriteLightTable light_table_;
+
     RGBAColor fog_color_;
     float     fog_density_;
 
     // for DDFLEVL fog checks
     Sector *sector_;
+
+    std::vector<RendererVertex> bake_vertices_;
 
   public:
     ColormapShader(const Colormap *CM)
@@ -573,11 +729,7 @@ class ColormapShader : public AbstractShader
   private:
     inline float DistanceFromViewPlane(float x, float y, float z)
     {
-        float dx = (x - view_x) * view_forward.X;
-        float dy = (y - view_y) * view_forward.Y;
-        float dz = (z - view_z) * view_forward.Z;
-
-        return dx + dy + dz;
+        return ViewPlaneDistance(x, y, z);
     }
 
     inline void TextureCoordinates(RendererVertex *v, int t, const HMM_Vec3 *lit_pos)
@@ -611,24 +763,6 @@ class ColormapShader : public AbstractShader
         col->modulate_blue_ += epi::GetRGBABlue(WH);
     }
 
-    virtual void Corner(ColorMixer *col, float nx, float ny, float nz, MapObject *mod_pos, bool is_weapon)
-    {
-        EPI_UNUSED(nx);
-        EPI_UNUSED(ny);
-        EPI_UNUSED(nz);
-        float mx = mod_pos->x;
-        float my = mod_pos->y;
-        float mz = mod_pos->z + mod_pos->height_ / 2;
-
-        if (is_weapon)
-        {
-            mx += view_cosine * 110;
-            my += view_sine * 110;
-        }
-
-        Sample(col, mx, my, mz);
-    }
-
     virtual void WorldMix(GLuint shape, int num_vert, GLuint tex, float alpha, int *pass_var, BlendingMode blending,
                           bool masked, void *data, ShaderCoordinateFunction func)
     {
@@ -650,8 +784,34 @@ class ColormapShader : public AbstractShader
             }
         }
 
-        RendererVertex *glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_,
-                                                 *pass_var, blending, fc_to_use, fd_to_use);
+        if (StaticBakeActive())
+        {
+            bake_vertices_.assign((size_t)num_vert, RendererVertex());
+
+            for (int v_idx = 0; v_idx < num_vert; v_idx++)
+            {
+                RendererVertex *dest = &bake_vertices_[(size_t)v_idx];
+
+                epi::SetRGBAAlpha(dest->rgba, alpha);
+
+                HMM_Vec3 lit_pos;
+
+                (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
+
+                TextureCoordinates(dest, 1, &lit_pos);
+            }
+
+            StaticCaptureVertices(shape, bake_vertices_.data(), num_vert);
+
+            (*pass_var) += 1;
+
+            return;
+        }
+
+        RendererVertex *glvert =
+            BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var, blending,
+                            fc_to_use, fd_to_use, nullptr, nullptr, false, true,
+                            LightGridGlowSetForSector(sector_));
 
         for (int v_idx = 0; v_idx < num_vert; v_idx++)
         {
@@ -660,14 +820,13 @@ class ColormapShader : public AbstractShader
             epi::SetRGBAAlpha(dest->rgba, alpha);
 
             HMM_Vec3 lit_pos;
-            HMM_Vec3 normal;
 
-            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &normal, &lit_pos);
+            (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
 
             TextureCoordinates(dest, 1, &lit_pos);
         }
 
-        StaticCaptureVertices(glvert, num_vert);
+        StaticCaptureVertices(shape, glvert, num_vert);
 
         EndRenderUnit(num_vert);
 
@@ -675,7 +834,7 @@ class ColormapShader : public AbstractShader
     }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
-                                    BlendingMode blending)
+                                    BlendingMode blending, int glow_set)
     {
         RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
@@ -695,13 +854,13 @@ class ColormapShader : public AbstractShader
         }
 
         AddStaticRenderUnit(handle, shape, first, count, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var,
-                            blending, fc_to_use, fd_to_use);
+                            blending, fc_to_use, fd_to_use, nullptr, true, glow_set);
 
         (*pass_var) += 1;
     }
 
     virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
-                            int *pass_var, BlendingMode blending)
+                            int *pass_var, BlendingMode blending, int glow_set)
     {
         RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
@@ -726,7 +885,7 @@ class ColormapShader : public AbstractShader
             EDGE_ZoneScopedN("WorldBaked BeginRenderUnit");
 
             glvert = BeginRenderUnit(shape, num_vert, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var, blending,
-                                     fc_to_use, fd_to_use, nullptr, nullptr, nullptr, true);
+                                     fc_to_use, fd_to_use, nullptr, nullptr, true, true, glow_set);
         }
 
         RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));
@@ -741,6 +900,8 @@ class ColormapShader : public AbstractShader
                 *dest = source[v_idx];
 
                 dest->rgba = tint;
+
+                dest->texture_coordinates[1].Y += static_batch_light_row_offset;
             }
         }
 
@@ -837,9 +998,32 @@ class ColormapShader : public AbstractShader
         }
 
         fade_texture_ = UploadTexture(&img, kUploadSmooth | kUploadClamp);
+
+        for (int ci = 0; ci < kSpriteLightLevels; ci++)
+        {
+            light_table_.whites[ci][0] = epi::GetRGBARed(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][1] = epi::GetRGBAGreen(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][2] = epi::GetRGBABlue(whites_[ci]) / 255.0f;
+            light_table_.whites[ci][3] = 1.0f;
+        }
+
+        light_table_.parameters[0] = (lighting_model_ == kLightingModelFlat) ? 1.0f : 0.0f;
+        light_table_.parameters[1] = (colormap_ && (colormap_->special_ & kColorSpecialNoFlash)) ? 1.0f : 0.0f;
+        light_table_.parameters[2] = 0.0f;
+        light_table_.parameters[3] = 0.0f;
     }
 
   public:
+    const SpriteLightTable *LightTable() const
+    {
+        return &light_table_;
+    }
+
+    int LightLevel() const
+    {
+        return light_level_;
+    }
+
     void Update()
     {
         if (fade_texture_ == 0 ||
@@ -894,7 +1078,7 @@ class ColormapShader : public AbstractShader
 
 static ColormapShader *standard_colormap_shader;
 
-AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
+static ColormapShader *PrepareColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
 {
     if (!standard_colormap_shader)
         standard_colormap_shader = new ColormapShader(nullptr);
@@ -935,6 +1119,36 @@ AbstractShader *GetColormapShader(const struct RegionProperties *props, int ligh
     shader->SetSector(sec);
 
     return shader;
+}
+
+AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add, Sector *sec)
+{
+    return PrepareColormapShader(props, light_add, sec);
+}
+
+const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                            int *light_level)
+{
+    ColormapShader *shader = PrepareColormapShader(props, light_add, sec);
+
+    *light_level = props->light_level + light_add + ((sector_brightness_correction.d_ - 5) * 10);
+
+    return shader->LightTable();
+}
+
+const SpriteLightTable *GetModelLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                           int *light_level)
+{
+    ColormapShader *shader = PrepareColormapShader(props, light_add, sec);
+
+    *light_level = shader->LightLevel();
+
+    return shader->LightTable();
+}
+
+float WeaponModelLightDepth(const MapObject *mo)
+{
+    return ViewPlaneDistance(mo->x + view_cosine * 110, mo->y + view_sine * 110, mo->z + mo->height_ / 2);
 }
 
 void DeleteColourmapTextures(void)

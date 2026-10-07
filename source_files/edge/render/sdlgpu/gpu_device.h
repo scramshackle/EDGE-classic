@@ -14,7 +14,8 @@ enum GpuLoadOperation
 enum GpuPassTarget
 {
     kGpuPassTargetMain = 0,
-    kGpuPassTargetWorld
+    kGpuPassTargetWorld,
+    kGpuPassTargetOit
 };
 
 struct GpuBlitRectangle
@@ -34,6 +35,8 @@ class GpuDevice
 
     bool AcquireFrame(int32_t width, int32_t height);
 
+    bool BeginReplay(bool present);
+
     void SubmitFrame();
 
     void BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_load, GpuLoadOperation stencil_load,
@@ -47,17 +50,29 @@ class GpuDevice
 
     int32_t CurrentTargetWidth() const
     {
-        return (current_target_ == kGpuPassTargetWorld) ? world_width_ : target_width_;
+        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_width_
+                                                                                               : target_width_;
     }
 
     int32_t CurrentTargetHeight() const
     {
-        return (current_target_ == kGpuPassTargetWorld) ? world_height_ : target_height_;
+        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_height_
+                                                                                               : target_height_;
     }
 
     GpuPassTarget CurrentTarget() const
     {
         return current_target_;
+    }
+
+    void SetWorldDirect(bool direct)
+    {
+        world_direct_ = direct && world_width_ == target_width_ && world_height_ == target_height_;
+    }
+
+    bool WorldDirect() const
+    {
+        return world_direct_;
     }
 
     int32_t WorldWidth() const
@@ -111,14 +126,14 @@ class GpuDevice
         return depth_format_;
     }
 
-    bool HasStencil() const
-    {
-        return has_stencil_;
-    }
-
     bool FrameAcquired() const
     {
-        return command_buffer_ != nullptr && swapchain_texture_ != nullptr;
+        return command_buffer_ != nullptr;
+    }
+
+    bool ReplayTargetReady() const
+    {
+        return command_buffer_ != nullptr && main_texture_ != nullptr;
     }
 
     int32_t TargetWidth() const
@@ -144,6 +159,7 @@ class GpuDevice
     SDL_GPURenderPass    *render_pass_       = nullptr;
     SDL_GPUTexture       *swapchain_texture_ = nullptr;
     SDL_GPUTexture       *color_texture_     = nullptr;
+    SDL_GPUTexture       *main_texture_      = nullptr;
     SDL_GPUTexture       *depth_texture_     = nullptr;
     SDL_GPUTexture       *world_color_texture_ = nullptr;
     SDL_GPUTexture       *world_depth_texture_ = nullptr;
@@ -163,12 +179,24 @@ class GpuDevice
     int32_t world_width_  = 0;
     int32_t world_height_ = 0;
 
+    void ReleaseOitTextures(void);
+
+    void PairColorClear(void);
+
     GpuPassTarget current_target_ = kGpuPassTargetMain;
+
+    SDL_GPUTexture *oit_accumulation_texture_ = nullptr;
+    SDL_GPUTexture *oit_revealage_texture_    = nullptr;
+
+    SDL_GPUTexture *clear_pair_texture_ = nullptr;
 
     RGBAColor clear_color_ = kRGBABlack;
 
     bool color_written_ = false;
-    bool has_stencil_   = false;
+
+    bool world_direct_ = false;
+
+    bool capture_only_ = false;
 };
 
 extern GpuDevice gpu_device;

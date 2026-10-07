@@ -1733,7 +1733,7 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
     float      projz          = source->z + (attack->height_ * ((source->height_ > 0 && source->info_->height_ > 0)
                                                                     ? source->height_ / source->info_->height_
                                                                     : 1.0f));
-    Sector    *cur_source_sec = source->subsector_->sector;
+    Sector    *cur_source_sec = source->sector_;
     BAMAngle   angle          = 0;
     float      slope          = 0.0f;
     MapObject *projectile     = nullptr;
@@ -1784,7 +1784,7 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
                     angle += (BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
             }
 
-            Sector *cur_target_sec = target->subsector_->sector;
+            Sector *cur_target_sec = target->sector_;
 
             if (cur_target_sec->sink_depth > 0 && !cur_target_sec->extrafloor_used && !cur_target_sec->height_sector &&
                 epi::AlmostEquals(target->z, cur_target_sec->floor_height))
@@ -1814,7 +1814,7 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
                     angle += (BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
             }
 
-            Sector *cur_target_sec = target->subsector_->sector;
+            Sector *cur_target_sec = target->sector_;
 
             if (cur_target_sec->sink_depth > 0 && !cur_target_sec->extrafloor_used && !cur_target_sec->height_sector &&
                 epi::AlmostEquals(target->z, cur_target_sec->floor_height))
@@ -3838,7 +3838,7 @@ void A_StandardLook(MapObject *object)
     bool CVAR_DOOM_TARGETTING = false;
 
     if (CVAR_DOOM_TARGETTING == true)
-        targ_pnum = object->subsector_->sector->sound_player; // old way
+        targ_pnum = object->sector_->sound_player; // old way
     else
         targ_pnum = object->last_heard_;                      // new way
 
@@ -4342,7 +4342,7 @@ void A_JumpSky(MapObject *mo)
     //
     // Note: nothing to do with monsters physically jumping.
 
-    if (mo->subsector_->sector->ceiling.image != sky_flat_image) // is it outdoors?
+    if (mo->sector_->ceiling.image != sky_flat_image) // is it outdoors?
     {
         return;
     }
@@ -4858,37 +4858,37 @@ void A_AddFlags(MapObject *mo)
     // Unlink from subsector if necessary
     if (args[0] & kMapObjectFlagNoSector)
     {
-        if (mo->subsector_next_)
+        if (mo->sector_next_)
         {
-            if (mo->subsector_next_->subsector_previous_)
+            if (mo->sector_next_->sector_previous_)
             {
-                EPI_ASSERT(mo->subsector_next_->subsector_previous_ == mo);
+                EPI_ASSERT(mo->sector_next_->sector_previous_ == mo);
 
-                mo->subsector_next_->subsector_previous_ = mo->subsector_previous_;
+                mo->sector_next_->sector_previous_ = mo->sector_previous_;
             }
         }
 
-        if (mo->subsector_previous_)
+        if (mo->sector_previous_)
         {
-            if (mo->subsector_previous_->subsector_next_)
+            if (mo->sector_previous_->sector_next_)
             {
-                EPI_ASSERT(mo->subsector_previous_->subsector_next_ == mo);
+                EPI_ASSERT(mo->sector_previous_->sector_next_ == mo);
 
-                mo->subsector_previous_->subsector_next_ = mo->subsector_next_;
+                mo->sector_previous_->sector_next_ = mo->sector_next_;
             }
         }
         else
         {
-            if (mo->subsector_->thing_list)
+            if (mo->sector_->thing_list)
             {
-                EPI_ASSERT(mo->subsector_->thing_list == mo);
+                EPI_ASSERT(mo->sector_->thing_list == mo);
 
-                mo->subsector_->thing_list = mo->subsector_next_;
+                mo->sector_->thing_list = mo->sector_next_;
             }
         }
 
-        mo->subsector_next_     = nullptr;
-        mo->subsector_previous_ = nullptr;
+        mo->sector_next_     = nullptr;
+        mo->sector_previous_ = nullptr;
     }
 }
 
@@ -4933,13 +4933,13 @@ void A_RemoveFlags(MapObject *mo)
     // Link into sector if necessary
     if (args[0] & kMapObjectFlagNoSector)
     {
-        mo->subsector_next_     = mo->subsector_->thing_list;
-        mo->subsector_previous_ = nullptr;
+        mo->sector_next_     = mo->sector_->thing_list;
+        mo->sector_previous_ = nullptr;
 
-        if (mo->subsector_->thing_list)
-            mo->subsector_->thing_list->subsector_previous_ = mo;
+        if (mo->sector_->thing_list)
+            mo->sector_->thing_list->sector_previous_ = mo;
 
-        mo->subsector_->thing_list = mo;
+        mo->sector_->thing_list = mo;
     }
 }
 

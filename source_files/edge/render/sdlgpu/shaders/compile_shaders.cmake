@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model light)
+set(SHADER_NAMES world movie model world_oit model_oit sprite)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
@@ -31,14 +31,41 @@ string(SUBSTRING "${SHADER_NAME}" 1 -1 NAME_TAIL)
 string(TOUPPER "${NAME_HEAD}" NAME_HEAD)
 set(SYMBOL_BASE "${NAME_HEAD}${NAME_TAIL}")
 
+if (SHADER_NAME STREQUAL "world_oit")
+  set(SYMBOL_BASE "WorldOit")
+elseif (SHADER_NAME STREQUAL "model_oit")
+  set(SYMBOL_BASE "ModelOit")
+endif()
+
 set(GENERATED_BODY "")
 
 foreach(STAGE IN LISTS SHADER_STAGES)
-  set(SOURCE_FILE "${SHADER_DIR}/${SHADER_NAME}.${STAGE}.glsl")
+  if (SHADER_NAME STREQUAL "sprite" AND STAGE STREQUAL "frag")
+    continue()
+  endif()
+
+  set(SHADER_SOURCE_NAME "${SHADER_NAME}")
+  set(EXTRA_DEFINES "")
+
+  if (SHADER_NAME STREQUAL "world_oit" OR SHADER_NAME STREQUAL "model_oit")
+    if (STAGE STREQUAL "vert")
+      continue()
+    endif()
+
+    if (SHADER_NAME STREQUAL "world_oit")
+      set(SHADER_SOURCE_NAME "world")
+    else()
+      set(SHADER_SOURCE_NAME "model")
+    endif()
+
+    set(EXTRA_DEFINES "-DEDGE_OIT_PASS=1")
+  endif()
+
+  set(SOURCE_FILE "${SHADER_DIR}/${SHADER_SOURCE_NAME}.${STAGE}.glsl")
   set(BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.${STAGE}.spv")
 
   execute_process(
-    COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 -S ${STAGE} -o "${BINARY_FILE}" "${SOURCE_FILE}"
+    COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.0 ${EXTRA_DEFINES} -S ${STAGE} -o "${BINARY_FILE}" "${SOURCE_FILE}"
     RESULT_VARIABLE COMPILE_RESULT
     OUTPUT_VARIABLE COMPILE_OUTPUT
     ERROR_VARIABLE COMPILE_OUTPUT)
@@ -82,6 +109,15 @@ foreach(STAGE IN LISTS SHADER_STAGES)
   count_descriptor_set("${DISASSEMBLY}" ${SAMPLER_SET} SAMPLER_COUNT)
   count_descriptor_set("${DISASSEMBLY}" ${UNIFORM_SET} UNIFORM_BUFFER_COUNT)
 
+  string(REGEX MATCHALL "BufferBlock" STORAGE_MATCHES "${DISASSEMBLY}")
+  list(LENGTH STORAGE_MATCHES STORAGE_BUFFER_COUNT)
+
+  math(EXPR SAMPLER_COUNT "${SAMPLER_COUNT} - ${STORAGE_BUFFER_COUNT}")
+
+  if (SAMPLER_COUNT LESS 0)
+    message(FATAL_ERROR "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl storage-buffer count exceeds set ${SAMPLER_SET} total.")
+  endif()
+
   foreach(STRAY_SET RANGE 0 3)
     if (NOT STRAY_SET EQUAL SAMPLER_SET AND NOT STRAY_SET EQUAL UNIFORM_SET)
       count_descriptor_set("${DISASSEMBLY}" ${STRAY_SET} STRAY_COUNT)
@@ -109,7 +145,8 @@ foreach(STAGE IN LISTS SHADER_STAGES)
   math(EXPR LAST_WORD "${WORD_COUNT} - 1")
 
   string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}SamplerCount = ${SAMPLER_COUNT};\n")
-  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}UniformBufferCount = ${UNIFORM_BUFFER_COUNT};\n\n")
+  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}UniformBufferCount = ${UNIFORM_BUFFER_COUNT};\n")
+  string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}StorageBufferCount = ${STORAGE_BUFFER_COUNT};\n\n")
   string(APPEND GENERATED_BODY "static const uint32_t ${STAGE_PREFIX}Spirv[] = {")
 
   foreach(WORD_INDEX RANGE ${LAST_WORD})
@@ -135,8 +172,8 @@ foreach(STAGE IN LISTS SHADER_STAGES)
 
   string(APPEND GENERATED_BODY "\n};\n\n")
 
-  message(STATUS "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) in set "
-                 "${SAMPLER_SET}, ${UNIFORM_BUFFER_COUNT} uniform buffer(s) in set ${UNIFORM_SET}")
+  message(STATUS "compile_shaders: ${SHADER_NAME}.${STAGE}.glsl -> ${WORD_COUNT} words, ${SAMPLER_COUNT} sampler(s) and "
+                 "${STORAGE_BUFFER_COUNT} storage buffer(s) in set ${SAMPLER_SET}, ${UNIFORM_BUFFER_COUNT} uniform buffer(s) in set ${UNIFORM_SET}")
 endforeach()
 
 set(GENERATED_HEADER "#pragma once\n\n#include <stdint.h>\n\n${GENERATED_BODY}")

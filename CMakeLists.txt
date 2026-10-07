@@ -22,9 +22,6 @@ option(EDGE_GLES2 "WebGL1/GLES 2.0/GL 2.0 Renderer" OFF)
 # SDL3_GPU Renderer (Vulkan only)
 option(EDGE_SDL_GPU "SDL3_GPU Renderer" ON)
 
-# Run the BSP walk on a worker thread
-option(EDGE_THREADED_BSP "Threaded BSP traversal" ON)
-
 # Web Player
 option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" OFF)
 option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
@@ -32,9 +29,6 @@ option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
 if (EMSCRIPTEN)
   set (EDGE_SDL_GPU OFF)
   set (EDGE_GLES2 ON)
-  if (NOT EDGE_WEB_MULTITHREADED)
-    set (EDGE_THREADED_BSP OFF)
-  endif()
 endif()
 
 if (EDGE_SDL_GPU)
@@ -230,10 +224,6 @@ else()
       message(STATUS "EDGE_GLES2: no OpenGL ES 2.0 driver found, falling back to desktop OpenGL 2.0")
     endif()
   endif()
-endif()
-
-if (EDGE_THREADED_BSP)
-  add_definitions(-DEDGE_THREADED_BSP)
 endif()
 
 if (EDGE_EXTRA_CHECKS)

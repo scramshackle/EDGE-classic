@@ -40,12 +40,9 @@ struct TrueTypeCharacter
 struct PatchFontCache
 {
     std::unordered_map<int, ImageAtlasRectangle> atlas_rectangles;
-    unsigned int                                 atlas_texture_id          = 0;
-    unsigned int                                 atlas_smoothed_texture_id = 0;
+    unsigned int                                 atlas_texture_id = 0;
     // Since we track our own atlas textures, need a whitened version for color
     // remaps
-    unsigned int atlas_whitened_texture_id          = 0;
-    unsigned int atlas_whitened_smoothed_texture_id = 0;
 
     // nominal width and height.  Characters can be larger or smaller
     // than this, but these values give a good guess for formatting
@@ -168,7 +165,6 @@ class TTFFont final : public Font
   public:
     float                                      truetype_kerning_scale_[3];
     unsigned int                               truetype_texture_id_[3];
-    unsigned int                               truetype_smoothed_texture_id_[3];
     std::unordered_map<int, TrueTypeCharacter> truetype_glyph_map_;
     stbtt_fontinfo                            *truetype_info_;
 

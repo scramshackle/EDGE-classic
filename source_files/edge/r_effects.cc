@@ -126,7 +126,7 @@ void RendererRainbowEffect(Player *player)
     }
 
     // AJA 2022: handle BOOM colormaps (linetype 242)
-    Sector *sector = player->map_object_->subsector_->sector;
+    Sector *sector = player->map_object_->sector_;
 
     if (sector->height_sector != nullptr)
     {

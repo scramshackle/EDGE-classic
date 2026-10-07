@@ -1,20 +1,100 @@
 #include "gles2_program.h"
 
+#include "gles2_lights.h"
+
+#include "r_lightgrid.h"
+
 #include <string.h>
+
+#include <vector>
 
 #include "epi.h"
 #include "epi_math.h"
 #include "i_system.h"
 #include "r_backend.h"
-#include "shaders/light_glsl.h"
+#include "r_colormap.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
+#include "shaders/oit_glsl.h"
 #include "shaders/world_glsl.h"
 
 Gles2Program      gles2_program;
 Gles2ModelProgram gles2_model_program;
 Gles2MovieProgram gles2_movie_program;
-Gles2LightProgram gles2_light_program;
+Gles2OitProgram   gles2_oit_program;
+
+static constexpr int kColorLookupTiles = 8;
+
+static GLuint color_lookup_textures[kColorLookupMaximum] = {};
+static GLuint color_lookup_bound                         = 0;
+
+static void BindColorLookupTexture(GLuint texture)
+{
+    GLint previous_unit = GL_TEXTURE0;
+
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previous_unit);
+
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitColorLookup);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glActiveTexture((GLenum)previous_unit);
+
+    color_lookup_bound = texture;
+}
+
+static bool UseColorLookup(int slot)
+{
+    GLuint texture = (slot > 0 && slot < kColorLookupMaximum) ? color_lookup_textures[slot] : 0;
+
+    if (texture != 0 && texture != color_lookup_bound)
+        BindColorLookupTexture(texture);
+
+    return texture != 0;
+}
+
+void Gles2UploadColorLookup(int slot, const uint8_t *pixels)
+{
+    if (slot <= 0 || slot >= kColorLookupMaximum || !pixels)
+        return;
+
+    int atlas_size = kColorLookupSize * kColorLookupTiles;
+
+    std::vector<uint8_t> packed((size_t)atlas_size * atlas_size * 4);
+
+    for (int b = 0; b < kColorLookupSize; b++)
+    {
+        int tile_x = (b % kColorLookupTiles) * kColorLookupSize;
+        int tile_y = (b / kColorLookupTiles) * kColorLookupSize;
+
+        for (int g = 0; g < kColorLookupSize; g++)
+        {
+            const uint8_t *source = pixels + ((size_t)b * kColorLookupSize + g) * kColorLookupSize * 4;
+            uint8_t       *dest   = packed.data() + ((size_t)(tile_y + g) * atlas_size + tile_x) * 4;
+
+            memcpy(dest, source, (size_t)kColorLookupSize * 4);
+        }
+    }
+
+    if (color_lookup_textures[slot] == 0)
+        glGenTextures(1, &color_lookup_textures[slot]);
+
+    GLint previous_unit = GL_TEXTURE0;
+
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previous_unit);
+
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitColorLookup);
+    glBindTexture(GL_TEXTURE_2D, color_lookup_textures[slot]);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas_size, atlas_size, 0, GL_RGBA, GL_UNSIGNED_BYTE, packed.data());
+
+    glActiveTexture((GLenum)previous_unit);
+
+    color_lookup_bound = color_lookup_textures[slot];
+}
 
 static GLuint CompileStage(GLenum stage, const char *source, const char *label)
 {
@@ -69,6 +149,10 @@ bool Gles2Program::Init()
     glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
     glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
     glBindAttribLocation(program_, kGles2AttributeColor, "a_color");
+    glBindAttribLocation(program_, kGles2AttributeSpriteOrigin, "a_sprite_origin");
+    glBindAttribLocation(program_, kGles2AttributeSpriteExtent, "a_sprite_extent");
+    glBindAttribLocation(program_, kGles2AttributeSpriteFuzz, "a_sprite_fuzz");
+    glBindAttribLocation(program_, kGles2AttributeSpriteLight, "a_sprite_light");
 
     glLinkProgram(program_);
 
@@ -98,10 +182,25 @@ bool Gles2Program::Init()
 
     uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
     uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
-    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
     uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
     uniform_texture1_              = glGetUniformLocation(program_, "u_texture1");
     uniform_multi_texture_         = glGetUniformLocation(program_, "u_multi_texture");
+    uniform_light_falloff_         = glGetUniformLocation(program_, "u_light_falloff");
+    uniform_world_lit_             = glGetUniformLocation(program_, "u_world_lit");
+    uniform_light_data_            = glGetUniformLocation(program_, "u_light_data");
+    uniform_light_headers_         = glGetUniformLocation(program_, "u_light_headers");
+    uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
+    uniform_light_list_            = glGetUniformLocation(program_, "u_light_list");
+    uniform_light_view_            = glGetUniformLocation(program_, "u_light_view");
+    uniform_light_cluster_         = glGetUniformLocation(program_, "u_light_cluster");
+    uniform_light_bounds_min_      = glGetUniformLocation(program_, "u_light_bounds_min");
+    uniform_light_bounds_range_    = glGetUniformLocation(program_, "u_light_bounds_range");
+    uniform_light_radius_scale_    = glGetUniformLocation(program_, "u_light_radius_scale");
+    uniform_light_data_step_       = glGetUniformLocation(program_, "u_light_data_step");
+    uniform_glow_count_            = glGetUniformLocation(program_, "u_glow_count");
+    uniform_glow_plane_            = glGetUniformLocation(program_, "u_glow_plane");
+    uniform_glow_color_            = glGetUniformLocation(program_, "u_glow_color");
+    uniform_glow_additive_         = glGetUniformLocation(program_, "u_glow_additive");
     uniform_line_mode_             = glGetUniformLocation(program_, "u_line_mode");
     uniform_skip_rgb_              = glGetUniformLocation(program_, "u_skip_rgb");
     uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
@@ -112,6 +211,20 @@ bool Gles2Program::Init()
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
 
     uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
+    uniform_oit_mode_               = glGetUniformLocation(program_, "u_oit_mode");
+    uniform_oit_scale_              = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_color_lookup_           = glGetUniformLocation(program_, "u_color_lookup");
+    uniform_color_lookup_enabled_   = glGetUniformLocation(program_, "u_color_lookup_enabled");
+    uniform_whiten_                 = glGetUniformLocation(program_, "u_whiten");
+    uniform_blur_                   = glGetUniformLocation(program_, "u_blur");
+    uniform_texture_offset_         = glGetUniformLocation(program_, "u_texture_offset");
+    uniform_light_row_offset_       = glGetUniformLocation(program_, "u_light_row_offset");
+    uniform_sprite_mode_            = glGetUniformLocation(program_, "u_sprite_mode");
+    uniform_sprite_whites_          = glGetUniformLocation(program_, "u_sprite_whites");
+    uniform_sprite_lighting_        = glGetUniformLocation(program_, "u_sprite_lighting");
+    uniform_sprite_view0_           = glGetUniformLocation(program_, "u_sprite_view0");
+    uniform_sprite_view1_           = glGetUniformLocation(program_, "u_sprite_view1");
+    uniform_liquid_                 = glGetUniformLocation(program_, "u_liquid");
     uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
     uniform_view_tint_              = glGetUniformLocation(program_, "u_view_tint");
     uniform_sky_fog_depth_          = glGetUniformLocation(program_, "u_sky_fog_depth");
@@ -134,17 +247,10 @@ bool Gles2Program::Init()
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
     glUniform1i(uniform_texture1_, kGles2TextureUnit1);
     glUniform1i(uniform_sky_cube_, kGles2TextureUnitSkyCube);
-
-    for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
-    {
-        clip_planes_[i].enabled     = false;
-        clip_planes_[i].equation[0] = 0.0f;
-        clip_planes_[i].equation[1] = 0.0f;
-        clip_planes_[i].equation[2] = 0.0f;
-        clip_planes_[i].equation[3] = 1.0f;
-
-        UploadClipPlane(i);
-    }
+    glUniform1i(uniform_light_data_, kGles2TextureUnitLightData);
+    glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
+    glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
+    glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
 
     return true;
 }
@@ -205,76 +311,80 @@ void Gles2Program::SetModelView(const HMM_Mat4 &matrix)
     uniform_update_count_++;
 }
 
-void Gles2Program::UploadClipPlane(int32_t index)
-{
-    GLfloat values[4];
-
-    if (clip_planes_[index].enabled)
-    {
-        values[0] = clip_planes_[index].equation[0];
-        values[1] = clip_planes_[index].equation[1];
-        values[2] = clip_planes_[index].equation[2];
-        values[3] = clip_planes_[index].equation[3];
-    }
-    else
-    {
-        values[0] = 0.0f;
-        values[1] = 0.0f;
-        values[2] = 0.0f;
-        values[3] = 1.0f;
-    }
-
-    glUniform4fv(uniform_clip_plane_ + index, 1, values);
-
-    uniform_update_count_++;
-}
-
-void Gles2Program::SetClipPlane(int32_t index, const double equation[4])
-{
-    if (index < 0 || index >= kGles2MaximumClipPlanes)
-    {
-        return;
-    }
-
-    bool changed = false;
-
-    for (int32_t i = 0; i < 4; i++)
-    {
-        float value = (float)equation[i];
-
-        if (!epi::AlmostEquals(clip_planes_[index].equation[i], value))
-        {
-            clip_planes_[index].equation[i] = value;
-            changed                         = true;
-        }
-    }
-
-    if (changed && clip_planes_[index].enabled)
-    {
-        UploadClipPlane(index);
-    }
-}
-
-void Gles2Program::SetClipPlaneEnabled(int32_t index, bool enabled)
-{
-    if (index < 0 || index >= kGles2MaximumClipPlanes)
-    {
-        return;
-    }
-
-    if (clip_planes_[index].enabled == enabled)
-    {
-        return;
-    }
-
-    clip_planes_[index].enabled = enabled;
-
-    UploadClipPlane(index);
-}
-
 void Gles2Program::SetMultiTexture(bool enabled)
 {
     SetFloat(uniform_multi_texture_, shadow_multi_texture_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetLightFalloff(bool enabled)
+{
+    SetFloat(uniform_light_falloff_, shadow_light_falloff_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetWorldLit(bool enabled)
+{
+    SetFloat(uniform_world_lit_, shadow_world_lit_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetLightGrid(const Gles2LightGridState *grid)
+{
+    if (!grid || !grid->active)
+        return;
+
+    glUniform4f(uniform_light_view_, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
+                grid->header_texel_step[1]);
+
+    glUniform4f(uniform_light_cluster_, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
+
+    glUniform4f(uniform_light_list_, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
+
+    glUniform3f(uniform_light_bounds_min_, grid->bounds_minimum[0], grid->bounds_minimum[1], grid->bounds_minimum[2]);
+    glUniform3f(uniform_light_bounds_range_, grid->bounds_range[0], grid->bounds_range[1], grid->bounds_range[2]);
+
+    glUniform1f(uniform_light_radius_scale_, grid->radius_scale);
+    glUniform1f(uniform_light_data_step_, grid->data_texel_step);
+}
+
+void Gles2Program::SetGlowSet(int index)
+{
+    if (shadow_glow_set_ == index)
+        return;
+
+    shadow_glow_set_ = index;
+
+    const LightGridGlowSet *set = LightGridGlowSetAt(index);
+
+    if (!set || set->count <= 0)
+    {
+        glUniform1f(uniform_glow_count_, 0.0f);
+        return;
+    }
+
+    float planes[kLightGridMaximumGlows * 4];
+    float colors[kLightGridMaximumGlows * 4];
+    float additive[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    for (int i = 0; i < kLightGridMaximumGlows; i++)
+    {
+        const LightGridGlow &glow = set->glows[i];
+
+        for (int e = 0; e < 4; e++)
+            planes[i * 4 + e] = (i < set->count) ? glow.plane[e] : 0.0f;
+
+        colors[i * 4 + 0] = (i < set->count) ? glow.color[0] / 255.0f : 0.0f;
+        colors[i * 4 + 1] = (i < set->count) ? glow.color[1] / 255.0f : 0.0f;
+        colors[i * 4 + 2] = (i < set->count) ? glow.color[2] / 255.0f : 0.0f;
+        colors[i * 4 + 3] = (i < set->count) ? glow.radius : 1.0f;
+
+        if (i < 4)
+            additive[i] = (i < set->count) ? glow.additive : 0.0f;
+    }
+
+    glUniform4fv(uniform_glow_plane_, kLightGridMaximumGlows, planes);
+    glUniform4fv(uniform_glow_color_, kLightGridMaximumGlows, colors);
+    glUniform4fv(uniform_glow_additive_, 1, additive);
+
+    glUniform1f(uniform_glow_count_, (float)set->count);
 }
 
 void Gles2Program::SetLineMode(bool enabled)
@@ -312,6 +422,98 @@ void Gles2Program::SetViewTint(float r, float g, float b)
 void Gles2Program::SetLightDepth(bool enabled)
 {
     SetFloat(uniform_light_depth_, shadow_light_depth_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetOit(float mode, float scale)
+{
+    SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
+    SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
+}
+
+void Gles2Program::SetTextureOffset(const HMM_Vec2 &offset)
+{
+    if (epi::AlmostEquals(shadow_texture_offset_.X, offset.X) && epi::AlmostEquals(shadow_texture_offset_.Y, offset.Y))
+        return;
+
+    shadow_texture_offset_ = offset;
+
+    glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+}
+
+void Gles2Program::SetLightRowOffset(float offset)
+{
+    SetFloat(uniform_light_row_offset_, shadow_light_row_offset_, offset);
+}
+
+void Gles2Program::SetSpriteMode(bool enabled)
+{
+    SetFloat(uniform_sprite_mode_, shadow_sprite_mode_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetSpriteLightTable(const SpriteLightTable *light_table)
+{
+    if (!light_table || light_table == shadow_sprite_light_table_)
+        return;
+
+    shadow_sprite_light_table_ = light_table;
+
+    glUniform4fv(uniform_sprite_whites_, kSpriteLightLevels, &light_table->whites[0][0]);
+    glUniform4fv(uniform_sprite_lighting_, 1, light_table->parameters);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetSpriteView(const HMM_Vec4 view[2])
+{
+    if (!memcmp(shadow_sprite_view_, view, sizeof(shadow_sprite_view_)))
+        return;
+
+    shadow_sprite_view_[0] = view[0];
+    shadow_sprite_view_[1] = view[1];
+
+    glUniform4fv(uniform_sprite_view0_, 1, view[0].Elements);
+    glUniform4fv(uniform_sprite_view1_, 1, view[1].Elements);
+
+    uniform_update_count_++;
+}
+
+void Gles2Program::SetLiquid(const HMM_Vec4 &liquid)
+{
+    if (epi::AlmostEquals(shadow_liquid_.X, liquid.X) && epi::AlmostEquals(shadow_liquid_.Y, liquid.Y) &&
+        epi::AlmostEquals(shadow_liquid_.Z, liquid.Z) && epi::AlmostEquals(shadow_liquid_.W, liquid.W))
+        return;
+
+    shadow_liquid_ = liquid;
+
+    glUniform4f(uniform_liquid_, liquid.X, liquid.Y, liquid.Z, liquid.W);
+}
+
+void Gles2Program::SetColorLookup(int slot)
+{
+    SetFloat(uniform_color_lookup_enabled_, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetWhiten(bool enabled)
+{
+    SetFloat(uniform_whiten_, shadow_whiten_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2Program::SetBlur(const HMM_Vec4 &blur)
+{
+    if (epi::AlmostEquals(shadow_blur_.X, blur.X) && epi::AlmostEquals(shadow_blur_.Z, blur.Z) &&
+        epi::AlmostEquals(shadow_blur_.W, blur.W))
+        return;
+
+    shadow_blur_ = blur;
+
+    glUniform4f(uniform_blur_, blur.X, blur.Y, blur.Z, blur.W);
+}
+
+void Gles2Program::ForceOitReset()
+{
+    shadow_oit_mode_ = 0.0f;
+
+    glUniform1f(uniform_oit_mode_, 0.0f);
 }
 
 void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
@@ -400,7 +602,8 @@ bool Gles2ModelProgram::Init()
     glBindAttribLocation(program_, kGles2AttributeModelPositionFrame1, "a_position_frame1");
     glBindAttribLocation(program_, kGles2AttributeModelPositionFrame2, "a_position_frame2");
     glBindAttribLocation(program_, kGles2AttributeModelTextureCoordinates, "a_texture_coordinates");
-    glBindAttribLocation(program_, kGles2AttributeModelColor, "a_color");
+    glBindAttribLocation(program_, kGles2AttributeModelNormalFrame1, "a_normal_frame1");
+    glBindAttribLocation(program_, kGles2AttributeModelNormalFrame2, "a_normal_frame2");
 
     glLinkProgram(program_);
 
@@ -431,24 +634,120 @@ bool Gles2ModelProgram::Init()
     uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
     uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
     uniform_model_transform_       = glGetUniformLocation(program_, "u_model_transform");
+    uniform_world_lit_             = glGetUniformLocation(program_, "u_world_lit");
+    uniform_light_data_            = glGetUniformLocation(program_, "u_light_data");
+    uniform_light_headers_         = glGetUniformLocation(program_, "u_light_headers");
+    uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
+    uniform_light_view_            = glGetUniformLocation(program_, "u_light_view");
+    uniform_light_cluster_         = glGetUniformLocation(program_, "u_light_cluster");
+    uniform_light_list_            = glGetUniformLocation(program_, "u_light_list");
+    uniform_light_bounds_min_      = glGetUniformLocation(program_, "u_light_bounds_min");
+    uniform_light_bounds_range_    = glGetUniformLocation(program_, "u_light_bounds_range");
+    uniform_light_radius_scale_    = glGetUniformLocation(program_, "u_light_radius_scale");
+    uniform_light_data_step_       = glGetUniformLocation(program_, "u_light_data_step");
+    uniform_glow_count_            = glGetUniformLocation(program_, "u_glow_count");
+    uniform_glow_plane_            = glGetUniformLocation(program_, "u_glow_plane");
+    uniform_glow_color_            = glGetUniformLocation(program_, "u_glow_color");
+    uniform_glow_additive_         = glGetUniformLocation(program_, "u_glow_additive");
     uniform_lerp_                  = glGetUniformLocation(program_, "u_lerp");
     uniform_texture_scale_         = glGetUniformLocation(program_, "u_texture_scale");
     uniform_texture_offset_        = glGetUniformLocation(program_, "u_texture_offset");
     uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
     uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
     uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
-    uniform_additive_pass_         = glGetUniformLocation(program_, "u_additive_pass");
-    uniform_clip_plane_            = glGetUniformLocation(program_, "u_clip_plane");
+    uniform_model_whites_          = glGetUniformLocation(program_, "u_model_whites");
+    uniform_model_lighting_        = glGetUniformLocation(program_, "u_model_lighting");
+    uniform_model_light_           = glGetUniformLocation(program_, "u_model_light");
+    uniform_model_tint_            = glGetUniformLocation(program_, "u_model_tint");
     uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
     uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
     uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
     uniform_fog_start_             = glGetUniformLocation(program_, "u_fog_start");
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
+    uniform_oit_mode_              = glGetUniformLocation(program_, "u_oit_mode");
+    uniform_oit_scale_             = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_color_lookup_          = glGetUniformLocation(program_, "u_color_lookup");
+    uniform_color_lookup_enabled_  = glGetUniformLocation(program_, "u_color_lookup_enabled");
 
     glUseProgram(program_);
     glUniform1i(uniform_texture0_, kGles2TextureUnit0);
+    glUniform1i(uniform_light_data_, kGles2TextureUnitLightData);
+    glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
+    glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
+    glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
 
     return true;
+}
+
+void Gles2ModelProgram::SetColorLookup(int slot)
+{
+    SetFloat(uniform_color_lookup_enabled_, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
+}
+
+void Gles2ModelProgram::SetWorldLit(bool enabled)
+{
+    SetFloat(uniform_world_lit_, shadow_world_lit_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2ModelProgram::SetLightGrid(const Gles2LightGridState *grid)
+{
+    if (!grid || !grid->active)
+        return;
+
+    glUniform4f(uniform_light_view_, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
+                grid->header_texel_step[1]);
+
+    glUniform4f(uniform_light_cluster_, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
+
+    glUniform4f(uniform_light_list_, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
+
+    glUniform3f(uniform_light_bounds_min_, grid->bounds_minimum[0], grid->bounds_minimum[1], grid->bounds_minimum[2]);
+    glUniform3f(uniform_light_bounds_range_, grid->bounds_range[0], grid->bounds_range[1], grid->bounds_range[2]);
+
+    glUniform1f(uniform_light_radius_scale_, grid->radius_scale);
+    glUniform1f(uniform_light_data_step_, grid->data_texel_step);
+}
+
+void Gles2ModelProgram::SetGlowSet(int index)
+{
+    if (shadow_glow_set_ == index)
+        return;
+
+    shadow_glow_set_ = index;
+
+    const LightGridGlowSet *set = LightGridGlowSetAt(index);
+
+    if (!set || set->count <= 0)
+    {
+        glUniform1f(uniform_glow_count_, 0.0f);
+        return;
+    }
+
+    float planes[kLightGridMaximumGlows * 4];
+    float colors[kLightGridMaximumGlows * 4];
+    float additive[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    for (int i = 0; i < kLightGridMaximumGlows; i++)
+    {
+        const LightGridGlow &glow = set->glows[i];
+
+        for (int e = 0; e < 4; e++)
+            planes[i * 4 + e] = (i < set->count) ? glow.plane[e] : 0.0f;
+
+        colors[i * 4 + 0] = (i < set->count) ? glow.color[0] / 255.0f : 0.0f;
+        colors[i * 4 + 1] = (i < set->count) ? glow.color[1] / 255.0f : 0.0f;
+        colors[i * 4 + 2] = (i < set->count) ? glow.color[2] / 255.0f : 0.0f;
+        colors[i * 4 + 3] = (i < set->count) ? glow.radius : 1.0f;
+
+        if (i < 4)
+            additive[i] = (i < set->count) ? glow.additive : 0.0f;
+    }
+
+    glUniform4fv(uniform_glow_plane_, kLightGridMaximumGlows, planes);
+    glUniform4fv(uniform_glow_color_, kLightGridMaximumGlows, colors);
+    glUniform4fv(uniform_glow_additive_, 1, additive);
+
+    glUniform1f(uniform_glow_count_, (float)set->count);
 }
 
 void Gles2ModelProgram::Shutdown()
@@ -509,31 +808,23 @@ void Gles2ModelProgram::SetAlphaTest(float reference)
     SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
 }
 
-void Gles2ModelProgram::SetAdditivePass(bool additive)
+void Gles2ModelProgram::SetLighting(const ModelDrawInfo &info)
 {
-    SetFloat(uniform_additive_pass_, shadow_additive_pass_, additive ? 1.0f : 0.0f);
+    if (info.light_table)
+    {
+        glUniform4fv(uniform_model_whites_, kSpriteLightLevels, &info.light_table->whites[0][0]);
+        glUniform4fv(uniform_model_lighting_, 1, info.light_table->parameters);
+    }
+
+    glUniform4f(uniform_model_light_, info.light_level, info.light_fixed_depth, info.light_depth_fixed ? 1.0f : 0.0f,
+                info.fuzzy ? 1.0f : 0.0f);
+    glUniform4f(uniform_model_tint_, info.tint.X, info.tint.Y, info.tint.Z, 1.0f);
 }
 
-void Gles2ModelProgram::SetClipPlane(int32_t index, bool enabled, const float equation[4])
+void Gles2ModelProgram::SetOit(float mode, float scale)
 {
-    GLfloat values[4];
-
-    if (enabled)
-    {
-        values[0] = equation[0];
-        values[1] = equation[1];
-        values[2] = equation[2];
-        values[3] = equation[3];
-    }
-    else
-    {
-        values[0] = 0.0f;
-        values[1] = 0.0f;
-        values[2] = 0.0f;
-        values[3] = 1.0f;
-    }
-
-    glUniform4fv(uniform_clip_plane_ + index, 1, values);
+    SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
+    SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
 }
 
 void Gles2ModelProgram::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start,
@@ -645,23 +936,23 @@ void Gles2MovieProgram::SetPlaneScales(float luma_x, float luma_y, float chroma_
     glUniform2f(uniform_chroma_scale_, chroma_x, chroma_y);
 }
 
-bool Gles2LightProgram::Init()
+bool Gles2OitProgram::Init()
 {
-    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kLightVertexSource, "light.vert.glsl");
-    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kLightFragmentSource, "light.frag.glsl");
+    GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kOitVertexSource, "oit.vert.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kOitFragmentSource, "oit.frag.glsl");
 
     program_ = glCreateProgram();
 
     if (!program_)
     {
-        FatalError("Gles2LightProgram: glCreateProgram failed\n");
+        FatalError("Gles2OitProgram: glCreateProgram failed\n");
     }
 
     glAttachShader(program_, vertex_shader);
     glAttachShader(program_, fragment_shader);
 
-    glBindAttribLocation(program_, kGles2AttributeLightPosition, "a_position");
-    glBindAttribLocation(program_, kGles2AttributeLightTextureCoordinates, "a_texture_coordinates");
+    glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
+    glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
 
     glLinkProgram(program_);
 
@@ -676,11 +967,9 @@ bool Gles2LightProgram::Init()
         char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
 
         if (log_length > 1)
-        {
             glGetProgramInfoLog(program_, log_length, nullptr, log);
-        }
 
-        FatalError("Gles2LightProgram: light program failed to link:\n%s\n", log);
+        FatalError("Gles2OitProgram: composite program failed to link:\n%s\n", log);
     }
 
     glDetachShader(program_, vertex_shader);
@@ -689,27 +978,19 @@ bool Gles2LightProgram::Init()
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
-    uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
-    uniform_surface_texture_       = glGetUniformLocation(program_, "u_surface_texture");
-    uniform_light_texture_         = glGetUniformLocation(program_, "u_light_texture");
-    uniform_surface_mode_          = glGetUniformLocation(program_, "u_surface_mode");
-    uniform_alpha_                 = glGetUniformLocation(program_, "u_alpha");
-    uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
-    uniform_surface_normal_        = glGetUniformLocation(program_, "u_surface_normal");
-    uniform_normal_horizontal_     = glGetUniformLocation(program_, "u_normal_horizontal");
-    uniform_light_count_           = glGetUniformLocation(program_, "u_light_count");
-    uniform_light_position_radius_ = glGetUniformLocation(program_, "u_light_position_radius");
-    uniform_light_color_           = glGetUniformLocation(program_, "u_light_color");
+    uniform_accumulation_ = glGetUniformLocation(program_, "u_accumulation");
+    uniform_revealage_    = glGetUniformLocation(program_, "u_revealage");
+    uniform_scale_        = glGetUniformLocation(program_, "u_oit_scale");
 
     glUseProgram(program_);
 
-    glUniform1i(uniform_surface_texture_, kGles2TextureUnit0);
-    glUniform1i(uniform_light_texture_, kGles2TextureUnit1);
+    glUniform1i(uniform_accumulation_, kGles2TextureUnit0);
+    glUniform1i(uniform_revealage_, kGles2TextureUnit1);
 
     return true;
 }
 
-void Gles2LightProgram::Shutdown()
+void Gles2OitProgram::Shutdown()
 {
     if (program_)
     {
@@ -718,58 +999,17 @@ void Gles2LightProgram::Shutdown()
     }
 }
 
-void Gles2LightProgram::Use()
+void Gles2OitProgram::Use()
 {
     glUseProgram(program_);
 }
 
-void Gles2LightProgram::SetFloat(GLint location, float &shadow, float value)
+void Gles2OitProgram::SetScale(float scale)
 {
-    if (epi::AlmostEquals(shadow, value))
-    {
+    if (epi::AlmostEquals(shadow_scale_, scale))
         return;
-    }
 
-    shadow = value;
+    shadow_scale_ = scale;
 
-    glUniform1f(location, value);
-}
-
-void Gles2LightProgram::SetModelViewProjection(const HMM_Mat4 &matrix)
-{
-    glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&matrix);
-}
-
-void Gles2LightProgram::SetSurfaceMode(float mode)
-{
-    SetFloat(uniform_surface_mode_, shadow_surface_mode_, mode);
-}
-
-void Gles2LightProgram::SetAlpha(float alpha)
-{
-    SetFloat(uniform_alpha_, shadow_alpha_, alpha);
-}
-
-void Gles2LightProgram::SetAlphaTest(float reference)
-{
-    SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
-}
-
-void Gles2LightProgram::SetSurfaceNormal(float x, float y, float z, float radius_xy_divisor,
-                                         bool normal_is_horizontal)
-{
-    glUniform4f(uniform_surface_normal_, x, y, z, radius_xy_divisor);
-
-    SetFloat(uniform_normal_horizontal_, shadow_normal_horizontal_, normal_is_horizontal ? 1.0f : 0.0f);
-}
-
-void Gles2LightProgram::SetLights(const float *position_radius, const float *color, int32_t count)
-{
-    if (count > kGles2MaximumLightsPerPass)
-        count = kGles2MaximumLightsPerPass;
-
-    glUniform4fv(uniform_light_position_radius_, kGles2MaximumLightsPerPass, position_radius);
-    glUniform4fv(uniform_light_color_, kGles2MaximumLightsPerPass, color);
-
-    glUniform1i(uniform_light_count_, count);
+    glUniform1f(uniform_scale_, scale);
 }

@@ -30,6 +30,7 @@
 #include "epi_str_compare.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
+#include "r_atlas.h"
 #include "r_backend.h"
 #include "r_colormap.h"
 #include "r_gldefs.h"
@@ -54,8 +55,6 @@ static Font *default_font;
 extern int game_tic;
 int        hud_tic;
 
-int  hud_swirl_pass   = 0;
-bool hud_thick_liquid = false;
 
 float hud_x_left;
 float hud_x_right;
@@ -71,6 +70,11 @@ static Font     *current_font;
 static RGBAColor current_color;
 
 static float current_scale, current_alpha;
+
+static constexpr float kFillBorderBlurSigma = 0.75f;
+
+static bool  current_image_whiten = false;
+static float current_image_blur   = 0.0f;
 static int   current_x_alignment, current_y_alignment;
 
 // mapping from hud X and Y coords to real (OpenGL) coords.
@@ -296,6 +300,11 @@ void HUDSetTextColor(RGBAColor color)
     current_color = color;
 }
 
+void HUDSetImageWhiten(bool whiten)
+{
+    current_image_whiten = whiten;
+}
+
 void HUDSetAlpha(float alpha)
 {
     current_alpha = alpha;
@@ -448,64 +457,6 @@ void HUDCalcScrollTexCoords(float x_scroll, float y_scroll, float *tx1, float *t
     *ty2 += adjustedScrollT;
 }
 
-// Adapted from Quake 3 GPL release
-void HUDCalcTurbulentTexCoords(float *tx, float *ty, float x, float y)
-{
-    float now;
-    float phase     = 0;
-    float frequency = hud_thick_liquid ? 0.5 : 1.0;
-    float amplitude = 0.05;
-
-    now = (phase + hud_tic / 100.0f * frequency);
-
-    if (swirling_flats == kLiquidSwirlParallax)
-    {
-        frequency *= 2;
-        if (hud_thick_liquid)
-        {
-            if (hud_swirl_pass == 1)
-            {
-                *tx = *tx +
-                      sine_table[(int)((x * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-                *ty = *ty +
-                      sine_table[(int)((y * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-            }
-            else
-            {
-                amplitude = 0;
-                *tx       = *tx -
-                      sine_table[(int)((x * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-                *ty = *ty -
-                      sine_table[(int)((y * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-            }
-        }
-        else
-        {
-            if (hud_swirl_pass == 1)
-            {
-                amplitude = 0.025;
-                *tx       = *tx +
-                      sine_table[(int)((x * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-                *ty = *ty +
-                      sine_table[(int)((y * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-            }
-            else
-            {
-                amplitude = 0.015;
-                *tx       = *tx -
-                      sine_table[(int)((x * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-                *ty = *ty -
-                      sine_table[(int)((y * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-            }
-        }
-    }
-    else
-    {
-        *tx = *tx + sine_table[(int)((x * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-        *ty = *ty + sine_table[(int)((y * 1.0 / 128 * 0.125 + now) * kSineTableSize) & (kSineTableMask)] * amplitude;
-    }
-}
-
 //----------------------------------------------------------------------------
 
 void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image, float tx1, float ty1, float tx2,
@@ -542,12 +493,7 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         {
             const TTFFont *cur_font = (const TTFFont *)current_font;
             blend                   = kBlendingAlpha;
-            if ((image_smoothing &&
-                 cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-                cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-                tex_id = cur_font->truetype_smoothed_texture_id_[current_font_size];
-            else
-                tex_id = cur_font->truetype_texture_id_[current_font_size];
+            tex_id                  = cur_font->truetype_texture_id_[current_font_size];
         }
         else // patch font
         {
@@ -557,28 +503,24 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
             else
                 blend = kBlendingMasked;
             blend = (BlendingMode)(blend | kBlendingAlpha);
-            if ((image_smoothing &&
-                 cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
-                cur_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways)
-            {
-                if (do_whiten)
-                    tex_id = cur_font->patch_font_cache_.atlas_whitened_smoothed_texture_id;
-                else
-                    tex_id = cur_font->patch_font_cache_.atlas_smoothed_texture_id;
-            }
-            else
-            {
-                if (do_whiten)
-                    tex_id = cur_font->patch_font_cache_.atlas_whitened_texture_id;
-                else
-                    tex_id = cur_font->patch_font_cache_.atlas_texture_id;
-            }
+            tex_id = cur_font->patch_font_cache_.atlas_texture_id;
         }
 
         StartUnitBatch(false);
 
+        render_unit_whiten = do_whiten && current_font->definition_->type_ == kFontTypePatch;
+
+        bool smooth = (image_smoothing &&
+                       current_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothOnDemand) ||
+                      current_font->definition_->truetype_smoothing_ == FontDefinition::kTrueTypeSmoothAlways;
+
+        render_unit_filter = smooth ? 1 : 0;
+
         RendererVertex *glvert =
             BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
+
+        render_unit_whiten = false;
+        render_unit_filter = -1;
 
         glvert->rgba                   = unit_col;
         glvert->texture_coordinates[0] = {{tx1, ty2}};
@@ -599,7 +541,28 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         return;
     }
 
-    tex_id = ImageCache(image, true, nullptr, do_whiten);
+    bool scrolling = !epi::AlmostEquals(sx, 0.0f) || !epi::AlmostEquals(sy, 0.0f);
+
+    AtlasRegion region;
+
+    if (!scrolling && current_image_blur <= 0.0f && image->liquid_type_ == kLiquidImageNone &&
+        HMM_MIN(tx1, tx2) >= 0.0f && HMM_MAX(tx1, tx2) <= 1.0f && HMM_MIN(ty1, ty2) >= 0.0f &&
+        HMM_MAX(ty1, ty2) <= 1.0f && AtlasImageRegion(image->animation_.current, &region))
+    {
+        tex_id = region.texture;
+
+        float region_width  = region.rectangle[2] - region.rectangle[0];
+        float region_height = region.rectangle[3] - region.rectangle[1];
+
+        tx1 = region.rectangle[0] + tx1 * region_width;
+        tx2 = region.rectangle[0] + tx2 * region_width;
+        ty1 = region.rectangle[1] + ty1 * region_height;
+        ty2 = region.rectangle[1] + ty2 * region_height;
+    }
+    else
+    {
+        tex_id = ImageCache(image, true);
+    }
 
     if (alpha >= 0.99f && image->opacity_ == kOpacitySolid)
         blend = kBlendingNone;
@@ -621,27 +584,17 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         HUDCalcScrollTexCoords(sx, sy, &tx1, &ty1, &tx2, &ty2);
     }
 
-    bool hud_swirl = false;
-
-    if (image->liquid_type_ > kLiquidImageNone && swirling_flats > kLiquidSwirlSmmu)
-    {
-        hud_swirl_pass = 1;
-        hud_swirl      = true;
-    }
-
-    if (image->liquid_type_ == kLiquidImageThick)
-        hud_thick_liquid = true;
-
     StartUnitBatch(false);
+
+    render_unit_whiten = do_whiten || current_image_whiten;
+
+    if (current_image_blur > 0.0f)
+        render_unit_blur = {{current_image_blur, 0.0f, (float)image->width_, (float)image->height_}};
+
+    render_unit_liquid = LiquidShaderParameters(image, hud_tic / 35.0f);
 
     RendererVertex *glvert =
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
-
-    if (hud_swirl)
-    {
-        HUDCalcTurbulentTexCoords(&tx1, &ty1, hx1, hy1);
-        HUDCalcTurbulentTexCoords(&tx2, &ty2, hx2, hy2);
-    }
 
     glvert->rgba                   = unit_col;
     glvert->texture_coordinates[0] = {{tx1, ty1}};
@@ -658,40 +611,11 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
 
     EndRenderUnit(4);
 
-    if (hud_swirl && swirling_flats == kLiquidSwirlParallax)
-    {
-        hud_swirl_pass = 2;
-        tx1 += 0.2;
-        tx2 += 0.2;
-        ty1 += 0.2;
-        ty2 += 0.2;
-        HUDCalcTurbulentTexCoords(&tx1, &ty1, hx1, hy1);
-        HUDCalcTurbulentTexCoords(&tx2, &ty2, hx2, hy2);
-        alpha /= 2;
-        blend = (BlendingMode)(blend | kBlendingMasked | kBlendingAlpha);
-
-        glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
-
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty1}};
-        glvert++->position             = {{hx1, hy1, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty1}};
-        glvert++->position             = {{hx2, hy1, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty2}};
-        glvert++->position             = {{hx2, hy2, 0}};
-        glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty2}};
-        glvert->position               = {{hx1, hy2, 0}};
-
-        EndRenderUnit(4);
-    }
-
     FinishUnitBatch();
 
-    hud_swirl_pass   = 0;
-    hud_thick_liquid = false;
+    render_unit_whiten = false;
+    render_unit_blur   = {{0, 0, 0, 0}};
+    render_unit_liquid = {{0, 0, 0, 0}};
 }
 
 void HUDRawFromTexID(float hx1, float hy1, float hx2, float hy2, unsigned int tex_id, ImageOpacity opacity, float tx1,
@@ -789,6 +713,15 @@ void HUDStretchImage(float x, float y, float w, float h, const Image *img, float
     // HUDRawImage(x1, y1, x2, y2, img, 0, 0, img->Right(), img->Top(),
     // current_alpha, text_col, colmap, sx, sy);
     HUDRawImage(x1, y1, x2, y2, img, 0, 0, 1.0f, 1.0f, current_alpha, text_col, sx, sy);
+}
+
+void HUDStretchImageBlurred(float x, float y, float w, float h, const Image *img)
+{
+    current_image_blur = kFillBorderBlurSigma;
+
+    HUDStretchImage(x, y, w, h, img, 0, 0);
+
+    current_image_blur = 0.0f;
 }
 
 void HUDStretchImageNoOffset(float x, float y, float w, float h, const Image *img, float sx, float sy)
@@ -1478,7 +1411,7 @@ void HUDDrawQuitScreen()
         ImageFont   *en_font = (ImageFont *)endoom_font;
         const Image *img     = en_font->font_image_;
         EPI_ASSERT(img);
-        GLuint       tex_id = ImageCache(img, true, (const Colormap *)0, true);
+        GLuint       tex_id = ImageCache(img, true);
         BlendingMode blend  = kBlendingNone;
         if (img->opacity_ == kOpacitySolid)
             blend = kBlendingNone;
@@ -1489,8 +1422,10 @@ void HUDDrawQuitScreen()
             else
                 blend = kBlendingAlpha;
         }
-        endoom_vert       = BeginRenderUnit(GL_QUADS, kENDOOMTotalVerts, GL_MODULATE, tex_id,
-                                            (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
+        render_unit_whiten = true;
+        endoom_vert        = BeginRenderUnit(GL_QUADS, kENDOOMTotalVerts, GL_MODULATE, tex_id,
+                                             (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
+        render_unit_whiten = false;
         endoom_vert_count = 0;
         for (int i = 0; i < kENDOOMLines; i++)
         {

@@ -631,6 +631,8 @@ int ConsoleCommandShowStatic(char **argv, int argc)
     LogPrint("Static mesh: %d batches, %d live spans (%d dead), %d vertices\n", batches, live_spans, dead_spans,
              mesh_vertices);
 
+
+
     return 0;
 }
 

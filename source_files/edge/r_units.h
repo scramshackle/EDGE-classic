@@ -42,11 +42,46 @@ struct RendererVertex
     HMM_Vec2  texture_coordinates[2];
 };
 
+constexpr int kSpriteLightLevels = 32;
+
+struct SpriteInstance
+{
+    float     origin[4];
+    float     extent[4];
+    float     texture_coordinates[4];
+    float     fuzz[4];
+    float     light[2];
+    RGBAColor rgba;
+    uint32_t  padding;
+};
+
+struct SpriteLightTable
+{
+    float whites[kSpriteLightLevels][4];
+    float parameters[4];
+};
+
+constexpr float kSpriteInstanceMirrorFlip = 1.0f;
+constexpr float kSpriteInstanceFuzzy      = 2.0f;
+
+extern HMM_Vec4 render_unit_sprite_view[2];
+
 extern RGBAColor culling_fog_color;
+
+extern float    static_batch_light_row_offset;
+
+extern bool     render_unit_whiten;
+extern int      render_unit_filter;
+extern HMM_Vec4 render_unit_blur;
+extern HMM_Vec4 render_unit_liquid;
 
 void StartUnitBatch(bool sort_em);
 void FinishUnitBatch(void);
 void RenderCurrentUnits(void);
+
+void BeginRetainedUnits(void);
+void EndRetainedUnits(void);
+void ReplayRetainedUnits(void);
 
 enum BlendingMode
 {
@@ -86,11 +121,14 @@ enum CustomTextureEnvironment
     // output of the texture unit is the same as the input
     // for the RGB components.  The alpha component is treated
     // normally, i.e. passed on to next texture unit.
+
+    kTextureEnvironmentLightFalloff
 };
 
 struct ModelMeshData
 {
     const float *frame_positions    = nullptr;
+    const float *frame_normals      = nullptr;
     const float *texture_coordinates = nullptr;
 
     int frame_count  = 0;
@@ -107,9 +145,8 @@ struct ModelDrawInfo
 
     HMM_Mat4 transform = HMM_M4D(1.0f);
 
-    float alpha         = 1.0f;
-    float alpha_test    = 0.0f;
-    bool  additive_pass = false;
+    float alpha      = 1.0f;
+    float alpha_test = 0.0f;
 
     HMM_Vec2 texture_scale  = {{1.0f, 1.0f}};
     HMM_Vec2 texture_offset = {{0.0f, 0.0f}};
@@ -118,24 +155,19 @@ struct ModelDrawInfo
     int vertex_count = 0;
     int first_index  = 0;
     int index_count  = 0;
-};
 
-constexpr int kMaximumLightsPerPass = 4;
+    bool world_lit = false;
+    int  glow_set  = -1;
 
-struct RendererLightPass
-{
-    float position_radius[kMaximumLightsPerPass * 4];
-    float color[kMaximumLightsPerPass * 4];
+    int color_lookup = 0;
 
-    int count = 0;
+    const SpriteLightTable *light_table = nullptr;
 
-    float surface_normal[4];
-
-    bool normal_is_horizontal = false;
-
-    float surface_mode = 0.0f;
-    float alpha        = 1.0f;
-    float alpha_test   = 0.0f;
+    float    light_level       = 255.0f;
+    float    light_fixed_depth = 0.0f;
+    bool     light_depth_fixed = false;
+    bool     fuzzy             = false;
+    HMM_Vec3 tint              = {{1.0f, 1.0f, 1.0f}};
 };
 
 struct RendererScissor
@@ -168,15 +200,26 @@ struct SkyPassInfo
 RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint tex1, GLuint env2, GLuint tex2,
                                 int pass, BlendingMode blending, RGBAColor fog_color = kRGBANoValue,
                                 float fog_density = 0, const SkyPassInfo *sky_pass = nullptr,
-                                const RendererScissor *scissor = nullptr,
-                                const RendererLightPass *light_pass = nullptr, bool light_depth = false);
+                                const RendererScissor *scissor = nullptr, bool light_depth = false,
+                                bool world_lit = false, int glow_set = -1);
 void            EndRenderUnit(int actual_vert);
 
 uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
+uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity);
+void     UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
+void     FlushStaticVertexUploads(void);
 void     DeleteStaticVertexBuffer(uint32_t handle);
 void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
                              GLuint tex2, int pass, BlendingMode blending, RGBAColor fog_color, float fog_density,
-                             const SkyPassInfo *sky_pass = nullptr);
+                             const SkyPassInfo *sky_pass = nullptr, bool world_lit = false, int glow_set = -1);
+
+SpriteInstance *ReserveSpriteInstances(int count, int *first);
+void            AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_texture, BlendingMode blending,
+                                    RGBAColor fog_color, float fog_density, int color_lookup, bool world_lit,
+                                    int glow_set, const SpriteLightTable *light_table, uint8_t alpha,
+                                    uint32_t buffer = 0);
+uint32_t        CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity);
+void            UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

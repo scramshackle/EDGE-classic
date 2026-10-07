@@ -24,11 +24,16 @@
 //----------------------------------------------------------------------------
 
 #include "edge_profiling.h"
+#include <limits.h>
 #include <math.h>
+#include <string.h>
 
 #include <map>
+#include <unordered_map>
+#include <vector>
 
 #include "epi_math.h"
+#include "r_lightgrid.h"
 #include "coal.h"
 #include "dm_defs.h"
 #include "dm_state.h"
@@ -44,6 +49,7 @@
 #include "m_misc.h" // !!!! model test
 #include "n_network.h"
 #include "p_local.h"
+#include "r_atlas.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_draw.h"
@@ -57,7 +63,9 @@
 #include "r_modes.h"
 #include "r_render.h"
 #include "r_shader.h"
+#include "r_static.h"
 #include "r_texgl.h"
+#include "r_things.h"
 #include "r_units.h"
 #include "script/compat/lua_compat.h"
 #include "vm_coal.h"
@@ -320,7 +328,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     if (!image)
         return;
 
-    GLuint tex_id = ImageCache(image, false, (which == kPlayerSpriteCrosshair) ? nullptr : render_view_effect_colormap);
+    GLuint tex_id = ImageCache(image, false);
 
     float w     = image->ScaledWidth();
     float h     = image->ScaledHeight();
@@ -469,12 +477,12 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
         trans    = 1.0f;
     }
 
-    RGBAColor fc_to_use = player->map_object_->subsector_->sector->properties.fog_color;
-    float     fd_to_use = player->map_object_->subsector_->sector->properties.fog_density;
+    RGBAColor fc_to_use = player->map_object_->sector_->properties.fog_color;
+    float     fd_to_use = player->map_object_->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
     {
-        if (EDGE_IMAGE_IS_SKY(player->map_object_->subsector_->sector->ceiling))
+        if (EDGE_IMAGE_IS_SKY(player->map_object_->sector_->ceiling))
         {
             fc_to_use = current_map->outdoor_fog_color_;
             fd_to_use = 0.01f * current_map->outdoor_fog_density_;
@@ -490,7 +498,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     {
         AbstractShader *shader =
             GetColormapShader(props, player->map_object_->info_->force_fullbright_ ? 255 : state->bright,
-                              player->map_object_->subsector_->sector);
+                              player->map_object_->sector_);
 
         shader->Sample(data.colors + 0, data.light_position.X, data.light_position.Y, data.light_position.Z);
 
@@ -519,11 +527,24 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
             float r = 96;
 
-            DynamicLightIterator(data.light_position.X - r, data.light_position.Y - r, player->map_object_->z,
-                                 data.light_position.X + r, data.light_position.Y + r,
-                                 player->map_object_->z + player->map_object_->height_, DLIT_PSprite, &data);
+            for (int index = 0; index < LightGridSampleTotal(); index++)
+            {
+                MapObject *light = LightGridSampleLight(index);
 
-            SectorGlowIterator(player->map_object_->subsector_->sector, data.light_position.X - r,
+                if (!light)
+                    continue;
+
+                float reach = light->dynamic_light_.r;
+
+                if (fabs(light->x - data.light_position.X) >= reach ||
+                    fabs(light->y - data.light_position.Y) >= reach ||
+                    fabs(MapObjectMidZ(light) - data.light_position.Z) >= reach)
+                    continue;
+
+                DLIT_PSprite(light, &data);
+            }
+
+            SectorGlowIterator(player->map_object_->sector_, data.light_position.X - r,
                                data.light_position.Y - r, player->map_object_->z, data.light_position.X + r,
                                data.light_position.Y + r, player->map_object_->z + player->map_object_->height_,
                                DLIT_PSprite, &data);
@@ -536,6 +557,11 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     data.colors[3] = data.colors[0];
 
     /* draw the weapon */
+
+    int saved_lookup = render_unit_color_lookup;
+
+    if (which == kPlayerSpriteCrosshair)
+        render_unit_color_lookup = 0;
 
     StartUnitBatch(false);
 
@@ -609,6 +635,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     }
 
     FinishUnitBatch();
+
+    render_unit_color_lookup = saved_lookup;
 
     render_state->Disable(GL_SCISSOR_TEST);
 }
@@ -730,7 +758,14 @@ void RenderCrosshair(Player *p)
     }
 
     if (p->health_ > 0)
+    {
+        int saved_lookup         = render_unit_color_lookup;
+        render_unit_color_lookup = 0;
+
         DrawStdCrossHair();
+
+        render_unit_color_lookup = saved_lookup;
+    }
 }
 
 void RenderWeaponModel(Player *p)
@@ -830,16 +865,14 @@ void RenderWeaponModel(Player *p)
 
 int sprite_kludge = 0;
 
-static inline void LinkDrawThingIntoDrawFloor(DrawFloor *dfloor, DrawThing *dthing)
+static inline void LinkDrawThingIntoView(DrawThing *dthing)
 {
-    dthing->properties = dfloor->properties;
-    dthing->next       = dfloor->things;
-    dthing->previous   = nullptr;
+    int32_t active_mirrors = active_mirror_set.TotalActive();
 
-    if (dfloor->things)
-        dfloor->things->previous = dthing;
-
-    dfloor->things = dthing;
+    if (active_mirrors > 0)
+        active_mirror_set.PushThing(active_mirrors - 1, dthing);
+    else
+        draw_thing_list.push_back(dthing);
 }
 
 static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, bool *flip)
@@ -872,13 +905,13 @@ static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, b
         else
             ang = mo->angle_;
 
-        bsp_mirror_set.Angle(ang);
+        active_mirror_set.Angle(ang);
 
         BAMAngle from_view = PointToAngle(view_x, view_y, mx, my);
 
         ang = from_view - ang + kBAMAngle180;
 
-        if (bsp_mirror_set.Reflective())
+        if (active_mirror_set.Reflective())
             ang = (BAMAngle)0 - ang;
 
         if (frame->rotations_ == 16)
@@ -891,7 +924,7 @@ static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, b
 
     (*flip) = frame->flip_[rot] ? true : false;
 
-    if (bsp_mirror_set.Reflective())
+    if (active_mirror_set.Reflective())
         (*flip) = !(*flip);
 
     if (!frame->images_[rot])
@@ -924,39 +957,37 @@ const Image *GetOtherSprite(int spritenum, int framenum, bool *flip)
     return frame->images_[0];
 }
 
-static void RendererClipSpriteVertically(DrawSubsector *dsub, DrawThing *dthing)
+static void RendererClipSpriteVertically(DrawThing *dthing)
 {
-    DrawFloor *dfloor = nullptr;
-
-    // find the thing's nominal region.  This section is equivalent to
-    // the PointInVertRegion() code (but using drawfloors).
-
     float z = dthing->map_z + (dthing->map_object->height_ * 0.5f);
 
-    std::vector<DrawFloor *>::iterator DFI;
+    dthing->properties = GetPointProperties(dthing->map_object->sector_, z);
 
-    for (DFI = dsub->floors.begin(); DFI != dsub->floors.end(); DFI++)
-    {
-        dfloor = *DFI;
-
-        if (z <= dfloor->top_height)
-            break;
-    }
-
-    EPI_ASSERT(dfloor);
-
-    // link in sprite.  We'll shrink it if it gets clipped.
-    LinkDrawThingIntoDrawFloor(dfloor, dthing);
+    LinkDrawThingIntoView(dthing);
 }
 
-void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
+static bool ThingSectorReached(const MapObject *mo)
+{
+    if (SectorReachedThisView(mo->sector_))
+        return true;
+
+    for (const TouchNode *tn = mo->touch_sectors_; tn; tn = tn->map_object_next)
+    {
+        if (tn->sector && SectorReachedThisView(tn->sector))
+            return true;
+    }
+
+    return false;
+}
+
+void BSPWalkThing(MapObject *mo)
 {
     /* Visit a single thing that exists in the current subsector */
 
     EPI_ASSERT(mo->state_);
 
     // ignore the camera itself
-    if (mo == view_camera_map_object && bsp_mirror_set.TotalActive() == 0)
+    if (mo == view_camera_map_object && active_mirror_set.TotalActive() == 0)
         return;
 
     // ignore invisible things
@@ -1008,12 +1039,13 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
         }
     }
 
-    bsp_mirror_set.Coordinate(mx, my);
-    bsp_mirror_set.Height(mz);
-    bsp_mirror_set.Height(fz);
+    float view_mx = mx;
+    float view_my = my;
 
-    float tr_x = mx - view_x;
-    float tr_y = my - view_y;
+    active_mirror_set.Coordinate(view_mx, view_my);
+
+    float tr_x = view_mx - view_x;
+    float tr_y = view_my - view_y;
 
     float tz = tr_x * view_cosine + tr_y * view_sine;
 
@@ -1044,7 +1076,7 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
 
     float   sink_mult = 0;
     float   bob_mult  = 0;
-    Sector *cur_sec   = mo->subsector_->sector;
+    Sector *cur_sec   = mo->sector_;
     if (!cur_sec->extrafloor_used && !cur_sec->height_sector && epi::AlmostEquals(mz, cur_sec->floor_height))
     {
         if (!(mo->flags_ & kMapObjectFlagNoGravity))
@@ -1068,7 +1100,7 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
 
     if (!is_model)
     {
-        image = RendererGetThingSprite2(mo, mx, my, &spr_flip);
+        image = RendererGetThingSprite2(mo, view_mx, view_my, &spr_flip);
 
         if (!image)
             return;
@@ -1081,21 +1113,14 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
     // create new draw thing
 
     DrawThing *dthing       = GetDrawThing();
-    dthing->next            = nullptr;
-    dthing->previous        = nullptr;
     dthing->map_object      = nullptr;
     dthing->properties      = nullptr;
-    dthing->render_left     = nullptr;
-    dthing->render_next     = nullptr;
-    dthing->render_previous = nullptr;
-    dthing->render_right    = nullptr;
 
     dthing->map_object = mo;
     dthing->map_x      = mx;
     dthing->map_y      = my;
     dthing->map_z      = mz;
 
-    dthing->properties = dsub->floors[0]->properties;
     dthing->is_model   = is_model;
 
     dthing->image = image;
@@ -1106,10 +1131,7 @@ void BSPWalkThing(DrawSubsector *dsub, MapObject *mo)
     dthing->hover_dz     = hover_dz;
     dthing->sink_mult    = sink_mult;
 
-    dthing->mir_scale  = bsp_mirror_set.XYScale();
-    dthing->mir_zscale = bsp_mirror_set.ZScale();
-
-    RendererClipSpriteVertically(dsub, dthing);
+    RendererClipSpriteVertically(dthing);
 }
 
 static void RenderModel(DrawThing *dthing)
@@ -1127,8 +1149,6 @@ static void RenderModel(DrawThing *dthing)
     }
 
     float z = dthing->map_z + dthing->hover_dz;
-
-    render_mirror_set.Height(z);
 
     int   last_frame = mo->state_->frame;
     float lerp       = 0.0;
@@ -1155,33 +1175,952 @@ static void RenderModel(DrawThing *dthing)
                        mo->info_->model_rotate_);
 }
 
-struct ThingCoordinateData
+struct SpriteBatchKey
 {
-    MapObject *mo;
-
-    HMM_Vec3 vertices[4];
-    HMM_Vec2 texture_coordinates[4];
-    HMM_Vec3 normal;
-
-    ColorMixer colors[4];
+    GLuint                  texture;
+    GLuint                  fuzz_texture;
+    BlendingMode            blending;
+    RGBAColor               fog_color;
+    float                   fog_density;
+    int                     color_lookup;
+    int                     glow_set;
+    const SpriteLightTable *light_table;
+    uint8_t                 alpha;
+    bool                    world_lit;
 };
 
-static void DLIT_Thing(MapObject *mo, void *dataptr)
+struct SpriteBatch
 {
-    ThingCoordinateData *data = (ThingCoordinateData *)dataptr;
+    SpriteBatchKey              key;
+    std::vector<SpriteInstance> instances;
+};
 
-    // dynamic lights do not light themselves up!
-    if (mo == data->mo)
-        return;
+static std::vector<SpriteBatch>             sprite_batches;
+static size_t                               sprite_batches_used = 0;
+static std::unordered_map<uint64_t, size_t> sprite_batch_index;
+static uint64_t                             sprite_batch_last_hash  = 0;
+static size_t                               sprite_batch_last_index = SIZE_MAX;
 
-    EPI_ASSERT(mo->dynamic_light_.shader);
+static uint64_t HashSpriteBatchValue(uint64_t hash, uint64_t value)
+{
+    hash ^= value;
+    hash *= 1099511628211ULL;
 
-    for (int v = 0; v < 4; v++)
+    return hash;
+}
+
+static uint64_t HashSpriteBatchKey(const SpriteBatchKey &key)
+{
+    uint32_t density_bits = 0;
+
+    memcpy(&density_bits, &key.fog_density, sizeof(density_bits));
+
+    uint64_t hash = 14695981039346656037ULL;
+
+    hash = HashSpriteBatchValue(hash, key.texture);
+    hash = HashSpriteBatchValue(hash, key.fuzz_texture);
+    hash = HashSpriteBatchValue(hash, (uint64_t)key.blending);
+    hash = HashSpriteBatchValue(hash, key.fog_color);
+    hash = HashSpriteBatchValue(hash, density_bits);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(int64_t)key.color_lookup);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(int64_t)key.glow_set);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uintptr_t)key.light_table);
+    hash = HashSpriteBatchValue(hash, key.alpha);
+    hash = HashSpriteBatchValue(hash, key.world_lit ? 1 : 0);
+
+    return hash;
+}
+
+static bool SpriteBatchKeysMatch(const SpriteBatchKey &a, const SpriteBatchKey &b)
+{
+    return a.texture == b.texture && a.fuzz_texture == b.fuzz_texture && a.blending == b.blending &&
+           a.fog_color == b.fog_color && epi::AlmostEquals(a.fog_density, b.fog_density) &&
+           a.color_lookup == b.color_lookup && a.glow_set == b.glow_set && a.light_table == b.light_table &&
+           a.alpha == b.alpha && a.world_lit == b.world_lit;
+}
+
+static void AddSpriteToBatch(const SpriteBatchKey &key, const SpriteInstance &instance)
+{
+    uint64_t hash = HashSpriteBatchKey(key);
+
+    if (sprite_batch_last_index != SIZE_MAX && hash == sprite_batch_last_hash &&
+        SpriteBatchKeysMatch(sprite_batches[sprite_batch_last_index].key, key))
     {
-        mo->dynamic_light_.shader->Sample(data->colors + v, data->vertices[v].X, data->vertices[v].Y,
-                                          data->vertices[v].Z);
+        sprite_batches[sprite_batch_last_index].instances.push_back(instance);
+        return;
+    }
+
+    uint64_t probe = hash;
+
+    for (;;)
+    {
+        std::unordered_map<uint64_t, size_t>::iterator found = sprite_batch_index.find(probe);
+
+        if (found == sprite_batch_index.end())
+        {
+            if (sprite_batches_used == sprite_batches.size())
+                sprite_batches.emplace_back();
+
+            SpriteBatch &batch = sprite_batches[sprite_batches_used];
+
+            batch.key = key;
+            batch.instances.clear();
+            batch.instances.push_back(instance);
+
+            sprite_batch_index[probe] = sprite_batches_used;
+
+            sprite_batch_last_hash  = hash;
+            sprite_batch_last_index = sprite_batches_used;
+
+            sprite_batches_used++;
+            return;
+        }
+
+        SpriteBatch &batch = sprite_batches[found->second];
+
+        if (SpriteBatchKeysMatch(batch.key, key))
+        {
+            batch.instances.push_back(instance);
+
+            sprite_batch_last_hash  = hash;
+            sprite_batch_last_index = found->second;
+            return;
+        }
+
+        probe++;
     }
 }
+
+static void FlushSpriteBatches(void)
+{
+    for (size_t i = 0; i < sprite_batches_used; i++)
+    {
+        SpriteBatch &batch = sprite_batches[i];
+
+        int count = (int)batch.instances.size();
+
+        if (count == 0)
+            continue;
+
+        int first = 0;
+
+        SpriteInstance *destination = ReserveSpriteInstances(count, &first);
+
+        memcpy(destination, batch.instances.data(), sizeof(SpriteInstance) * (size_t)count);
+
+        const SpriteBatchKey &key = batch.key;
+
+        AddSpriteRenderUnit(first, count, key.texture, key.fuzz_texture, key.blending, key.fog_color,
+                            key.fog_density, key.color_lookup, key.world_lit, key.glow_set, key.light_table,
+                            key.alpha);
+
+        batch.instances.clear();
+    }
+
+    sprite_batches_used = 0;
+    sprite_batch_index.clear();
+
+    sprite_batch_last_index = SIZE_MAX;
+}
+
+struct SpriteSource
+{
+    MapObject        *map_object;
+    const Image      *image;
+    RegionProperties *properties;
+    float             map_x;
+    float             map_y;
+    float             map_z;
+    float             floor_z;
+    float             hover_dz;
+    float             sink_mult;
+    bool              flip;
+    bool              resident;
+};
+
+static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *instance, SpriteBatchKey *key)
+{
+    MapObject   *mo    = source.map_object;
+    const Image *image = source.image;
+
+    bool is_fuzzy = (mo->flags_ & kMapObjectFlagFuzzy) ? true : false;
+
+    float trans = mo->visibility_;
+
+    if (trans <= 0)
+        return false;
+
+    AtlasRegion region;
+
+    GLuint tex_id;
+
+    if (AtlasSpriteRegion(mo->state_->sprite, image, &region))
+    {
+        tex_id = region.texture;
+    }
+    else
+    {
+        tex_id = ImageCache(image, false);
+
+        region.rectangle[0] = 0.0f;
+        region.rectangle[1] = 0.0f;
+        region.rectangle[2] = 1.0f;
+        region.rectangle[3] = 1.0f;
+    }
+
+    float region_width  = region.rectangle[2] - region.rectangle[0];
+    float region_height = region.rectangle[3] - region.rectangle[1];
+
+    // calculate edges of the shape
+    float sprite_width  = image->ScaledWidth();
+    float sprite_height = image->ScaledHeight();
+    float side_offset   = image->ScaledOffsetX();
+    float top_offset    = image->ScaledOffsetY();
+
+    if (source.flip)
+        side_offset = -side_offset;
+
+    float xscale = mo->scale_ * mo->aspect_;
+
+    float pos1 = (sprite_width / -2.0f - side_offset) * xscale;
+    float pos2 = (sprite_width / +2.0f - side_offset) * xscale;
+
+    float gzt = 0;
+    float gzb = 0;
+    float fz  = source.floor_z;
+
+    switch (mo->info_->yalign_)
+    {
+    case SpriteYAlignmentTopDown:
+        gzt = source.map_z + mo->height_ + top_offset * mo->scale_;
+        gzb = gzt - sprite_height * mo->scale_;
+        break;
+
+    case SpriteYAlignmentMiddle: {
+        float _mz = source.map_z + mo->height_ * 0.5 + top_offset * mo->scale_;
+        float dz  = sprite_height * 0.5 * mo->scale_;
+
+        gzt = _mz + dz;
+        gzb = _mz - dz;
+        break;
+    }
+
+    case SpriteYAlignmentBottomUp:
+    default:
+        gzb = source.map_z + top_offset * mo->scale_;
+        gzt = gzb + sprite_height * mo->scale_;
+        break;
+    }
+
+    gzt += source.hover_dz;
+    gzb += source.hover_dz;
+
+    if ((mo->flags_ & kMapObjectFlagFuzzy) ||
+        ((mo->hyper_flags_ & kHyperFlagHover) && epi::AlmostEquals(source.sink_mult, 0.0f)))
+    {
+        /* nothing, don't adjust clipping */
+    }
+    // Lobo: new FLOOR_CLIP flag
+    else if (mo->hyper_flags_ & kHyperFlagFloorClip || source.sink_mult > 0)
+    {
+        /* nothing, don't adjust clipping */
+    }
+    else if (sprite_kludge == 0 && gzb < fz)
+    {
+        // explosion ?
+        if (mo->info_->flags_ & kMapObjectFlagMissile)
+        {
+            /* nothing, don't adjust clipping */
+        }
+        else
+        {
+            // Dasho - The sprite boundaries are clipped by the floor; this checks
+            // the actual visible portion of the image to see if we need to do any adjustments.
+            float diff = (float)image->real_bottom_ * image->scale_y_ * mo->scale_;
+            if (gzb + diff < fz)
+            {
+                gzt += fz - (gzb + diff);
+                gzb = fz - diff;
+            }
+        }
+    }
+
+    if (gzb >= gzt)
+        return false;
+
+    BlendingMode blending = GetThingBlending(trans, (ImageOpacity)image->opacity_, mo->hyper_flags_);
+
+    if (is_fuzzy)
+        blending = (BlendingMode)(blending | kBlendingAlpha);
+
+    float h = image->ScaledHeight();
+
+    // MLook: tilt sprites so they look better
+    float skew2 = gzt - gzb;
+
+    if (mo->radius_ >= 1.0f && h > mo->radius_)
+        skew2 = mo->radius_;
+
+    float tex_x1 = 0.001f;
+    float tex_x2 = 1.0f - 0.001f;
+
+    EPI_ASSERT(h > 0);
+
+    float tex_y1 = 0;
+    float tex_y2 = (gzt - gzb) / (h * mo->scale_);
+
+    if (source.flip)
+    {
+        float temp = tex_x2;
+        tex_x1     = 1.0f - tex_x1;
+        tex_x2     = 1.0f - temp;
+    }
+
+    float    fuzz_mul = 0;
+    HMM_Vec2 fuzz_add = {{0, 0}};
+
+    if (is_fuzzy)
+    {
+        blending = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
+        trans    = 1.0f;
+
+        float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
+
+        fuzz_mul = 0.8 / HMM_Clamp(20, dist, 700);
+
+        FuzzAdjust(&fuzz_add, mo);
+    }
+
+    int                     light_level = 0;
+    const SpriteLightTable *light_table = nullptr;
+
+    if (!is_fuzzy)
+        light_table = GetSpriteLightTable(source.properties, mo->info_->force_fullbright_ ? 255 : mo->state_->bright,
+                                          mo->sector_, &light_level);
+
+    RGBAColor fc_to_use = mo->sector_->properties.fog_color;
+    float     fd_to_use = mo->sector_->properties.fog_density;
+    // check for DDFLEVL fog
+    if (fc_to_use == kRGBANoValue)
+    {
+        if (EDGE_IMAGE_IS_SKY(mo->sector_->ceiling))
+        {
+            fc_to_use = current_map->outdoor_fog_color_;
+            fd_to_use = 0.01f * current_map->outdoor_fog_density_;
+        }
+        else
+        {
+            fc_to_use = current_map->indoor_fog_color_;
+            fd_to_use = 0.01f * current_map->indoor_fog_density_;
+        }
+    }
+
+    float tint_r = 1.0f;
+    float tint_g = 1.0f;
+    float tint_b = 1.0f;
+
+    int color_lookup = render_unit_color_lookup;
+
+    if (!render_view_effect_colormap && !ColormapTintFactors(mo->info_->palremap_, &tint_r, &tint_g, &tint_b))
+        color_lookup = ColorLookupForColormap(mo->info_->palremap_);
+
+    bool sprite_lit = !is_fuzzy && use_dynamic_lights && render_view_extra_light < 250;
+
+    float flags = (source.resident ? kSpriteInstanceMirrorFlip : 0.0f) + (is_fuzzy ? kSpriteInstanceFuzzy : 0.0f);
+
+    instance->origin[0] = source.map_x;
+    instance->origin[1] = source.map_y;
+    instance->origin[2] = gzb;
+    instance->origin[3] = gzt;
+
+    instance->extent[0] = pos1;
+    instance->extent[1] = pos2;
+    instance->extent[2] = skew2;
+    instance->extent[3] = flags;
+
+    instance->texture_coordinates[0] = region.rectangle[0] + tex_x1 * region_width;
+    instance->texture_coordinates[1] = region.rectangle[1] + tex_y1 * region_height;
+    instance->texture_coordinates[2] = region.rectangle[0] + tex_x2 * region_width;
+    instance->texture_coordinates[3] = region.rectangle[1] + tex_y2 * region_height;
+
+    instance->fuzz[0] = mo->radius_ * 2 * fuzz_mul;
+    instance->fuzz[1] = mo->height_ * fuzz_mul;
+    instance->fuzz[2] = fuzz_add.X;
+    instance->fuzz[3] = fuzz_add.Y;
+
+    instance->light[0] = (float)light_level;
+    instance->light[1] = 0.0f;
+
+    if (is_fuzzy)
+        instance->rgba = kRGBABlack;
+    else
+        instance->rgba = epi::MakeRGBAClamped((int)(tint_r * 255.0f), (int)(tint_g * 255.0f), (int)(tint_b * 255.0f));
+
+    epi::SetRGBAAlpha(instance->rgba, trans);
+
+    instance->padding = 0;
+
+    key->texture      = tex_id;
+    key->fuzz_texture = is_fuzzy ? ImageCache(fuzz_image, false) : 0;
+    key->blending     = blending;
+    key->fog_color    = fc_to_use;
+    key->fog_density  = fd_to_use;
+    key->color_lookup = color_lookup;
+    key->glow_set     = sprite_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
+    key->light_table  = light_table;
+    key->alpha        = epi::GetRGBAAlpha(instance->rgba);
+    key->world_lit    = sprite_lit;
+
+    return true;
+}
+
+struct ResidentBatch
+{
+    SpriteBatchKey              key;
+    std::vector<SpriteInstance> instances;
+    std::vector<MapObject *>    owners;
+    std::vector<int>            free_slots;
+    uint32_t                    buffer          = 0;
+    int                         buffer_capacity = 0;
+    int                         dirty_low       = INT_MAX;
+    int                         dirty_high      = -1;
+    int                         live            = 0;
+    bool                        transparent     = false;
+};
+
+struct ResidentSignature
+{
+    const Colormap *effect_colormap;
+    int             color_lookup;
+    int             dynamic_lights;
+    bool            extra_full;
+    int             brightness;
+};
+
+static std::vector<ResidentBatch>           resident_batches;
+static std::unordered_map<uint64_t, size_t> resident_batch_index;
+static int                                  resident_sector_total = -1;
+static std::vector<MapObject *>             dynamic_things;
+static std::vector<MapObject *>             resident_candidates;
+static ResidentSignature                    resident_signature;
+static bool                                 resident_ready = false;
+static bool                                 resident_invalid = false;
+
+extern ConsoleVariable sector_brightness_correction;
+
+static uint64_t HashFloats(uint64_t hash, const float *values, int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        uint32_t bits = 0;
+
+        memcpy(&bits, &values[i], sizeof(bits));
+
+        hash = HashSpriteBatchValue(hash, bits);
+    }
+
+    return hash;
+}
+
+static uint64_t HashThingRenderState(const MapObject *mo)
+{
+    float values[5] = {mo->x, mo->y, mo->z, mo->floor_z_, (float)mo->interpolation_number_};
+
+    uint64_t hash = HashFloats(14695981039346656037ULL, values, 5);
+
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uintptr_t)mo->sector_);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uintptr_t)mo->region_properties_);
+
+    return hash;
+}
+
+static uint64_t HashThingLookState(const MapObject *mo)
+{
+    float values[5] = {mo->visibility_, mo->scale_, mo->aspect_, mo->height_, mo->radius_};
+
+    uint64_t hash = HashFloats(14695981039346656037ULL, values, 5);
+
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uintptr_t)mo->state_);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uint32_t)mo->flags_);
+    hash = HashSpriteBatchValue(hash, (uint64_t)(uint32_t)mo->hyper_flags_);
+
+    return hash;
+}
+
+static ResidentSignature CurrentResidentSignature(void)
+{
+    ResidentSignature signature;
+
+    signature.effect_colormap = render_view_effect_colormap;
+    signature.color_lookup    = render_unit_color_lookup;
+    signature.dynamic_lights  = use_dynamic_lights;
+    signature.extra_full      = render_view_extra_light >= 250;
+    signature.brightness      = sector_brightness_correction.d_;
+
+    return signature;
+}
+
+static bool ResidentSignaturesMatch(const ResidentSignature &a, const ResidentSignature &b)
+{
+    return a.effect_colormap == b.effect_colormap && a.color_lookup == b.color_lookup &&
+           a.dynamic_lights == b.dynamic_lights && a.extra_full == b.extra_full && a.brightness == b.brightness;
+}
+
+static void DynamicThingAdd(MapObject *mo)
+{
+    if (mo->render_dynamic_index_ >= 0)
+        return;
+
+    mo->render_dynamic_index_ = (int)dynamic_things.size();
+
+    dynamic_things.push_back(mo);
+}
+
+static void DynamicThingRemove(MapObject *mo)
+{
+    int index = mo->render_dynamic_index_;
+
+    if (index < 0)
+        return;
+
+    MapObject *last = dynamic_things.back();
+
+    dynamic_things[(size_t)index] = last;
+    last->render_dynamic_index_   = index;
+
+    dynamic_things.pop_back();
+
+    mo->render_dynamic_index_ = -1;
+}
+
+static void MarkResidentSlot(ResidentBatch &batch, int slot)
+{
+    batch.dirty_low  = HMM_MIN(batch.dirty_low, slot);
+    batch.dirty_high = HMM_MAX(batch.dirty_high, slot);
+}
+
+static void ResidentThingRemove(MapObject *mo)
+{
+    if (mo->render_resident_batch_ < 0)
+        return;
+
+    ResidentBatch &batch = resident_batches[(size_t)mo->render_resident_batch_];
+
+    int slot = mo->render_resident_slot_;
+
+    SpriteInstance &instance = batch.instances[(size_t)slot];
+
+    instance.origin[3] = instance.origin[2];
+    instance.extent[0] = 0.0f;
+    instance.extent[1] = 0.0f;
+
+    batch.owners[(size_t)slot] = nullptr;
+    batch.free_slots.push_back(slot);
+    batch.live--;
+
+    MarkResidentSlot(batch, slot);
+
+    mo->render_resident_batch_ = -1;
+    mo->render_resident_slot_  = -1;
+}
+
+static size_t ResidentBatchFor(const SpriteBatchKey &key)
+{
+    uint64_t probe = HashSpriteBatchKey(key);
+
+    for (;;)
+    {
+        std::unordered_map<uint64_t, size_t>::iterator found = resident_batch_index.find(probe);
+
+        if (found == resident_batch_index.end())
+        {
+            resident_batches.emplace_back();
+
+            ResidentBatch &batch = resident_batches.back();
+
+            batch.key         = key;
+            batch.transparent = (key.blending & kBlendingNoZBuffer) || (key.blending & kBlendingAlpha);
+
+            resident_batch_index[probe] = resident_batches.size() - 1;
+
+            return resident_batches.size() - 1;
+        }
+
+        if (SpriteBatchKeysMatch(resident_batches[found->second].key, key))
+            return found->second;
+
+        probe++;
+    }
+}
+
+static void ResidentThingInsert(MapObject *mo, const SpriteBatchKey &key, const SpriteInstance &instance)
+{
+    size_t batch_index = ResidentBatchFor(key);
+
+    ResidentBatch &batch = resident_batches[batch_index];
+
+    int slot;
+
+    if (!batch.free_slots.empty())
+    {
+        slot = batch.free_slots.back();
+        batch.free_slots.pop_back();
+
+        batch.instances[(size_t)slot] = instance;
+        batch.owners[(size_t)slot]    = mo;
+    }
+    else
+    {
+        slot = (int)batch.instances.size();
+
+        batch.instances.push_back(instance);
+        batch.owners.push_back(mo);
+    }
+
+    batch.live++;
+
+    MarkResidentSlot(batch, slot);
+
+    mo->render_resident_batch_ = (int)batch_index;
+    mo->render_resident_slot_  = slot;
+}
+
+static bool BuildResidentInstance(MapObject *mo, SpriteInstance *instance, SpriteBatchKey *key)
+{
+    if (mo->IsRemoved() || !mo->sector_ || !mo->state_ || mo->state_->sprite == 0)
+        return false;
+
+    if (mo == view_camera_map_object)
+        return false;
+
+    if (mo->state_->flags & kStateFrameFlagModel)
+        return false;
+
+    if ((mo->flags_ & (kMapObjectFlagFuzzy | kMapObjectFlagNoSector)) || (mo->hyper_flags_ & kHyperFlagHover))
+        return false;
+
+    if (mo->interpolation_number_ > 0 || epi::AlmostEquals(mo->visibility_, 0.0f))
+        return false;
+
+    Sector *sector = mo->sector_;
+
+    if (sector->extrafloor_used || sector->height_sector)
+        return false;
+
+    if (epi::AlmostEquals(mo->z, sector->floor_height) && !(mo->flags_ & kMapObjectFlagNoGravity) &&
+        (sector->sink_depth > 0 || sector->bob_depth > 0))
+        return false;
+
+    SpriteFrame *frame = GetSpriteFrame(mo->state_->sprite, mo->state_->frame);
+
+    if (!frame || frame->rotations_ >= 8 || !frame->images_[0])
+        return false;
+
+    RegionProperties *properties = GetPointProperties(sector, mo->z + mo->height_ * 0.5f);
+
+    if (properties != &sector->properties)
+        return false;
+
+    SpriteSource source;
+
+    source.map_object = mo;
+    source.image      = frame->images_[0];
+    source.properties = properties;
+    source.map_x      = mo->x;
+    source.map_y      = mo->y;
+    source.map_z      = mo->z;
+    source.floor_z    = mo->floor_z_;
+    source.hover_dz   = 0.0f;
+    source.sink_mult  = 0.0f;
+    source.flip       = frame->flip_[0] ? true : false;
+    source.resident   = true;
+
+    return BuildSpriteInstance(source, instance, key);
+}
+
+static void AddResidentCandidate(MapObject *mo)
+{
+    if (mo->render_candidate_)
+        return;
+
+    mo->render_candidate_ = true;
+
+    resident_candidates.push_back(mo);
+}
+
+static void ClearResidentBatches(void)
+{
+    for (size_t i = 0; i < resident_batches.size(); i++)
+    {
+        if (resident_batches[i].buffer)
+            DeleteStaticVertexBuffer(resident_batches[i].buffer);
+    }
+
+    resident_batches.clear();
+    resident_batch_index.clear();
+}
+
+void ResidentThingsReset(void)
+{
+    ClearResidentBatches();
+
+    resident_invalid = false;
+
+    dynamic_things.clear();
+    resident_candidates.clear();
+
+    for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
+    {
+        mo->render_dynamic_index_  = -1;
+        mo->render_resident_batch_ = -1;
+        mo->render_resident_slot_  = -1;
+        mo->render_candidate_      = false;
+        mo->render_hash_           = HashThingRenderState(mo);
+        mo->render_look_hash_      = HashThingLookState(mo);
+        mo->render_quiet_tics_     = 2;
+
+        DynamicThingAdd(mo);
+
+        if (!mo->IsRemoved())
+            AddResidentCandidate(mo);
+    }
+
+    resident_sector_total = total_level_sectors;
+
+    resident_signature = CurrentResidentSignature();
+
+    resident_ready = true;
+}
+
+void ThingRenderTic(MapObject *mo)
+{
+    if (!resident_ready)
+        return;
+
+    uint64_t hash = HashThingRenderState(mo);
+
+    if (hash != mo->render_hash_)
+    {
+        mo->render_hash_       = hash;
+        mo->render_look_hash_  = HashThingLookState(mo);
+        mo->render_quiet_tics_ = 0;
+
+        if (mo->render_resident_batch_ >= 0)
+        {
+            ResidentThingRemove(mo);
+            DynamicThingAdd(mo);
+        }
+
+        return;
+    }
+
+    uint64_t look_hash = HashThingLookState(mo);
+
+    if (look_hash != mo->render_look_hash_)
+    {
+        mo->render_look_hash_ = look_hash;
+
+        if (mo->render_resident_batch_ >= 0)
+            AddResidentCandidate(mo);
+    }
+
+    if (mo->render_quiet_tics_ >= 2)
+        return;
+
+    mo->render_quiet_tics_++;
+
+    if (mo->render_quiet_tics_ == 2 && mo->render_resident_batch_ < 0)
+        AddResidentCandidate(mo);
+}
+
+void ThingRenderSpawned(MapObject *mo)
+{
+    if (!resident_ready)
+        return;
+
+    mo->render_hash_       = HashThingRenderState(mo);
+    mo->render_look_hash_  = HashThingLookState(mo);
+    mo->render_quiet_tics_ = 0;
+
+    DynamicThingAdd(mo);
+}
+
+void ThingRenderRemoved(MapObject *mo)
+{
+    if (!resident_ready)
+        return;
+
+    if (mo->render_resident_batch_ >= 0)
+    {
+        ResidentThingRemove(mo);
+        DynamicThingAdd(mo);
+    }
+}
+
+void ThingRenderDeleted(MapObject *mo)
+{
+    ResidentThingRemove(mo);
+    DynamicThingRemove(mo);
+
+    if (mo->render_candidate_)
+    {
+        for (size_t i = 0; i < resident_candidates.size(); i++)
+        {
+            if (resident_candidates[i] == mo)
+            {
+                resident_candidates[i] = resident_candidates.back();
+                resident_candidates.pop_back();
+                break;
+            }
+        }
+
+        mo->render_candidate_ = false;
+    }
+}
+
+void ResidentThingsInvalidate(void)
+{
+    resident_invalid = true;
+}
+
+static void RebuildResidentThing(MapObject *mo)
+{
+    SpriteInstance instance;
+    SpriteBatchKey key;
+
+    bool built = BuildResidentInstance(mo, &instance, &key);
+
+    if (mo->render_resident_batch_ >= 0)
+    {
+        ResidentBatch &batch = resident_batches[(size_t)mo->render_resident_batch_];
+
+        if (built && SpriteBatchKeysMatch(batch.key, key))
+        {
+            batch.instances[(size_t)mo->render_resident_slot_] = instance;
+
+            MarkResidentSlot(batch, mo->render_resident_slot_);
+            return;
+        }
+
+        ResidentThingRemove(mo);
+        DynamicThingAdd(mo);
+    }
+
+    if (!built)
+        return;
+
+    ResidentThingInsert(mo, key, instance);
+
+    DynamicThingRemove(mo);
+}
+
+static void UploadResidentBatches(void);
+
+static void ApplyResidentSectorChanges(void)
+{
+    if (!resident_ready || resident_sector_total != total_level_sectors)
+        return;
+
+    const std::vector<StaticSectorChange> &changes = StaticSectorChanges();
+
+    if (changes.empty())
+        return;
+
+    for (size_t i = 0; i < changes.size(); i++)
+    {
+        Sector *sector = level_sectors + changes[i].sector;
+
+        for (MapObject *mo = sector->thing_list; mo; mo = mo->sector_next_)
+        {
+            if (mo->render_resident_batch_ >= 0)
+                RebuildResidentThing(mo);
+        }
+    }
+
+    UploadResidentBatches();
+}
+
+static void UpdateResidentThings(void)
+{
+    if (!resident_ready)
+        return;
+
+    if (resident_invalid || resident_sector_total != total_level_sectors ||
+        !ResidentSignaturesMatch(resident_signature, CurrentResidentSignature()))
+    {
+        ResidentThingsReset();
+    }
+
+    for (size_t i = 0; i < resident_candidates.size(); i++)
+    {
+        MapObject *mo = resident_candidates[i];
+
+        mo->render_candidate_ = false;
+
+        if (mo->render_quiet_tics_ < 2)
+            continue;
+
+        RebuildResidentThing(mo);
+    }
+
+    resident_candidates.clear();
+
+    UploadResidentBatches();
+}
+
+static void UploadResidentBatches(void)
+{
+    for (size_t i = 0; i < resident_batches.size(); i++)
+    {
+        ResidentBatch &batch = resident_batches[i];
+
+        if (batch.dirty_high < batch.dirty_low)
+            continue;
+
+        int count = (int)batch.instances.size();
+
+        if (!batch.buffer || batch.buffer_capacity < count)
+        {
+            if (batch.buffer)
+                DeleteStaticVertexBuffer(batch.buffer);
+
+            batch.buffer_capacity = HMM_MAX(256, count + count / 2);
+            batch.buffer          = CreateSpriteInstanceBuffer(batch.instances.data(), count, batch.buffer_capacity);
+        }
+        else
+        {
+            UpdateSpriteInstanceBuffer(batch.buffer, batch.dirty_low, batch.instances.data() + batch.dirty_low,
+                                       batch.dirty_high - batch.dirty_low + 1);
+        }
+
+        batch.dirty_low  = INT_MAX;
+        batch.dirty_high = -1;
+    }
+
+    FlushStaticVertexUploads();
+}
+
+static void DrawResidentBatches(bool transparent)
+{
+    if (!resident_ready)
+        return;
+
+    for (size_t i = 0; i < resident_batches.size(); i++)
+    {
+        const ResidentBatch &batch = resident_batches[i];
+
+        if (batch.live <= 0 || !batch.buffer || batch.transparent != transparent)
+            continue;
+
+        const SpriteBatchKey &key = batch.key;
+
+        AddSpriteRenderUnit(0, (int)batch.instances.size(), key.texture, key.fuzz_texture, key.blending,
+                            key.fog_color, key.fog_density, key.color_lookup, key.world_lit, key.glow_set,
+                            key.light_table, key.alpha, batch.buffer);
+    }
+}
+
+static bool render_thing_needs_transparent = false;
 
 static bool RenderThing(DrawThing *dthing, bool solid)
 {
@@ -1206,475 +2145,134 @@ static bool RenderThing(DrawThing *dthing, bool solid)
             return is_solid;
         }
 
+        if (solid)
+            render_thing_needs_transparent = true;
+
         return is_solid;
     }
 
-    MapObject *mo = dthing->map_object;
+    SpriteSource source;
 
-    bool is_fuzzy = (mo->flags_ & kMapObjectFlagFuzzy) ? true : false;
+    source.map_object = dthing->map_object;
+    source.image      = dthing->image;
+    source.properties = dthing->properties;
+    source.map_x      = dthing->map_x;
+    source.map_y      = dthing->map_y;
+    source.map_z      = dthing->map_z;
+    source.floor_z    = dthing->floor_z;
+    source.hover_dz   = dthing->hover_dz;
+    source.sink_mult  = dthing->sink_mult;
+    source.flip       = dthing->flip;
+    source.resident   = false;
 
-    float trans = mo->visibility_;
+    SpriteInstance instance;
+    SpriteBatchKey key;
 
-    float dx = 0, dy = 0;
+    if (!BuildSpriteInstance(source, &instance, &key))
+        return false;
 
-    if (trans <= 0)
-        return true;
-
-    const Image *image = dthing->image;
-
-    GLuint tex_id = ImageCache(
-        image, false, render_view_effect_colormap ? render_view_effect_colormap : dthing->map_object->info_->palremap_);
-
-    // calculate edges of the shape
-    float sprite_width  = image->ScaledWidth();
-    float sprite_height = image->ScaledHeight();
-    float side_offset   = image->ScaledOffsetX();
-    float top_offset    = image->ScaledOffsetY();
-
-    if (dthing->flip)
-        side_offset = -side_offset;
-
-    float xscale = mo->scale_ * mo->aspect_;
-
-    float pos1 = (sprite_width / -2.0f - side_offset) * xscale;
-    float pos2 = (sprite_width / +2.0f - side_offset) * xscale;
-
-    float gzt = 0;
-    float gzb = 0;
-    float fz  = dthing->floor_z;
-
-    switch (mo->info_->yalign_)
-    {
-    case SpriteYAlignmentTopDown:
-        gzt = dthing->map_z + mo->height_ + top_offset * mo->scale_ * dthing->mir_zscale;
-        gzb = gzt - sprite_height * mo->scale_ * dthing->mir_zscale;
-        break;
-
-    case SpriteYAlignmentMiddle: {
-        float _mz = dthing->map_z + mo->height_ * 0.5 + top_offset * mo->scale_ * dthing->mir_zscale;
-        float dz  = sprite_height * 0.5 * mo->scale_ * dthing->mir_zscale;
-
-        gzt = _mz + dz;
-        gzb = _mz - dz;
-        break;
-    }
-
-    case SpriteYAlignmentBottomUp:
-    default:
-        gzb = dthing->map_z + top_offset * mo->scale_ * dthing->mir_zscale;
-        gzt = gzb + sprite_height * mo->scale_ * dthing->mir_zscale;
-        break;
-    }
-
-    gzt += dthing->hover_dz;
-    gzb += dthing->hover_dz;
-
-    if (dthing->is_model || (mo->flags_ & kMapObjectFlagFuzzy) ||
-        ((mo->hyper_flags_ & kHyperFlagHover) && epi::AlmostEquals(dthing->sink_mult, 0.0f)))
-    {
-        /* nothing, don't adjust clipping */
-    }
-    // Lobo: new FLOOR_CLIP flag
-    else if (mo->hyper_flags_ & kHyperFlagFloorClip || dthing->sink_mult > 0)
-    {
-        /* nothing, don't adjust clipping */
-    }
-    else if (sprite_kludge == 0 && gzb < fz)
-    {
-        // explosion ?
-        if (mo->info_->flags_ & kMapObjectFlagMissile)
-        {
-            /* nothing, don't adjust clipping */
-        }
-        else
-        {
-            // Dasho - The sprite boundaries are clipped by the floor; this checks
-            // the actual visible portion of the image to see if we need to do any adjustments.
-            float diff = (float)image->real_bottom_ * image->scale_y_ * mo->scale_;
-            if (gzb + diff < fz)
-            {
-                gzt += fz - (gzb + diff);
-                gzb = fz - diff;
-            }
-        }
-    }
-
-    if (!dthing->is_model)
-    {
-        if (gzb >= gzt)
-            return false;
-    }
-
-    dthing->top    = gzt;
-    dthing->bottom = gzb;
-
-    dthing->left_delta_x  = pos1 * view_sine * dthing->mir_scale;
-    dthing->left_delta_y  = pos1 * -view_cosine * dthing->mir_scale;
-    dthing->right_delta_x = pos2 * view_sine * dthing->mir_scale;
-    dthing->right_delta_y = pos2 * -view_cosine * dthing->mir_scale;
-
-    BlendingMode blending = GetThingBlending(trans, (ImageOpacity)image->opacity_, mo->hyper_flags_);
-
-    if (is_fuzzy)
-    {
-        blending = (BlendingMode)(blending | kBlendingAlpha);
-    }
+    bool transparent = (key.blending & kBlendingNoZBuffer) || (key.blending & kBlendingAlpha);
 
     if (solid)
     {
-        if ((blending & kBlendingNoZBuffer) || (blending & kBlendingAlpha))
+        if (transparent)
         {
+            render_thing_needs_transparent = true;
             return false;
         }
     }
-    else
+    else if (!transparent)
     {
-        if (!(blending & kBlendingNoZBuffer) && !(blending & kBlendingAlpha))
-        {
-            return false;
-        }
+        return false;
     }
 
-    float h     = image->ScaledHeight();
-    float right = 1.0f;
-    float top   = 1.0f;
-
-    float x1b, y1b, z1b, x1t, y1t, z1t;
-    float x2b, y2b, z2b, x2t, y2t, z2t;
-
-    x1b = x1t = dthing->map_x + dthing->left_delta_x;
-    y1b = y1t = dthing->map_y + dthing->left_delta_y;
-    x2b = x2t = dthing->map_x + dthing->right_delta_x;
-    y2b = y2t = dthing->map_y + dthing->right_delta_y;
-
-    z1b = z2b = dthing->bottom;
-    z1t = z2t = dthing->top;
-
-    // MLook: tilt sprites so they look better
-    if (render_mirror_set.XYScale() >= 0.99)
-    {
-        float _h    = dthing->top - dthing->bottom;
-        float skew2 = _h;
-
-        if (mo->radius_ >= 1.0f && h > mo->radius_)
-            skew2 = mo->radius_;
-
-        float _dx = view_cosine * sprite_skew * skew2;
-        float _dy = view_sine * sprite_skew * skew2;
-
-        float top_q    = 0.5f;
-        float bottom_q = 0.5f;
-
-        x1t += top_q * _dx;
-        y1t += top_q * _dy;
-        x2t += top_q * _dx;
-        y2t += top_q * _dy;
-
-        x1b -= bottom_q * _dx;
-        y1b -= bottom_q * _dy;
-        x2b -= bottom_q * _dx;
-        y2b -= bottom_q * _dy;
-    }
-
-    float tex_x1 = 0.001f;
-    float tex_x2 = right - 0.001f;
-
-    float tex_y1 = 0;
-    float tex_y2 = tex_y1 + (z1t - z1b);
-
-    float yscale = mo->scale_ * render_mirror_set.ZScale();
-
-    EPI_ASSERT(h > 0);
-    tex_y1 = top * tex_y1 / (h * yscale);
-    tex_y2 = top * tex_y2 / (h * yscale);
-
-    if (dthing->flip)
-    {
-        float temp = tex_x2;
-        tex_x1     = right - tex_x1;
-        tex_x2     = right - temp;
-    }
-
-    ThingCoordinateData data;
-
-    data.mo = mo;
-
-    data.vertices[0] = {{x1b + dx, y1b + dy, z1b}};
-    data.vertices[1] = {{x1t + dx, y1t + dy, z1t}};
-    data.vertices[2] = {{x2t + dx, y2t + dy, z2t}};
-    data.vertices[3] = {{x2b + dx, y2b + dy, z2b}};
-
-    data.texture_coordinates[0] = {{tex_x1, tex_y1}};
-    data.texture_coordinates[1] = {{tex_x1, tex_y2}};
-    data.texture_coordinates[2] = {{tex_x2, tex_y2}};
-    data.texture_coordinates[3] = {{tex_x2, tex_y1}};
-
-    data.normal = {{-view_cosine, -view_sine, 0}};
-
-    data.colors[0].Clear();
-    data.colors[1].Clear();
-    data.colors[2].Clear();
-    data.colors[3].Clear();
-
-    float    fuzz_mul = 0;
-    HMM_Vec2 fuzz_add;
-
-    fuzz_add = {{0, 0}};
-
-    if (is_fuzzy)
-    {
-        blending = (BlendingMode)(kBlendingMasked | kBlendingAlpha);
-        trans    = 1.0f;
-
-        float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
-
-        fuzz_mul = 0.8 / HMM_Clamp(20, dist, 700);
-
-        FuzzAdjust(&fuzz_add, mo);
-    }
-
-    if (!is_fuzzy)
-    {
-        AbstractShader *shader = GetColormapShader(
-            dthing->properties, mo->info_->force_fullbright_ ? 255 : mo->state_->bright, mo->subsector_->sector);
-
-        for (int v = 0; v < 4; v++)
-        {
-            shader->Sample(data.colors + v, data.vertices[v].X, data.vertices[v].Y, data.vertices[v].Z);
-        }
-
-        if (use_dynamic_lights && render_view_extra_light < 250)
-        {
-            float r = mo->radius_ + 32;
-
-            DynamicLightIterator(mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r, mo->z + mo->height_, DLIT_Thing,
-                                 &data);
-
-            SectorGlowIterator(mo->subsector_->sector, mo->x - r, mo->y - r, mo->z, mo->x + r, mo->y + r,
-                               mo->z + mo->height_, DLIT_Thing, &data);
-        }
-    }
-
-    /* draw the sprite */
-
-    int num_pass = is_fuzzy ? 1 : (detail_level > 0 ? 4 : 3);
-
-    RGBAColor fc_to_use = dthing->map_object->subsector_->sector->properties.fog_color;
-    float     fd_to_use = dthing->map_object->subsector_->sector->properties.fog_density;
-    // check for DDFLEVL fog
-    if (fc_to_use == kRGBANoValue)
-    {
-        if (EDGE_IMAGE_IS_SKY(mo->subsector_->sector->ceiling))
-        {
-            fc_to_use = current_map->outdoor_fog_color_;
-            fd_to_use = 0.01f * current_map->outdoor_fog_density_;
-        }
-        else
-        {
-            fc_to_use = current_map->indoor_fog_color_;
-            fd_to_use = 0.01f * current_map->indoor_fog_density_;
-        }
-    }
-
-    for (int pass = 0; pass < num_pass; pass++)
-    {
-        if (pass == 1)
-        {
-            blending = (BlendingMode)(blending & ~kBlendingAlpha);
-            blending = (BlendingMode)(blending | kBlendingAdd);
-        }
-
-        bool is_additive = (pass > 0 && pass == num_pass - 1);
-
-        if (pass > 0 && pass < num_pass - 1)
-        {
-            if (GetMulticolMaxRGB(data.colors, 4, false) <= 0)
-                continue;
-        }
-        else if (is_additive)
-        {
-            if (GetMulticolMaxRGB(data.colors, 4, true) <= 0)
-                continue;
-        }
-
-        GLuint fuzz_tex = is_fuzzy ? ImageCache(fuzz_image, false) : 0;
-
-        RendererVertex *glvert =
-            BeginRenderUnit(GL_QUADS, 4, is_additive ? (GLuint)kTextureEnvironmentSkipRGB : GL_MODULATE, tex_id,
-                            is_fuzzy ? GL_MODULATE : (GLuint)kTextureEnvironmentDisable, fuzz_tex, pass, blending,
-                            pass > 0 ? kRGBANoValue : fc_to_use, fd_to_use);
-
-        for (int v_idx = 0; v_idx < 4; v_idx++)
-        {
-            RendererVertex *dest = glvert + v_idx;
-
-            dest->position               = data.vertices[v_idx];
-            dest->texture_coordinates[0] = data.texture_coordinates[v_idx];
-
-            if (is_fuzzy)
-            {
-                float ftx = (v_idx >= 2) ? (mo->radius_ * 2) : 0;
-                float fty = (v_idx == 1 || v_idx == 2) ? (mo->height_) : 0;
-
-                dest->texture_coordinates[1].X = ftx * fuzz_mul + fuzz_add.X;
-                dest->texture_coordinates[1].Y = fty * fuzz_mul + fuzz_add.Y;
-
-                dest->rgba = kRGBABlack;
-            }
-            else if (!is_additive)
-            {
-                dest->rgba = epi::MakeRGBAClamped(data.colors[v_idx].modulate_red_ * render_view_red_multiplier,
-                                                  (data.colors[v_idx].modulate_green_ * render_view_green_multiplier),
-                                                  data.colors[v_idx].modulate_blue_ * render_view_blue_multiplier);
-
-                data.colors[v_idx].modulate_red_ -= 256;
-                data.colors[v_idx].modulate_green_ -= 256;
-                data.colors[v_idx].modulate_blue_ -= 256;
-            }
-            else
-            {
-                dest->rgba = epi::MakeRGBAClamped(data.colors[v_idx].add_red_ * render_view_red_multiplier,
-                                                  (data.colors[v_idx].add_green_ * render_view_green_multiplier),
-                                                  data.colors[v_idx].add_blue_ * render_view_blue_multiplier);
-            }
-
-            epi::SetRGBAAlpha(dest->rgba, trans);
-        }
-
-        EndRenderUnit(4);
-    }
+    AddSpriteToBatch(key, instance);
 
     return solid;
 }
 
-bool RenderThings(DrawFloor *dfloor, bool solid)
+void EnumerateViewThings(void)
 {
-    //
-    // As part my move to strip out Z_Zone usage and replace
-    // it with array classes and more standard new and delete
-    // calls, I've removed the EDGE_QSORT() here and the array.
-    // My main reason for doing that is that since I have to
-    // modify the code here anyway, it is prudent to re-evaluate
-    // their usage.
-    //
-    // The EDGE_QSORT() mechanism used does an
-    // allocation each time it is used and this is called
-    // for each floor drawn in each subsector drawn, it is
-    // reasonable to assume that removing it will give
-    // something of speed improvement.
-    //
-    // This comes at a cost since optimisation is always
-    // a balance between speed and size: drawthing_t now has
-    // to hold 4 additional pointers. Two for the binary tree
-    // (order building) and two for the the final linked list
-    // (avoiding recursive function calls that the parsing the
-    // binary tree would require).
-    //
-    // -ACB- 2004/08/17
-    //
+    if (active_mirror_set.TotalActive() == 0)
+        UpdateResidentThings();
 
-    DrawThing *head_dt;
-
-    // Check we have something to draw
-    head_dt = dfloor->things;
-    if (!head_dt)
-        return true;
-
-    bool all_solid = true;
-
-    if (solid)
+    if (resident_ready)
     {
-        while (head_dt)
+        for (size_t i = 0; i < dynamic_things.size(); i++)
         {
-            if (!RenderThing(head_dt, solid))
-            {
-                all_solid = false;
-            }
-            head_dt = head_dt->next;
+            MapObject *mo = dynamic_things[i];
+
+            if (mo->IsRemoved() || !mo->sector_)
+                continue;
+
+            if (!ThingSectorReached(mo))
+                continue;
+
+            BSPWalkThing(mo);
         }
 
-        return all_solid;
+        return;
     }
 
-    DrawThing *curr_dt, *dt, *next_dt;
-    float      cmp_val;
-
-    head_dt->render_left = head_dt->render_right = head_dt->render_previous = head_dt->render_next = nullptr;
-
-    dt = nullptr; // Warning removal: This will always have been set
-
-    curr_dt = head_dt->next;
-    while (curr_dt)
+    for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {
-        curr_dt->render_left = curr_dt->render_right = nullptr;
+        if (mo->IsRemoved() || !mo->sector_)
+            continue;
 
-        // Parse the tree to find our place
-        next_dt = head_dt;
-        do
-        {
-            dt = next_dt;
+        if (!ThingSectorReached(mo))
+            continue;
 
-            cmp_val = dt->translated_z - curr_dt->translated_z;
-            if (epi::AlmostEquals(cmp_val, 0.0f))
-            {
-                // Resolve Z fight by letting the mobj pointer values settle it
-                int offset = dt->map_object - curr_dt->map_object;
-                cmp_val    = (float)offset;
-            }
+        BSPWalkThing(mo);
+    }
+}
 
-            if (cmp_val < 0.0f)
-                next_dt = dt->render_left;
-            else
-                next_dt = dt->render_right;
-        } while (next_dt);
+static void SetSpriteViewParameters(void)
+{
+    float skew = (mirror_view.xy_scale >= 0.99f) ? sprite_skew : 0.0f;
 
-        // Update our place
-        if (cmp_val < 0.0f)
-        {
-            // Update the binary tree
-            dt->render_left = curr_dt;
+    render_unit_sprite_view[0] = {{mirror_view.sprite_right.X, mirror_view.sprite_right.Y,
+                                   mirror_view.sprite_forward.X * skew, mirror_view.sprite_forward.Y * skew}};
+    render_unit_sprite_view[1] = {{mirror_view.reflective ? 1.0f : 0.0f, (float)render_view_extra_light, 0.0f, 0.0f}};
+}
 
-            // Update the linked list (Insert behind node)
-            if (dt->render_previous)
-                dt->render_previous->render_next = curr_dt;
+void RenderThings(std::vector<DrawThing *> &things, std::vector<DrawThing *> &transparent_things)
+{
+    SetSpriteViewParameters();
 
-            curr_dt->render_previous = dt->render_previous;
-            curr_dt->render_next     = dt;
+    if (active_mirror_set.TotalActive() == 0)
+        ApplyResidentSectorChanges();
 
-            dt->render_previous = curr_dt;
-        }
-        else
-        {
-            // Update the binary tree
-            dt->render_right = curr_dt;
+    transparent_things.clear();
 
-            // Update the linked list (Insert infront of node)
-            if (dt->render_next)
-                dt->render_next->render_previous = curr_dt;
+    for (std::vector<DrawThing *>::iterator it = things.begin(); it != things.end(); it++)
+    {
+        render_thing_needs_transparent = false;
 
-            curr_dt->render_next     = dt->render_next;
-            curr_dt->render_previous = dt;
+        RenderThing(*it, true);
 
-            dt->render_next = curr_dt;
-        }
-
-        curr_dt = curr_dt->next;
+        if (render_thing_needs_transparent)
+            transparent_things.push_back(*it);
     }
 
-    // Find the first to draw
-    while (head_dt->render_previous)
-        head_dt = head_dt->render_previous;
+    FlushSpriteBatches();
 
-    // Draw...
-    for (dt = head_dt; dt; dt = dt->render_next)
+    DrawResidentBatches(false);
+}
+
+void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things, bool models)
+{
+    SetSpriteViewParameters();
+
+    for (size_t i = 0; i < transparent_things.size(); i++)
     {
-        if (!RenderThing(dt, solid))
-        {
-            all_solid = false;
-        }
+        if (transparent_things[i]->is_model == models)
+            RenderThing(transparent_things[i], false);
     }
 
-    return all_solid;
+    FlushSpriteBatches();
+
+    if (!models)
+        DrawResidentBatches(true);
 }
 
 //--- editor settings ---

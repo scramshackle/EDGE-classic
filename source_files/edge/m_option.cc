@@ -392,6 +392,30 @@ static OptionMenuDefinition main_optmenu = {mainoptions,
 //
 // -ACB- 1998/07/15 Altered menu structure
 
+static constexpr LiquidSwirl kLiquidEffectChoices[] = {kLiquidSwirlVanilla, kLiquidSwirlSwirl, kLiquidSwirlParallax,
+                                                       kLiquidSwirlScanline};
+
+static int liquid_effect_choice = 0;
+
+static void SyncLiquidEffectChoice(void)
+{
+    liquid_effect_choice = 0;
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (kLiquidEffectChoices[i] == swirling_flats)
+            liquid_effect_choice = i;
+    }
+}
+
+static void ChangeLiquidEffect(int key_pressed, ConsoleVariable *console_variable)
+{
+    EPI_UNUSED(key_pressed);
+    EPI_UNUSED(console_variable);
+
+    swirling_flats = kLiquidEffectChoices[liquid_effect_choice];
+}
+
 static OptionMenuItem vidoptions[] = {
     {kOptionMenuItemTypeSlider, "Gamma Adjustment", nullptr, 0, &gamma_correction.f_,
      OptionMenuUpdateConsoleVariableFromFloat, nullptr, &gamma_correction, 0.10f, -1.0f, 1.0f, "%0.2f"},
@@ -404,8 +428,8 @@ static OptionMenuItem vidoptions[] = {
      nullptr, nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Smoothing", YesNo, 2, &image_smoothing, OptionMenuChangeMipMap, nullptr, nullptr, 0, 0,
      0, ""},
-    {kOptionMenuItemTypeSwitch, "Upscale Textures", "Off/UI Only/UI & Sprites/All", 4, &hq2x_scaling,
-     OptionMenuChangeMipMap, "Only affects paletted (Doom format) textures", nullptr, 0, 0, 0, ""},
+    {kOptionMenuItemTypeSwitch, "Upscale Textures", "Off/On", 2, &image_upscaling,
+     OptionMenuChangeMipMap, "Applies to all native-resolution images", nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Title/Intermission Scaling", "Normal/Border Fill", 2, &title_scaling.d_,
      OptionMenuUpdateConsoleVariableFromInt, nullptr, &title_scaling, 0, 0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Sky Scaling", "Mirror/Repeat/Stretch", 3, &sky_stretch_mode.d_,
@@ -421,8 +445,8 @@ static OptionMenuItem vidoptions[] = {
     {kOptionMenuItemTypeSwitch, "Wipe method", "None/Melt/Crossfade/Pixelfade/Top/Bottom/Left/Right/Spooky/Doors",
      kTotalScreenWipeTypes, &wipe_method, nullptr, nullptr, nullptr, 0, 0, 0, ""},
 #endif
-    {kOptionMenuItemTypeSwitch, "Animated Liquid Type", "Vanilla/SMMU/SMMU+Swirl/Parallax", 4, &swirling_flats, nullptr,
-     nullptr, nullptr, 0, 0, 0, ""}};
+    {kOptionMenuItemTypeSwitch, "Animated Liquid Type", "Vanilla/Swirl/Parallax/Scanline", 4, &liquid_effect_choice,
+     ChangeLiquidEffect, nullptr, nullptr, 0, 0, 0, ""}};
 
 static OptionMenuDefinition video_optmenu = {
     vidoptions,           sizeof(vidoptions) / sizeof(OptionMenuItem), &options_menu_default_style, 150, 77, 0, "",
@@ -1033,6 +1057,8 @@ void OptionMenuDrawer()
     char         tempstring[80];
     int          curry, deltay, menutop;
     unsigned int k;
+
+    SyncLiquidEffectChoice();
 
     Style *style = current_menu->style_var[0];
     EPI_ASSERT(style);

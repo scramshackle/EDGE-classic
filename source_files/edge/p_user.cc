@@ -104,7 +104,7 @@ static void CalcHeight(Player *player)
 {
     bool    onground  = player->map_object_->z <= player->map_object_->floor_z_;
     float   sink_mult = 1.0f;
-    Sector *cur_sec   = player->map_object_->subsector_->sector;
+    Sector *cur_sec   = player->map_object_->sector_;
     if (!cur_sec->extrafloor_used && !cur_sec->height_sector && onground)
         sink_mult -= cur_sec->sink_depth;
 
@@ -378,7 +378,7 @@ static void MovePlayer(Player *player)
     {
         fric           = -1.0f;
         factor         = -1.0f;
-        Sector *sector = player->map_object_->subsector_->sector;
+        Sector *sector = player->map_object_->sector_;
 
         for (TouchNode *tn = mo->touch_sectors_; tn; tn = tn->map_object_next)
         {
@@ -815,7 +815,7 @@ bool PlayerThink(Player *player)
         {
             ExitType do_exit = player->map_object_->region_properties_->special->e_exit_;
 
-            player->map_object_->subsector_->sector->properties.special = nullptr;
+            player->map_object_->sector_->properties.special = nullptr;
 
             if (do_exit == kExitTypeSecret)
                 ExitLevelSecret(1);
@@ -842,7 +842,7 @@ bool PlayerThink(Player *player)
     if (erraticism.d_)
     {
         bool    sinking = false;
-        Sector *cur_sec = player->map_object_->subsector_->sector;
+        Sector *cur_sec = player->map_object_->sector_;
         if (!cur_sec->extrafloor_used && !cur_sec->height_sector && cur_sec->sink_depth > 0 &&
             player->map_object_->z <= player->map_object_->floor_z_)
             sinking = true;
@@ -870,10 +870,10 @@ bool PlayerThink(Player *player)
     submerged_sound_effects = false;
 
     if (player->map_object_->region_properties_->special ||
-        player->map_object_->subsector_->sector->extrafloor_used > 0 || player->underwater_ || player->swimming_ ||
+        player->map_object_->sector_->extrafloor_used > 0 || player->underwater_ || player->swimming_ ||
         player->airless_)
     {
-        PlayerInSpecialSector(player, player->map_object_->subsector_->sector, should_think);
+        PlayerInSpecialSector(player, player->map_object_->sector_, should_think);
     }
 
     // Check for weapon change.
@@ -961,10 +961,10 @@ bool PlayerThink(Player *player)
     {
         if (pc_speaker_mode)
             sector_reverb = false;
-        else if (player->map_object_->subsector_->sector->sound_reverb)
+        else if (player->map_object_->sector_->sound_reverb)
         {
             sector_reverb = true;
-            player->map_object_->subsector_->sector->sound_reverb->ApplyReverb(&reverb_effect);
+            player->map_object_->sector_->sound_reverb->ApplyReverb(&reverb_effect);
         }
         else if (dynamic_reverb.d_)
         {
@@ -994,7 +994,7 @@ bool PlayerThink(Player *player)
             PathTraverse(player_x, player_y, 32768.0f, player_y, kPathAddLines, P_RoomPath, &room_checker);
             room_check += abs(room_checker.X - player_x);
             room_check *= 0.125f;
-            if (EDGE_IMAGE_IS_SKY(player->map_object_->subsector_->sector->ceiling))
+            if (EDGE_IMAGE_IS_SKY(player->map_object_->sector_->ceiling))
             {
                 if (dynamic_reverb.d_ == 1) // Headphones
                     ddf::ReverbDefinition::kOutdoorWeak.ApplyReverb(&reverb_effect);

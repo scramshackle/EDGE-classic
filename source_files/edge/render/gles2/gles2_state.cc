@@ -2,6 +2,7 @@
 
 #include "epi.h"
 #include "gles2_immediate.h"
+#include "gles2_lights.h"
 #include "gles2_program.h"
 #include "i_system.h"
 #include "r_backend.h"
@@ -10,23 +11,6 @@
 
 std::unordered_map<GLuint, GLint> texture_clamp_s;
 std::unordered_map<GLuint, GLint> texture_clamp_t;
-
-static bool gles2_stencil_available = false;
-
-void Gles2DetectStencilBuffer()
-{
-    if (gles2_immediate.RenderTargetReady())
-    {
-        gles2_stencil_available = gles2_immediate.RenderTargetHasStencil();
-        return;
-    }
-
-    GLint stencil_bits = 0;
-
-    glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
-
-    gles2_stencil_available = (stencil_bits > 0);
-}
 
 static GLint Gles2WrapMode(GLint wrap)
 {
@@ -83,15 +67,6 @@ class Gles2RenderState : public RenderState
                 glDisable(GL_STENCIL_TEST);
             }
             break;
-        case GL_CLIP_PLANE0:
-        case GL_CLIP_PLANE1:
-        case GL_CLIP_PLANE2:
-        case GL_CLIP_PLANE3:
-        case GL_CLIP_PLANE4:
-        case GL_CLIP_PLANE5:
-            clip_plane_enabled_[cap - GL_CLIP_PLANE0] = enabled;
-            state_dirty_                              = true;
-            break;
         default:
             break;
         }
@@ -136,11 +111,6 @@ class Gles2RenderState : public RenderState
         glStencilMask(mask);
     }
 
-    bool HasStencilBuffer()
-    {
-        return gles2_stencil_available;
-    }
-
     void CullFace(GLenum mode)
     {
         cull_face_   = mode;
@@ -176,18 +146,6 @@ class Gles2RenderState : public RenderState
 
         glActiveTexture(GL_TEXTURE0 + index);
         glBindTexture(GL_TEXTURE_2D, textureid);
-    }
-
-    void ClipPlane(GLenum plane, GLdouble *equation)
-    {
-        int32_t index = (int32_t)(plane - GL_CLIP_PLANE0);
-
-        for (int32_t i = 0; i < 4; i++)
-        {
-            clip_plane_equation_[index][i] = equation[i];
-        }
-
-        state_dirty_ = true;
     }
 
     void PolygonOffset(GLfloat factor, GLfloat units)
@@ -419,18 +377,7 @@ class Gles2RenderState : public RenderState
 
     void InvalidateApplied()
     {
-        applied_blend_          = !enable_blend_;
-        applied_cull_face_      = !enable_cull_face_;
-        applied_depth_test_     = !enable_depth_test_;
-        applied_scissor_test_   = !enable_scissor_test_;
-        applied_depth_mask_     = !depth_mask_;
-        applied_polygon_offset_ = !applied_polygon_offset_;
-
-        applied_depth_func_ = 0;
-        applied_cull_mode_  = 0;
-
-        applied_blend_source_      = 0;
-        applied_blend_destination_ = 0;
+        applied_unknown_ = true;
 
         gl_bound_texture_[0] = 0xFFFFFFFFu;
         gl_bound_texture_[1] = 0xFFFFFFFFu;
@@ -467,11 +414,6 @@ class Gles2RenderState : public RenderState
             texture_environment_source_0_rgb_[i] = GL_TEXTURE;
         }
 
-        for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
-        {
-            clip_plane_enabled_[i] = false;
-        }
-
         glDisable(GL_BLEND);
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
@@ -489,6 +431,8 @@ class Gles2RenderState : public RenderState
         glDepthFunc(GL_LEQUAL);
 
         glFrontFace(front_face_);
+        glCullFace(GL_BACK);
+        glBlendFunc(GL_ONE, GL_ZERO);
 
         glClearColor(epi::GetRGBARed(clear_color_) / 255.0f, epi::GetRGBAGreen(clear_color_) / 255.0f,
                      epi::GetRGBABlue(clear_color_) / 255.0f, epi::GetRGBAAlpha(clear_color_) / 255.0f);
@@ -550,15 +494,35 @@ class Gles2RenderState : public RenderState
         gles2_immediate.DeleteModelMesh(handle);
     }
 
-    void UpdateModelColors(uint32_t handle, const float *colors, int vertex_count)
-    {
-        gles2_immediate.UpdateModelColors(handle, colors, vertex_count);
-    }
-
     void DrawModel(const ModelDrawInfo &info)
     {
         if (info.handle == 0 || info.index_count <= 0)
             return;
+
+        int32_t oit_mode = render_backend->OitMode();
+
+        if (oit_mode != kOitPassNone)
+        {
+            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
+
+            bool wanted = (model_pass == oit_mode) ||
+                          (model_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+
+            if (!wanted)
+                return;
+        }
+
+        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage)
+        {
+            Enable(GL_BLEND);
+
+            if (oit_mode == kOitPassRevealage)
+                BlendFunction(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+            else
+                BlendFunction(GL_ONE, GL_ONE);
+
+            DepthMask(false);
+        }
 
         ApplyState();
 
@@ -573,7 +537,11 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetTextureTransform(info.texture_scale, info.texture_offset);
         gles2_model_program.SetAlpha(info.alpha);
         gles2_model_program.SetAlphaTest(info.alpha_test);
-        gles2_model_program.SetAdditivePass(info.additive_pass);
+        gles2_model_program.SetLighting(info);
+        gles2_model_program.SetColorLookup(info.color_lookup);
+        gles2_model_program.SetOit(
+            (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage) ? (float)oit_mode : 0.0f,
+            gles2_immediate.OitScale());
 
         Gles2FogMode fog_mode = kGles2FogModeNone;
 
@@ -584,15 +552,28 @@ class Gles2RenderState : public RenderState
                                    epi::GetRGBAGreen(fog_color_) / 255.0f, epi::GetRGBABlue(fog_color_) / 255.0f,
                                    fog_density_, fog_start_, fog_end_);
 
-        for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
+        const Gles2LightGridState *light_grid = Gles2CurrentLightGrid();
+
+        bool model_lit = info.world_lit && light_grid->active;
+
+        if (model_lit)
         {
-            float equation[4];
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightData);
+            glBindTexture(GL_TEXTURE_2D, light_grid->data_texture);
 
-            for (int32_t e = 0; e < 4; e++)
-                equation[e] = (float)clip_plane_equation_[i][e];
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightHeaders);
+            glBindTexture(GL_TEXTURE_2D, light_grid->header_texture);
 
-            gles2_model_program.SetClipPlane(i, clip_plane_enabled_[i], equation);
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitLightIndices);
+            glBindTexture(GL_TEXTURE_2D, light_grid->list_texture);
+
+            glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
+
+            gles2_model_program.SetLightGrid(light_grid);
         }
+
+        gles2_model_program.SetWorldLit(model_lit);
+        gles2_model_program.SetGlowSet(model_lit ? info.glow_set : -1);
 
         gles2_immediate.DrawModelMesh(info);
 
@@ -615,7 +596,16 @@ class Gles2RenderState : public RenderState
 
         ApplyState();
 
+        gles2_program.SetColorLookup(color_lookup_slot_);
+
         gles2_immediate.DrawModelIndexed(index_first, index_count);
+
+        gles2_program.SetColorLookup(0);
+    }
+
+    void SetColorLookup(int slot)
+    {
+        color_lookup_slot_ = slot;
     }
 
     void ApplyState()
@@ -627,7 +617,7 @@ class Gles2RenderState : public RenderState
 
         state_dirty_ = false;
 
-        if (applied_blend_ != enable_blend_)
+        if (applied_unknown_ || applied_blend_ != enable_blend_)
         {
             applied_blend_ = enable_blend_;
 
@@ -641,7 +631,8 @@ class Gles2RenderState : public RenderState
             }
         }
 
-        if (applied_blend_source_ != blend_source_factor_ || applied_blend_destination_ != blend_destination_factor_)
+        if (applied_unknown_ || applied_blend_source_ != blend_source_factor_ ||
+            applied_blend_destination_ != blend_destination_factor_)
         {
             applied_blend_source_      = blend_source_factor_;
             applied_blend_destination_ = blend_destination_factor_;
@@ -649,7 +640,7 @@ class Gles2RenderState : public RenderState
             glBlendFunc(blend_source_factor_, blend_destination_factor_);
         }
 
-        if (applied_cull_face_ != enable_cull_face_)
+        if (applied_unknown_ || applied_cull_face_ != enable_cull_face_)
         {
             applied_cull_face_ = enable_cull_face_;
 
@@ -663,14 +654,14 @@ class Gles2RenderState : public RenderState
             }
         }
 
-        if (applied_cull_mode_ != cull_face_)
+        if (applied_unknown_ || applied_cull_mode_ != cull_face_)
         {
             applied_cull_mode_ = cull_face_;
 
             glCullFace(cull_face_);
         }
 
-        if (applied_depth_test_ != enable_depth_test_)
+        if (applied_unknown_ || applied_depth_test_ != enable_depth_test_)
         {
             applied_depth_test_ = enable_depth_test_;
 
@@ -684,21 +675,21 @@ class Gles2RenderState : public RenderState
             }
         }
 
-        if (applied_depth_mask_ != depth_mask_)
+        if (applied_unknown_ || applied_depth_mask_ != depth_mask_)
         {
             applied_depth_mask_ = depth_mask_;
 
             glDepthMask(depth_mask_ ? GL_TRUE : GL_FALSE);
         }
 
-        if (applied_depth_func_ != depth_function_)
+        if (applied_unknown_ || applied_depth_func_ != depth_function_)
         {
             applied_depth_func_ = depth_function_;
 
             glDepthFunc(depth_function_);
         }
 
-        if (applied_scissor_test_ != enable_scissor_test_)
+        if (applied_unknown_ || applied_scissor_test_ != enable_scissor_test_)
         {
             applied_scissor_test_ = enable_scissor_test_;
 
@@ -715,7 +706,7 @@ class Gles2RenderState : public RenderState
         bool polygon_offset = !epi::AlmostEquals(polygon_offset_factor_, 0.0f) ||
                               !epi::AlmostEquals(polygon_offset_units_, 0.0f);
 
-        if (applied_polygon_offset_ != polygon_offset)
+        if (applied_unknown_ || applied_polygon_offset_ != polygon_offset)
         {
             applied_polygon_offset_ = polygon_offset;
 
@@ -772,11 +763,7 @@ class Gles2RenderState : public RenderState
         gles2_program.SetFog(fog_mode, epi::GetRGBARed(fog_color_) / 255.0f, epi::GetRGBAGreen(fog_color_) / 255.0f,
                              epi::GetRGBABlue(fog_color_) / 255.0f, fog_density_, fog_start_, fog_end_);
 
-        for (int32_t i = 0; i < kGles2MaximumClipPlanes; i++)
-        {
-            gles2_program.SetClipPlane(i, clip_plane_equation_[i]);
-            gles2_program.SetClipPlaneEnabled(i, clip_plane_enabled_[i]);
-        }
+        applied_unknown_ = false;
     }
 
   private:
@@ -799,8 +786,6 @@ class Gles2RenderState : public RenderState
     GLsizei scissor_width_  = 0;
     GLsizei scissor_height_ = 0;
 
-    bool     clip_plane_enabled_[kGles2MaximumClipPlanes]     = {};
-    GLdouble clip_plane_equation_[kGles2MaximumClipPlanes][4] = {};
 
     bool    enable_alpha_test_        = false;
     GLenum  alpha_function_           = GL_GREATER;
@@ -829,6 +814,7 @@ class Gles2RenderState : public RenderState
 
     float line_width_ = 1.0f;
 
+    bool   applied_unknown_           = true;
     bool   applied_blend_             = false;
     bool   applied_cull_face_         = false;
     bool   applied_depth_test_        = false;
@@ -845,6 +831,8 @@ class Gles2RenderState : public RenderState
     bool state_dirty_ = true;
 
     const RendererVertex *vertex_array_base_ = nullptr;
+
+    int color_lookup_slot_ = 0;
 };
 
 static Gles2RenderState state;

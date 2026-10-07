@@ -82,18 +82,13 @@ typedef int GLsizei;
 #define GL_RGB  0x1907
 #define GL_RGBA 0x1908
 
-#define GL_CLIP_PLANE0 0x3000
-#define GL_CLIP_PLANE1 0x3001
-#define GL_CLIP_PLANE2 0x3002
-#define GL_CLIP_PLANE3 0x3003
-#define GL_CLIP_PLANE4 0x3004
-#define GL_CLIP_PLANE5 0x3005
-
 #define GL_GREATER 0x0204
 #define GL_LEQUAL  0x0203
 #define GL_ALWAYS  0x0207
 #define GL_EQUAL   0x0202
 #define GL_KEEP    0x1E00
+#define GL_INCR    0x1E02
+#define GL_DECR    0x1E03
 
 #define GL_TEXTURE0 0x84C0
 
@@ -184,14 +179,6 @@ typedef double GLdouble;
 #define GL_EXP 0x0800
 #endif
 
-#ifndef GL_CLIP_PLANE0
-#define GL_CLIP_PLANE0 0x3000
-#define GL_CLIP_PLANE1 0x3001
-#define GL_CLIP_PLANE2 0x3002
-#define GL_CLIP_PLANE3 0x3003
-#define GL_CLIP_PLANE4 0x3004
-#define GL_CLIP_PLANE5 0x3005
-#endif
 
 #ifndef GL_LIGHTING
 #define GL_LIGHTING 0x0B50
@@ -283,6 +270,30 @@ typedef double GLdouble;
 #endif
 #ifndef GL_DEPTH_STENCIL
 #define GL_DEPTH_STENCIL 0x84F9
+#endif
+#ifndef GL_FRAMEBUFFER_BINDING
+#define GL_FRAMEBUFFER_BINDING 0x8CA6
+#endif
+#ifndef GL_TEXTURE_BINDING_2D
+#define GL_TEXTURE_BINDING_2D 0x8069
+#endif
+#ifndef GL_CURRENT_PROGRAM
+#define GL_CURRENT_PROGRAM 0x8B8D
+#endif
+#ifndef GL_BLEND_SRC_RGB
+#define GL_BLEND_SRC_RGB 0x80C9
+#endif
+#ifndef GL_BLEND_DST_RGB
+#define GL_BLEND_DST_RGB 0x80C8
+#endif
+#ifndef GL_ACTIVE_TEXTURE
+#define GL_ACTIVE_TEXTURE 0x84E0
+#endif
+#ifndef GL_RGBA16F
+#define GL_RGBA16F 0x881A
+#endif
+#ifndef GL_HALF_FLOAT_OES
+#define GL_HALF_FLOAT_OES 0x8D61
 #endif
 #else
 #include <SDL3/SDL_opengl.h>

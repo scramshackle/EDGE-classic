@@ -57,7 +57,7 @@ inline float FastApproximateDistance(float delta_x, float delta_y)
 
 struct DrawFloor;
 
-struct DrawSubsector;
+struct DrawSector;
 
 //
 // DrawThing
@@ -66,10 +66,6 @@ struct DrawSubsector;
 //
 struct DrawThing
 {
-    // link for list
-    DrawThing *next;
-    DrawThing *previous;
-
     // actual map object
     MapObject *map_object;
 
@@ -88,8 +84,6 @@ struct DrawThing
     // translated coords
     float translated_z;
     float floor_z;
-    float mir_scale;
-    float mir_zscale;
 
     // colourmap/lighting
     RegionProperties *properties;
@@ -101,7 +95,6 @@ struct DrawThing
     float sink_mult;
 
     // Rendering order
-    DrawThing *render_left, *render_right, *render_previous, *render_next;
 };
 
 //
@@ -124,34 +117,51 @@ struct DrawFloor
     MapSurface *floor, *ceiling;
 
     Extrafloor *extrafloor;
+    Extrafloor *floor_extrafloor;
 
     // properties used herein
     RegionProperties *properties;
 
     // list of things
     // (not sorted until RenderFloor is called).
-    DrawThing *things;
+
+    std::vector<LineSide *> transparent_line_sides;
+
+    uint8_t transparent_planes;
 };
 
 struct DrawMirror
 {
-    Seg *seg = nullptr;
+    LineSide *line_side = nullptr;
 
     BAMAngle left, right;
 
     bool is_portal = false;
 
-    std::list<DrawSubsector *> draw_subsectors;
+    HMM_Mat4 local_matrix;
+    HMM_Mat4 view_matrix;
+
+    HMM_Vec2 sprite_right;
+    HMM_Vec2 sprite_forward;
+
+    HMM_Vec3 view_position;
+    HMM_Vec3 view_plane;
+
+    float xy_scale;
+    float z_scale;
+
+    bool reflective;
+
+    HMM_Vec4 near_plane;
+
+    std::list<DrawSector *> draw_sectors;
+    std::vector<DrawThing *> draw_things;
+    std::list<DrawMirror *> draw_mirrors;
 };
 
-struct DrawSeg // HOPEFULLY this can go away
+struct DrawSector
 {
-    Seg *seg;
-};
-
-struct DrawSubsector
-{
-    Subsector *subsector = nullptr;
+    Sector *sector = nullptr;
 
     // floors, sorted in height order (lowest to highest).
     std::vector<DrawFloor *> floors;
@@ -159,13 +169,7 @@ struct DrawSubsector
     // link list of floors, render order (furthest to closest)
     DrawFloor *render_floors;
 
-    std::list<DrawSeg *> segs;
-
-    std::list<DrawMirror *> mirrors;
-
-    bool visible;
-    bool sorted;
-    bool solid;
+    std::vector<LineSide *> line_sides;
 };
 
 extern int detail_level;
@@ -181,11 +185,10 @@ const Image *GetOtherSprite(int sprite, int frame, bool *flip);
 void AllocateDrawStructs(void);
 void ClearBSP(void);
 
-DrawThing     *GetDrawThing();
-DrawFloor     *GetDrawFloor();
-DrawSeg       *GetDrawSeg();
-DrawSubsector *GetDrawSub();
-DrawMirror    *GetDrawMirror();
+DrawThing  *GetDrawThing();
+DrawFloor  *GetDrawFloor();
+DrawSector *GetDrawSector();
+DrawMirror *GetDrawMirror();
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

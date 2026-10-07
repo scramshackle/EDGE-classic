@@ -34,6 +34,7 @@
 #include "r_image.h"
 
 #include <limits.h>
+#include <math.h>
 
 #include <list>
 #include <map>
@@ -62,6 +63,7 @@
 #include "m_menu.h"
 #include "m_misc.h"
 #include "p_local.h"
+#include "r_atlas.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
@@ -76,6 +78,44 @@
 #include "w_wad.h"
 
 LiquidSwirl swirling_flats = kLiquidSwirlVanilla;
+
+void NormalizeLiquidSwirl(void)
+{
+    switch (swirling_flats)
+    {
+    case kLiquidSwirlVanilla:
+    case kLiquidSwirlSwirl:
+    case kLiquidSwirlParallax:
+    case kLiquidSwirlScanline:
+        break;
+    case kLiquidSwirlLegacySmmu:
+        swirling_flats = kLiquidSwirlSwirl;
+        break;
+    default:
+        swirling_flats = kLiquidSwirlVanilla;
+        break;
+    }
+}
+
+HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
+{
+    if (!image || image->liquid_type_ == kLiquidImageNone || swirling_flats == kLiquidSwirlVanilla)
+        return {{0, 0, 0, 0}};
+
+    float mode = 1.0f;
+
+    if (swirling_flats == kLiquidSwirlParallax)
+        mode = 2.0f;
+    else if (swirling_flats == kLiquidSwirlScanline)
+        mode = 3.0f;
+
+    float time = fmodf(seconds, 3600.0f);
+
+    if (image->liquid_type_ == kLiquidImageThick)
+        time *= 0.5f;
+
+    return {{mode, time, (float)image->width_, (float)image->height_}};
+}
 
 extern ImageData *ReadAsEpiBlock(Image *rim);
 
@@ -100,16 +140,11 @@ struct CachedImage
     // parent image
     Image *parent;
 
-    // colormap used for translated image, normally nullptr
-    const Colormap *translation_map;
-
     // general hue of image (skewed towards pure colors)
     RGBAColor hue;
 
     // texture identifier within GL
     GLuint texture_id;
-
-    bool is_whitened;
 };
 
 // total set of images
@@ -203,7 +238,7 @@ int image_mipmapping = 2;
 
 int image_smoothing = 0;
 
-int hq2x_scaling = 0;
+int image_upscaling = 0;
 
 std::vector<std::string> TX_names;
 
@@ -244,47 +279,6 @@ Image::~Image()
 { /* TODO: image_c destructor */
 }
 
-void StoreBlurredImage(const Image *image)
-{
-    // const override
-    Image *img = (Image *)image;
-    if (!img->blurred_version_)
-    {
-        img->blurred_version_                     = new Image;
-        img->blurred_version_->name_              = std::string(img->name_).append("_BLURRED");
-        img->blurred_version_->height_            = img->height_;
-        img->blurred_version_->width_             = img->width_;
-        img->blurred_version_->is_empty_          = img->is_empty_;
-        img->blurred_version_->is_font_           = img->is_font_;
-        img->blurred_version_->liquid_type_       = img->liquid_type_;
-        img->blurred_version_->offset_x_          = img->offset_x_;
-        img->blurred_version_->offset_y_          = img->offset_y_;
-        img->blurred_version_->opacity_           = img->opacity_;
-        img->blurred_version_->scale_x_           = img->scale_x_;
-        img->blurred_version_->scale_y_           = img->scale_y_;
-        img->blurred_version_->source_graphic_    = img->source_graphic_;
-        img->blurred_version_->source_flat_       = img->source_flat_;
-        img->blurred_version_->source_texture_    = img->source_texture_;
-        img->blurred_version_->source_dummy_      = img->source_dummy_;
-        img->blurred_version_->source_user_       = img->source_user_;
-        img->blurred_version_->source_palette_    = img->source_palette_;
-        img->blurred_version_->source_type_       = img->source_type_;
-        img->blurred_version_->animation_.current = img->blurred_version_;
-        img->blurred_version_->animation_.next    = nullptr;
-        img->blurred_version_->animation_.count   = 0;
-        img->blurred_version_->animation_.speed   = 0;
-        img->blurred_version_->grayscale_         = img->grayscale_;
-        if (img->blur_sigma_ > 0.0f)
-        {
-            img->blurred_version_->blur_sigma_ = img->blur_sigma_;
-        }
-        else
-        {
-            img->blurred_version_->blur_sigma_ = -1.0f;
-        }
-    }
-}
-
 static Image *NewImage(int width, int height, int opacity = kOpacityUnknown)
 {
     Image *rim = new Image;
@@ -304,7 +298,6 @@ static Image *NewImage(int width, int height, int opacity = kOpacityUnknown)
 
     rim->liquid_type_ = kLiquidImageNone;
 
-    rim->swirled_game_tic_ = 0;
 
     return rim;
 }
@@ -752,7 +745,6 @@ static Image *AddImage_DOOM(ImageDefinition *def, bool user_defined = false)
     rim->hsv_rotation_   = def->hsv_rotation_;
     rim->hsv_saturation_ = def->hsv_saturation_;
     rim->hsv_value_      = def->hsv_value_;
-    rim->blur_sigma_     = def->blur_factor_;
 
     rim->source_graphic_.special = kImageSpecialNone;
 
@@ -881,7 +873,6 @@ static Image *AddImageUser(ImageDefinition *def)
     rim->hsv_rotation_   = def->hsv_rotation_;
     rim->hsv_saturation_ = def->hsv_saturation_;
     rim->hsv_value_      = def->hsv_value_;
-    rim->blur_sigma_     = def->blur_factor_;
 
     if (def->special_ & kImageSpecialCrosshair)
     {
@@ -1191,47 +1182,33 @@ static bool IM_ShouldMipmap(const Image *rim)
     }
 }
 
-static bool IM_ShouldSmooth(const Image *rim)
+static bool IM_ShouldSmooth(void)
 {
-    if (!epi::AlmostEquals(rim->blur_sigma_, 0.0f))
-        return true;
-
     return image_smoothing ? true : false;
 }
 
-static bool IM_ShouldHQ2X(const Image *rim)
+static bool IM_ShouldUpscale(const Image *rim, const ImageData *img, int max_pix)
 {
-    // Note: no need to check kImageSourceUser, since those images are
-    //       always PNG or JPEG (etc) and never palettised, hence
-    //       the HQ2x scaling would never apply.
-
-    if (hq2x_scaling == 0)
+    if (!image_upscaling)
         return false;
 
-    if (hq2x_scaling >= 3)
+    if (rim->is_empty_)
+        return false;
+
+    if (rim->scale_x_ < 0.99f || rim->scale_y_ < 0.99f)
+        return false;
+
+    return (img->width_ * img->height_ * 4) <= max_pix;
+}
+
+static bool IM_UpscaleWraps(const Image *rim)
+{
+    if (rim->source_type_ == kImageSourceTexture || rim->source_type_ == kImageSourceFlat)
         return true;
 
-    switch (rim->source_type_)
-    {
-    case kImageSourceGraphic:
-    case kImageSourceRawBlock:
-        // UI elements
-        return true;
-#if 0
-		case kImageSourceTexture:
-			// the "SKY" check here is a hack...
-			if (epi::StringPrefixCaseCompareASCII(rim->name_, "SKY") == 0)
-				return true;
-			break;
-#endif
-    case kImageSourceSprite:
-        if (hq2x_scaling >= 2)
-            return true;
-        break;
-
-    default:
-        break;
-    }
+    if (rim->source_type_ == kImageSourceUser)
+        return rim->source_user_.def->belong_ == kImageNamespaceTexture ||
+               rim->source_user_.def->belong_ == kImageNamespaceFlat;
 
     return false;
 }
@@ -1246,15 +1223,14 @@ static int IM_PixelLimit()
         return (1 << 22);
 }
 
-static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
+static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 {
-    bool clamp  = IM_ShouldClamp(rim);
-    bool mip    = IM_ShouldMipmap(rim);
-    bool smooth = IM_ShouldSmooth(rim);
-    bool flip   = false;
-    bool invert = false;
-
-    int max_pix = IM_PixelLimit();
+    bool clamp         = IM_ShouldClamp(rim);
+    bool mip           = IM_ShouldMipmap(rim);
+    bool mip_requested = false;
+    bool smooth        = IM_ShouldSmooth();
+    bool flip          = false;
+    bool invert        = false;
 
     if (rim->source_type_ == kImageSourceUser)
     {
@@ -1262,7 +1238,10 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
             clamp = true;
 
         if (rim->source_user_.def->special_ & kImageSpecialMip)
-            mip = !rim->is_sky_;
+        {
+            mip           = !rim->is_sky_;
+            mip_requested = mip;
+        }
         else if (rim->source_user_.def->special_ & kImageSpecialNoMip)
             mip = false;
 
@@ -1281,7 +1260,10 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
             clamp = true;
 
         if (rim->source_graphic_.special & kImageSpecialMip)
-            mip = true;
+        {
+            mip           = true;
+            mip_requested = true;
+        }
         else if (rim->source_graphic_.special & kImageSpecialNoMip)
             mip = false;
 
@@ -1298,18 +1280,7 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
     const uint8_t *what_palette    = (const uint8_t *)&playpal_data[0];
     bool           what_pal_cached = false;
 
-    static uint8_t trans_pal[256 * 3];
-
-    if (trans != nullptr)
-    {
-        // Note: we don't care about source_palette here. It's likely that
-        // the translation table itself would not match the other palette,
-        // and so we would still end up with messed up colours.
-
-        TranslatePalette(trans_pal, what_palette, trans);
-        what_palette = trans_pal;
-    }
-    else if (rim->source_palette_ >= 0)
+    if (rim->source_palette_ >= 0)
     {
         what_palette    = (const uint8_t *)LoadLumpIntoMemory(rim->source_palette_);
         what_pal_cached = true;
@@ -1317,43 +1288,10 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
 
     ImageData *tmp_img = ReadAsEpiBlock(rim);
 
-    if (rim->liquid_type_ > kLiquidImageNone &&
-        (swirling_flats == kLiquidSwirlSmmu || swirling_flats == kLiquidSwirlSmmuSlosh))
-    {
-        rim->swirled_game_tic_ = hud_tic;
-        tmp_img->Swirl(rim->swirled_game_tic_,
-                       rim->liquid_type_); // Using leveltime disabled swirl
-                                           // for intermission screens
-    }
-
     if (rim->opacity_ == kOpacityUnknown)
         rim->opacity_ = DetermineOpacity(tmp_img, &rim->is_empty_);
 
-    if ((tmp_img->depth_ == 1) && IM_ShouldHQ2X(rim))
-    {
-        bool solid = (rim->opacity_ == kOpacitySolid);
-
-        HQ2xPaletteSetup(what_palette, solid ? -1 : kTransparentPixelIndex);
-
-        ImageData *scaled_img = ImageHQ2x(tmp_img, solid, false /* invert */);
-
-        if (rim->is_font_)
-        {
-            scaled_img->RemoveBackground();
-            rim->opacity_ = DetermineOpacity(tmp_img, &rim->is_empty_);
-        }
-
-        if (rim->blur_sigma_ > 0.0f)
-        {
-            ImageData *blurred_img = ImageBlur(scaled_img, rim->blur_sigma_);
-            delete scaled_img;
-            scaled_img = blurred_img;
-        }
-
-        delete tmp_img;
-        tmp_img = scaled_img;
-    }
-    else if (tmp_img->depth_ == 1)
+    if (tmp_img->depth_ == 1)
     {
         ImageData *rgb_img = RGBFromPalettised(tmp_img, what_palette, rim->opacity_);
 
@@ -1361,13 +1299,6 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
         {
             rgb_img->RemoveBackground();
             rim->opacity_ = DetermineOpacity(tmp_img, &rim->is_empty_);
-        }
-
-        if (rim->blur_sigma_ > 0.0f)
-        {
-            ImageData *blurred_img = ImageBlur(rgb_img, rim->blur_sigma_);
-            delete rgb_img;
-            rgb_img = blurred_img;
         }
 
         delete tmp_img;
@@ -1380,20 +1311,12 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
             tmp_img->RemoveBackground();
             rim->opacity_ = DetermineOpacity(tmp_img, &rim->is_empty_);
         }
-        if (rim->blur_sigma_ > 0.0f)
-        {
-            ImageData *blurred_img = ImageBlur(tmp_img, rim->blur_sigma_);
-            delete tmp_img;
-            tmp_img = blurred_img;
-        }
-        if (trans != nullptr)
-            PaletteRemapRGBA(tmp_img, what_palette, (const uint8_t *)&playpal_data[0]);
     }
 
     if (rim->hsv_rotation_ || rim->hsv_saturation_ > -1 || rim->hsv_value_)
         tmp_img->SetHSV(rim->hsv_rotation_, rim->hsv_saturation_, rim->hsv_value_);
 
-    if (do_whiten)
+    if (rim->grayscale_)
         tmp_img->Whiten();
 
     // Need to flip or invert before checking image bounds.
@@ -1421,18 +1344,67 @@ static GLuint LoadImageOGL(Image *rim, const Colormap *trans, bool do_whiten)
         rim->real_right_  = rim->width_;
     }
 
-    GLuint tex_id =
-        UploadTexture(tmp_img,
-                      (clamp ? kUploadClamp : 0) | (mip ? kUploadMipMap : 0) | (smooth ? kUploadSmooth : 0) |
-                          ((rim->opacity_ == kOpacityMasked) ? kUploadThresh : 0),
-                      max_pix);
+    if (IM_ShouldUpscale(rim, tmp_img, max_pix))
+    {
+        ImageData *scaled_img = ImageEPX(tmp_img, IM_UpscaleWraps(rim));
 
-    delete tmp_img;
+        delete tmp_img;
+        tmp_img = scaled_img;
+    }
+
+    if (rim->opacity_ == kOpacityMasked && mip)
+    {
+        if (mip_requested)
+            LogWarning("Image [%s] is masked: ignoring MIP\n", rim->name_.c_str());
+
+        mip = false;
+    }
+
+    *upload_flags = (clamp ? kUploadClamp : 0) | (mip ? kUploadMipMap : 0) | (smooth ? kUploadSmooth : 0) |
+                    ((rim->opacity_ == kOpacityMasked) ? kUploadThresh : 0);
 
     if (what_pal_cached)
         delete[] what_palette;
 
+    return tmp_img;
+}
+
+static GLuint LoadImageOGL(Image *rim)
+{
+    int max_pix = IM_PixelLimit();
+
+    int upload_flags = 0;
+
+    ImageData *tmp_img = BuildImageData(rim, max_pix, &upload_flags);
+
+    GLuint tex_id = UploadTexture(tmp_img, upload_flags, max_pix);
+
+    delete tmp_img;
+
     return tex_id;
+}
+
+ImageData *LoadAtlasImageData(Image *rim, bool *smooth)
+{
+    int max_pix = IM_PixelLimit();
+
+    int upload_flags = 0;
+
+    ImageData *img = BuildImageData(rim, max_pix, &upload_flags);
+
+    if (!(upload_flags & kUploadClamp) || (upload_flags & kUploadMipMap) || rim->is_sky_ ||
+        img->width_ * img->height_ > max_pix)
+    {
+        delete img;
+        return nullptr;
+    }
+
+    if (img->depth_ == 3)
+        img->SetAlpha(255);
+
+    *smooth = (upload_flags & kUploadSmooth) ? true : false;
+
+    return img;
 }
 
 //----------------------------------------------------------------------------
@@ -1674,18 +1646,18 @@ const Image *ImageForHomDetect(void)
     return dummy_hom[(hud_tic & 0x10) ? 1 : 0];
 }
 
-const Image *ImageForFogWall(RGBAColor fog_color)
+const Image *ImageForFogWall(void)
 {
-    std::string fogname = epi::StringFormat("FOGWALL_%d", fog_color);
-    Image      *fogwall = (Image *)ImageLookup(fogname.c_str(), kImageNamespaceGraphic, kImageLookupNull);
+    Image *fogwall = (Image *)ImageLookup("FOGWALL", kImageNamespaceGraphic, kImageLookupNull);
     if (fogwall)
         return fogwall;
     ImageDefinition *fogdef = new ImageDefinition;
-    fogdef->colour_         = fog_color;
-    fogdef->name_           = fogname;
+    fogdef->colour_         = kRGBAWhite;
+    fogdef->name_           = "FOGWALL";
     fogdef->type_           = kImageDataColor;
     fogdef->belong_         = kImageNamespaceGraphic;
     fogwall                 = AddImageUser(fogdef);
+    fogwall->opacity_       = kOpacityComplex;
     return fogwall;
 }
 
@@ -1793,7 +1765,7 @@ void ImageMakeSaveString(const Image *image, char *type, char *namebuf)
 //  IMAGE USAGE
 //
 
-static CachedImage *ImageCacheOGL(Image *rim, const Colormap *trans, bool do_whiten)
+static CachedImage *ImageCacheOGL(Image *rim)
 {
     // check if image + translation is already cached
 
@@ -1811,21 +1783,7 @@ static CachedImage *ImageCacheOGL(Image *rim, const Colormap *trans, bool do_whi
             continue;
         }
 
-        if (do_whiten && rc->is_whitened)
-            break;
-
-        if (rc->translation_map == trans)
-        {
-            if (do_whiten)
-            {
-                if (rc->is_whitened)
-                    break;
-            }
-            else if (!rc->is_whitened)
-                break;
-        }
-
-        rc = nullptr;
+        break;
     }
 
     if (!rc)
@@ -1834,10 +1792,8 @@ static CachedImage *ImageCacheOGL(Image *rim, const Colormap *trans, bool do_whi
         rc = new CachedImage;
 
         rc->parent          = rim;
-        rc->translation_map = trans;
         rc->hue             = kRGBANoValue;
         rc->texture_id      = 0;
-        rc->is_whitened     = do_whiten ? true : false;
 
         image_cache.push_back(rc);
 
@@ -1849,23 +1805,10 @@ static CachedImage *ImageCacheOGL(Image *rim, const Colormap *trans, bool do_whi
 
     EPI_ASSERT(rc);
 
-    if (rim->liquid_type_ > kLiquidImageNone &&
-        (swirling_flats == kLiquidSwirlSmmu || swirling_flats == kLiquidSwirlSmmuSlosh))
-    {
-        if (!erraticism_active && !time_stop_active && rim->swirled_game_tic_ != hud_tic)
-        {
-            if (rc->texture_id != 0)
-            {
-                render_state->DeleteTexture(&rc->texture_id);
-                rc->texture_id = 0;
-            }
-        }
-    }
-
     if (rc->texture_id == 0)
     {
         // load image into cache
-        rc->texture_id = LoadImageOGL(rim, trans, do_whiten);
+        rc->texture_id = LoadImageOGL(rim);
     }
 
     return rc;
@@ -1875,7 +1818,7 @@ static CachedImage *ImageCacheOGL(Image *rim, const Colormap *trans, bool do_whi
 // The top-level routine for caching in an image.  Mainly just a
 // switch to more specialised routines.
 //
-GLuint ImageCache(const Image *image, bool anim, const Colormap *trans, bool do_whiten)
+GLuint ImageCache(const Image *image, bool anim)
 {
     // Intentional Const Override
     Image *rim = (Image *)image;
@@ -1887,10 +1830,7 @@ GLuint ImageCache(const Image *image, bool anim, const Colormap *trans, bool do_
             rim = rim->animation_.current;
     }
 
-    if (rim->grayscale_)
-        do_whiten = true;
-
-    CachedImage *rc = ImageCacheOGL(rim, trans, do_whiten);
+    CachedImage *rc = ImageCacheOGL(rim);
 
     EPI_ASSERT(rc->parent);
 
@@ -1976,10 +1916,13 @@ bool InitializeImages(void)
     else if (FindArgument("smoothing") > 0)
         image_smoothing = 1;
 
+    if (image_upscaling != 0)
+        image_upscaling = 1;
+
     if (FindArgument("hqscale") > 0 || FindArgument("hqall") > 0)
-        hq2x_scaling = 3;
+        image_upscaling = 1;
     else if (FindArgument("nohqscale") > 0)
-        hq2x_scaling = 0;
+        image_upscaling = 0;
 
     W_CreateDummyImages();
 
@@ -2006,6 +1949,8 @@ void AnimationTicker(void)
 
 void DeleteAllImages(bool shutdown)
 {
+    AtlasClear();
+
     std::list<CachedImage *>::iterator CI;
 
     for (CI = image_cache.begin(); CI != image_cache.end(); CI++)
@@ -2022,11 +1967,11 @@ void DeleteAllImages(bool shutdown)
 
     DeleteSkyTextures();
     DeleteColourmapTextures();
+    ResetColorLookups();
 
     // Delete images that should otherwise persist for the program lifetime
     if (shutdown)
     {
-        DeleteAllLightImages();
         for (Font *font : hud_fonts)
         {
             if (font->definition_->type_ == kFontTypeTrueType)
@@ -2038,10 +1983,6 @@ void DeleteAllImages(bool shutdown)
                     {
                         render_state->DeleteTexture(&ttf->truetype_texture_id_[i]);
                     }
-                    if (ttf->truetype_smoothed_texture_id_[i])
-                    {
-                        render_state->DeleteTexture(&ttf->truetype_smoothed_texture_id_[i]);
-                    }
                 }
             }
             else if (font->definition_->type_ == kFontTypePatch)
@@ -2049,12 +1990,6 @@ void DeleteAllImages(bool shutdown)
                 PatchFont *pat = (PatchFont *)font;
                 if (pat->patch_font_cache_.atlas_texture_id)
                     render_state->DeleteTexture(&pat->patch_font_cache_.atlas_texture_id);
-                if (pat->patch_font_cache_.atlas_smoothed_texture_id)
-                    render_state->DeleteTexture(&pat->patch_font_cache_.atlas_smoothed_texture_id);
-                if (pat->patch_font_cache_.atlas_whitened_texture_id)
-                    render_state->DeleteTexture(&pat->patch_font_cache_.atlas_whitened_texture_id);
-                if (pat->patch_font_cache_.atlas_whitened_smoothed_texture_id)
-                    render_state->DeleteTexture(&pat->patch_font_cache_.atlas_whitened_smoothed_texture_id);
             }
         }
         for (ImageMap::iterator iter = real_graphics.begin(), iter_end = real_graphics.end(); iter != iter_end; ++iter)
@@ -2063,14 +1998,6 @@ void DeleteAllImages(bool shutdown)
             {
                 if (im->source_graphic_.packfile_name)
                     free(im->source_graphic_.packfile_name);
-                if (im->blurred_version_)
-                {
-                    for (CachedImage *cim : im->blurred_version_->cache_)
-                    {
-                        delete cim;
-                    }
-                    delete im->blurred_version_;
-                }
                 for (CachedImage *cim : im->cache_)
                 {
                     delete cim;
@@ -2084,14 +2011,6 @@ void DeleteAllImages(bool shutdown)
             {
                 if (im->source_graphic_.packfile_name)
                     free(im->source_graphic_.packfile_name);
-                if (im->blurred_version_)
-                {
-                    for (CachedImage *cim : im->blurred_version_->cache_)
-                    {
-                        delete cim;
-                    }
-                    delete im->blurred_version_;
-                }
                 for (CachedImage *cim : im->cache_)
                 {
                     delete cim;
@@ -2105,14 +2024,6 @@ void DeleteAllImages(bool shutdown)
             {
                 if (im->source_graphic_.packfile_name)
                     free(im->source_graphic_.packfile_name);
-                if (im->blurred_version_)
-                {
-                    for (CachedImage *cim : im->blurred_version_->cache_)
-                    {
-                        delete cim;
-                    }
-                    delete im->blurred_version_;
-                }
                 for (CachedImage *cim : im->cache_)
                 {
                     delete cim;
@@ -2126,14 +2037,6 @@ void DeleteAllImages(bool shutdown)
             {
                 if (im->source_graphic_.packfile_name)
                     free(im->source_graphic_.packfile_name);
-                if (im->blurred_version_)
-                {
-                    for (CachedImage *cim : im->blurred_version_->cache_)
-                    {
-                        delete cim;
-                    }
-                    delete im->blurred_version_;
-                }
                 for (CachedImage *cim : im->cache_)
                 {
                     delete cim;

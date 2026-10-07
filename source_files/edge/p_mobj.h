@@ -49,7 +49,6 @@ class Player;
 struct RADScript;
 struct RegionProperties;
 struct State;
-struct Subsector;
 struct TouchNode;
 struct Line;
 
@@ -213,7 +212,7 @@ class MapObject : public Position
     float phase_ = 0.0f;
 
     // current subsector
-    struct Subsector *subsector_ = nullptr;
+    struct Sector *sector_ = nullptr;
 
     // properties from extrafloor the thing is in
     struct RegionProperties *region_properties_ = nullptr;
@@ -369,6 +368,14 @@ class MapObject : public Position
     // touch list: sectors this thing is in or touches
     struct TouchNode *touch_sectors_ = nullptr;
 
+    uint64_t render_hash_           = 0;
+    uint64_t render_look_hash_      = 0;
+    int      render_quiet_tics_     = 0;
+    int      render_dynamic_index_  = -1;
+    int      render_resident_batch_ = -1;
+    int      render_resident_slot_  = -1;
+    bool     render_candidate_      = false;
+
     // linked list (map_object_list_head)
     MapObject *next_     = nullptr;
     MapObject *previous_ = nullptr;
@@ -379,8 +386,8 @@ class MapObject : public Position
     MapObject *blockmap_previous_ = nullptr;
 
     // More list: links in subsector (if needed)
-    MapObject *subsector_next_     = nullptr;
-    MapObject *subsector_previous_ = nullptr;
+    MapObject *sector_next_     = nullptr;
+    MapObject *sector_previous_ = nullptr;
 
     // One more: link in dynamic light blockmap
     MapObject *dynamic_light_next_     = nullptr;

@@ -29,6 +29,7 @@
 #include "r_defs.h"
 
 class AbstractShader;
+struct SpriteLightTable;
 
 void InitializePalette(void);
 
@@ -55,10 +56,27 @@ void TranslatePalette(uint8_t *new_pal, const uint8_t *old_pal, const Colormap *
 
 void GetColormapRGB(const Colormap *colmap, float *r, float *g, float *b);
 
+constexpr int kColorLookupSize    = 64;
+constexpr int kColorLookupMaximum = 32;
+
+extern int render_unit_color_lookup;
+
+int  ColorLookupForColormap(const Colormap *colmap);
+void ResetColorLookups(void);
+bool ColormapTintFactors(const Colormap *colmap, float *r, float *g, float *b);
+
 RGBAColor GetFontColor(const Colormap *colmap);
 RGBAColor ParseFontColor(const char *name, bool strict = false);
 
 AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add = 0, Sector *sec = nullptr);
+
+const SpriteLightTable *GetSpriteLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                            int *light_level);
+
+const SpriteLightTable *GetModelLightTable(const struct RegionProperties *props, int light_add, Sector *sec,
+                                           int *light_level);
+
+float WeaponModelLightDepth(const MapObject *mo);
 
 // colour indices from palette
 extern int playpal_black, playpal_white, playpal_gray;

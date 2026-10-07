@@ -240,30 +240,6 @@ PatchFont::PatchFont(FontDefinition *definition)
                                  GL_UNSIGNED_BYTE, atlas->data_->pixels_);
         render_state->FinishTextures(1, &patch_font_cache_.atlas_texture_id);
 
-        render_state->GenTextures(1, &patch_font_cache_.atlas_smoothed_texture_id);
-        render_state->BindTexture(patch_font_cache_.atlas_smoothed_texture_id);
-        render_state->TextureMinFilter(GL_LINEAR);
-        render_state->TextureMagFilter(GL_LINEAR);
-        render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas->data_->width_, atlas->data_->height_, 0, GL_RGBA,
-                                 GL_UNSIGNED_BYTE, atlas->data_->pixels_);
-        render_state->FinishTextures(1, &patch_font_cache_.atlas_smoothed_texture_id);
-
-        atlas->data_->Whiten();
-        render_state->GenTextures(1, &patch_font_cache_.atlas_whitened_texture_id);
-        render_state->BindTexture(patch_font_cache_.atlas_whitened_texture_id);
-        render_state->TextureMinFilter(GL_NEAREST);
-        render_state->TextureMagFilter(GL_NEAREST);
-        render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas->data_->width_, atlas->data_->height_, 0, GL_RGBA,
-                                 GL_UNSIGNED_BYTE, atlas->data_->pixels_);
-        render_state->FinishTextures(1, &patch_font_cache_.atlas_whitened_texture_id);
-
-        render_state->GenTextures(1, &patch_font_cache_.atlas_whitened_smoothed_texture_id);
-        render_state->BindTexture(patch_font_cache_.atlas_whitened_smoothed_texture_id);
-        render_state->TextureMinFilter(GL_LINEAR);
-        render_state->TextureMagFilter(GL_LINEAR);
-        render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas->data_->width_, atlas->data_->height_, 0, GL_RGBA,
-                                 GL_UNSIGNED_BYTE, atlas->data_->pixels_);
-        render_state->FinishTextures(1, &patch_font_cache_.atlas_whitened_smoothed_texture_id);
         delete atlas;
     }
     else
@@ -311,7 +287,6 @@ TTFFont::TTFFont(FontDefinition *definition)
     EPI_CLEAR_MEMORY(truetype_kerning_scale_, float, 3);
     EPI_CLEAR_MEMORY(truetype_reference_yshift_, float, 3);
     EPI_CLEAR_MEMORY(truetype_texture_id_, unsigned int, 3);
-    EPI_CLEAR_MEMORY(truetype_smoothed_texture_id_, unsigned int, 3);
 
     if (definition_->truetype_name_.empty())
     {
@@ -431,14 +406,6 @@ TTFFont::TTFFont(FontDefinition *definition)
         render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap_size, bitmap_size, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                                  font_bitmap);
         render_state->FinishTextures(1, &truetype_texture_id_[i]);
-
-        render_state->GenTextures(1, &truetype_smoothed_texture_id_[i]);
-        render_state->BindTexture(truetype_smoothed_texture_id_[i]);
-        render_state->TextureMinFilter(GL_LINEAR);
-        render_state->TextureMagFilter(GL_LINEAR);
-        render_state->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap_size, bitmap_size, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                                 font_bitmap);
-        render_state->FinishTextures(1, &truetype_smoothed_texture_id_[i]);
 
         delete[] temp_bitmap;
         delete[] font_bitmap;

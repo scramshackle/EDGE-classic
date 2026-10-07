@@ -2917,15 +2917,15 @@ void MenuDrawer(void)
         (option_menu_on || network_game_menu_on ||
          (current_menu->draw_function == MenuDrawLoad || current_menu->draw_function == MenuDrawSave)))
     {
+        HUDSetImageWhiten(true);
         if (title_scaling.d_) // Fill Border
         {
-            if (!menu_backdrop->blurred_version_)
-                StoreBlurredImage(menu_backdrop);
-            HUDStretchImage(-320, -200, 960, 600, menu_backdrop->blurred_version_, 0, 0);
+            HUDStretchImageBlurred(-320, -200, 960, 600, menu_backdrop);
         }
         else
             HUDSolidBox(-320, -200, 960, 600, 0);
         HUDDrawImageTitleWS(menu_backdrop);
+        HUDSetImageWhiten(false);
     }
 
     // Horiz. & Vertically center string and print it.

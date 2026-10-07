@@ -172,20 +172,19 @@ static Force *NewForce(void)
 void AddPointForce(Sector *sec, float length)
 {
     // search for the point objects
-    for (Subsector *sub = sec->subsectors; sub; sub = sub->sector_next)
-        for (MapObject *mo = sub->thing_list; mo; mo = mo->subsector_next_)
-            if (mo->hyper_flags_ & kHyperFlagPointForce)
-            {
-                Force *f = NewForce();
+    for (MapObject *mo = sec->thing_list; mo; mo = mo->sector_next_)
+        if (mo->hyper_flags_ & kHyperFlagPointForce)
+        {
+            Force *f = NewForce();
 
-                f->is_point  = true;
-                f->point.X   = mo->x;
-                f->point.Y   = mo->y;
-                f->point.Z   = mo->z;
-                f->radius    = length * 2.0f;
-                f->magnitude = length * mo->info_->speed_ / kPushFactor;
-                f->sector    = sec;
-            }
+            f->is_point  = true;
+            f->point.X   = mo->x;
+            f->point.Y   = mo->y;
+            f->point.Z   = mo->z;
+            f->radius    = length * 2.0f;
+            f->magnitude = length * mo->info_->speed_ / kPushFactor;
+            f->sector    = sec;
+        }
 }
 
 void AddSectorForce(Sector *sec, bool is_wind, float x_mag, float y_mag)

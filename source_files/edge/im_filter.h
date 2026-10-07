@@ -38,19 +38,7 @@
 
 #include "im_data.h"
 
-ImageData *ImageBlur(ImageData *image, float sigma);
-
-void HQ2xPaletteSetup(const uint8_t *palette, int transparent_pixel);
-// initialises look-up tables based on the given palette.
-// The 'trans_pixel' gives a pixel index which is fully
-// transparent, or none when -1.
-
-ImageData *ImageHQ2x(ImageData *image, bool solid, bool invert = false);
-// converts a single palettised image into an RGB or RGBA
-// image (depending on the solid parameter).  The Setup()
-// method must be called sometime prior to calling this
-// function, and this determines the palette of the input
-// image.
+ImageData *ImageEPX(const ImageData *image, bool wrap);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

@@ -25,9 +25,6 @@
 
 #include "epi_str_hash.h"
 
-// Indicate a leaf.
-constexpr uint32_t kLeafSubsector = (uint32_t)(1 << 31);
-
 /* ----- The wad structures ---------------------- */
 
 // wad header
