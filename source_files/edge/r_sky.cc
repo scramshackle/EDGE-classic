@@ -18,6 +18,7 @@
 
 #include "r_sky.h"
 
+#include <algorithm>
 #include <float.h>
 #include <math.h>
 
@@ -268,8 +269,25 @@ struct SkySpan
     float         view_z_maximum;
     bool          is_wall;
     bool          live;
+    bool          entry_needed;
+    int           varying_slot;
+    int           cell;
 
     const LineSide *facing_side;
+};
+
+struct SkyRun
+{
+    int start;
+    int count;
+};
+
+struct SkyCell
+{
+    float bounds[4] = {0, 0, 0, 0};
+
+    std::vector<SkyRun> fixed_runs;
+    std::vector<int>    varying_spans;
 };
 
 struct SkySpanReference
@@ -291,6 +309,12 @@ struct SkySection
 
     uint32_t gpu_handle = 0;
     bool     gpu_dirty  = false;
+
+    std::vector<SkyCell> cells;
+    SkyCell              loose;
+    float                fixed_view_z_low  = 0.0f;
+    float                fixed_view_z_high = 0.0f;
+    bool                 runs_dirty        = true;
 
     bool used = false;
 };
@@ -364,6 +388,15 @@ static int sky_capture_dependency_count = 0;
 
 static uint32_t sky_resident_generation = 0;
 
+static std::vector<uint8_t>      sky_entry_tracked;
+static std::vector<int>          sky_entry_light;
+static std::vector<const Image *> sky_entry_image;
+static std::vector<MapSurface *> sky_entry_ref;
+static std::vector<uint8_t>      sky_entry_flipped;
+static std::vector<int>          sky_entry_sectors;
+static std::vector<uint8_t>      sky_entry_dirty_flag;
+static std::vector<int>          sky_entry_dirty;
+
 uint32_t SkyResidentGeneration(void)
 {
     return sky_resident_generation;
@@ -385,7 +418,45 @@ static void SkyResidentReset(void)
     sky_wall_baked.assign((size_t)total_level_lines * 2 * kSkyWallParts * kHeightKeyTotal, 0);
     sky_sector_spans.assign((size_t)total_level_sectors, std::vector<SkySpanReference>());
 
+    sky_entry_tracked.assign((size_t)total_level_sectors, 0);
+    sky_entry_light.assign((size_t)total_level_sectors, 0);
+    sky_entry_image.assign((size_t)total_level_sectors, nullptr);
+    sky_entry_ref.assign((size_t)total_level_sectors, nullptr);
+    sky_entry_flipped.assign((size_t)total_level_sectors, 0);
+    sky_entry_dirty_flag.assign((size_t)total_level_sectors, 0);
+    sky_entry_sectors.clear();
+    sky_entry_dirty.clear();
+
     sky_capture_active = false;
+}
+
+static void SkyEntryTrack(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index >= sky_entry_tracked.size() || sky_entry_tracked[index])
+        return;
+
+    sky_entry_tracked[index] = 1;
+    sky_entry_light[index]   = sec->properties.light_level;
+    sky_entry_image[index]   = sec->sky_image;
+    sky_entry_ref[index]     = sec->sky_ref;
+    sky_entry_flipped[index] = sec->sky_flipped ? 1 : 0;
+
+    sky_entry_sectors.push_back((int)index);
+}
+
+void SkyEntryNoteSectorChanged(int index)
+{
+    if (index < 0 || (size_t)index >= sky_entry_dirty_flag.size() || sky_entry_dirty_flag[(size_t)index])
+        return;
+
+    sky_entry_dirty_flag[(size_t)index] = 1;
+
+    sky_entry_dirty.push_back(index);
 }
 
 static void SkyAddCaptureDependency(const Sector *sec)
@@ -471,8 +542,21 @@ static void SkyCaptureEnd(void)
     span.is_wall        = sky_capture_is_wall;
     span.live           = true;
     span.facing_side    = sky_capture_facing_side;
+    span.entry_needed   = false;
+    span.varying_slot   = -1;
+    span.cell           = -1;
+
+    if (span.facing_side)
+    {
+        span.entry_needed = SkyEntryClipNeeded(span.facing_side->back_sector, span.facing_side->front_sector);
+
+        SkyEntryTrack(span.facing_side->front_sector);
+        SkyEntryTrack(span.facing_side->back_sector);
+    }
 
     section.spans.push_back(span);
+
+    section.runs_dirty = true;
 
     SkySpanReference reference;
 
@@ -518,6 +602,8 @@ void SkyResidentInvalidateSector(Sector *sec)
 
         span.live = false;
 
+        section.runs_dirty = true;
+
         if (span.flag_slot < 0)
             continue;
 
@@ -534,17 +620,14 @@ void SkyResidentInvalidateSector(Sector *sec)
     refs.clear();
 }
 
-static bool SkyEntryClipLive(const LineSide *line_side)
+static bool SkyEntryFacesView(const LineSide *line_side)
 {
     float x1 = line_side->vertex_1->X;
     float y1 = line_side->vertex_1->Y;
     float x2 = line_side->vertex_2->X;
     float y2 = line_side->vertex_2->Y;
 
-    if ((view_x - x1) * (y2 - y1) - (view_y - y1) * (x2 - x1) <= 0.0f)
-        return false;
-
-    return SkyEntryClipNeeded(line_side->back_sector, line_side->front_sector);
+    return (view_x - x1) * (y2 - y1) - (view_y - y1) * (x2 - x1) > 0.0f;
 }
 
 static void PushSkyVertex(int section, const HMM_Vec3 &position)
@@ -616,6 +699,405 @@ void BeginSky(void)
     }
 }
 
+static bool SkySpanHeightVaries(const SkySpan &span)
+{
+    return (span.height_front && span.height_front->height_sector) ||
+           (span.height_back && span.height_back->height_sector);
+}
+
+static bool SkySpanWantsVarying(const SkySpan &span)
+{
+    if (!span.live)
+        return false;
+
+    if (span.facing_side)
+        return span.entry_needed;
+
+    return SkySpanHeightVaries(span);
+}
+
+static bool SkySpanVisible(const SkySpan &span)
+{
+    if (!span.live)
+        return false;
+
+    if (span.height_key != SkyHeightKey(span.height_front, span.height_back))
+        return false;
+
+    if (view_z <= span.view_z_minimum || view_z >= span.view_z_maximum)
+        return false;
+
+    if (span.facing_side && !(span.entry_needed && SkyEntryFacesView(span.facing_side)))
+        return false;
+
+    return true;
+}
+
+static void AppendSkyRun(std::vector<SkyRun> &runs, int start, int count)
+{
+    if (!runs.empty())
+    {
+        SkyRun &last = runs.back();
+
+        if (last.start + last.count == start && (size_t)(last.count + count) <= kMaximumSkyRun)
+        {
+            last.count += count;
+            return;
+        }
+    }
+
+    runs.push_back(SkyRun{start, count});
+}
+
+static std::vector<SkyRun> sky_fixed_frame_runs;
+static std::vector<SkyRun> sky_varying_runs;
+
+static SkyCell &SkySpanCell(SkySection &section, const SkySpan &span)
+{
+    if (span.cell >= 0 && (size_t)span.cell < section.cells.size())
+        return section.cells[(size_t)span.cell];
+
+    return section.loose;
+}
+
+static void SkyUpdateVaryingMembership(SkySection &section, int span_index)
+{
+    SkySpan &span = section.spans[(size_t)span_index];
+    SkyCell &cell = SkySpanCell(section, span);
+
+    bool want = SkySpanWantsVarying(span);
+
+    if (want && span.varying_slot < 0)
+    {
+        span.varying_slot = (int)cell.varying_spans.size();
+        cell.varying_spans.push_back(span_index);
+    }
+    else if (!want && span.varying_slot >= 0)
+    {
+        int last = cell.varying_spans.back();
+
+        cell.varying_spans[(size_t)span.varying_slot] = last;
+        section.spans[(size_t)last].varying_slot      = span.varying_slot;
+        cell.varying_spans.pop_back();
+
+        span.varying_slot = -1;
+    }
+}
+
+static constexpr float kSkyCellSize = 1024.0f;
+
+void SkyResidentOrganize(void)
+{
+    for (size_t s = 0; s < sky_sections.size(); s++)
+    {
+        SkySection &section = sky_sections[s];
+
+        size_t total = section.spans.size();
+
+        if (total == 0)
+            continue;
+
+        std::vector<float> span_bounds(total * 4);
+
+        float origin_x = FLT_MAX;
+        float origin_y = FLT_MAX;
+        float limit_x  = -FLT_MAX;
+
+        for (size_t k = 0; k < total; k++)
+        {
+            const SkySpan &span = section.spans[k];
+
+            float *b = &span_bounds[k * 4];
+
+            b[0] = FLT_MAX;
+            b[1] = FLT_MAX;
+            b[2] = -FLT_MAX;
+            b[3] = -FLT_MAX;
+
+            for (int v = span.start; v < span.start + span.count; v++)
+            {
+                const HMM_Vec3 &p = section.resident_vertices[(size_t)v].position;
+
+                b[0] = HMM_MIN(b[0], p.X);
+                b[1] = HMM_MIN(b[1], p.Y);
+                b[2] = HMM_MAX(b[2], p.X);
+                b[3] = HMM_MAX(b[3], p.Y);
+            }
+
+            origin_x = HMM_MIN(origin_x, b[0]);
+            origin_y = HMM_MIN(origin_y, b[1]);
+            limit_x  = HMM_MAX(limit_x, b[2]);
+        }
+
+        int64_t columns = (int64_t)((limit_x - origin_x) / kSkyCellSize) + 1;
+
+        std::vector<int64_t> keys(total);
+
+        for (size_t k = 0; k < total; k++)
+        {
+            const float *b = &span_bounds[k * 4];
+
+            int64_t column = (int64_t)(((b[0] + b[2]) * 0.5f - origin_x) / kSkyCellSize);
+            int64_t row    = (int64_t)(((b[1] + b[3]) * 0.5f - origin_y) / kSkyCellSize);
+
+            keys[k] = row * columns + column;
+        }
+
+        std::vector<int> order(total);
+
+        for (size_t k = 0; k < total; k++)
+            order[k] = (int)k;
+
+        std::stable_sort(order.begin(), order.end(), [&keys](int a, int b) { return keys[(size_t)a] < keys[(size_t)b]; });
+
+        std::vector<RendererVertex> vertices;
+        std::vector<SkySpan>        spans;
+        std::vector<int>            remap(total);
+
+        vertices.reserve(section.resident_vertices.size());
+        spans.reserve(total);
+
+        section.cells.clear();
+
+        int64_t current_key = 0;
+
+        for (size_t i = 0; i < total; i++)
+        {
+            int      old  = order[i];
+            SkySpan  span = section.spans[(size_t)old];
+            const float *b = &span_bounds[(size_t)old * 4];
+
+            if (section.cells.empty() || keys[(size_t)old] != current_key)
+            {
+                current_key = keys[(size_t)old];
+
+                SkyCell cell;
+
+                cell.bounds[0] = b[0];
+                cell.bounds[1] = b[1];
+                cell.bounds[2] = b[2];
+                cell.bounds[3] = b[3];
+
+                section.cells.push_back(cell);
+            }
+            else
+            {
+                SkyCell &cell = section.cells.back();
+
+                cell.bounds[0] = HMM_MIN(cell.bounds[0], b[0]);
+                cell.bounds[1] = HMM_MIN(cell.bounds[1], b[1]);
+                cell.bounds[2] = HMM_MAX(cell.bounds[2], b[2]);
+                cell.bounds[3] = HMM_MAX(cell.bounds[3], b[3]);
+            }
+
+            int start = (int)vertices.size();
+
+            vertices.insert(vertices.end(), section.resident_vertices.begin() + span.start,
+                            section.resident_vertices.begin() + span.start + span.count);
+
+            span.start        = start;
+            span.cell         = (int)section.cells.size() - 1;
+            span.varying_slot = -1;
+
+            remap[(size_t)old] = (int)spans.size();
+
+            spans.push_back(span);
+        }
+
+        section.resident_vertices.swap(vertices);
+        section.spans.swap(spans);
+
+        section.gpu_dirty  = true;
+        section.runs_dirty = true;
+
+        for (size_t i = 0; i < sky_sector_spans.size(); i++)
+        {
+            std::vector<SkySpanReference> &refs = sky_sector_spans[i];
+
+            for (size_t r = 0; r < refs.size(); r++)
+            {
+                if (refs[r].section == (int)s)
+                    refs[r].span = remap[(size_t)refs[r].span];
+            }
+        }
+    }
+}
+
+struct SkyViewWedge
+{
+    float apex_x;
+    float apex_y;
+    float left_x;
+    float left_y;
+    float left_sign;
+    float right_x;
+    float right_y;
+    float right_sign;
+};
+
+static bool SkyComputeViewWedge(SkyViewWedge *wedge)
+{
+    if (draw_culling.d_ || clip_scope >= kBAMAngle180)
+        return false;
+
+    float forward = epi::RadiansFromBAM(view_angle);
+    float left    = epi::RadiansFromBAM(view_angle + clip_left);
+    float right   = epi::RadiansFromBAM(view_angle + clip_right);
+
+    float forward_x = cosf(forward);
+    float forward_y = sinf(forward);
+
+    wedge->apex_x  = view_x - 32.0f * forward_x;
+    wedge->apex_y  = view_y - 32.0f * forward_y;
+    wedge->left_x  = cosf(left);
+    wedge->left_y  = sinf(left);
+    wedge->right_x = cosf(right);
+    wedge->right_y = sinf(right);
+
+    wedge->left_sign  = wedge->left_x * forward_y - wedge->left_y * forward_x;
+    wedge->right_sign = wedge->right_x * forward_y - wedge->right_y * forward_x;
+
+    return true;
+}
+
+static bool SkyBoundsOutsideEdge(const float *bounds, float apex_x, float apex_y, float edge_x, float edge_y, float sign)
+{
+    for (int corner = 0; corner < 4; corner++)
+    {
+        float x = bounds[(corner & 1) ? 2 : 0] - apex_x;
+        float y = bounds[(corner & 2) ? 3 : 1] - apex_y;
+
+        if ((edge_x * y - edge_y * x) * sign >= 0.0f)
+            return false;
+    }
+
+    return true;
+}
+
+static bool SkyCellVisible(const SkyCell &cell, const SkyViewWedge &wedge)
+{
+    if (SkyBoundsOutsideEdge(cell.bounds, wedge.apex_x, wedge.apex_y, wedge.left_x, wedge.left_y, wedge.left_sign))
+        return false;
+
+    if (SkyBoundsOutsideEdge(cell.bounds, wedge.apex_x, wedge.apex_y, wedge.right_x, wedge.right_y, wedge.right_sign))
+        return false;
+
+    return true;
+}
+
+static void SkyRefreshEntryClips(void)
+{
+    for (size_t i = 0; i < sky_entry_sectors.size(); i++)
+    {
+        size_t        index = (size_t)sky_entry_sectors[i];
+        const Sector *sec   = level_sectors + index;
+
+        uint8_t flipped = sec->sky_flipped ? 1 : 0;
+
+        if (sec->properties.light_level == sky_entry_light[index] && sec->sky_image == sky_entry_image[index] &&
+            sec->sky_ref == sky_entry_ref[index] && flipped == sky_entry_flipped[index])
+        {
+            continue;
+        }
+
+        sky_entry_light[index]   = sec->properties.light_level;
+        sky_entry_image[index]   = sec->sky_image;
+        sky_entry_ref[index]     = sec->sky_ref;
+        sky_entry_flipped[index] = flipped;
+
+        SkyEntryNoteSectorChanged((int)index);
+    }
+
+    for (size_t i = 0; i < sky_entry_dirty.size(); i++)
+    {
+        size_t index = (size_t)sky_entry_dirty[i];
+
+        sky_entry_dirty_flag[index] = 0;
+
+        if (index >= sky_sector_spans.size())
+            continue;
+
+        const std::vector<SkySpanReference> &refs = sky_sector_spans[index];
+
+        for (size_t r = 0; r < refs.size(); r++)
+        {
+            SkySection &section = sky_sections[(size_t)refs[r].section];
+            SkySpan    &span    = section.spans[(size_t)refs[r].span];
+
+            if (!span.live || !span.facing_side)
+                continue;
+
+            bool needed = SkyEntryClipNeeded(span.facing_side->back_sector, span.facing_side->front_sector);
+
+            if (needed == span.entry_needed)
+                continue;
+
+            span.entry_needed = needed;
+
+            if (!section.runs_dirty)
+                SkyUpdateVaryingMembership(section, refs[r].span);
+        }
+    }
+
+    sky_entry_dirty.clear();
+}
+
+static void RebuildSkyRuns(SkySection &section)
+{
+    for (size_t c = 0; c < section.cells.size(); c++)
+    {
+        section.cells[c].fixed_runs.clear();
+        section.cells[c].varying_spans.clear();
+    }
+
+    section.loose.fixed_runs.clear();
+    section.loose.varying_spans.clear();
+
+    float low  = -FLT_MAX;
+    float high = FLT_MAX;
+
+    for (size_t k = 0; k < section.spans.size(); k++)
+    {
+        SkySpan &span = section.spans[k];
+        SkyCell &cell = SkySpanCell(section, span);
+
+        span.varying_slot = -1;
+
+        if (!span.live)
+            continue;
+
+        if (span.facing_side || SkySpanHeightVaries(span))
+        {
+            if (SkySpanWantsVarying(span))
+            {
+                span.varying_slot = (int)cell.varying_spans.size();
+                cell.varying_spans.push_back((int)k);
+            }
+
+            continue;
+        }
+
+        if (span.view_z_minimum <= view_z)
+            low = HMM_MAX(low, span.view_z_minimum);
+        else
+            high = HMM_MIN(high, span.view_z_minimum);
+
+        if (span.view_z_maximum <= view_z)
+            low = HMM_MAX(low, span.view_z_maximum);
+        else
+            high = HMM_MIN(high, span.view_z_maximum);
+
+        if (view_z <= span.view_z_minimum || view_z >= span.view_z_maximum)
+            continue;
+
+        AppendSkyRun(cell.fixed_runs, span.start, span.count);
+    }
+
+    section.fixed_view_z_low  = low;
+    section.fixed_view_z_high = high;
+    section.runs_dirty        = false;
+}
+
 static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingMode blend,
                             RGBAColor fog_color, float fog_density, const SkyPassInfo *sky_pass_info)
 {
@@ -660,52 +1142,44 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
 
         if (resident.gpu_handle)
         {
-            int run_start = -1;
-            int run_end   = -1;
+            if (resident.runs_dirty || !(view_z > resident.fixed_view_z_low && view_z < resident.fixed_view_z_high))
+                RebuildSkyRuns(resident);
 
-            for (size_t k = 0; k <= resident.spans.size(); k++)
+            sky_fixed_frame_runs.clear();
+            sky_varying_runs.clear();
+
+            SkyViewWedge wedge;
+
+            bool cull = SkyComputeViewWedge(&wedge);
+
+            for (size_t c = 0; c <= resident.cells.size(); c++)
             {
-                bool live = (k < resident.spans.size()) && resident.spans[k].live;
+                const SkyCell &cell = (c < resident.cells.size()) ? resident.cells[c] : resident.loose;
 
-                if (live && resident.spans[k].height_key !=
-                                SkyHeightKey(resident.spans[k].height_front, resident.spans[k].height_back))
-                {
-                    live = false;
-                }
-
-                if (live && (view_z <= resident.spans[k].view_z_minimum || view_z >= resident.spans[k].view_z_maximum))
-                {
-                    live = false;
-                }
-
-                if (live && resident.spans[k].facing_side && !SkyEntryClipLive(resident.spans[k].facing_side))
-                {
-                    live = false;
-                }
-
-                bool contiguous = live && run_start >= 0 && resident.spans[k].start == run_end &&
-                                  (size_t)(run_end + resident.spans[k].count - run_start) <= kMaximumSkyRun;
-
-                if (contiguous)
-                {
-                    run_end += resident.spans[k].count;
+                if (cull && c < resident.cells.size() && !SkyCellVisible(cell, wedge))
                     continue;
-                }
 
-                if (run_start >= 0)
+                for (size_t r = 0; r < cell.fixed_runs.size(); r++)
+                    AppendSkyRun(sky_fixed_frame_runs, cell.fixed_runs[r].start, cell.fixed_runs[r].count);
+
+                for (size_t v = 0; v < cell.varying_spans.size(); v++)
                 {
-                    AddStaticRenderUnit(resident.gpu_handle, GL_TRIANGLES, run_start, run_end - run_start,
-                                        GL_MODULATE, texture, (GLuint)kTextureEnvironmentDisable, 0, 0, blend,
-                                        fog_color, fog_density, sky_pass_info);
+                    const SkySpan &span = resident.spans[(size_t)cell.varying_spans[v]];
 
-                    run_start = -1;
-                    run_end   = -1;
+                    if (SkySpanVisible(span))
+                        AppendSkyRun(sky_varying_runs, span.start, span.count);
                 }
+            }
 
-                if (live)
+            for (int pass = 0; pass < 2; pass++)
+            {
+                const std::vector<SkyRun> &runs = (pass == 0) ? sky_fixed_frame_runs : sky_varying_runs;
+
+                for (size_t r = 0; r < runs.size(); r++)
                 {
-                    run_start = resident.spans[k].start;
-                    run_end   = resident.spans[k].start + resident.spans[k].count;
+                    AddStaticRenderUnit(resident.gpu_handle, GL_TRIANGLES, runs[r].start, runs[r].count, GL_MODULATE,
+                                        texture, (GLuint)kTextureEnvironmentDisable, 0, 0, blend, fog_color,
+                                        fog_density, sky_pass_info);
                 }
             }
         }
@@ -946,6 +1420,8 @@ void FinishSky(bool use_depth_mask)
 
     if (!need_to_draw_sky)
         return;
+
+    SkyRefreshEntryClips();
 
     if (draw_culling.d_)
         render_state->Disable(GL_DEPTH_TEST);

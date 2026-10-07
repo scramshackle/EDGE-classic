@@ -86,6 +86,8 @@ MapObject *view_camera_map_object;
 
 ViewHeightZone view_height_zone;
 
+static bool sky_bake_all = false;
+
 static void EmitSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, int part, DrawMirror *mir,
                         bool resident)
 {
@@ -445,12 +447,12 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
 {
     if (!sector->height_sector)
     {
-        if (EDGE_IMAGE_IS_SKY(sector->floor) && view_z > sector->interpolated_floor_height)
+        if (EDGE_IMAGE_IS_SKY(sector->floor) && (sky_bake_all || view_z > sector->interpolated_floor_height))
         {
             EmitSkyPlane(sector, sector->interpolated_floor_height, sector, 1, mir, resident);
         }
 
-        if (EDGE_IMAGE_IS_SKY(sector->ceiling) && view_z < sector->sky_height)
+        if (EDGE_IMAGE_IS_SKY(sector->ceiling) && (sky_bake_all || view_z < sector->sky_height))
         {
             EmitSkyPlane(sector, sector->sky_height, sector, 0, mir, resident);
         }
@@ -480,12 +482,12 @@ void SkyDecideSector(Sector *sector, DrawMirror *mir, bool resident)
         floor_h = sector->height_sector->interpolated_floor_height;
     }
 
-    if (EDGE_IMAGE_IS_SKY(*floor_s) && view_z > floor_h)
+    if (EDGE_IMAGE_IS_SKY(*floor_s) && (sky_bake_all || view_z > floor_h))
     {
         EmitSkyPlane(sector, floor_h, sector->height_sector, 1, mir, resident);
     }
 
-    if (EDGE_IMAGE_IS_SKY(*ceil_s) && view_z < sector->sky_height)
+    if (EDGE_IMAGE_IS_SKY(*ceil_s) && (sky_bake_all || view_z < sector->sky_height))
     {
         EmitSkyPlane(sector, sector->sky_height, sector->height_sector, 0, mir, resident);
     }
@@ -660,16 +662,28 @@ static int32_t SkyFindTallerNeighbour(const Sector *sector)
     return found;
 }
 
+static void SkySetTallerNeighbour(size_t index, int32_t value)
+{
+    if (sky_taller_neighbour[index] == value)
+        return;
+
+    sky_taller_neighbour[index] = value;
+
+    SkyEntryNoteSectorChanged((int)index);
+}
+
 static void SkyRefreshTallerNeighbours(const std::vector<int> &changed, bool everything)
 {
     if (everything || sky_taller_base != level_sectors ||
         sky_taller_neighbour.size() != (size_t)total_level_sectors)
     {
+        if (sky_taller_base != level_sectors || sky_taller_neighbour.size() != (size_t)total_level_sectors)
+            sky_taller_neighbour.assign((size_t)total_level_sectors, kSkyTallerNone);
+
         sky_taller_base = level_sectors;
-        sky_taller_neighbour.resize((size_t)total_level_sectors);
 
         for (int i = 0; i < total_level_sectors; i++)
-            sky_taller_neighbour[(size_t)i] = SkyFindTallerNeighbour(level_sectors + i);
+            SkySetTallerNeighbour((size_t)i, SkyFindTallerNeighbour(level_sectors + i));
 
         return;
     }
@@ -681,7 +695,7 @@ static void SkyRefreshTallerNeighbours(const std::vector<int> &changed, bool eve
 
         const Sector *sector = level_sectors + changed[c];
 
-        sky_taller_neighbour[(size_t)changed[c]] = SkyFindTallerNeighbour(sector);
+        SkySetTallerNeighbour((size_t)changed[c], SkyFindTallerNeighbour(sector));
 
         for (int i = 0; i < sector->line_count; i++)
         {
@@ -691,7 +705,7 @@ static void SkyRefreshTallerNeighbours(const std::vector<int> &changed, bool eve
             for (int k = 0; k < 2; k++)
             {
                 if (sides[k] && sides[k] != sector)
-                    sky_taller_neighbour[(size_t)(sides[k] - level_sectors)] = SkyFindTallerNeighbour(sides[k]);
+                    SkySetTallerNeighbour((size_t)(sides[k] - level_sectors), SkyFindTallerNeighbour(sides[k]));
             }
         }
     }
@@ -960,7 +974,7 @@ static bool SkyRunSectorCandidate(size_t c)
 
     SkyDecideSector(sector, nullptr, true);
 
-    if (ready && SkySectorPlanesReachable(sector))
+    if (ready && (sky_bake_all || SkySectorPlanesReachable(sector)))
         sky_sector_done[c] = stamp;
 
     return false;
@@ -1014,12 +1028,8 @@ static void SkyCompactSector(int index)
     sky_sector_pending_count[(size_t)index] = keep;
 }
 
-void EnumerateViewSky(void)
+static void SkyTakeChangedSectors(void)
 {
-    EDGE_ZoneScoped;
-
-    RefreshSkyCandidates();
-
     if (StaticTakeChangedSectors(sky_changed_sectors))
     {
         SkyListEverything();
@@ -1032,6 +1042,94 @@ void EnumerateViewSky(void)
 
         SkyRefreshTallerNeighbours(sky_changed_sectors, false);
     }
+}
+
+static void SkyBakeHeightZones(const Sector *height_owner, Sector *sector, LineSide *line_side)
+{
+    if (!height_owner || !height_owner->height_sector)
+        return;
+
+    const Sector *height_sector = height_owner->height_sector;
+
+    for (int pass = 0; pass < 2; pass++)
+    {
+        if (pass == 0)
+        {
+            view_height_zone = kHeightZoneA;
+            view_z           = height_sector->interpolated_ceiling_height + 1.0f;
+        }
+        else
+        {
+            view_height_zone = kHeightZoneC;
+            view_z           = height_sector->interpolated_floor_height - 1.0f;
+        }
+
+        if (sector)
+            SkyDecideSector(sector, nullptr, true);
+        else
+            SkyDecideLineSide(line_side, nullptr, true);
+    }
+}
+
+void BakeStaticSky(void)
+{
+    if (total_level_sectors <= 0)
+        return;
+
+    RefreshSkyCandidates();
+
+    SkyTakeChangedSectors();
+
+    float          saved_view_z = view_z;
+    ViewHeightZone saved_zone   = view_height_zone;
+
+    view_height_zone = kHeightZoneNone;
+    sky_bake_all     = true;
+
+    for (size_t c = 0; c < sky_sector_candidates.size(); c++)
+        SkyRunSectorCandidate(c);
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+        SkyRunLineSideCandidate(c);
+
+    for (size_t c = 0; c < sky_sector_candidates.size(); c++)
+    {
+        Sector *sector = &level_sectors[sky_sector_candidates[c]];
+
+        SkyBakeHeightZones(sector, sector, nullptr);
+    }
+
+    for (size_t c = 0; c < sky_line_side_candidates.size(); c++)
+    {
+        const SkyLineCandidate &candidate = sky_line_side_candidates[c];
+
+        LineSide     *line_side = &level_line_sides[candidate.line_side];
+        const Sector *front     = level_sectors + candidate.front;
+        const Sector *back      = (candidate.back >= 0) ? level_sectors + candidate.back : nullptr;
+
+        SkyBakeHeightZones(front, nullptr, line_side);
+
+        if (back && back->height_sector != front->height_sector)
+            SkyBakeHeightZones(back, nullptr, line_side);
+    }
+
+    sky_bake_all     = false;
+    view_height_zone = saved_zone;
+    view_z           = saved_view_z;
+
+    for (int i = 0; i < total_level_sectors; i++)
+        SkyCompactSector(i);
+
+    SkyResidentOrganize();
+}
+
+void EnumerateViewSky(void)
+{
+    EDGE_ZoneScoped;
+
+    RefreshSkyCandidates();
+
+    SkyTakeChangedSectors();
 
     bool any_skipped = false;
 

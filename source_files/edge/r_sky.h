@@ -82,6 +82,10 @@ void SkyNoteResidentVisible(void);
 
 bool SkyWallBakeable(const LineSide *line_side, const Sector *sky_owner);
 
+void SkyEntryNoteSectorChanged(int index);
+
+void SkyResidentOrganize(void);
+
 bool SkyEntryClipNeeded(const Sector *entered, const Sector *from);
 
 //--- editor settings ---

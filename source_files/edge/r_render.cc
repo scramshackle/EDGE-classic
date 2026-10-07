@@ -1761,6 +1761,12 @@ void BakeStaticLevel(void)
 
     LogPrint("Static bake: %d sectors in %llu us, %d batches, %d spans, %d vertices\n", total_level_sectors,
              (unsigned long long)(GetMicroseconds() - mark), batches, live_spans, vertices);
+
+    mark = GetMicroseconds();
+
+    BakeStaticSky();
+
+    LogPrint("Sky bake: %llu us\n", (unsigned long long)(GetMicroseconds() - mark));
 }
 
 static void RenderSector(DrawSector *dsector)

@@ -10,6 +10,7 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
                       std::list<DrawMirror *> &dmirrors, bool for_mirror = false);
 
 void EnumerateViewSky(void);
+void BakeStaticSky(void);
 
 void EnumerateViewMirrors(void);
 void EnumerateViewSectors(void);
