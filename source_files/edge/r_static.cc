@@ -420,6 +420,8 @@ bool StaticBakeDeferred(void)
 
 static std::vector<uint8_t>  sector_bake_clean;
 static std::vector<uint8_t>  sector_bake_pending;
+static std::vector<uint8_t>  sector_bake_whole_declined;
+static std::vector<uint8_t>  line_side_bake_declined;
 static std::vector<uint32_t> sector_bake_epoch;
 static std::vector<int>     sector_pending_list;
 static std::vector<uint8_t>  sector_change_flag;
@@ -457,6 +459,22 @@ void StaticBakeSectorBegin(const Sector *sec)
     if (index < sector_bake_clean.size())
         sector_bake_clean[index] = 1;
 
+    if (index < sector_bake_whole_declined.size())
+        sector_bake_whole_declined[index] = 0;
+
+    for (int i = 0; i < sec->line_count; i++)
+    {
+        const Line *line = sec->lines[i];
+
+        for (int side = 0; side < 2; side++)
+        {
+            size_t slot = (size_t)(line - level_lines) * 2 + (size_t)side;
+
+            if (slot < line_side_bake_declined.size() && level_line_sides[slot].front_sector == sec)
+                line_side_bake_declined[slot] = 0;
+        }
+    }
+
     NoteSectorChange(index);
 }
 
@@ -481,6 +499,39 @@ void StaticMarkSectorDeclined(const Sector *sec)
         sector_bake_clean[index] = 0;
 
     NoteSectorChange(index);
+}
+
+void StaticMarkLineSideDeclined(const LineSide *line_side, const Sector *sec)
+{
+    if (line_side)
+    {
+        size_t slot = (size_t)(line_side - level_line_sides);
+
+        if (slot < line_side_bake_declined.size())
+            line_side_bake_declined[slot] = 1;
+    }
+    else if (sec)
+    {
+        size_t index = (size_t)(sec - level_sectors);
+
+        if (index < sector_bake_whole_declined.size())
+            sector_bake_whole_declined[index] = 1;
+    }
+
+    StaticMarkSectorDeclined(sec);
+}
+
+void StaticMarkSectorWholeDeclined(const Sector *sec)
+{
+    if (!sec)
+        return;
+
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (index < sector_bake_whole_declined.size())
+        sector_bake_whole_declined[index] = 1;
+
+    StaticMarkSectorDeclined(sec);
 }
 
 void StaticMarkSectorPending(const Sector *sec)
@@ -520,6 +571,23 @@ bool StaticSectorSettled(const Sector *sec)
         return false;
 
     return !sector_bake_pending[index];
+}
+
+bool StaticSectorPartlyReady(const Sector *sec)
+{
+    size_t index = (size_t)(sec - level_sectors);
+
+    if (!static_mesh_built || index >= sector_bake_whole_declined.size())
+        return false;
+
+    return !sector_bake_pending[index] && !sector_bake_whole_declined[index];
+}
+
+bool StaticLineSideDeclined(const LineSide *line_side)
+{
+    size_t slot = (size_t)(line_side - level_line_sides);
+
+    return slot >= line_side_bake_declined.size() || line_side_bake_declined[slot] != 0;
 }
 
 uint32_t StaticSectorEpoch(const Sector *sec)
@@ -1642,6 +1710,8 @@ void BuildStaticMesh(void)
 
     sector_bake_clean.assign((size_t)total_level_sectors, 0);
     sector_bake_pending.assign((size_t)total_level_sectors, 0);
+    sector_bake_whole_declined.assign((size_t)total_level_sectors, 0);
+    line_side_bake_declined.assign((size_t)total_level_lines * 2, 0);
     sector_bake_epoch.assign((size_t)total_level_sectors, 0);
     sector_pending_list.clear();
     sector_change_flag.assign((size_t)total_level_sectors, 0);
@@ -1677,6 +1747,8 @@ void DestroyStaticMesh(void)
     static_sector_changes.clear();
     sector_bake_clean.clear();
     sector_bake_pending.clear();
+    sector_bake_whole_declined.clear();
+    line_side_bake_declined.clear();
     sector_bake_epoch.clear();
     sector_pending_list.clear();
     sector_change_flag.clear();

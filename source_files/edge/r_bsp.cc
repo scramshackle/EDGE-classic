@@ -1352,7 +1352,7 @@ static void BuildSectorFloors(DrawSector *K, Sector *sector)
     K->floors[K->floors.size() - 1]->is_highest = true;
 }
 
-static void VisitSector(Sector *sector)
+static void VisitSector(Sector *sector, bool declined_only)
 {
     if (draw_culling.d_ && SectorBeyondFarClip(sector))
         return;
@@ -1376,7 +1376,8 @@ static void VisitSector(Sector *sector)
         {
             LineSide *line_side = &level_line_sides[(line - level_lines) * 2 + side];
 
-            if (line_side->sidedef && line_side->front_sector == sector)
+            if (line_side->sidedef && line_side->front_sector == sector &&
+                (!declined_only || StaticLineSideDeclined(line_side)))
                 VisitLineSide(K, line_side);
         }
     }
@@ -1492,25 +1493,128 @@ static void BuildViewGrid(void)
 
     view_grid_starts.assign((size_t)view_grid_width * view_grid_height + 1, 0);
 
-    for (int pass = 0; pass < 2; pass++)
+    std::vector<int>   footprint_starts((size_t)total_level_sectors + 1, 0);
+    std::vector<int>   footprint_cells;
+    std::vector<int>   cell_stamp((size_t)view_grid_width * view_grid_height, 0);
+    std::vector<float> crossings;
+
+    for (int i = 0; i < total_level_sectors; i++)
     {
-        std::vector<int> cursor;
+        footprint_starts[(size_t)i] = (int)footprint_cells.size();
 
-        if (pass == 1)
+        const float *box = &bounds[(size_t)i * 4];
+
+        if (box[0] > box[2])
+            continue;
+
+        const Sector *sec   = level_sectors + i;
+        int           stamp = i + 1;
+        size_t        first = footprint_cells.size();
+
+        for (int k = 0; k < sec->line_count; k++)
         {
-            for (size_t i = 1; i < view_grid_starts.size(); i++)
-                view_grid_starts[i] += view_grid_starts[i - 1];
+            const Line *ld = sec->lines[k];
 
-            view_grid_sectors.assign((size_t)view_grid_starts.back(), 0);
-            cursor.assign(view_grid_starts.begin(), view_grid_starts.end() - 1);
+            float lx1 = ld->vertex_1->X;
+            float ly1 = ld->vertex_1->Y;
+            float lx2 = ld->vertex_2->X;
+            float ly2 = ld->vertex_2->Y;
+
+            int x0 = (int)((HMM_MIN(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
+            int y0 = (int)((HMM_MIN(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
+            int x1 = (int)((HMM_MAX(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
+            int y1 = (int)((HMM_MAX(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
+
+            float dx = lx2 - lx1;
+            float dy = ly2 - ly1;
+
+            for (int y = y0; y <= y1; y++)
+            {
+                for (int x = x0; x <= x1; x++)
+                {
+                    float cx0 = view_grid_origin_x + x * view_grid_cell - 1.0f;
+                    float cy0 = view_grid_origin_y + y * view_grid_cell - 1.0f;
+                    float cx1 = cx0 + view_grid_cell + 2.0f;
+                    float cy1 = cy0 + view_grid_cell + 2.0f;
+
+                    float d00 = (cx0 - lx1) * dy - (cy0 - ly1) * dx;
+                    float d10 = (cx1 - lx1) * dy - (cy0 - ly1) * dx;
+                    float d01 = (cx0 - lx1) * dy - (cy1 - ly1) * dx;
+                    float d11 = (cx1 - lx1) * dy - (cy1 - ly1) * dx;
+
+                    if ((d00 > 0 && d10 > 0 && d01 > 0 && d11 > 0) || (d00 < 0 && d10 < 0 && d01 < 0 && d11 < 0))
+                        continue;
+
+                    int cell = y * view_grid_width + x;
+
+                    if (cell_stamp[(size_t)cell] == stamp)
+                        continue;
+
+                    cell_stamp[(size_t)cell] = stamp;
+                    footprint_cells.push_back(cell);
+                }
+            }
         }
 
-        for (int i = 0; i < total_level_sectors; i++)
-        {
-            const float *box = &bounds[(size_t)i * 4];
+        bool closed = true;
 
-            if (box[0] > box[2])
-                continue;
+        int row_low  = (int)((box[1] - view_grid_origin_y) / view_grid_cell);
+        int row_high = (int)((box[3] - view_grid_origin_y) / view_grid_cell);
+
+        for (int y = row_low; y <= row_high && closed; y++)
+        {
+            float center_y = view_grid_origin_y + (y + 0.5f) * view_grid_cell;
+
+            crossings.clear();
+
+            for (int k = 0; k < sec->line_count; k++)
+            {
+                const Line *ld = sec->lines[k];
+
+                if (ld->front_sector == ld->back_sector)
+                    continue;
+
+                float ly1 = ld->vertex_1->Y;
+                float ly2 = ld->vertex_2->Y;
+
+                if ((ly1 <= center_y) == (ly2 <= center_y))
+                    continue;
+
+                float lx1 = ld->vertex_1->X;
+                float lx2 = ld->vertex_2->X;
+
+                crossings.push_back(lx1 + (center_y - ly1) * (lx2 - lx1) / (ly2 - ly1));
+            }
+
+            if (crossings.size() & 1)
+            {
+                closed = false;
+                break;
+            }
+
+            std::sort(crossings.begin(), crossings.end());
+
+            for (size_t k = 0; k + 1 < crossings.size(); k += 2)
+            {
+                int x0 = HMM_MAX(0, (int)((crossings[k] - view_grid_origin_x) / view_grid_cell));
+                int x1 = HMM_MIN(view_grid_width - 1, (int)((crossings[k + 1] - view_grid_origin_x) / view_grid_cell));
+
+                for (int x = x0; x <= x1; x++)
+                {
+                    int cell = y * view_grid_width + x;
+
+                    if (cell_stamp[(size_t)cell] == stamp)
+                        continue;
+
+                    cell_stamp[(size_t)cell] = stamp;
+                    footprint_cells.push_back(cell);
+                }
+            }
+        }
+
+        if (!closed)
+        {
+            footprint_cells.resize(first);
 
             int x0 = (int)((box[0] - view_grid_origin_x) / view_grid_cell);
             int y0 = (int)((box[1] - view_grid_origin_y) / view_grid_cell);
@@ -1520,16 +1624,27 @@ static void BuildViewGrid(void)
             for (int y = y0; y <= y1; y++)
             {
                 for (int x = x0; x <= x1; x++)
-                {
-                    size_t cell = (size_t)y * view_grid_width + x;
-
-                    if (pass == 0)
-                        view_grid_starts[cell + 1]++;
-                    else
-                        view_grid_sectors[(size_t)cursor[cell]++] = i;
-                }
+                    footprint_cells.push_back(y * view_grid_width + x);
             }
         }
+    }
+
+    footprint_starts[(size_t)total_level_sectors] = (int)footprint_cells.size();
+
+    for (size_t k = 0; k < footprint_cells.size(); k++)
+        view_grid_starts[(size_t)footprint_cells[k] + 1]++;
+
+    for (size_t i = 1; i < view_grid_starts.size(); i++)
+        view_grid_starts[i] += view_grid_starts[i - 1];
+
+    view_grid_sectors.assign((size_t)view_grid_starts.back(), 0);
+
+    std::vector<int> cursor(view_grid_starts.begin(), view_grid_starts.end() - 1);
+
+    for (int i = 0; i < total_level_sectors; i++)
+    {
+        for (int k = footprint_starts[(size_t)i]; k < footprint_starts[(size_t)i + 1]; k++)
+            view_grid_sectors[(size_t)cursor[(size_t)footprint_cells[(size_t)k]]++] = i;
     }
 }
 
@@ -1664,7 +1779,7 @@ static void GridViewSectors(void)
                 sector_reach_list.push_back(index);
 
                 if (!StaticSectorReady(level_sectors + index))
-                    VisitSector(level_sectors + index);
+                    VisitSector(level_sectors + index, StaticSectorPartlyReady(level_sectors + index));
             }
         }
     }
@@ -1837,7 +1952,7 @@ void EnumerateViewSectors(void)
             sector_reach_list.push_back(i);
 
         if (!StaticSectorReady(&level_sectors[i]))
-            VisitSector(&level_sectors[i]);
+            VisitSector(&level_sectors[i], StaticSectorPartlyReady(&level_sectors[i]));
     }
 
     if (active_mirror_set.TotalActive() == 0)

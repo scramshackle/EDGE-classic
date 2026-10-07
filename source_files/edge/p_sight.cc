@@ -113,8 +113,9 @@ static inline void AddSightIntercept(float frac, Sector *sec)
 
 struct SightCrossing
 {
-    float along;
-    Line *line;
+    float   along;
+    Line   *line;
+    Sector *front;
 };
 
 static std::vector<SightCrossing> sight_crossings;
@@ -122,6 +123,15 @@ static std::vector<SightCrossing> sight_crossings;
 static bool SightCrossingLess(const SightCrossing &a, const SightCrossing &b)
 {
     return a.along < b.along;
+}
+
+static void SightNoteSector(const Sector *sec)
+{
+    if (sec->extrafloor_used > 0)
+        sight_check.saw_extrafloors = true;
+
+    if (sec->floor_vertex_slope || sec->ceiling_vertex_slope)
+        sight_check.saw_vertex_slopes = true;
 }
 
 static bool SightCollectLine(Line *ld, void *data)
@@ -165,87 +175,67 @@ static bool SightCollectLine(Line *ld, void *data)
     if (epi::AlmostEquals(along, 0.0f))
         return true;
 
-    sight_crossings.push_back(SightCrossing{along, ld});
+    // stop because it is not two sided anyway
+    if (!(ld->flags & kLineFlagTwoSided) || ld->blocked)
+        return false;
+
+    // line explicitly blocks sight ?  (XDoom compatibility)
+    if (ld->flags & kLineFlagSightBlock)
+        return false;
+
+    // -AJA- 2001/11/11: closed Sliding door ?
+    if (ld->slide_door && !ld->slide_door->s_.see_through_ && !ld->slider_move)
+        return false;
+
+    bool source_behind = s1 != 0;
+
+    Sector *front = source_behind ? ld->back_sector : ld->front_sector;
+    Sector *back  = source_behind ? ld->front_sector : ld->back_sector;
+
+    EPI_ASSERT(front && back);
+
+    SightNoteSector(front);
+    SightNoteSector(back);
+
+    if (!epi::AlmostEquals(front->floor_height, back->floor_height))
+    {
+        float openbottom = HMM_MAX(ld->front_sector->floor_height, ld->back_sector->floor_height);
+        float slope      = (openbottom - sight_check.source_z) / along;
+        if (slope > sight_check.bottom_slope)
+            sight_check.bottom_slope = slope;
+    }
+
+    if (!epi::AlmostEquals(front->ceiling_height, back->ceiling_height))
+    {
+        float opentop = HMM_MIN(ld->front_sector->ceiling_height, ld->back_sector->ceiling_height);
+        float slope   = (opentop - sight_check.source_z) / along;
+        if (slope < sight_check.top_slope)
+            sight_check.top_slope = slope;
+    }
+
+    // did our slope range close up ?
+    if (sight_check.top_slope <= sight_check.bottom_slope)
+        return false;
+
+    sight_crossings.push_back(SightCrossing{along, ld, front});
 
     return true;
-}
-
-static void SightNoteSector(const Sector *sec)
-{
-    if (sec->extrafloor_used > 0)
-        sight_check.saw_extrafloors = true;
-
-    if (sec->floor_vertex_slope || sec->ceiling_vertex_slope)
-        sight_check.saw_vertex_slopes = true;
 }
 
 static bool CheckSightLines(void)
 {
     sight_crossings.clear();
 
-    BlockmapSegmentLineIterator(sight_check.source.x, sight_check.source.y, sight_check.destination.X,
-                                sight_check.destination.Y, SightCollectLine);
+    SightNoteSector(sight_check.source_sector);
+
+    if (!BlockmapSegmentLineIterator(sight_check.source.x, sight_check.source.y, sight_check.destination.X,
+                                     sight_check.destination.Y, SightCollectLine))
+        return false;
 
     std::sort(sight_crossings.begin(), sight_crossings.end(), SightCrossingLess);
 
-    SightNoteSector(sight_check.source_sector);
-
     for (size_t i = 0; i < sight_crossings.size(); i++)
-    {
-        Line *ld    = sight_crossings[i].line;
-        float along = sight_crossings[i].along;
-
-        // stop because it is not two sided anyway
-        if (!(ld->flags & kLineFlagTwoSided) || ld->blocked)
-            return false;
-
-        // line explicitly blocks sight ?  (XDoom compatibility)
-        if (ld->flags & kLineFlagSightBlock)
-            return false;
-
-        // -AJA- 2001/11/11: closed Sliding door ?
-        if (ld->slide_door && !ld->slide_door->s_.see_through_ && !ld->slider_move)
-            return false;
-
-        DividingLine divl;
-
-        divl.x       = ld->vertex_1->X;
-        divl.y       = ld->vertex_1->Y;
-        divl.delta_x = ld->delta_x;
-        divl.delta_y = ld->delta_y;
-
-        bool source_behind = PointOnDividingLineSide(sight_check.source.x, sight_check.source.y, &divl) != 0;
-
-        Sector *front = source_behind ? ld->back_sector : ld->front_sector;
-        Sector *back  = source_behind ? ld->front_sector : ld->back_sector;
-
-        EPI_ASSERT(front && back);
-
-        SightNoteSector(front);
-        SightNoteSector(back);
-
-        if (!epi::AlmostEquals(front->floor_height, back->floor_height))
-        {
-            float openbottom = HMM_MAX(ld->front_sector->floor_height, ld->back_sector->floor_height);
-            float slope      = (openbottom - sight_check.source_z) / along;
-            if (slope > sight_check.bottom_slope)
-                sight_check.bottom_slope = slope;
-        }
-
-        if (!epi::AlmostEquals(front->ceiling_height, back->ceiling_height))
-        {
-            float opentop = HMM_MIN(ld->front_sector->ceiling_height, ld->back_sector->ceiling_height);
-            float slope   = (opentop - sight_check.source_z) / along;
-            if (slope < sight_check.top_slope)
-                sight_check.top_slope = slope;
-        }
-
-        // did our slope range close up ?
-        if (sight_check.top_slope <= sight_check.bottom_slope)
-            return false;
-
-        AddSightIntercept(along, front);
-    }
+        AddSightIntercept(sight_crossings[i].along, sight_crossings[i].front);
 
     SightNoteSector(sight_check.destination_sector);
 

@@ -515,7 +515,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
                                           current_surface_extrafloor);
 
     if (!capture && StaticBakeActive())
-        StaticMarkSectorDeclined(current_sector);
+        StaticMarkLineSideDeclined(current_line_side, current_sector);
 
     if (capture)
         StaticCaptureBegin(current_line_side, surf, image, props, current_sector, blending, lit_adjust, data.div.x,
@@ -1340,7 +1340,7 @@ static void RenderLineSide(DrawFloor *dfloor, LineSide *line_side)
 
         if (StaticBakeActive() && ((middle_empty && !sd->bottom.image && b_fh > f_fh) ||
                                    (!sd->top.image && b_ch < f_ch)))
-            StaticMarkSectorDeclined(current_sector);
+            StaticMarkLineSideDeclined(line_side, current_sector);
 
         // -AJA- 2004/04/21: Emulate Flat-Flooding TRICK
         if (!debug_hall_of_mirrors.d_ && solid_mode && dfloor->is_lowest && middle_empty && !sd->bottom.image &&
@@ -1651,7 +1651,7 @@ static void BakeSector(Sector *sector)
     StaticBakeSectorBegin(sector);
 
     if (sector->height_sector || sector->extrafloor_used > 0)
-        StaticMarkSectorDeclined(sector);
+        StaticMarkSectorWholeDeclined(sector);
 
     for (int i = 0; i < sector->line_count; i++)
     {
@@ -1667,10 +1667,10 @@ static void BakeSector(Sector *sector)
             Sector *back = line_side->back_sector;
 
             if (back && (back->height_sector || back->extrafloor_used > 0))
-                StaticMarkSectorDeclined(sector);
+                StaticMarkLineSideDeclined(line_side, sector);
 
             if (back && !SkyWallBakeable(line_side, sector))
-                StaticMarkSectorDeclined(sector);
+                StaticMarkLineSideDeclined(line_side, sector);
         }
     }
 
