@@ -59,8 +59,12 @@ if (EMSCRIPTEN)
 endif()
 
 # Set WIN32_WINNT to Windows 7 if using the new renderer
-if ((WIN32 OR MINGW) AND EDGE_SDL_GPU)
-  add_definitions(-D_WIN32_WINNT=0x601)
+if (WIN32)
+  if (EDGE_WINDOWS_XP)
+    add_definitions(-D_WIN32_WINNT=0x0501 -DWINVER=0x0501)
+  else()
+    add_definitions(-D_WIN32_WINNT=0x0601 -DWINVER=0x0601)
+  endif()
 endif()
 
 if(MSVC)
