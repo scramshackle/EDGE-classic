@@ -21,7 +21,6 @@
 #include <SDL3/SDL.h>
 
 #include <chrono>
-#include <thread>
 
 #include "con_main.h"
 #include "dm_defs.h"

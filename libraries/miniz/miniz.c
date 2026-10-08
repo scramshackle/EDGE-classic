@@ -3093,7 +3093,12 @@ static FILE *mz_fopen(const char *pFilename, const char *pMode)
     WCHAR *wFilename = mz_utf8z_to_widechar(pFilename);
     WCHAR *wMode = mz_utf8z_to_widechar(pMode);
     FILE *pFile = NULL;
+#if defined(__MINGW32__)
+    pFile = _wfopen(wFilename, wMode);
+    errno_t err = pFile ? 0 : errno;
+#else
     errno_t err = _wfopen_s(&pFile, wFilename, wMode);
+#endif
     free(wFilename);
     free(wMode);
     return err ? NULL : pFile;
@@ -3104,7 +3109,12 @@ static FILE *mz_freopen(const char *pPath, const char *pMode, FILE *pStream)
     WCHAR *wPath = mz_utf8z_to_widechar(pPath);
     WCHAR *wMode = mz_utf8z_to_widechar(pMode);
     FILE *pFile = NULL;
+#if defined(__MINGW32__)
+    pFile = _wfreopen(wPath, wMode, pStream);
+    errno_t err = pFile ? 0 : errno;
+#else
     errno_t err = _wfreopen_s(&pFile, wPath, wMode, pStream);
+#endif
     free(wPath);
     free(wMode);
     return err ? NULL : pFile;
