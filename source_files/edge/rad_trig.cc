@@ -828,7 +828,7 @@ void ScriptUpdateMonsterDeaths(MapObject *mo)
 
         for (trig = active_triggers; trig; trig = trig->next)
         {
-            for (auto tag : epi::SeparatedStringVector(mo->wait_until_dead_tags_, ','))
+            for (std::string tag : epi::SeparatedStringVector(mo->wait_until_dead_tags_, ','))
             {
                 if (trig->wud_tag == atoi(tag.c_str()))
                     trig->wud_count--;

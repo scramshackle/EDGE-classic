@@ -26,11 +26,7 @@
 #include "s_effect.h"
 
 extern epi::StringHash DDFCreateStringHash(std::string_view name);
-#ifdef __GNUC__
-[[noreturn]] extern void DDFError(const char *err, ...) __attribute__((format(printf, 1, 2)));
-#else
-[[noreturn]] extern void DDFError(const char *err, ...);
-#endif
+[[noreturn]] extern void DDFError(const char *err, ...) EPI_PRINTF_FORMAT(1, 2);
 
 namespace ddf
 {

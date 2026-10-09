@@ -100,7 +100,7 @@ void NormalizeLiquidSwirl(void)
 HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
 {
     if (!image || image->liquid_type_ == kLiquidImageNone || swirling_flats == kLiquidSwirlVanilla)
-        return {{0, 0, 0, 0}};
+        return {};
 
     float mode = 1.0f;
 
@@ -114,7 +114,7 @@ HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
     if (image->liquid_type_ == kLiquidImageThick)
         time *= 0.5f;
 
-    return {{mode, time, (float)image->width_, (float)image->height_}};
+    return HMM_V4(mode, time, (float)image->width_, (float)image->height_);
 }
 
 extern ImageData *ReadAsEpiBlock(Image *rim);
@@ -166,14 +166,14 @@ static Image *ImageContainerLookupInternal(ImageMap &bucket, const epi::StringHa
             return rim;
     }
 
-    auto f = bucket.find(name_hash);
+    ImageMap::iterator f = bucket.find(name_hash);
     if (f == bucket.end())
     {
         return nullptr;
     }
 
     // search backwards, we want newer image to override older ones
-    for (auto it = f->second.rbegin(); it != f->second.rend(); it++)
+    for (std::list<Image *>::reverse_iterator it = f->second.rbegin(); it != f->second.rend(); it++)
     {
         Image *rim = *it;
 
@@ -207,9 +207,9 @@ Image *ImageContainerLookup(ImageType image_type, const char *name, int source_t
 
 static void do_Animate(ImageMap &bucket)
 {
-    for (auto mitr = bucket.begin(); mitr != bucket.end(); mitr++)
+    for (ImageMap::iterator mitr = bucket.begin(); mitr != bucket.end(); mitr++)
     {
-        for (auto it = mitr->second.begin(); it != mitr->second.end(); it++)
+        for (std::list<Image *>::iterator it = mitr->second.begin(); it != mitr->second.end(); it++)
         {
             Image *rim = *it;
 
@@ -254,7 +254,7 @@ static std::list<CachedImage *> image_cache;
 static void AddImageToMap(ImageMap &map, const char *name, Image *image)
 {
     epi::StringHash name_hash = epi::StringHash::Create(name);
-    auto            result    = real_textures.find(name_hash);
+    ImageMap::iterator result    = real_textures.find(name_hash);
     if (result == real_textures.end())
     {
         map.emplace(std::make_pair(name_hash, std::list<Image *>()));
@@ -341,7 +341,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
     bool solid    = false;
 
     int  header_len = HMM_MIN((int)sizeof(header), packfile_len);
-    auto fmt        = DetectImageFormat(header, header_len, packfile_len);
+    ImageFormat fmt        = DetectImageFormat(header, header_len, packfile_len);
 
     if (fmt == kImageOther)
     {
@@ -482,7 +482,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
     bool solid    = false;
 
     int  header_len = HMM_MIN((int)sizeof(header), lump_len);
-    auto fmt        = DetectImageFormat(header, header_len, lump_len);
+    ImageFormat fmt        = DetectImageFormat(header, header_len, lump_len);
 
     if (fmt == kImageOther)
     {
@@ -1015,7 +1015,7 @@ void CreateUserImages(void)
 {
     LogPrint("Adding DDFIMAGE definitions...\n");
 
-    for (auto def : imagedefs)
+    for (ImageDefinition *def : imagedefs)
     {
         if (def == nullptr)
             continue;
@@ -1080,9 +1080,9 @@ const Image **GetUserSprites(int *count)
     // count number of user sprites
     (*count) = 0;
 
-    for (auto mitr = real_sprites.begin(); mitr != real_sprites.end(); mitr++)
+    for (ImageMap::iterator mitr = real_sprites.begin(); mitr != real_sprites.end(); mitr++)
     {
-        for (auto it = mitr->second.begin(); it != mitr->second.end(); it++)
+        for (std::list<Image *>::iterator it = mitr->second.begin(); it != mitr->second.end(); it++)
         {
             const Image *rim = *it;
 
@@ -1100,10 +1100,10 @@ const Image **GetUserSprites(int *count)
     const Image **array = new const Image *[*count];
     int           pos   = 0;
 
-    for (auto mitr = real_sprites.begin(); mitr != real_sprites.end(); mitr++)
+    for (ImageMap::iterator mitr = real_sprites.begin(); mitr != real_sprites.end(); mitr++)
     {
 
-        for (auto it = mitr->second.begin(); it != mitr->second.end(); it++)
+        for (std::list<Image *>::iterator it = mitr->second.begin(); it != mitr->second.end(); it++)
         {
             Image *rim = *it;
 
@@ -1438,7 +1438,7 @@ static const Image *BackupTexture(const char *tex_name, int flags)
         int checklump = CheckLumpNumberForName(tex_name);
         if (checkfile > -1 && checklump > -1)
         {
-            for (auto patch_lump : *GetPatchListForWAD(checkfile))
+            for (int patch_lump : *GetPatchListForWAD(checkfile))
             {
                 if (patch_lump == checklump)
                 {

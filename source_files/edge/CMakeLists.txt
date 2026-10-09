@@ -16,6 +16,7 @@ set (EDGE_SOURCE_FILES
   e_input.cc
   e_main.cc
   e_player.cc
+  edge_profiling.cc
   f_finale.cc
   f_interm.cc
   g_game.cc
@@ -198,8 +199,6 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ddf
   dr_libs
-  earcut
-  edge_tracy
   edgetracker
   epi
   ${SDL3_LIBRARIES}
@@ -228,7 +227,7 @@ elseif (NOT EMSCRIPTEN)
 endif()
 
 if (EDGE_PROFILING)
-  list (APPEND EDGE_LINK_LIBRARIES TracyClient)
+  list (APPEND EDGE_LINK_LIBRARIES remotery)
 endif()
 
 target_link_libraries(edge-classic PRIVATE ${EDGE_LINK_LIBRARIES})

@@ -27,7 +27,6 @@
 
 #include "deh_things.h"
 
-#include <ctype.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <string.h>

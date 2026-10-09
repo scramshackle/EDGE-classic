@@ -29,6 +29,7 @@
 #pragma once
 
 #include "con_var.h"
+#include "epi.h"
 
 //
 // MISC
@@ -57,13 +58,8 @@ void SaveDefaults(void);
 void TakeScreenshot(bool show_msg);
 void CreateSaveScreenshot(void);
 
-#ifdef __GNUC__
-void WarningOrError(const char *error, ...) __attribute__((format(printf, 1, 2)));
-void DebugOrError(const char *error, ...) __attribute__((format(printf, 1, 2)));
-#else
-void WarningOrError(const char *error, ...);
-void DebugOrError(const char *error, ...);
-#endif
+void WarningOrError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
+void DebugOrError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
 
 extern bool show_obituaries;
 

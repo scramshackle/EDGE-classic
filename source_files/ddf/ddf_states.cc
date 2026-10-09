@@ -769,7 +769,7 @@ void DDFStateGetFloat(const char *arg, State *cur_state)
 
     float *val_ptr = new float;
 
-    if (sscanf(arg, " %f ", val_ptr) != 1)
+    if (!epi::ScanFloat(arg, val_ptr))
         DDFError("DDFStateGetFloat: bad value: %s\n", arg);
 
     cur_state->action_par = val_ptr;
@@ -782,7 +782,7 @@ void DDFStateGetPercent(const char *arg, State *cur_state)
 
     float *val_ptr = new float;
 
-    if (sscanf(arg, " %f%% ", val_ptr) != 1 || (*val_ptr) < 0)
+    if (!epi::ScanFloat(arg, val_ptr) || (*val_ptr) < 0)
         DDFError("DDFStateGetPercent: Bad percentage: %s\n", arg);
 
     (*val_ptr) /= 100.0f;
@@ -1187,7 +1187,7 @@ void DDFStateGetAngle(const char *arg, State *cur_state)
 
     value = new BAMAngle;
 
-    if (sscanf(arg, " %f ", &tmp) != 1)
+    if (!epi::ScanFloat(arg, &tmp))
         DDFError("DDFStateGetAngle: bad value: %s\n", arg);
 
     *value = epi::BAMFromDegrees(tmp);
@@ -1204,7 +1204,7 @@ void DDFStateGetSlope(const char *arg, State *cur_state)
 
     value = new float;
 
-    if (sscanf(arg, " %f ", &tmp) != 1)
+    if (!epi::ScanFloat(arg, &tmp))
         DDFError("DDFStateGetSlope: bad value: %s\n", arg);
 
     if (tmp > +89.5f)

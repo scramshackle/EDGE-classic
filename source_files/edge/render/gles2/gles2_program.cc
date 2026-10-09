@@ -407,7 +407,8 @@ void Gles2Program::SetViewTint(float r, float g, float b)
     if (uniform_view_tint_ < 0)
         return;
 
-    if (shadow_view_tint_[0] == r && shadow_view_tint_[1] == g && shadow_view_tint_[2] == b)
+    if (epi::AlmostEquals(shadow_view_tint_[0], r) && epi::AlmostEquals(shadow_view_tint_[1], g) &&
+        epi::AlmostEquals(shadow_view_tint_[2], b))
         return;
 
     shadow_view_tint_[0] = r;

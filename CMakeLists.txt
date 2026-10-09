@@ -44,7 +44,7 @@ option(EDGE_SANITIZE "Enable code sanitizing" OFF)
 option(EDGE_SANITIZE_THREADS "Enable thread sanitizing (No-op with MSVC)" OFF)
 option(EDGE_SANITIZE_UB "Enable undefined behavior sanitizing (No-op with MSVC)" OFF)
 option(EDGE_EXTRA_CHECKS "Enable diagnostic checks/functions" OFF)
-option(EDGE_PROFILING "Enable Tracy profiler instrumentation" OFF)
+option(EDGE_PROFILING "Enable Remotery profiler instrumentation" OFF)
 
 include("${CMAKE_SOURCE_DIR}/cmake/EDGEClassic.cmake")
 

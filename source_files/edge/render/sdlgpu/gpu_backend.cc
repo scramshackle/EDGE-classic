@@ -211,9 +211,9 @@ class GpuRenderBackend : public RenderBackend
 
         gpu_device.SubmitFrame();
 
-        for (auto itr = on_frame_finished_.begin(); itr != on_frame_finished_.end(); itr++)
+        for (size_t i = 0; i < on_frame_finished_.size(); i++)
         {
-            (*itr)();
+            on_frame_finished_[i].function(on_frame_finished_[i].context);
         }
 
         on_frame_finished_.clear();
@@ -376,16 +376,16 @@ class GpuRenderBackend : public RenderBackend
         if (target_width < 1.0f || target_height < 1.0f)
             return;
 
-        float view_x      = (float)ScaleToRenderTargetX(view_window_x);
-        float view_y      = (float)ScaleToRenderTargetY(view_window_y);
-        float view_width  = (float)ScaleToRenderTargetX(view_window_width);
-        float view_height = (float)ScaleToRenderTargetY(view_window_height);
+        float target_view_x = (float)ScaleToRenderTargetX(view_window_x);
+        float target_view_y = (float)ScaleToRenderTargetY(view_window_y);
+        float view_width    = (float)ScaleToRenderTargetX(view_window_width);
+        float view_height   = (float)ScaleToRenderTargetY(view_window_height);
 
-        float u0 = view_x / target_width;
-        float u1 = (view_x + view_width) / target_width;
+        float u0 = target_view_x / target_width;
+        float u1 = (target_view_x + view_width) / target_width;
 
-        float v_top    = (target_height - view_y - view_height) / target_height;
-        float v_bottom = (target_height - view_y) / target_height;
+        float v_top    = (target_height - target_view_y - view_height) / target_height;
+        float v_bottom = (target_height - target_view_y) / target_height;
 
         gpu_immediate.SetPipelineState(kGpuPipelineBlend, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -404,7 +404,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.SetViewTint(1.0f, 1.0f, 1.0f);
         gpu_immediate.SetTextureOffset({{0.0f, 0.0f}});
         gpu_immediate.SetLightRowOffset(0.0f);
-        gpu_immediate.SetLiquid({{0.0f, 0.0f, 0.0f, 0.0f}});
+        gpu_immediate.SetLiquid(HMM_Vec4{});
         gpu_immediate.SetOitComposite(true);
 
         gpu_immediate.SetMultiTexture(accumulation->texture, accumulation->sampler, revealage->texture,

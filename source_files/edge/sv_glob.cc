@@ -47,7 +47,6 @@ static const char *SaveGlobalPutCheckCRC(void *storage);
 static const char *SaveGlobalPutLevelFlags(void *storage);
 static const char *SaveGlobalPutImage(void *storage);
 
-static SaveGlobals *current_global = nullptr;
 
 struct GlobalCommand
 {
@@ -442,7 +441,7 @@ SaveGlobals *SaveGlobalsLoad(void)
     if (strcmp(marker, "Glob") != 0 || !SavePushReadChunk("Glob"))
         return nullptr;
 
-    current_global = globs = SaveGlobalsNew();
+    globs = SaveGlobalsNew();
 
     // read through all the chunks, picking the bits we need
 
@@ -524,7 +523,6 @@ static void GlobalWriteWads(SaveGlobals *globs)
 
 void SaveGlobalsSave(SaveGlobals *globs)
 {
-    current_global = globs;
 
     SavePushWriteChunk("Glob");
 

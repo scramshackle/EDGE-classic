@@ -1039,8 +1039,9 @@ void A_MakeIntoCorpse(MapObject *mo)
 
     if (mo->tag_)
     {
-        auto mobjs = active_tagged_map_objects.equal_range(mo->tag_);
-        for (auto mobj = mobjs.first; mobj != mobjs.second;)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tagged_map_objects.equal_range(mo->tag_);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second;)
         {
             if (mobj->second == mo)
                 mobj = active_tagged_map_objects.erase(mobj);
@@ -1051,8 +1052,9 @@ void A_MakeIntoCorpse(MapObject *mo)
 
     if (mo->tid_)
     {
-        auto mobjs = active_tids.equal_range(mo->tid_);
-        for (auto mobj = mobjs.first; mobj != mobjs.second;)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tids.equal_range(mo->tid_);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second;)
         {
             if (mobj->second == mo)
                 mobj = active_tids.erase(mobj);

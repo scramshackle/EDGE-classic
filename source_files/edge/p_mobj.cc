@@ -1556,7 +1556,7 @@ static void P_MobjThinker(MapObject *mobj)
 
     if (!(mobj->player_ != NULL && mobj == mobj->player_->map_object_))
     {
-        mobj->interpolate_ = mobj->old_x_ == kInvalidPosition ? false : true;
+        mobj->interpolate_ = epi::AlmostEquals(mobj->old_x_, kInvalidPosition) ? false : true;
 
         // Store starting position for mobj interpolation.
         mobj->old_x_     = mobj->x;
@@ -2126,8 +2126,9 @@ void RemoveMapObject(MapObject *mo)
     //  was not triggering in the above function
     if (mo->tag_)
     {
-        auto mobjs = active_tagged_map_objects.equal_range(mo->tag_);
-        for (auto mobj = mobjs.first; mobj != mobjs.second;)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tagged_map_objects.equal_range(mo->tag_);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second;)
         {
             if (mobj->second == mo)
                 mobj = active_tagged_map_objects.erase(mobj);
@@ -2138,8 +2139,9 @@ void RemoveMapObject(MapObject *mo)
 
     if (mo->tid_)
     {
-        auto mobjs = active_tids.equal_range(mo->tid_);
-        for (auto mobj = mobjs.first; mobj != mobjs.second;)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tids.equal_range(mo->tid_);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second;)
         {
             if (mobj->second == mo)
                 mobj = active_tids.erase(mobj);

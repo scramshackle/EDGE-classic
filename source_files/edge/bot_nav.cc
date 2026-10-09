@@ -389,8 +389,8 @@ static void BotCreateLinks()
                     continue;
 
                 // compute length of link
-                auto p1 = area.get_middle();
-                auto p2 = nav_areas[dest_id].get_middle();
+                Position p1 = area.get_middle();
+                Position p2 = nav_areas[dest_id].get_middle();
 
                 float length = PointToDistance(p1.x, p1.y, p2.x, p2.y);
 
@@ -480,7 +480,7 @@ static float BotTraverseLinkCost(int cur, const nav_link_c &link, bool allow_doo
 
 static float BotEstimateH(int id)
 {
-    auto p  = nav_areas[id].get_middle();
+    Position p = nav_areas[id].get_middle();
 
     float dist = PointToDistance(p.x, p.y, nav_finish_mid.x, nav_finish_mid.y);
     float time = dist / kRunningSpeed;
@@ -607,7 +607,7 @@ static BotPath *BotStorePath(Position start, int start_id, Position finish, int 
         // for a lift, also store the place to ride the lift
         if (link->flags & kBotPathNodeLift)
         {
-            auto pos = nav_areas[link->dest_id].get_middle();
+            Position pos = nav_areas[link->dest_id].get_middle();
             path->nodes_.push_back(BotPathNode{pos, 0, nullptr});
         }
 

@@ -1062,8 +1062,11 @@ bool FindPackFile(PackFile *pack, const std::string &name)
     if (find_name != epi::GetFilename(find_name))
     {
         std::string find_comp = find_name;
-        auto        results   = pack->search_files_.equal_range(find_stem);
-        for (auto file = results.first; file != results.second; ++file)
+        std::pair<std::unordered_multimap<epi::StringHash, std::string>::iterator,
+                  std::unordered_multimap<epi::StringHash, std::string>::iterator>
+            results = pack->search_files_.equal_range(find_stem);
+        for (std::unordered_multimap<epi::StringHash, std::string>::iterator file = results.first;
+             file != results.second; ++file)
         {
             if (find_comp == file->second)
                 return true;
@@ -1073,7 +1076,7 @@ bool FindPackFile(PackFile *pack, const std::string &name)
     // Search only the root dir for this filename, return false if not present
     else if (root_only)
     {
-        for (auto file : pack->directories_[0].entries_)
+        for (PackEntry file : pack->directories_[0].entries_)
         {
             if (epi::StringCaseCompareASCII(file.name_, find_name) == 0)
                 return true;
@@ -1085,8 +1088,11 @@ bool FindPackFile(PackFile *pack, const std::string &name)
     // wouldn't be in the same pack
     else
     {
-        auto results = pack->search_files_.equal_range(find_stem);
-        for (auto file = results.first; file != results.second; ++file)
+        std::pair<std::unordered_multimap<epi::StringHash, std::string>::iterator,
+                  std::unordered_multimap<epi::StringHash, std::string>::iterator>
+            results = pack->search_files_.equal_range(find_stem);
+        for (std::unordered_multimap<epi::StringHash, std::string>::iterator file = results.first;
+             file != results.second; ++file)
         {
             if (epi::StringCaseCompareASCII(find_name, epi::GetFilename(file->second)) == 0)
                 return true;
@@ -1141,7 +1147,7 @@ epi::File *OpenPackFile(PackFile *pack, const std::string &name)
     // Search only the root dir for this filename, return nullptr if not present
     else if (root_only)
     {
-        for (auto file : pack->directories_[0].entries_)
+        for (PackEntry file : pack->directories_[0].entries_)
         {
             if (epi::StringCaseCompareASCII(file.pack_path_, open_name) == 0)
                 return pack->OpenEntryByName(open_name);
@@ -1153,8 +1159,11 @@ epi::File *OpenPackFile(PackFile *pack, const std::string &name)
     // wouldn't be in the same pack
     else
     {
-        auto results = pack->search_files_.equal_range(open_stem);
-        for (auto file = results.first; file != results.second; ++file)
+        std::pair<std::unordered_multimap<epi::StringHash, std::string>::iterator,
+                  std::unordered_multimap<epi::StringHash, std::string>::iterator>
+            results = pack->search_files_.equal_range(open_stem);
+        for (std::unordered_multimap<epi::StringHash, std::string>::iterator file = results.first;
+             file != results.second; ++file)
         {
             if (epi::StringCaseCompareASCII(open_name, epi::GetFilename(file->second)) == 0)
                 return pack->OpenEntryByName(file->second);
@@ -1180,8 +1189,11 @@ epi::File *OpenPackMatch(PackFile *pack, const std::string &name, const std::vec
 
     std::string stem_match = name;
 
-    auto results = pack->search_files_.equal_range(open_stem);
-    for (auto file = results.first; file != results.second; ++file)
+    std::pair<std::unordered_multimap<epi::StringHash, std::string>::iterator,
+              std::unordered_multimap<epi::StringHash, std::string>::iterator>
+        results = pack->search_files_.equal_range(open_stem);
+    for (std::unordered_multimap<epi::StringHash, std::string>::iterator file = results.first; file != results.second;
+         ++file)
     {
         for (const std::string &ext : extensions)
         {
@@ -1219,7 +1231,7 @@ std::vector<std::string> GetPackSpriteList(PackFile *pack)
 
                 bool addme = true;
                 // Don't add things already defined in DDFIMAGE
-                for (auto img : imagedefs)
+                for (ImageDefinition *img : imagedefs)
                 {
                     if (epi::StringCaseCompareASCII(img->name_, texname) == 0)
                     {

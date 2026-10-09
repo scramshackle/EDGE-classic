@@ -29,6 +29,8 @@
 
 #include <string>
 
+#include "epi.h"
+
 //--------------------------------------------------------
 //  SYSTEM functions.
 //--------------------------------------------------------
@@ -41,17 +43,10 @@
 // StartupSound).  Does whatever else the platform code needs.
 void SystemStartup(void);
 
-#ifdef __GNUC__
-void              LogPrint(const char *message, ...) __attribute__((format(printf, 1, 2)));
-void              LogWarning(const char *warning, ...) __attribute__((format(printf, 1, 2)));
-void              LogDebug(const char *message, ...) __attribute__((format(printf, 1, 2)));
-[[noreturn]] void FatalError(const char *error, ...) __attribute__((format(printf, 1, 2)));
-#else
-void              LogPrint(const char *message, ...);
-void              LogWarning(const char *warning, ...);
-void              LogDebug(const char *message, ...);
-[[noreturn]] void FatalError(const char *error, ...);
-#endif
+void              LogPrint(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
+void              LogWarning(const char *warning, ...) EPI_PRINTF_FORMAT(1, 2);
+void              LogDebug(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
+[[noreturn]] void FatalError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
 
 // The opposite of the SystemStartup routine.  This will shutdown
 // everything running in the platform code, by calling the other

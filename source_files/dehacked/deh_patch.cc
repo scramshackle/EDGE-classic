@@ -27,7 +27,6 @@
 
 #include "deh_patch.h"
 
-#include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,7 +279,7 @@ void GetFlags(int o_kind, int o_num, int *dest)
 
     // prevent the BOOM/MBF specific flags from being set
     // from binary patch files.
-    temp &= ~DEHACKED_ALL_BEX_FLAGS;
+    temp &= ~kDehackedAllBexFlags;
 
     if (*dest == temp)
         return;

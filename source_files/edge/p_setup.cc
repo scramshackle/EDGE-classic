@@ -890,7 +890,7 @@ static void LoadLineDefs(int lump)
 
         if (ld->tag && ld->special && ld->special->ef_.type_)
         {
-            auto it = sector_tag_map.find(ld->tag);
+            std::unordered_map<int, std::vector<int>>::iterator it = sector_tag_map.find(ld->tag);
             if (it != sector_tag_map.end())
             {
                 for (int j : it->second)
@@ -1788,7 +1788,7 @@ static void LoadUDMFLineDefs()
 
             if (ld->tag && ld->special && ld->special->ef_.type_)
             {
-                auto it = sector_tag_map.find(ld->tag);
+                std::unordered_map<int, std::vector<int>>::iterator it = sector_tag_map.find(ld->tag);
                 if (it != sector_tag_map.end())
                 {
                     for (int j : it->second)
@@ -2329,7 +2329,7 @@ static void SetupSlidingDoors(void)
             ld->slide_door = ld->special;
         else
         {
-            auto it = line_tag_map.find(ld->tag);
+            std::unordered_map<int, std::vector<int>>::iterator it = line_tag_map.find(ld->tag);
             if (it != line_tag_map.end())
             {
                 for (int k : it->second)

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "epi.h"
+
 namespace dehacked
 {
 
@@ -26,11 +28,7 @@ extern bool quiet_mode;
 void System_Startup(void);
 
 // error message storage and retrieval
-#ifdef __GNUC__
-void SetErrorMsg(const char *str, ...) __attribute__((format(printf, 1, 2)));
-#else
-void SetErrorMsg(const char *str, ...);
-#endif
+void        SetErrorMsg(const char *str, ...) EPI_PRINTF_FORMAT(1, 2);
 const char *GetErrorMsg(void);
 
 } // namespace dehacked

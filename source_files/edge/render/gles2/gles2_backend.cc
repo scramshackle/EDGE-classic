@@ -235,9 +235,9 @@ class Gles2RenderBackend : public RenderBackend
     {
         gles2_immediate.InvalidateBatch();
 
-        for (auto itr = on_frame_finished_.begin(); itr != on_frame_finished_.end(); itr++)
+        for (size_t i = 0; i < on_frame_finished_.size(); i++)
         {
-            (*itr)();
+            on_frame_finished_[i].function(on_frame_finished_[i].context);
         }
 
         on_frame_finished_.clear();

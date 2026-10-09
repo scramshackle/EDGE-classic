@@ -940,6 +940,31 @@ void DDFMobjCleanUp(void)
     mobjtypes.shrink_to_fit();
 }
 
+static int ScanBenefitValues(const char *text, float *value, float *limit)
+{
+    const char *cursor = text;
+
+    while (epi::IsSpaceASCII(*cursor))
+        cursor++;
+
+    if (*cursor == 0)
+        return -1;
+
+    if (!epi::ScanFloat(cursor, value, &cursor))
+        return 0;
+
+    while (epi::IsSpaceASCII(*cursor))
+        cursor++;
+
+    if (*cursor != ':')
+        return 1;
+
+    if (!epi::ScanFloat(cursor + 1, limit))
+        return 1;
+
+    return 2;
+}
+
 //
 // ParseBenefitString
 //
@@ -967,7 +992,7 @@ int ParseBenefitString(const char *info, char *name, char *param, float *value, 
         len -= len2 + 2;
         epi::CStringCopyMax(param, pos + 1, len);
 
-        switch (sscanf(param, " %f : %f ", value, limit))
+        switch (ScanBenefitValues(param, value, limit))
         {
         case 0:
             return 0;
@@ -1834,13 +1859,42 @@ static void DDFMobjGetYAlign(const char *info, void *storage)
     }
 }
 
+static bool ScanPercentRange(const char *text, float *low, float *high)
+{
+    const char *cursor = text;
+
+    if (!epi::ScanFloat(cursor, low, &cursor))
+        return false;
+
+    while (epi::IsSpaceASCII(*cursor))
+        cursor++;
+
+    if (cursor[0] != '%' || cursor[1] != ':')
+        return false;
+
+    return epi::ScanFloat(cursor + 2, high);
+}
+
+static bool ScanColonPair(const char *text, float *first, float *second)
+{
+    const char *cursor = text;
+
+    if (!epi::ScanFloat(cursor, first, &cursor))
+        return false;
+
+    if (*cursor != ':')
+        return false;
+
+    return epi::ScanFloat(cursor + 1, second);
+}
+
 static void DDFMobjGetPercentRange(const char *info, void *storage)
 {
     EPI_ASSERT(info && storage);
 
     float *dest = (float *)storage;
 
-    if (sscanf(info, "%f%%:%f%%", dest + 0, dest + 1) != 2)
+    if (!ScanPercentRange(info, dest + 0, dest + 1))
         DDFError("Bad percentage range: %s\n", info);
 
     dest[0] /= 100.0f;
@@ -1858,7 +1912,7 @@ static void DDFMobjGetAngleRange(const char *info, void *storage)
 
     float val1, val2;
 
-    if (sscanf(info, "%f:%f", &val1, &val2) != 2)
+    if (!ScanColonPair(info, &val1, &val2))
         DDFError("Bad angle range: %s\n", info);
 
     dest[0] = epi::BAMFromDegrees(val1);
@@ -2187,7 +2241,7 @@ static bool ConditionTryCounter(const char *name, const char *sub, ConditionChec
     }
 
     if (sub[0])
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
     cond->cond_type = kConditionCheckTypeCounter;
     return true;
@@ -2201,7 +2255,7 @@ static bool ConditionTryInventory(const char *name, const char *sub, ConditionCh
     }
 
     if (sub[0])
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
     cond->cond_type = kConditionCheckTypeInventory;
     return true;
@@ -2221,7 +2275,7 @@ static bool ConditionTryAmmo(const char *name, const char *sub, ConditionCheck *
     }
 
     if (sub[0])
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
     cond->cond_type = kConditionCheckTypeAmmo;
     return true;
@@ -2259,7 +2313,7 @@ static bool ConditionTryHealth(const char *name, const char *sub, ConditionCheck
         return false;
 
     if (sub[0])
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
     cond->cond_type = kConditionCheckTypeHealth;
     return true;
@@ -2277,7 +2331,7 @@ static bool ConditionTryArmour(const char *name, const char *sub, ConditionCheck
     }
 
     if (sub[0])
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
     cond->cond_type = kConditionCheckTypeArmour;
     return true;
@@ -2292,7 +2346,7 @@ static bool ConditionTryPowerup(const char *name, const char *sub, ConditionChec
 
     if (sub[0])
     {
-        sscanf(sub, " %f ", &cond->amount);
+        epi::ScanFloat(sub, &cond->amount);
 
         cond->amount *= (float)kTicRate;
     }

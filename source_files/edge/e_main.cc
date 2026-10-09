@@ -49,6 +49,7 @@
 #include "dm_state.h"
 #include "dstrings.h"
 #include "e_input.h"
+#include "edge_profiling.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
 #include "epi_str_compare.h"
@@ -88,6 +89,7 @@
 #include "s_music.h"
 #include "s_sound.h"
 #include "script/compat/lua_compat.h"
+#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "version.h"
@@ -638,6 +640,18 @@ void ForceWipe(void)
 
 static bool wipe_gl_active = false;
 
+static void TakeScreenshotWithMessage(void *context)
+{
+    EPI_UNUSED(context);
+    TakeScreenshot(true);
+}
+
+static void TakeScreenshotSilently(void *context)
+{
+    EPI_UNUSED(context);
+    TakeScreenshot(false);
+}
+
 void EdgeDisplay(void)
 {
     // Start the frame - should we need to.
@@ -799,7 +813,7 @@ void EdgeDisplay(void)
     if (m_screenshot_required)
     {
         m_screenshot_required = false;
-        render_backend->OnFrameFinished([]() -> void { TakeScreenshot(true); });
+        render_backend->OnFrameFinished(TakeScreenshotWithMessage, nullptr);
     }
     else if (screenshot_rate && (game_state >= kGameStateLevel))
     {
@@ -807,7 +821,7 @@ void EdgeDisplay(void)
 
         if (level_time_elapsed % screenshot_rate == 0)
         {
-            render_backend->OnFrameFinished([]() -> void { TakeScreenshot(false); });
+            render_backend->OnFrameFinished(TakeScreenshotSilently, nullptr);
         }
     }
 
@@ -1823,13 +1837,31 @@ static void CheckTurbo(void)
     SetTurboScale(turbo_scale);
 }
 
+static const char *month_abbreviations[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
 static void ShowDateAndVersion(void)
 {
     time_t cur_time;
     char   timebuf[100];
 
     time(&cur_time);
-    strftime(timebuf, 99, "%I:%M %p on %d/%b/%Y", localtime(&cur_time));
+
+    const struct tm *local_time = localtime(&cur_time);
+
+    timebuf[0] = 0;
+
+    if (local_time)
+    {
+        int hour_12 = local_time->tm_hour % 12;
+
+        if (hour_12 == 0)
+            hour_12 = 12;
+
+        stbsp_snprintf(timebuf, sizeof(timebuf), "%02d:%02d %s on %02d/%s/%d", hour_12, local_time->tm_min,
+                       local_time->tm_hour < 12 ? "AM" : "PM", local_time->tm_mday,
+                       month_abbreviations[local_time->tm_mon], local_time->tm_year + 1900);
+    }
 
     LogDebug("[Log file created at %s]\n\n", timebuf);
     LogDebug("[Debug file created at %s]\n\n", timebuf);
@@ -2076,6 +2108,7 @@ void EdgeShutdown(void)
     }
     if (GetCOALDetected())
         ShutdownCOAL();
+    ProfilerShutdown();
 }
 
 static void EdgeStartup(void)
@@ -2095,6 +2128,8 @@ static void EdgeStartup(void)
     }
 
     SetupLogAndDebugFiles();
+
+    ProfilerStartup();
 
     PurgeCache();
 
@@ -2134,7 +2169,7 @@ static void EdgeStartup(void)
 
 #ifdef EDGE_EXTRA_CHECKS
     LogDebug("String Hash Registry:\n\n");
-    for (auto entry : epi::StringHash::GetHashRegistry())
+    for (std::pair<const epi::StringHash, std::string> entry : epi::StringHash::GetHashRegistry())
     {
         LogDebug("%s\n", entry.first.ToDebugString().c_str());
     }

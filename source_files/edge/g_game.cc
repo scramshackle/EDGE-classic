@@ -980,7 +980,14 @@ static bool GameSaveGameToFile(const std::string &filename, const char *descript
     globs->sky_image = sky_image;
 
     time(&cur_time);
-    strftime(timebuf, 99, "%H:%M  %Y-%m-%d", localtime(&cur_time));
+
+    const struct tm *local_time = localtime(&cur_time);
+
+    timebuf[0] = 0;
+
+    if (local_time)
+        stbsp_snprintf(timebuf, sizeof(timebuf), "%02d:%02d  %d-%02d-%02d", local_time->tm_hour, local_time->tm_min,
+                       local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday);
 
     globs->description = SaveChunkCopyString(description);
     globs->desc_date   = SaveChunkCopyString(timebuf);

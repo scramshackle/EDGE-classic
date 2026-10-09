@@ -334,7 +334,7 @@ static void LinedefParseField(const char *field, const char *contents, int index
     }
     else if (DDFCompareName(field, "SCROLLING_SPEED") == 0)
     {
-        scrolling_speed = atof(contents);
+        scrolling_speed = epi::ParseDouble(contents);
         return;
     }
 
@@ -440,7 +440,7 @@ void DDFLinedefInit(void)
 
 void DDFLinedefCleanUp(void)
 {
-    for (auto l : linetypes)
+    for (LineType *l : linetypes)
     {
         cur_ddf_entryname = epi::StringFormat("[%d]  (lines.ddf)", l->number_);
 
@@ -1685,7 +1685,7 @@ LineTypeContainer::LineTypeContainer()
 //
 LineTypeContainer::~LineTypeContainer()
 {
-    for (auto iter = begin(); iter != end(); iter++)
+    for (std::vector<LineType *>::iterator iter = begin(); iter != end(); iter++)
     {
         LineType *line = *iter;
         delete line;
@@ -1711,7 +1711,7 @@ LineType *LineTypeContainer::Lookup(const int id)
         return lookup_cache_[slot];
     }
 
-    for (auto iter = rbegin(); iter != rend(); iter++)
+    for (std::vector<LineType *>::reverse_iterator iter = rbegin(); iter != rend(); iter++)
     {
         LineType *l = *iter;
 
@@ -1733,7 +1733,7 @@ LineType *LineTypeContainer::Lookup(const int id)
 //
 void LineTypeContainer::Reset()
 {
-    for (auto iter = begin(); iter != end(); iter++)
+    for (std::vector<LineType *>::iterator iter = begin(); iter != end(); iter++)
     {
         LineType *line = *iter;
         delete line;

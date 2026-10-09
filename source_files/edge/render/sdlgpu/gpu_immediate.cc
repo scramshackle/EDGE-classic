@@ -1033,7 +1033,8 @@ void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTa
 
 void GpuImmediate::SetViewTint(float r, float g, float b)
 {
-    if (view_tint_[0] == r && view_tint_[1] == g && view_tint_[2] == b)
+    if (epi::AlmostEquals(view_tint_[0], r) && epi::AlmostEquals(view_tint_[1], g) &&
+        epi::AlmostEquals(view_tint_[2], b))
         return;
 
     view_tint_[0] = r;
@@ -2483,10 +2484,10 @@ void GpuImmediate::Replay()
             pipeline_bind_count_++;
 
             SDL_GPUTextureSamplerBinding movie_bindings[3];
-            for (int32_t i = 0; i < 3; i++)
+            for (int32_t binding_index = 0; binding_index < 3; binding_index++)
             {
-                movie_bindings[i].texture = movie->texture[i];
-                movie_bindings[i].sampler = movie->sampler;
+                movie_bindings[binding_index].texture = movie->texture[binding_index];
+                movie_bindings[binding_index].sampler = movie->sampler;
             }
 
             SDL_BindGPUFragmentSamplers(pass, 0, movie_bindings, 3);
@@ -2501,8 +2502,8 @@ void GpuImmediate::Replay()
             movie_vertex.mvp = movie->mvp;
 
             GpuMovieFragmentParameters movie_fragment;
-            for (int32_t i = 0; i < 4; i++)
-                movie_fragment.plane_scales[i] = movie->plane_scales[i];
+            for (int32_t plane_index = 0; plane_index < 4; plane_index++)
+                movie_fragment.plane_scales[plane_index] = movie->plane_scales[plane_index];
 
             SDL_PushGPUVertexUniformData(gpu_device.CommandBuffer(), kGpuVertexUniformSlot, &movie_vertex,
                                          (uint32_t)sizeof(movie_vertex));

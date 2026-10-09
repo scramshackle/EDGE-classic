@@ -146,7 +146,7 @@ void ConsoleVariable::FormatFloat(float value)
 void ConsoleVariable::ParseString()
 {
     d_ = atoi(s_.c_str());
-    f_ = atof(s_.c_str());
+    f_ = epi::ParseDouble(s_.c_str());
     if (f_ < min_ || f_ > max_)
     {
         LogWarning("Value %g exceeds lower/upper limits for %s! Resetting to default "
@@ -154,7 +154,7 @@ void ConsoleVariable::ParseString()
                    f_, name_);
         s_ = def_;
         d_ = atoi(s_.c_str());
-        f_ = atof(s_.c_str());
+        f_ = epi::ParseDouble(s_.c_str());
     }
 }
 

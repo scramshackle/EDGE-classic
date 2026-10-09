@@ -1,7 +1,7 @@
+#include <math.h>
 #include <string.h>
 
 #include <algorithm>
-#include <cmath>
 #include <unordered_map>
 #include <vector>
 
@@ -51,13 +51,13 @@ struct RendererUnit
     int         color_lookup        = 0;
     bool        whiten              = false;
     int         filter              = -1;
-    HMM_Vec4    blur                = {{0, 0, 0, 0}};
+    HMM_Vec4    blur                = {};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
     HMM_Vec2 texture_offset = {{0, 0}};
     float    light_row_offset = 0;
-    HMM_Vec4 liquid         = {{0, 0, 0, 0}};
+    HMM_Vec4    liquid           = {};
     SkyPassInfo sky_pass;
 
     bool                    sprite             = false;
@@ -87,10 +87,9 @@ float    static_batch_light_row_offset = 0;
 
 bool     render_unit_whiten = false;
 int      render_unit_filter = -1;
-HMM_Vec4 render_unit_blur   = {{0, 0, 0, 0}};
-HMM_Vec4 render_unit_liquid = {{0, 0, 0, 0}};
-HMM_Vec4 render_unit_sprite_view[2] = {{{0, 0, 0, 0}}, {{0, 0, 0, 0}}};
-
+HMM_Vec4 render_unit_blur           = {};
+HMM_Vec4 render_unit_liquid         = {};
+HMM_Vec4 render_unit_sprite_view[2] = {};
 
 static uint8_t UnitAlpha(const RendererUnit *unit)
 {
@@ -274,12 +273,12 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
     unit->filter              = -1;
-    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{};
     unit->scissor_enabled     = false;
     unit->static_buffer       = handle;
     unit->texture_offset      = {{0, 0}};
     unit->light_row_offset    = static_batch_light_row_offset;
-    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{};
     unit->static_first        = first;
     unit->sprite              = false;
 
@@ -350,13 +349,13 @@ void AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_textu
     unit->color_lookup        = color_lookup;
     unit->whiten              = false;
     unit->filter              = -1;
-    unit->blur                = {{0, 0, 0, 0}};
+    unit->blur                = {};
     unit->scissor_enabled     = false;
     unit->static_buffer       = 0;
     unit->static_first        = 0;
     unit->texture_offset      = {{0, 0}};
     unit->light_row_offset    = 0;
-    unit->liquid              = {{0, 0, 0, 0}};
+    unit->liquid              = {};
     unit->sprite              = true;
     unit->sprite_light_table  = light_table;
     unit->sprite_alpha        = alpha;
@@ -415,10 +414,10 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
     unit->filter              = tex1 ? render_unit_filter : -1;
-    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{{0, 0, 0, 0}};
+    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{};
     unit->texture_offset      = {{0, 0}};
     unit->light_row_offset    = 0;
-    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{{0, 0, 0, 0}};
+    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{};
     unit->static_buffer       = 0;
     unit->static_first        = 0;
     unit->sprite              = false;
@@ -713,7 +712,7 @@ void RenderCurrentUnits(void)
             render_state->FogMode(GL_EXP);
             render_state->ClearColor(unit->fog_color);
             render_state->FogColor(unit->fog_color);
-            render_state->FogDensity(std::log1p(density));
+            render_state->FogDensity(log1pf(density));
             if (!epi::AlmostEquals(density, 0.0f))
                 render_state->Enable(GL_FOG);
             else
@@ -872,7 +871,7 @@ void RenderCurrentUnits(void)
     gpu_immediate.SetSkyPass(nullptr);
     gpu_immediate.SetColorLookup(0);
     gpu_immediate.SetWhiten(false);
-    gpu_immediate.SetBlur({{0, 0, 0, 0}});
+    gpu_immediate.SetBlur(HMM_Vec4{});
 
     current_render_vert = current_render_unit = 0;
 }

@@ -171,22 +171,27 @@ static void UpdateMelt(int tics)
     }
 }
 
+static void InitializeWipeOnFrameFinished(void *context)
+{
+    ScreenWipe effect = (ScreenWipe)(intptr_t)context;
+
+    current_wipe_effect = effect;
+
+    current_wipe_progress  = 0;
+    current_wipe_last_time = -1;
+
+    if (current_wipe_effect == kScreenWipeNone)
+        return;
+
+    CaptureScreenAsTexture(effect == kScreenWipePixelfade, effect == kScreenWipeSpooky);
+
+    if (current_wipe_effect == kScreenWipeMelt)
+        AllocateDrawStructsMelt();
+}
+
 void InitializeWipe(ScreenWipe effect)
 {
-    render_backend->OnFrameFinished([effect]() -> void {
-        current_wipe_effect = effect;
-
-        current_wipe_progress  = 0;
-        current_wipe_last_time = -1;
-
-        if (current_wipe_effect == kScreenWipeNone)
-            return;
-
-        CaptureScreenAsTexture(effect == kScreenWipePixelfade, effect == kScreenWipeSpooky);
-
-        if (current_wipe_effect == kScreenWipeMelt)
-            AllocateDrawStructsMelt();
-    });
+    render_backend->OnFrameFinished(InitializeWipeOnFrameFinished, (void *)(intptr_t)effect);
 }
 
 void StopWipe(void)

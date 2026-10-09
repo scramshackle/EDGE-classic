@@ -175,7 +175,7 @@ static void ScriptCheckForFloat(const char *value, float *retvalue)
     if (strchr(value, '%'))
         ScriptError("Parameter '%s' should not be a percentage.\n", value);
 
-    if (sscanf(value, "%f", retvalue) != 1)
+    if (!epi::ScanFloat(value, retvalue))
         ScriptError("Parameter '%s' is not of numeric type.\n", value);
 }
 
@@ -265,7 +265,7 @@ static void ScriptCheckForTime(const char *info, void *storage)
     }
 
     float val;
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
     {
         // LogWarning("Bad time value '%s'.\n", info);
         LogWarning("RTS: Bad time value '%s' near line %d.\n", info, current_script_line_number);

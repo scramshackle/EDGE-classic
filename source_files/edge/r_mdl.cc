@@ -855,7 +855,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
     if (blending & kBlendingClampY)
     {
-        auto existing = texture_clamp_t.find(skin_tex);
+        std::unordered_map<GLuint, GLint>::iterator existing = texture_clamp_t.find(skin_tex);
         if (existing != texture_clamp_t.end())
         {
             old_clamp = existing->second;

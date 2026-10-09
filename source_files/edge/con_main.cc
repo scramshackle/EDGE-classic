@@ -121,8 +121,8 @@ int ConsoleCommandMove(char **argv, int argc)
     }
     else
     {
-        float x = atof(argv[1]);
-        float y = atof(argv[2]);
+        float x = epi::ParseDouble(argv[1]);
+        float y = epi::ParseDouble(argv[2]);
 
         if (BlockmapGetX(x) < 0 || BlockmapGetX(x) > blockmap_width - 1)
         {
@@ -198,8 +198,8 @@ int ConsoleCommandSpawn(char **argv, int argc)
     }
     else
     {
-        x = atof(argv[2]);
-        y = atof(argv[3]);
+        x = epi::ParseDouble(argv[2]);
+        y = epi::ParseDouble(argv[3]);
         z = info->flags_ & kMapObjectFlagSpawnCeiling ? kOnCeilingZ : kOnFloorZ;
     }
 

@@ -800,7 +800,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
                 // else Since 'clear' is supposed to come before any custom
                 // definitions this should not clear out any
                 // UMAPINFO-defined episodes
-                for (auto iter = gamedefs.begin() + 1; iter != gamedefs.end();)
+                for (std::vector<GameDefinition *>::iterator iter = gamedefs.begin() + 1; iter != gamedefs.end();)
                 {
                     GameDefinition *game = *iter;
                     if (game->firstmap_.empty() && epi::StringCaseCompareASCII(game->name_, "UMAPINFO_TEMPLATE") != 0)
@@ -817,7 +817,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
             {
                 GameDefinition *new_epi = nullptr;
                 // Check for episode to replace
-                for (auto game : gamedefs)
+                for (GameDefinition *game : gamedefs)
                 {
                     if (epi::StringCaseCompareASCII(game->firstmap_, val->mapname) == 0 &&
                         epi::StringCaseCompareASCII(game->name_, "UMAPINFO_TEMPLATE") != 0)
@@ -831,7 +831,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
                     // Create a new episode from game-specific UMAPINFO
                     // template data
                     GameDefinition *um_template = nullptr;
-                    for (auto game : gamedefs)
+                    for (GameDefinition *game : gamedefs)
                     {
                         if (epi::StringCaseCompareASCII(game->name_, "UMAPINFO_TEMPLATE") == 0)
                         {

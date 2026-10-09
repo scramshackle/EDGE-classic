@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "epi.h"
+
 namespace epi
 {
 #ifdef _WIN32
@@ -93,12 +95,13 @@ char *CStringUpper(const char *name);
 void  CStringFree(const char *string);
 
 void TextureNameFromFilename(std::string &buf, std::string_view stem);
-#ifdef __GNUC__
-std::string StringFormat(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-#else
-std::string StringFormat(const char *fmt, ...);
-#endif
+std::string              StringFormat(const char *fmt, ...) EPI_PRINTF_FORMAT(1, 2);
 std::vector<std::string> SeparatedStringVector(std::string_view str, char separator);
+
+bool        ScanFloat(const char *text, float *value, const char **end = nullptr);
+bool        ScanDouble(const char *text, double *value, const char **end = nullptr);
+double      ParseDouble(const char *text);
+std::string FloatToFixedString(float value, int decimals);
 
 } // namespace epi
 

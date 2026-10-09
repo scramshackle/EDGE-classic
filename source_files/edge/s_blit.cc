@@ -54,8 +54,6 @@ bool submerged_sound_effects = false;
 
 EDGE_DEFINE_CONSOLE_VARIABLE(sound_effect_volume, "0.15", kConsoleVariableFlagArchive)
 
-static bool sound_effects_paused = false;
-
 // these are analogous to view_x/y/z/angle
 float    listen_x;
 float    listen_y;
@@ -194,12 +192,10 @@ void UpdateSounds(MapObject *listener, BAMAngle angle)
 
 void PauseSound(void)
 {
-    sound_effects_paused = true;
 }
 
 void ResumeSound(void)
 {
-    sound_effects_paused = false;
 }
 
 //----------------------------------------------------------------------------

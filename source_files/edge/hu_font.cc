@@ -221,7 +221,7 @@ PatchFont::PatchFont(FontDefinition *definition)
     delete[] images;
 
     ImageAtlas *atlas = PackImages(patch_data);
-    for (auto patch : temp_imdata)
+    for (ImageData *patch : temp_imdata)
         delete patch;
     delete missing_imdata;
     if (atlas)
@@ -571,7 +571,7 @@ float PatchFont::CharWidth(char ch)
 
 float TTFFont::CharWidth(char ch)
 {
-    auto find_glyph = truetype_glyph_map_.find((uint8_t)ch);
+    std::unordered_map<int, TrueTypeCharacter>::iterator find_glyph = truetype_glyph_map_.find((uint8_t)ch);
     if (find_glyph != truetype_glyph_map_.end())
         return (find_glyph->second.width[current_font_size] + spacing_) * pixel_aspect_ratio.f_;
     else
@@ -606,7 +606,7 @@ float TTFFont::CharWidth(char ch)
 //
 int TTFFont::GetGlyphIndex(char ch)
 {
-    auto find_glyph = truetype_glyph_map_.find((uint8_t)ch);
+    std::unordered_map<int, TrueTypeCharacter>::iterator find_glyph = truetype_glyph_map_.find((uint8_t)ch);
     if (find_glyph != truetype_glyph_map_.end())
         return find_glyph->second.glyph_index;
     else

@@ -1210,7 +1210,7 @@ void ProcessWad(DataFile *df, size_t file_index)
 
 void ReadUMAPINFOLumps(void)
 {
-    for (auto df : data_files)
+    for (DataFile *df : data_files)
     {
         if (df->wad_)
         {
@@ -1254,7 +1254,7 @@ void ReadUMAPINFOLumps(void)
 
             if (epi::StringPrefixCompare(mapname, "MAP") == 0)
             {
-                for (auto c : mapname.substr(3))
+                for (char c : mapname.substr(3))
                 {
                     if (!epi::IsDigitASCII(c))
                         FatalError("UMAPINFO: Bad map name: %s!\n", mapname.c_str());
@@ -1264,7 +1264,7 @@ void ReadUMAPINFOLumps(void)
             }
             else if (mapname[0] == 'E')
             {
-                for (auto c : mapname.substr(3))
+                for (char c : mapname.substr(3))
                 {
                     if (!epi::IsDigitASCII(c) && c != 'M')
                         FatalError("UMAPINFO: Bad map name: %s!\n", mapname.c_str());
@@ -1637,7 +1637,7 @@ void ReadUMAPINFOLumps(void)
 
             // Validate episode entry
             bool good_epi = false;
-            for (auto g : gamedefs)
+            for (GameDefinition *g : gamedefs)
             {
                 if (temp_level->episode_name_ == g->name_)
                 {

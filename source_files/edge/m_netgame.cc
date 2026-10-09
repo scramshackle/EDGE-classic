@@ -236,7 +236,7 @@ static void ChangeGame(NewGameParameters *param, int dir)
     GameDefinition *closest  = nullptr;
     GameDefinition *furthest = nullptr;
 
-    for (auto def : gamedefs)
+    for (GameDefinition *def : gamedefs)
     {
         MapDefinition *first_map = mapdefs.Lookup(def->firstmap_.c_str());
 

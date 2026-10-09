@@ -776,7 +776,8 @@ void SR_PlayerPutState(void *storage, int index)
     // Traverses backwards in case #CLEARALL was used.
     const WeaponDefinition *actual = nullptr;
 
-    for (auto iter = weapondefs.rbegin(); iter != weapondefs.rend(); iter++)
+    for (std::vector<WeaponDefinition *>::reverse_iterator iter = weapondefs.rbegin(); iter != weapondefs.rend();
+         iter++)
     {
         actual = *iter;
 

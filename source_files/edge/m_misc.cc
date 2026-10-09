@@ -453,37 +453,42 @@ void TakeScreenshot(bool show_msg)
     delete img;
 }
 
+static void SaveScreenshotOnFrameFinished(void *context)
+{
+    EPI_UNUSED(context);
+
+    std::string temp(epi::StringFormat("%s/%s.png", "current", "head"));
+    std::string filename = epi::PathAppend(save_directory, temp);
+
+    epi::FileDelete(filename);
+
+    ImageData *img = new ImageData(current_screen_width, current_screen_height, 4);
+
+    render_backend->CaptureScreen(current_screen_width, current_screen_height, current_screen_width * 4,
+                                  img->PixelAt(0, 0));
+
+    // ReadScreen produces a bottom-up image, need to invert it
+    img->Invert();
+
+    bool result = SavePNG(filename, img);
+
+    if (result)
+        LogPrint("Captured to file: %s\n", filename.c_str());
+    else
+        LogPrint("Error saving file: %s\n", filename.c_str());
+
+    delete img;
+
+    epi::ReplaceExtension(filename, ".replace");
+
+    epi::File *replace_touch = epi::FileOpen(filename, epi::kFileAccessWrite);
+
+    delete replace_touch;
+}
+
 void CreateSaveScreenshot(void)
 {
-    render_backend->OnFrameFinished([]() -> void {
-        std::string temp(epi::StringFormat("%s/%s.png", "current", "head"));
-        std::string filename = epi::PathAppend(save_directory, temp);
-
-        epi::FileDelete(filename);
-
-        ImageData *img = new ImageData(current_screen_width, current_screen_height, 4);
-
-        render_backend->CaptureScreen(current_screen_width, current_screen_height, current_screen_width * 4,
-                                      img->PixelAt(0, 0));
-
-        // ReadScreen produces a bottom-up image, need to invert it
-        img->Invert();
-
-        bool result = SavePNG(filename, img);
-
-        if (result)
-            LogPrint("Captured to file: %s\n", filename.c_str());
-        else
-            LogPrint("Error saving file: %s\n", filename.c_str());
-
-        delete img;
-
-        epi::ReplaceExtension(filename, ".replace");
-
-        epi::File *replace_touch = epi::FileOpen(filename, epi::kFileAccessWrite);
-
-        delete replace_touch;
-    });
+    render_backend->OnFrameFinished(SaveScreenshotOnFrameFinished, nullptr);
 }
 
 void WarningOrError(const char *error, ...)

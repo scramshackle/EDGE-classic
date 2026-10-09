@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "epi.h"
 #include "epi_color.h"
 
 extern std::string working_directory;
@@ -90,11 +91,7 @@ enum ConsoleMessageTarget
     kConsoleHUDCenter
 };
 
-#ifdef __GNUC__
-void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...) __attribute__((format(printf, 2, 3)));
-#else
-void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...);
-#endif
+void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...) EPI_PRINTF_FORMAT(2, 3);
 
 void ConsoleENDOOM();
 

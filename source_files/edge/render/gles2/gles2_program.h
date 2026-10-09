@@ -189,7 +189,6 @@ class Gles2Program
     float shadow_light_falloff_ = -1.0f;
     float shadow_world_lit_     = -1.0f;
     int   shadow_glow_set_      = -2;
-    uint32_t shadow_light_grid_serial_ = 0;
     float shadow_line_mode_     = -1.0f;
     float shadow_skip_rgb_      = -1.0f;
     float shadow_alpha_test_    = -1.0f;
@@ -210,15 +209,15 @@ class Gles2Program
     HMM_Vec2 shadow_texture_offset_ = {{-1.0e30f, -1.0e30f}};
     float    shadow_light_row_offset_ = -1.0e30f;
     float    shadow_sprite_mode_      = -1.0f;
-    HMM_Vec4 shadow_sprite_view_[2]   = {{{-1.0e30f, 0, 0, 0}}, {{-1.0e30f, 0, 0, 0}}};
+    HMM_Vec4 shadow_sprite_view_[2]   = {HMM_V4(-1.0e30f, 0, 0, 0), HMM_V4(-1.0e30f, 0, 0, 0)};
 
     const SpriteLightTable *shadow_sprite_light_table_ = nullptr;
-    HMM_Vec4 shadow_liquid_         = {{-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f}};
+    HMM_Vec4                shadow_liquid_             = HMM_V4(-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f);
 
     float shadow_color_lookup_enabled_ = -1.0f;
     float shadow_whiten_               = -1.0f;
 
-    HMM_Vec4 shadow_blur_ = {{-1.0f, -1.0f, -1.0f, -1.0f}};
+    HMM_Vec4 shadow_blur_ = HMM_V4(-1.0f, -1.0f, -1.0f, -1.0f);
 
     uint32_t uniform_update_count_ = 0;
 };

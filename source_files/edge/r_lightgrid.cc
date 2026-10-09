@@ -123,12 +123,12 @@ static bool BuildGlowForObject(MapObject *mo, const Sector *sec, LightGridGlow *
         float norm_x = (ld->vertex_1->Y - ld->vertex_2->Y) / ld->length;
         float norm_y = (ld->vertex_2->X - ld->vertex_1->X) / ld->length;
 
-        plane = {{-norm_x, -norm_y, 0.0f, ld->vertex_1->X * norm_x + ld->vertex_1->Y * norm_y}};
+        plane = HMM_V4(-norm_x, -norm_y, 0.0f, ld->vertex_1->X * norm_x + ld->vertex_1->Y * norm_y);
     }
     else if (mo->info_->glow_type_ == kSectorGlowTypeFloor)
-        plane = {{0.0f, 0.0f, 1.0f, -sec->floor_height}};
+        plane = HMM_V4(0.0f, 0.0f, 1.0f, -sec->floor_height);
     else
-        plane = {{0.0f, 0.0f, 1.0f, -sec->ceiling_height}};
+        plane = HMM_V4(0.0f, 0.0f, 1.0f, -sec->ceiling_height);
 
     HMM_Vec4 eye_plane = EyeSpacePlane(glow_model_view, plane);
 
@@ -448,7 +448,7 @@ void BuildLightGrid(void)
         if (!LightGridScreenBounds(view_projection, light, &minimum_x, &minimum_y, &maximum_x, &maximum_y))
             continue;
 
-        HMM_Vec4 world = {{light.world_position.X, light.world_position.Y, light.world_position.Z, 1.0f}};
+        HMM_Vec4 world = HMM_V4(light.world_position.X, light.world_position.Y, light.world_position.Z, 1.0f);
 
         HMM_Vec4 eye = HMM_MulM4V4(model_view, world);
 

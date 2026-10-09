@@ -23,7 +23,7 @@ const StringHash StringHash::kEmpty{""};
 std::unordered_map<StringHash, std::string> StringHash::global_hash_registry_;
 void                                        StringHash::Register(StringHash hash, const std::string_view &str)
 {
-    auto iter = global_hash_registry_.find(hash);
+    std::unordered_map<StringHash, std::string>::iterator iter = global_hash_registry_.find(hash);
     if (iter == global_hash_registry_.end())
     {
         global_hash_registry_.emplace(hash, std::string(str));
@@ -40,7 +40,7 @@ void StringHash::Register(const char *str)
 }
 std::string StringHash::GetRegistered(StringHash hash)
 {
-    auto iter = global_hash_registry_.find(hash);
+    std::unordered_map<StringHash, std::string>::iterator iter = global_hash_registry_.find(hash);
     return iter == global_hash_registry_.end() ? EMPTY_STRING : iter->second;
 }
 const std::unordered_map<StringHash, std::string> &StringHash::GetHashRegistry()

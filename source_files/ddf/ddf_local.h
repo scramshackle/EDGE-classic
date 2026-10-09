@@ -184,17 +184,10 @@ extern std::string cur_ddf_filename;
 extern std::string cur_ddf_entryname;
 extern std::string cur_ddf_linedata;
 
-#ifdef __GNUC__
-[[noreturn]] void DDFError(const char *err, ...) __attribute__((format(printf, 1, 2)));
-void              DDFDebug(const char *err, ...) __attribute__((format(printf, 1, 2)));
-void              DDFWarning(const char *err, ...) __attribute__((format(printf, 1, 2)));
-void              DDFWarnError(const char *err, ...) __attribute__((format(printf, 1, 2)));
-#else
-[[noreturn]] void DDFError(const char *err, ...);
-void              DDFDebug(const char *err, ...);
-void              DDFWarning(const char *err, ...);
-void              DDFWarnError(const char *err, ...);
-#endif
+[[noreturn]] void DDFError(const char *err, ...) EPI_PRINTF_FORMAT(1, 2);
+void              DDFDebug(const char *err, ...) EPI_PRINTF_FORMAT(1, 2);
+void              DDFWarning(const char *err, ...) EPI_PRINTF_FORMAT(1, 2);
+void              DDFWarnError(const char *err, ...) EPI_PRINTF_FORMAT(1, 2);
 
 void DDFMainGetPercent(const char *info, void *storage);
 void DDFMainGetPercentAny(const char *info, void *storage);

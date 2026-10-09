@@ -491,7 +491,8 @@ bool InitPipelines(SDL_GPUDevice *device, SDL_GPUTextureFormat color_format, SDL
 
 void ShutdownPipelines(SDL_GPUDevice *device)
 {
-    for (auto itr = pipelines.begin(); itr != pipelines.end(); itr++)
+    for (std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.begin();
+         itr != pipelines.end(); itr++)
     {
         if (itr->second)
             SDL_ReleaseGPUGraphicsPipeline(device, itr->second);
@@ -517,7 +518,7 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
 
     uint32_t key = pipeline_flags | ((uint32_t)primitive << 16);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;
@@ -539,7 +540,7 @@ SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source
 
     uint32_t key = pipeline_flags | (1u << 24);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;
@@ -562,7 +563,7 @@ SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveTyp
 
     uint32_t key = pipeline_flags | ((uint32_t)primitive << 16) | (3u << 24);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;
@@ -587,7 +588,7 @@ SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags)
 
     uint32_t key = pipeline_flags | (4u << 24);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;
@@ -607,7 +608,7 @@ SDL_GPUGraphicsPipeline *GetSpritePipeline(uint32_t pipeline_flags, GLenum sourc
 
     uint32_t key = pipeline_flags | (5u << 24);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;
@@ -630,7 +631,7 @@ SDL_GPUGraphicsPipeline *GetSpriteOitPipeline(uint32_t pipeline_flags)
 
     uint32_t key = pipeline_flags | (6u << 24);
 
-    auto itr = pipelines.find(key);
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
     if (itr != pipelines.end())
         return itr->second;

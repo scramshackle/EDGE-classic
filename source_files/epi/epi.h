@@ -21,18 +21,20 @@
 #include <math.h>
 #include <string.h>
 
-/* Important functions provided by Engine code */
-#ifdef __GNUC__
-[[noreturn]] void FatalError(const char *error, ...) __attribute__((format(printf, 1, 2)));
-void              LogWarning(const char *warning, ...) __attribute__((format(printf, 1, 2)));
-void              LogPrint(const char *message, ...) __attribute__((format(printf, 1, 2)));
-void              LogDebug(const char *message, ...) __attribute__((format(printf, 1, 2)));
+#if defined(__MINGW32__)
+#define EPI_PRINTF_FORMAT(format_index, first_argument)                                                                \
+    __attribute__((format(gnu_printf, format_index, first_argument)))
+#elif defined(__GNUC__)
+#define EPI_PRINTF_FORMAT(format_index, first_argument) __attribute__((format(printf, format_index, first_argument)))
 #else
-[[noreturn]] void FatalError(const char *error, ...);
-void              LogWarning(const char *warning, ...);
-void              LogPrint(const char *message, ...);
-void              LogDebug(const char *message, ...);
+#define EPI_PRINTF_FORMAT(format_index, first_argument)
 #endif
+
+/* Important functions provided by Engine code */
+[[noreturn]] void FatalError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
+void              LogWarning(const char *warning, ...) EPI_PRINTF_FORMAT(1, 2);
+void              LogPrint(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
+void              LogDebug(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
 
 // Move these to dedicated EPI math file - Dasho
 inline int RoundToInteger(float x)

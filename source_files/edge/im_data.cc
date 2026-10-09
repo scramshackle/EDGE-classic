@@ -653,7 +653,8 @@ RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
             if (depth_ == 4 && src[3] == 0)
                 continue;
             RGBAColor color = epi::MakeRGBA(src[0], src[1], src[2]);
-            auto      res   = seen_colors.try_emplace(color, 0);
+            std::pair<std::unordered_map<RGBAColor, unsigned int>::iterator, bool> res =
+                seen_colors.try_emplace(color, 0);
             // If color already seen, increment the hit counter
             if (!res.second)
                 res.first->second++;
@@ -662,14 +663,14 @@ RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
 
     unsigned int highest_count = 0;
     RGBAColor    average_color = kRGBABlack;
-    for (auto color : seen_colors)
+    for (std::pair<const RGBAColor, unsigned int> color : seen_colors)
     {
         if (color.second > highest_count)
             highest_count = color.second;
     }
 
     // If multiple colors were seen "the most", just use the last one spotted
-    for (auto color : seen_colors)
+    for (std::pair<const RGBAColor, unsigned int> color : seen_colors)
     {
         if (color.second == highest_count)
         {

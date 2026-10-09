@@ -1206,7 +1206,7 @@ void DDFMainGetFloat(const char *info, void *storage)
         return;
     }
 
-    if (sscanf(info, "%f", dest) != 1)
+    if (!epi::ScanFloat(info, dest))
         DDFError("Bad floating point value: %s\n", info);
 }
 
@@ -1220,7 +1220,7 @@ void DDFMainGetAngle(const char *info, void *storage)
 
     float val;
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad angle value: %s\n", info);
 
     *dest = epi::BAMFromDegrees(val);
@@ -1233,7 +1233,7 @@ void DDFMainGetSlope(const char *info, void *storage)
 
     EPI_ASSERT(info && storage);
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad slope value: %s\n", info);
 
     if (val > +89.5f)
@@ -1250,7 +1250,7 @@ static void DoGetFloat(const char *info, void *storage)
 
     EPI_ASSERT(info && storage);
 
-    if (sscanf(info, "%f", dest) != 1)
+    if (!epi::ScanFloat(info, dest))
         DDFError("Bad floating point value: %s\n", info);
 }
 
@@ -1349,7 +1349,7 @@ void DDFMainGetTime(const char *info, void *storage)
         return;
     }
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad time value: %s\n", info);
 
     *dest = (int)(val * (float)kTicRate);

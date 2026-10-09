@@ -7,11 +7,8 @@
 #include <stdlib.h>
 
 #include <algorithm>
-#include <array>
 #include <utility>
 #include <vector>
-
-#include "earcut.hpp"
 
 #include "con_var.h"
 #include "epi.h"
@@ -249,25 +246,990 @@ static void PolygonLoopProbe(const std::vector<int> &loop, double area, float *p
     *probe_y = (a->Y + b->Y) * 0.5f - side * 0.01f * dx / length;
 }
 
-static void PolygonAppendRing(std::vector<std::vector<std::array<float, 2>>> &rings, std::vector<int> &ring_vertices,
-                              const std::vector<int> &loop)
+class PolygonEarClipper
 {
-    std::vector<std::array<float, 2>> ring;
+  public:
+    void Triangulate(const std::vector<float> &coords, const std::vector<uint32_t> &ring_ends,
+                     std::vector<uint32_t> *indices);
+    void Release(void);
 
-    ring.reserve(loop.size());
+  private:
+    struct Node
+    {
+        double   x;
+        double   y;
+        Node    *prev;
+        Node    *next;
+        int32_t  z;
+        uint32_t index;
+        bool     steiner;
+        Node    *prev_z;
+        Node    *next_z;
+    };
 
+    struct EarTriangle
+    {
+        const Node *a;
+        const Node *b;
+        const Node *c;
+        double      min_x;
+        double      min_y;
+        double      max_x;
+        double      max_y;
+    };
+
+    static constexpr int32_t kEdgesPerBlock = 16;
+    static constexpr size_t  kNodeBlockSize = 512;
+
+    Node   *NewNode(uint32_t index, double x, double y);
+    Node   *InsertNode(uint32_t index, double x, double y, Node *last);
+    void    RemoveNode(Node *p);
+    Node   *LinkRing(const std::vector<float> &coords, size_t start, size_t end, bool clockwise);
+    Node   *FilterPoints(Node *start, Node *end);
+    void    ClipEars(Node *ear);
+    bool    IsEar(const Node *ear) const;
+    bool    IsEarHashed(const Node *ear) const;
+    Node   *CureLocalIntersections(Node *start);
+    void    SplitAndClip(Node *start);
+    Node   *EliminateHoles(const std::vector<float> &coords, const std::vector<uint32_t> &ring_ends, Node *outer_node);
+    Node   *EliminateHole(Node *hole, Node *outer_node);
+    Node   *FindHoleBridge(Node *hole, Node *outer_node);
+    void    BuildBlockIndex(size_t max_nodes, size_t hole_count);
+    void    IndexSegment(Node *head, Node *stop);
+    void    GrowBlock(const Node *head, const Node *tail);
+    Node   *LiveBlockHead(size_t block);
+    Node   *LiveBlockStop(size_t block);
+    void    IndexCurve(Node *start);
+    void    SortLinked(Node *list);
+    int32_t ZOrder(double x, double y) const;
+    Node   *SplitPolygon(Node *a, Node *b);
+
+    static EarTriangle MakeEarTriangle(const Node *ear);
+    static bool        NodeBlocksEar(const EarTriangle &triangle, const Node *p);
+    static bool        HoleQueueLess(const Node *a, const Node *b);
+    static bool        NodeZLess(const Node *a, const Node *b);
+    static Node       *GetLeftmost(Node *start);
+    static bool PointInTriangle(double ax, double ay, double bx, double by, double cx, double cy, double px, double py);
+    static bool IsValidDiagonal(const Node *a, const Node *b);
+    static double SignedArea(const Node *p, const Node *q, const Node *r);
+    static bool   PointsEqual(const Node *p1, const Node *p2);
+    static bool   SegmentsIntersect(const Node *p1, const Node *q1, const Node *p2, const Node *q2,
+                                    bool include_boundary);
+    static bool   OnSegment(const Node *p, const Node *q, const Node *r);
+    static bool   IntersectsPolygon(const Node *a, const Node *b);
+    static bool   LocallyInside(const Node *a, const Node *b);
+    static bool   MiddleInside(const Node *a, const Node *b);
+    static bool   SectorContainsSector(const Node *m, const Node *p);
+
+    std::vector<uint32_t>         *indices_ = nullptr;
+    std::vector<std::vector<Node>> node_blocks_;
+    size_t                         node_block_index_ = 0;
+    size_t                         node_block_used_  = 0;
+    std::vector<Node *>            hole_queue_;
+    std::vector<Node *>            sort_buffer_;
+    std::vector<double>            block_bounds_;
+    std::vector<Node *>            block_heads_;
+    std::vector<Node *>            block_stops_;
+    size_t                         block_count_  = 0;
+    size_t                         vertex_count_ = 0;
+    double                         min_x_        = 0.0;
+    double                         min_y_        = 0.0;
+    double                         inverse_size_ = 0.0;
+    bool                           hashing_      = false;
+    bool                           filtered_out_ = false;
+    bool                           index_active_ = false;
+};
+
+void PolygonEarClipper::Triangulate(const std::vector<float> &coords, const std::vector<uint32_t> &ring_ends,
+                                    std::vector<uint32_t> *indices)
+{
+    indices_ = indices;
+    indices_->clear();
+
+    vertex_count_     = 0;
+    node_block_index_ = 0;
+    node_block_used_  = 0;
+
+    if (ring_ends.empty())
+        return;
+
+    int    threshold  = 80;
+    size_t ring_start = 0;
+
+    for (size_t i = 0; threshold >= 0 && i < ring_ends.size(); i++)
+    {
+        threshold -= (int)(ring_ends[i] - ring_start);
+        ring_start = ring_ends[i];
+    }
+
+    indices_->reserve((size_t)ring_ends.back() + ring_ends[0]);
+
+    Node *outer_node = LinkRing(coords, 0, ring_ends[0], true);
+
+    if (outer_node == nullptr || outer_node->prev == outer_node->next)
+        return;
+
+    if (ring_ends.size() > 1)
+        outer_node = EliminateHoles(coords, ring_ends, outer_node);
+
+    hashing_ = threshold < 0;
+
+    if (hashing_)
+    {
+        Node  *p     = outer_node->next;
+        double max_x = outer_node->x;
+        double max_y = outer_node->y;
+
+        min_x_ = outer_node->x;
+        min_y_ = outer_node->y;
+
+        do
+        {
+            min_x_ = std::min(min_x_, p->x);
+            min_y_ = std::min(min_y_, p->y);
+            max_x  = std::max(max_x, p->x);
+            max_y  = std::max(max_y, p->y);
+            p      = p->next;
+        } while (p != outer_node);
+
+        inverse_size_ = std::max(max_x - min_x_, max_y - min_y_);
+        inverse_size_ = epi::AlmostEquals(inverse_size_, 0.0) ? 0.0 : 32767.0 / inverse_size_;
+    }
+
+    ClipEars(outer_node);
+
+    hole_queue_.clear();
+}
+
+void PolygonEarClipper::Release(void)
+{
+    node_blocks_.clear();
+    node_blocks_.shrink_to_fit();
+    hole_queue_.clear();
+    hole_queue_.shrink_to_fit();
+    sort_buffer_.clear();
+    sort_buffer_.shrink_to_fit();
+    block_bounds_.clear();
+    block_bounds_.shrink_to_fit();
+    block_heads_.clear();
+    block_heads_.shrink_to_fit();
+    block_stops_.clear();
+    block_stops_.shrink_to_fit();
+
+    indices_          = nullptr;
+    node_block_index_ = 0;
+    node_block_used_  = 0;
+    block_count_      = 0;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::NewNode(uint32_t index, double x, double y)
+{
+    if (node_block_used_ == kNodeBlockSize)
+    {
+        node_block_index_++;
+        node_block_used_ = 0;
+    }
+
+    if (node_block_index_ == node_blocks_.size())
+        node_blocks_.emplace_back(kNodeBlockSize);
+
+    Node *node = &node_blocks_[node_block_index_][node_block_used_++];
+
+    node->x       = x;
+    node->y       = y;
+    node->prev    = nullptr;
+    node->next    = nullptr;
+    node->z       = 0;
+    node->index   = index;
+    node->steiner = false;
+    node->prev_z  = nullptr;
+    node->next_z  = nullptr;
+
+    return node;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::InsertNode(uint32_t index, double x, double y, Node *last)
+{
+    Node *p = NewNode(index, x, y);
+
+    if (last == nullptr)
+    {
+        p->prev = p;
+        p->next = p;
+    }
+    else
+    {
+        p->next          = last->next;
+        p->prev          = last;
+        last->next->prev = p;
+        last->next       = p;
+    }
+
+    return p;
+}
+
+void PolygonEarClipper::RemoveNode(Node *p)
+{
+    p->next->prev = p->prev;
+    p->prev->next = p->next;
+
+    if (p->prev_z != nullptr)
+        p->prev_z->next_z = p->next_z;
+
+    if (p->next_z != nullptr)
+        p->next_z->prev_z = p->prev_z;
+
+    if (index_active_)
+        GrowBlock(p->prev, p->next);
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::LinkRing(const std::vector<float> &coords, size_t start, size_t end,
+                                                     bool clockwise)
+{
+    size_t length = end - start;
+    double sum    = 0.0;
+
+    for (size_t i = 0, j = length > 0 ? length - 1 : 0; i < length; j = i++)
+    {
+        double x1 = coords[(start + i) * 2];
+        double y1 = coords[(start + i) * 2 + 1];
+        double x2 = coords[(start + j) * 2];
+        double y2 = coords[(start + j) * 2 + 1];
+
+        sum += (x2 - x1) * (y1 + y2);
+    }
+
+    Node *last = nullptr;
+
+    if (clockwise == (sum > 0.0))
+    {
+        for (size_t i = start; i < end; i++)
+            last = InsertNode((uint32_t)i, coords[i * 2], coords[i * 2 + 1], last);
+    }
+    else
+    {
+        for (size_t i = end; i-- > start;)
+            last = InsertNode((uint32_t)i, coords[i * 2], coords[i * 2 + 1], last);
+    }
+
+    if (last != nullptr && PointsEqual(last, last->next))
+    {
+        RemoveNode(last);
+        last = last->next;
+    }
+
+    vertex_count_ += length;
+
+    return last;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::FilterPoints(Node *start, Node *end)
+{
+    if (start == nullptr)
+        return start;
+
+    bool full = end == nullptr;
+
+    if (full)
+        end = start;
+
+    Node *p = start;
+    bool  again;
+
+    do
+    {
+        again = false;
+
+        if (p != p->next && !p->steiner &&
+            (PointsEqual(p, p->next) || epi::AlmostEquals(SignedArea(p->prev, p, p->next), 0.0)))
+        {
+            if (full || p == end)
+                end = p->prev;
+
+            filtered_out_ = true;
+            RemoveNode(p);
+            p     = p->prev;
+            again = true;
+        }
+        else if (full || p != end)
+        {
+            p     = p->next;
+            again = !full;
+        }
+    } while (again || p != end);
+
+    return end;
+}
+
+void PolygonEarClipper::ClipEars(Node *ear)
+{
+    if (ear == nullptr)
+        return;
+
+    if (hashing_)
+        IndexCurve(ear);
+
+    Node *stop  = ear;
+    bool  cured = false;
+
+    while (ear->prev != ear->next)
+    {
+        Node *prev = ear->prev;
+        Node *next = ear->next;
+
+        if (SignedArea(prev, ear, next) < 0.0 && (hashing_ ? IsEarHashed(ear) : IsEar(ear)))
+        {
+            indices_->push_back(prev->index);
+            indices_->push_back(ear->index);
+            indices_->push_back(next->index);
+
+            RemoveNode(ear);
+
+            ear  = next;
+            stop = next;
+
+            continue;
+        }
+
+        ear = next;
+
+        if (ear == stop)
+        {
+            filtered_out_ = false;
+            ear           = FilterPoints(ear, nullptr);
+
+            if (filtered_out_)
+            {
+                stop = ear;
+                continue;
+            }
+
+            if (!cured)
+            {
+                ear   = CureLocalIntersections(ear);
+                stop  = ear;
+                cured = true;
+                continue;
+            }
+
+            SplitAndClip(ear);
+            break;
+        }
+    }
+}
+
+PolygonEarClipper::EarTriangle PolygonEarClipper::MakeEarTriangle(const Node *ear)
+{
+    EarTriangle triangle;
+
+    triangle.a     = ear->prev;
+    triangle.b     = ear;
+    triangle.c     = ear->next;
+    triangle.min_x = std::min(triangle.a->x, std::min(triangle.b->x, triangle.c->x));
+    triangle.min_y = std::min(triangle.a->y, std::min(triangle.b->y, triangle.c->y));
+    triangle.max_x = std::max(triangle.a->x, std::max(triangle.b->x, triangle.c->x));
+    triangle.max_y = std::max(triangle.a->y, std::max(triangle.b->y, triangle.c->y));
+
+    return triangle;
+}
+
+bool PolygonEarClipper::NodeBlocksEar(const EarTriangle &triangle, const Node *p)
+{
+    if (p->x < triangle.min_x || p->x > triangle.max_x || p->y < triangle.min_y || p->y > triangle.max_y)
+        return false;
+
+    if (PointsEqual(triangle.a, p))
+        return false;
+
+    return PointInTriangle(triangle.a->x, triangle.a->y, triangle.b->x, triangle.b->y, triangle.c->x, triangle.c->y,
+                           p->x, p->y) &&
+           SignedArea(p->prev, p, p->next) >= 0.0;
+}
+
+bool PolygonEarClipper::IsEar(const Node *ear) const
+{
+    EarTriangle triangle = MakeEarTriangle(ear);
+
+    for (const Node *p = ear->next->next; p != ear->prev; p = p->next)
+    {
+        if (NodeBlocksEar(triangle, p))
+            return false;
+    }
+
+    return true;
+}
+
+bool PolygonEarClipper::IsEarHashed(const Node *ear) const
+{
+    EarTriangle triangle = MakeEarTriangle(ear);
+
+    int32_t min_z = ZOrder(triangle.min_x, triangle.min_y);
+    int32_t max_z = ZOrder(triangle.max_x, triangle.max_y);
+
+    for (const Node *p = ear->next_z; p != nullptr && p->z <= max_z; p = p->next_z)
+    {
+        if (p != ear->next && NodeBlocksEar(triangle, p))
+            return false;
+    }
+
+    for (const Node *p = ear->prev_z; p != nullptr && p->z >= min_z; p = p->prev_z)
+    {
+        if (p != ear->next && NodeBlocksEar(triangle, p))
+            return false;
+    }
+
+    return true;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::CureLocalIntersections(Node *start)
+{
+    Node *p     = start;
+    bool  cured = false;
+
+    do
+    {
+        Node *a = p->prev;
+        Node *b = p->next->next;
+
+        if (SegmentsIntersect(a, p, p->next, b, false) && LocallyInside(a, b) && LocallyInside(b, a))
+        {
+            indices_->push_back(a->index);
+            indices_->push_back(p->index);
+            indices_->push_back(b->index);
+
+            RemoveNode(p);
+            RemoveNode(p->next);
+
+            p     = b;
+            start = b;
+            cured = true;
+        }
+
+        p = p->next;
+    } while (p != start);
+
+    return cured ? FilterPoints(p, nullptr) : p;
+}
+
+void PolygonEarClipper::SplitAndClip(Node *start)
+{
+    Node *a = start;
+
+    do
+    {
+        for (Node *b = a->next->next; b != a->prev; b = b->next)
+        {
+            if (a->index != b->index && IsValidDiagonal(a, b))
+            {
+                Node *c = SplitPolygon(a, b);
+
+                a = FilterPoints(a, a->next);
+                c = FilterPoints(c, c->next);
+
+                ClipEars(a);
+                ClipEars(c);
+                return;
+            }
+        }
+
+        a = a->next;
+    } while (a != start);
+}
+
+bool PolygonEarClipper::HoleQueueLess(const Node *a, const Node *b)
+{
+    if (!epi::AlmostEquals(a->x, b->x))
+        return a->x < b->x;
+
+    if (!epi::AlmostEquals(a->y, b->y))
+        return a->y < b->y;
+
+    double a_dx = a->next->x - a->x;
+    double a_dy = a->next->y - a->y;
+    double b_dx = b->next->x - b->x;
+    double b_dy = b->next->y - b->y;
+
+    bool a_degenerate = epi::AlmostEquals(a_dx, 0.0) && epi::AlmostEquals(a_dy, 0.0);
+    bool b_degenerate = epi::AlmostEquals(b_dx, 0.0) && epi::AlmostEquals(b_dy, 0.0);
+
+    if (a_degenerate != b_degenerate)
+        return a_degenerate;
+
+    return a_dy * b_dx < b_dy * a_dx;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::EliminateHoles(const std::vector<float>    &coords,
+                                                           const std::vector<uint32_t> &ring_ends, Node *outer_node)
+{
+    hole_queue_.clear();
+
+    for (size_t i = 1; i < ring_ends.size(); i++)
+    {
+        Node *list = LinkRing(coords, ring_ends[i - 1], ring_ends[i], false);
+
+        if (list != nullptr)
+        {
+            if (list == list->next)
+                list->steiner = true;
+
+            hole_queue_.push_back(GetLeftmost(list));
+        }
+    }
+
+    std::sort(hole_queue_.begin(), hole_queue_.end(), HoleQueueLess);
+
+    BuildBlockIndex(vertex_count_, hole_queue_.size());
+    IndexSegment(outer_node, outer_node);
+
+    index_active_ = true;
+
+    for (size_t i = 0; i < hole_queue_.size(); i++)
+        outer_node = EliminateHole(hole_queue_[i], outer_node);
+
+    index_active_ = false;
+
+    return FilterPoints(outer_node, nullptr);
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::EliminateHole(Node *hole, Node *outer_node)
+{
+    Node *bridge = FindHoleBridge(hole, outer_node);
+
+    if (bridge == nullptr)
+        return outer_node;
+
+    Node *bridge_reverse = SplitPolygon(bridge, hole);
+
+    IndexSegment(bridge, bridge_reverse->next->next);
+
+    FilterPoints(bridge_reverse, bridge_reverse->next);
+
+    return FilterPoints(bridge, bridge->next);
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::FindHoleBridge(Node *hole, Node *outer_node)
+{
+    double hx = hole->x;
+    double hy = hole->y;
+    double qx = -DBL_MAX;
+    Node  *m  = nullptr;
+
+    if (PointsEqual(hole, outer_node))
+        return outer_node;
+
+    for (size_t block = 0; block < block_count_; block++)
+    {
+        const double *bounds = &block_bounds_[block * 4];
+
+        if (hy < bounds[1] || hy > bounds[3] || bounds[0] > hx || bounds[2] <= qx)
+            continue;
+
+        const Node *stop = LiveBlockStop(block);
+        Node       *p    = LiveBlockHead(block);
+
+        do
+        {
+            if (p->prev->next == p)
+            {
+                if (PointsEqual(hole, p->next))
+                    return p->next;
+
+                if (hy <= p->y && hy >= p->next->y && !epi::AlmostEquals(p->next->y, p->y))
+                {
+                    double x = p->x + (hy - p->y) * (p->next->x - p->x) / (p->next->y - p->y);
+
+                    if (x <= hx && x > qx)
+                    {
+                        qx = x;
+                        m  = p->x < p->next->x ? p : p->next;
+
+                        if (epi::AlmostEquals(x, hx))
+                            return m;
+                    }
+                }
+            }
+
+            p = p->next;
+        } while (p != stop);
+    }
+
+    if (m == nullptr)
+        return nullptr;
+
+    double mx           = m->x;
+    double my           = m->y;
+    double triangle_min = std::min(hy, my);
+    double triangle_max = std::max(hy, my);
+    double tangent_min  = DBL_MAX;
+
+    for (size_t block = 0; block < block_count_; block++)
+    {
+        const double *bounds = &block_bounds_[block * 4];
+
+        if (bounds[2] < mx || bounds[0] > hx || bounds[3] < triangle_min || bounds[1] > triangle_max)
+            continue;
+
+        const Node *stop = LiveBlockStop(block);
+        Node       *p    = LiveBlockHead(block);
+
+        do
+        {
+            if (p->prev->next == p && hx >= p->x && p->x >= mx && !epi::AlmostEquals(hx, p->x) &&
+                PointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, p->x, p->y))
+            {
+                double tangent = fabs(hy - p->y) / (hx - p->x);
+
+                bool touches_edge = epi::AlmostEquals(p->y, hy) && epi::AlmostEquals(p->next->y, hy) && p->next->x > hx;
+
+                if ((LocallyInside(p, hole) || touches_edge) &&
+                    (tangent < tangent_min ||
+                     (epi::AlmostEquals(tangent, tangent_min) &&
+                      (p->x > m->x || (epi::AlmostEquals(p->x, m->x) && SectorContainsSector(m, p))))))
+                {
+                    m           = p;
+                    tangent_min = tangent;
+                }
+            }
+
+            p = p->next;
+        } while (p != stop);
+    }
+
+    return m;
+}
+
+void PolygonEarClipper::BuildBlockIndex(size_t max_nodes, size_t hole_count)
+{
+    size_t max_blocks = (max_nodes + 2 * hole_count + kEdgesPerBlock - 1) / kEdgesPerBlock + hole_count + 2;
+
+    if (block_bounds_.size() < max_blocks * 4)
+        block_bounds_.resize(max_blocks * 4);
+
+    if (block_heads_.size() < max_blocks)
+    {
+        block_heads_.resize(max_blocks);
+        block_stops_.resize(max_blocks);
+    }
+
+    block_count_ = 0;
+}
+
+void PolygonEarClipper::IndexSegment(Node *head, Node *stop)
+{
+    Node *p = head;
+
+    do
+    {
+        size_t  block       = block_count_++;
+        double  block_min_x = DBL_MAX;
+        double  block_min_y = DBL_MAX;
+        double  block_max_x = -DBL_MAX;
+        double  block_max_y = -DBL_MAX;
+        int32_t edge_count  = 0;
+        block_heads_[block] = p;
+
+        do
+        {
+            Node *c = p->next;
+
+            p->z = (int32_t)block;
+
+            block_min_x = std::min(block_min_x, std::min(p->x, c->x));
+            block_min_y = std::min(block_min_y, std::min(p->y, c->y));
+            block_max_x = std::max(block_max_x, std::max(p->x, c->x));
+            block_max_y = std::max(block_max_y, std::max(p->y, c->y));
+
+            p = c;
+        } while (++edge_count < kEdgesPerBlock && p != stop);
+
+        block_stops_[block] = p;
+
+        double *bounds = &block_bounds_[block * 4];
+
+        bounds[0] = block_min_x;
+        bounds[1] = block_min_y;
+        bounds[2] = block_max_x;
+        bounds[3] = block_max_y;
+    } while (p != stop);
+}
+
+void PolygonEarClipper::GrowBlock(const Node *head, const Node *tail)
+{
+    double *bounds = &block_bounds_[(size_t)head->z * 4];
+
+    bounds[0] = std::min(bounds[0], tail->x);
+    bounds[1] = std::min(bounds[1], tail->y);
+    bounds[2] = std::max(bounds[2], tail->x);
+    bounds[3] = std::max(bounds[3], tail->y);
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::LiveBlockHead(size_t block)
+{
+    Node *head = block_heads_[block];
+
+    while (head->prev->next != head)
+        head = head->next;
+
+    block_heads_[block] = head;
+
+    return head;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::LiveBlockStop(size_t block)
+{
+    Node *stop = block_stops_[block];
+
+    while (stop->prev->next != stop)
+        stop = stop->next;
+
+    block_stops_[block] = stop;
+
+    return stop;
+}
+
+bool PolygonEarClipper::SectorContainsSector(const Node *m, const Node *p)
+{
+    return SignedArea(m->prev, m, p->prev) < 0.0 && SignedArea(p->next, m, m->next) < 0.0;
+}
+
+void PolygonEarClipper::IndexCurve(Node *start)
+{
+    Node *p = start;
+
+    do
+    {
+        p->z      = ZOrder(p->x, p->y);
+        p->prev_z = p->prev;
+        p->next_z = p->next;
+        p         = p->next;
+    } while (p != start);
+
+    p->prev_z->next_z = nullptr;
+    p->prev_z         = nullptr;
+
+    SortLinked(p);
+}
+
+bool PolygonEarClipper::NodeZLess(const Node *a, const Node *b)
+{
+    return a->z < b->z;
+}
+
+void PolygonEarClipper::SortLinked(Node *list)
+{
+    sort_buffer_.clear();
+
+    for (Node *p = list; p != nullptr; p = p->next_z)
+        sort_buffer_.push_back(p);
+
+    std::sort(sort_buffer_.begin(), sort_buffer_.end(), NodeZLess);
+
+    Node *prev = nullptr;
+
+    for (size_t i = 0; i < sort_buffer_.size(); i++)
+    {
+        Node *p = sort_buffer_[i];
+
+        p->prev_z = prev;
+
+        if (prev != nullptr)
+            prev->next_z = p;
+
+        prev = p;
+    }
+
+    prev->next_z = nullptr;
+}
+
+int32_t PolygonEarClipper::ZOrder(double x, double y) const
+{
+    int32_t z_x = (int32_t)((x - min_x_) * inverse_size_);
+    int32_t z_y = (int32_t)((y - min_y_) * inverse_size_);
+
+    z_x = (z_x | (z_x << 8)) & 0x00FF00FF;
+    z_x = (z_x | (z_x << 4)) & 0x0F0F0F0F;
+    z_x = (z_x | (z_x << 2)) & 0x33333333;
+    z_x = (z_x | (z_x << 1)) & 0x55555555;
+
+    z_y = (z_y | (z_y << 8)) & 0x00FF00FF;
+    z_y = (z_y | (z_y << 4)) & 0x0F0F0F0F;
+    z_y = (z_y | (z_y << 2)) & 0x33333333;
+    z_y = (z_y | (z_y << 1)) & 0x55555555;
+
+    return z_x | (z_y << 1);
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::GetLeftmost(Node *start)
+{
+    Node *p        = start;
+    Node *leftmost = start;
+
+    do
+    {
+        if (p->x < leftmost->x || (epi::AlmostEquals(p->x, leftmost->x) && p->y < leftmost->y))
+            leftmost = p;
+
+        p = p->next;
+    } while (p != start);
+
+    return leftmost;
+}
+
+bool PolygonEarClipper::PointInTriangle(double ax, double ay, double bx, double by, double cx, double cy, double px,
+                                        double py)
+{
+    return (cx - px) * (ay - py) >= (ax - px) * (cy - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) &&
+           (bx - px) * (cy - py) >= (cx - px) * (by - py);
+}
+
+bool PolygonEarClipper::IsValidDiagonal(const Node *a, const Node *b)
+{
+    bool zero_length =
+        PointsEqual(a, b) && SignedArea(a->prev, a, a->next) > 0.0 && SignedArea(b->prev, b, b->next) > 0.0;
+
+    bool locally_visible = LocallyInside(a, b) && LocallyInside(b, a) &&
+                           (!epi::AlmostEquals(SignedArea(a->prev, a, b->prev), 0.0) ||
+                            !epi::AlmostEquals(SignedArea(a, b->prev, b), 0.0));
+
+    return a->next->index != b->index && (zero_length || locally_visible) && !IntersectsPolygon(a, b) &&
+           (zero_length || MiddleInside(a, b));
+}
+
+double PolygonEarClipper::SignedArea(const Node *p, const Node *q, const Node *r)
+{
+    return (q->y - p->y) * (r->x - q->x) - (q->x - p->x) * (r->y - q->y);
+}
+
+bool PolygonEarClipper::PointsEqual(const Node *p1, const Node *p2)
+{
+    return epi::AlmostEquals(p1->x, p2->x) && epi::AlmostEquals(p1->y, p2->y);
+}
+
+bool PolygonEarClipper::SegmentsIntersect(const Node *p1, const Node *q1, const Node *p2, const Node *q2,
+                                          bool include_boundary)
+{
+    double o1 = SignedArea(p1, q1, p2);
+    double o2 = SignedArea(p1, q1, q2);
+    double o3 = SignedArea(p2, q2, p1);
+    double o4 = SignedArea(p2, q2, q1);
+
+    if (((o1 > 0.0 && o2 < 0.0) || (o1 < 0.0 && o2 > 0.0)) && ((o3 > 0.0 && o4 < 0.0) || (o3 < 0.0 && o4 > 0.0)))
+        return true;
+
+    if (!include_boundary)
+        return false;
+
+    if (epi::AlmostEquals(o1, 0.0) && OnSegment(p1, p2, q1))
+        return true;
+
+    if (epi::AlmostEquals(o2, 0.0) && OnSegment(p1, q2, q1))
+        return true;
+
+    if (epi::AlmostEquals(o3, 0.0) && OnSegment(p2, p1, q2))
+        return true;
+
+    if (epi::AlmostEquals(o4, 0.0) && OnSegment(p2, q1, q2))
+        return true;
+
+    return false;
+}
+
+bool PolygonEarClipper::OnSegment(const Node *p, const Node *q, const Node *r)
+{
+    return q->x <= std::max(p->x, r->x) && q->x >= std::min(p->x, r->x) && q->y <= std::max(p->y, r->y) &&
+           q->y >= std::min(p->y, r->y);
+}
+
+bool PolygonEarClipper::IntersectsPolygon(const Node *a, const Node *b)
+{
+    double diagonal_min_x = std::min(a->x, b->x);
+    double diagonal_max_x = std::max(a->x, b->x);
+    double diagonal_min_y = std::min(a->y, b->y);
+    double diagonal_max_y = std::max(a->y, b->y);
+
+    const Node *p = a;
+
+    do
+    {
+        const Node *n = p->next;
+
+        bool disjoint =
+            (p->x > diagonal_max_x && n->x > diagonal_max_x) || (p->x < diagonal_min_x && n->x < diagonal_min_x) ||
+            (p->y > diagonal_max_y && n->y > diagonal_max_y) || (p->y < diagonal_min_y && n->y < diagonal_min_y);
+
+        if (!disjoint && p->index != a->index && n->index != a->index && p->index != b->index && n->index != b->index &&
+            SegmentsIntersect(p, n, a, b, true))
+            return true;
+
+        p = n;
+    } while (p != a);
+
+    return false;
+}
+
+bool PolygonEarClipper::LocallyInside(const Node *a, const Node *b)
+{
+    if (SignedArea(a->prev, a, a->next) < 0.0)
+        return SignedArea(a, b, a->next) >= 0.0 && SignedArea(a, a->prev, b) >= 0.0;
+
+    return SignedArea(a, b, a->prev) < 0.0 || SignedArea(a, a->next, b) < 0.0;
+}
+
+bool PolygonEarClipper::MiddleInside(const Node *a, const Node *b)
+{
+    const Node *p      = a;
+    bool        inside = false;
+    double      px     = (a->x + b->x) / 2.0;
+    double      py     = (a->y + b->y) / 2.0;
+
+    do
+    {
+        const Node *n = p->next;
+
+        if ((p->y > py) != (n->y > py) && px < (n->x - p->x) * (py - p->y) / (n->y - p->y) + p->x)
+            inside = !inside;
+
+        p = n;
+    } while (p != a);
+
+    return inside;
+}
+
+PolygonEarClipper::Node *PolygonEarClipper::SplitPolygon(Node *a, Node *b)
+{
+    Node *a2 = NewNode(a->index, a->x, a->y);
+    Node *b2 = NewNode(b->index, b->x, b->y);
+    Node *an = a->next;
+    Node *bp = b->prev;
+
+    a->next  = b;
+    b->prev  = a;
+    a2->next = an;
+    an->prev = a2;
+    b2->next = a2;
+    a2->prev = b2;
+    bp->next = b2;
+    b2->prev = bp;
+
+    return b2;
+}
+
+static PolygonEarClipper polygon_ear_clipper;
+
+static void PolygonAppendRing(std::vector<float> &ring_coords, std::vector<uint32_t> &ring_ends,
+                              std::vector<int> &ring_vertices, const std::vector<int> &loop)
+{
     for (size_t i = 0; i < loop.size(); i++)
     {
         const Vertex *point = level_vertexes + loop[i];
 
-        std::array<float, 2> entry = {{point->X, point->Y}};
-
-        ring.push_back(entry);
+        ring_coords.push_back(point->X);
+        ring_coords.push_back(point->Y);
 
         ring_vertices.push_back(loop[i]);
     }
 
-    rings.push_back(ring);
+    ring_ends.push_back((uint32_t)ring_vertices.size());
 }
 
 static int PolygonMapPoint(SectorPolygon *poly, int vertex_index)
@@ -1414,28 +2376,31 @@ static void PolygonFinishSector(int sector_index)
 
     std::vector<int> triangles;
 
-    std::vector<std::vector<std::array<float, 2>>> rings;
-    std::vector<int>                               ring_vertices;
+    std::vector<float>    ring_coords;
+    std::vector<uint32_t> ring_ends;
+    std::vector<int>      ring_vertices;
+    std::vector<uint32_t> result;
 
     for (size_t i = 0; i < loop_count; i++)
     {
         if ((depths[i] & 1) != 0)
             continue;
 
-        rings.clear();
+        ring_coords.clear();
+        ring_ends.clear();
         ring_vertices.clear();
 
-        PolygonAppendRing(rings, ring_vertices, loops[i]);
+        PolygonAppendRing(ring_coords, ring_ends, ring_vertices, loops[i]);
 
         for (size_t j = 0; j < loop_count; j++)
         {
             if ((depths[j] & 1) == 0 || parents[j] != (int)i)
                 continue;
 
-            PolygonAppendRing(rings, ring_vertices, loops[j]);
+            PolygonAppendRing(ring_coords, ring_ends, ring_vertices, loops[j]);
         }
 
-        std::vector<uint32_t> result = mapbox::earcut<uint32_t>(rings);
+        polygon_ear_clipper.Triangulate(ring_coords, ring_ends, &result);
 
         if (result.empty())
         {
@@ -1496,6 +2461,8 @@ void DestroySectorPolygons(void)
     polygon_self_reference_probe.clear();
     polygon_self_reference_ring.clear();
     polygon_self_reference_containers.clear();
+
+    polygon_ear_clipper.Release();
 
     DestroySectorGrid();
 

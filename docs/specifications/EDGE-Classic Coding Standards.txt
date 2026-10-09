@@ -89,7 +89,7 @@ Function-like macros should be replaced with true functions (preferably inline).
 
 Macros that must still be created after considering the above rules should begin with 
 the name of the library in question (in the case of EDGE-Classic this would be 
-AJBSP_, COAL_, DDF_, DEHACKED_, EDGE_, or EPI_).
+COAL_, DDF_, DEHACKED_, EDGE_, or EPI_).
 
 Macros provided by, or required for, dependencies are acceptable to use as-is.
 
@@ -135,7 +135,7 @@ BAMAngle and RGBAColor as aliases for uint32_t).
 
 Do not use typedef with structs or enums, simply define them.
 
-Reduce or avoid the use of 'auto' when declaring variables to reduce potential confusion.
+The use of 'auto' when declaring variables is forbidden to reduce potential confusion.
 
 =======================================
 I/O
@@ -160,7 +160,7 @@ Much of the codebase, owing to its C roots, is still in the program's global nam
 should be made to gradually introduce new namespaces, or move code into the existing namespaces
 if appropriate.
 
-Do not use the 'using' keyword; it is more valuable to reduce confusion as to the namespace that
+The 'using' keyword is forbidden; it is more valuable to reduce confusion as to the namespace that
 a type/class/function resides in.
 
 =======================================
@@ -185,17 +185,27 @@ warnings that should be addressed when possible.
 
 Warnings produced by compiling code under the 'libraries' folder should be examined, but are not
 required to be remediated. In many situations, upgrading the library releases in a timely manner
-will address the situation.
+will address the situation. The exception to this is a subset of libraries that are either owned or forked by
+the EDGE Team:
+- egtengine: The wavetable/FM synth from EC Studio powering our MIDI/MUS/IMF/ORG playback
+- libcRSID: A fork of Hermit's cRSID for PSID/RSID playback
+- m4p: An amalgamation of 8bitbubsy's module replayers
+- remotery: A fork of the (seemingly) unmaintained Remotery profiler
 
 =======================================
 Other Considerations
 =======================================
 
+Third party libraries (i.e., the contents of the /libraries folder) should be C, never C++ (with the exception of required iddefs in order to properly
+compile in C); this makes it easier to enforce our C++ header/feature/standard restrictions.
+
+The use of lambdas is forbidden; this may make it harder for someone reviewing the code to understand the purpose of a given function.
+
 Do not test floats for equality directly (==); use either the AlmostEquals function (preferred) or 
 subtraction with an appropriate epsilon.
 
-Strings should be stored and considered UTF-8 where possible, with the exception of Windows API
+Strings should be stored and considered UTF-8, with the exception of Windows API
 boundaries, in which case the EPI library should be used to convert to/from wide strings.
 
-It is recommended to avoid functions that rely on installed locales; the EPI filesystem and 
+It is forbidden to use headers or functions that rely on installed locales; the EPI filesystem and 
 string functions should work regardless of system locale(s).

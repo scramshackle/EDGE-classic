@@ -35,6 +35,7 @@
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi_endian.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "g_game.h"
 #include "hu_stuff.h"
@@ -608,7 +609,7 @@ bool GameCheckConditions(MapObject *mo, ConditionCheck *cond)
         {
         case kConditionCheckTypeHealth:
             if (cond->exact)
-                return (mo->health_ == cond->amount);
+                return epi::AlmostEquals(mo->health_, cond->amount);
 
             temp = (mo->health_ >= cond->amount);
 
@@ -624,9 +625,9 @@ bool GameCheckConditions(MapObject *mo, ConditionCheck *cond)
             if (cond->exact)
             {
                 if (cond->sub.type == kTotalArmourTypes)
-                    return (p->total_armour_ == i_amount);
+                    return epi::AlmostEquals(p->total_armour_, (float)i_amount);
                 else
-                    return (p->armours_[cond->sub.type] == i_amount);
+                    return epi::AlmostEquals(p->armours_[cond->sub.type], (float)i_amount);
             }
 
             if (cond->sub.type == kTotalArmourTypes)
@@ -675,7 +676,7 @@ bool GameCheckConditions(MapObject *mo, ConditionCheck *cond)
                 return false;
 
             if (cond->exact)
-                return (p->powers_[cond->sub.type] == cond->amount);
+                return epi::AlmostEquals(p->powers_[cond->sub.type], cond->amount);
 
             temp = (p->powers_[cond->sub.type] > cond->amount);
 
