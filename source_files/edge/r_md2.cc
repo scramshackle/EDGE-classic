@@ -34,7 +34,6 @@
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_simd.h"
-#include "epi_str_compare.h"
 #include "g_game.h" //current_map
 #include "i_defs_gl.h"
 #include "n_network.h"
@@ -477,7 +476,7 @@ MD2Model *MD2Load(epi::File *f, float &radius)
     LogDebug("MODEL IDENT: [%c%c%c%c] VERSION: %d", header.ident[0], header.ident[1], header.ident[2], header.ident[3],
              version);
 
-    if (epi::StringPrefixCompare(header.ident, kMD2Identifier) != 0)
+    if (strncmp(header.ident, kMD2Identifier, 4) != 0)
     {
         FatalError("MD2LoadModel: file is not an MD2 model!");
     }
@@ -581,18 +580,11 @@ MD2Model *MD2Load(epi::File *f, float &radius)
             raw_frame.translate[j] = AlignedLittleEndianU32(raw_frame.translate[j]);
         }
 
-        float *f_ptr = (float *)raw_frame.scale;
-
         float scale[3];
         float translate[3];
 
-        scale[0] = f_ptr[0];
-        scale[1] = f_ptr[1];
-        scale[2] = f_ptr[2];
-
-        translate[0] = f_ptr[3];
-        translate[1] = f_ptr[4];
-        translate[2] = f_ptr[5];
+        memcpy(scale, raw_frame.scale, sizeof(scale));
+        memcpy(translate, raw_frame.translate, sizeof(translate));
 
         md->frames_[i].name = CopyFrameName(&raw_frame);
 

@@ -20,6 +20,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <string_view>
+
 #include "ddf_anim.h"
 #include "ddf_colormap.h"
 #include "ddf_font.h"
@@ -1458,13 +1460,13 @@ void DDFMainGetWhenAppear(const char *info, void *storage)
             *result = (AppearsFlag)(*result | kAppearsWhenSkillLevel5);
     }
 
-    if (strstr(info, "SP") || strstr(info, "sp"))
+    if (epi::StringCaseFindASCII(info, "SP") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenSingle);
 
-    if (strstr(info, "COOP") || strstr(info, "coop"))
+    if (epi::StringCaseFindASCII(info, "COOP") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenCoop);
 
-    if (strstr(info, "DM") || strstr(info, "dm"))
+    if (epi::StringCaseFindASCII(info, "DM") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenDeathMatch);
 
     // allow more human readable strings...
@@ -2146,7 +2148,10 @@ void DDFAddFile(DDFType type, std::string &data, const std::string &source)
 void DDFAddCollection(std::vector<DDFFile> &col, const std::string &source)
 {
     for (DDFFile &it : col)
+    {
         DDFAddFile(it.type, it.data, source);
+        unread_ddf.back().from_dehacked = true;
+    }
 }
 
 void DDFDumpFile(const std::string &data)
@@ -2189,7 +2194,7 @@ static void DDFParseUnreadFile(size_t d)
             LogPrint("Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
 
             bool old_strict = strict_errors;
-            bool converted_ddf = (epi::StringCompareMax("DEHACKED", it.source, 8) == 0);
+            bool converted_ddf = it.from_dehacked;
 
             if (converted_ddf) 
             {

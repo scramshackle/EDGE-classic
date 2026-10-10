@@ -57,10 +57,10 @@ EDGE_DEFINE_CONSOLE_VARIABLE(erraticism, "0", kConsoleVariableFlagArchive)
 
 EDGE_DEFINE_CONSOLE_VARIABLE(view_bobbing, "0", kConsoleVariableFlagArchive)
 
-static constexpr float   kMaximumBob       = 16.0f;
-static constexpr uint8_t kZoomAngleDivisor = 4;
-static const BAMAngle    kMouseLookLimit   = epi::BAMFromDegrees(75);
-static constexpr float   kCrouchSlowdown   = 0.5f;
+static constexpr float    kMaximumBob       = 16.0f;
+static constexpr uint8_t  kZoomAngleDivisor = 4;
+static constexpr BAMAngle kMouseLookLimit   = epi::BAMFromDegrees(75);
+static constexpr float    kCrouchSlowdown   = 0.5f;
 
 static SoundEffect *sfx_jpidle;
 static SoundEffect *sfx_jpmove;
@@ -847,10 +847,11 @@ bool PlayerThink(Player *player)
             player->map_object_->z <= player->map_object_->floor_z_)
             sinking = true;
         if (cmd->forward_move == 0 && cmd->side_move == 0 && !player->swimming_ && cmd->upward_move <= 0 &&
-            !(cmd->buttons &
-              (kButtonCodeAttack | kButtonCodeUse | kButtonCodeChangeWeapon | kExtendedButtonCodeSecondAttack |
-               kExtendedButtonCodeReload | kExtendedButtonCodeAction1 | kExtendedButtonCodeAction2 |
-               kExtendedButtonCodeInventoryUse | kExtendedButtonCodeThirdAttack | kExtendedButtonCodeFourthAttack)) &&
+            !(cmd->buttons & (kButtonCodeAttack | kButtonCodeUse | kButtonCodeChangeWeapon)) &&
+            !(cmd->extended_buttons &
+              (kExtendedButtonCodeSecondAttack | kExtendedButtonCodeReload | kExtendedButtonCodeAction1 |
+               kExtendedButtonCodeAction2 | kExtendedButtonCodeInventoryUse | kExtendedButtonCodeThirdAttack |
+               kExtendedButtonCodeFourthAttack)) &&
             ((epi::AlmostEquals(player->map_object_->height_, player->map_object_->info_->height_) ||
               epi::AlmostEquals(player->map_object_->height_, player->map_object_->info_->crouchheight_)) &&
              (epi::AlmostEquals(player->delta_view_height_, 0.0f) || sinking)))

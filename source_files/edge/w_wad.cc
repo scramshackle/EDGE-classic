@@ -798,7 +798,7 @@ static void CheckForLevel(WadFile *wad, int lump, const char *name, const RawWad
     if (remaining < 2)
         return;
 
-    if (strncmp(raw[1].name, "THINGS", 8) == 0 && strncmp(raw[2].name, "LINEDEFS", 8) == 0 &&
+    if (remaining >= 4 && strncmp(raw[1].name, "THINGS", 8) == 0 && strncmp(raw[2].name, "LINEDEFS", 8) == 0 &&
         strncmp(raw[3].name, "SIDEDEFS", 8) == 0 && strncmp(raw[4].name, "VERTEXES", 8) == 0)
     {
         if (strlen(name) > 5)
@@ -820,7 +820,7 @@ static void CheckForLevel(WadFile *wad, int lump, const char *name, const RawWad
 
     // handle GL nodes here too
 
-    if (strncmp(raw[1].name, "GL_VERT", 8) == 0 && strncmp(raw[2].name, "GL_SEGS", 8) == 0 &&
+    if (remaining >= 4 && strncmp(raw[1].name, "GL_VERT", 8) == 0 && strncmp(raw[2].name, "GL_SEGS", 8) == 0 &&
         strncmp(raw[3].name, "GL_SSECT", 8) == 0 && strncmp(raw[4].name, "GL_NODES", 8) == 0)
     {
         wad->level_markers_.push_back(lump);

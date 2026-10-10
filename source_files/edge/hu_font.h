@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <string_view>
 #include <unordered_map>
 
 #include "im_funcs.h"

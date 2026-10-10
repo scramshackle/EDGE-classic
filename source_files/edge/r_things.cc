@@ -649,10 +649,12 @@ static void DrawStdCrossHair(void)
     if (crosshair_size.f_ < 0.1 || crosshair_brightness.f_ < 0.1)
         return;
 
-    unsigned int tex_id = available_crosshairs[crosshair_image.s_];
+    std::map<std::string, unsigned int>::iterator crosshair = available_crosshairs.find(crosshair_image.s_);
 
-    if (!tex_id)
+    if (crosshair == available_crosshairs.end() || !crosshair->second)
         return;
+
+    unsigned int tex_id = crosshair->second;
 
     RGBAColor color = crosshair_colors[crosshair_color.d_ & 7];
 

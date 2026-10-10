@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <string>
-
 // a bitset is a set of named bits, from `A' to `Z'.
 typedef int BitSet;
 

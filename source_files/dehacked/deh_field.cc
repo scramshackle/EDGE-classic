@@ -31,8 +31,6 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include <string>
-
 #include "deh_ammo.h"
 #include "deh_buffer.h"
 #include "deh_edge.h"

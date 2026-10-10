@@ -21,6 +21,7 @@
 #define DDF_DEBUG 0
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ddf_collection.h"

@@ -141,6 +141,28 @@ int StringPrefixCaseCompareASCII(std::string_view A, std::string_view B)
     }
 }
 
+size_t StringCaseFindASCII(std::string_view haystack, std::string_view needle)
+{
+    if (needle.size() > haystack.size())
+        return std::string_view::npos;
+
+    size_t last_start = haystack.size() - needle.size();
+
+    for (size_t start = 0; start <= last_start; start++)
+    {
+        size_t matched = 0;
+
+        while (matched < needle.size() &&
+               ToLowerASCII((unsigned char)haystack[start + matched]) == ToLowerASCII((unsigned char)needle[matched]))
+            matched++;
+
+        if (matched == needle.size())
+            return start;
+    }
+
+    return std::string_view::npos;
+}
+
 } // namespace epi
 
 //--- editor settings ---

@@ -254,12 +254,6 @@ static std::list<CachedImage *> image_cache;
 static void AddImageToMap(ImageMap &map, const char *name, Image *image)
 {
     epi::StringHash name_hash = epi::StringHash::Create(name);
-    ImageMap::iterator result    = real_textures.find(name_hash);
-    if (result == real_textures.end())
-    {
-        map.emplace(std::make_pair(name_hash, std::list<Image *>()));
-    }
-
     map[name_hash].push_back(image);
 }
 

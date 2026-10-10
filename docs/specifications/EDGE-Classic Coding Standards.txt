@@ -163,6 +163,8 @@ if appropriate.
 The 'using' keyword is forbidden; it is more valuable to reduce confusion as to the namespace that
 a type/class/function resides in.
 
+Do not use nested namespaces for namespaces originating in our codebase (edge, epi, dehacked, etc)
+
 =======================================
 Classes and Structs
 =======================================
@@ -196,7 +198,7 @@ the EDGE Team:
 Other Considerations
 =======================================
 
-Third party libraries (i.e., the contents of the /libraries folder) should be C, never C++ (with the exception of required iddefs in order to properly
+Third party libraries (i.e., the contents of the /libraries folder) should be C, never C++ (with the exception of required ifdefs in order to properly
 compile in C); this makes it easier to enforce our C++ header/feature/standard restrictions.
 
 The use of lambdas is forbidden; this may make it harder for someone reviewing the code to understand the purpose of a given function.

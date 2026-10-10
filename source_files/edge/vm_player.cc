@@ -1211,8 +1211,7 @@ static std::string GetMobjBenefits(MapObject *obj, bool KillBenefits = false)
 
         case kBenefitTypeKey:
             temp_string += "KEY";
-            temp_num = log2((int)list->sub.type);
-            temp_num++;
+            temp_num = epi::HighestSetBit((uint32_t)list->sub.type) + 1;
             temp_string += std::to_string(temp_num);
             break;
 

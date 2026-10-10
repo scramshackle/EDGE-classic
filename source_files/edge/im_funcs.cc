@@ -20,6 +20,7 @@
 
 #include "epi.h"
 #include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "miniz.h"
 #include "stb_image.h"
@@ -211,15 +212,11 @@ ImageAtlas *PackImages(const std::unordered_map<int, ImageData *> &image_pack_da
         rect.was_packed = false;
         if (rect.w > atlas_w)
         {
-            atlas_w = 1;
-            while (atlas_w < (int)rect.w)
-                atlas_w <<= 1;
+            atlas_w = epi::NextPowerOfTwo((int)rect.w);
         }
         if (rect.h > atlas_h)
         {
-            atlas_h = 1;
-            while (atlas_h < (int)rect.h)
-                atlas_h <<= 1;
+            atlas_h = epi::NextPowerOfTwo((int)rect.h);
         }
         rects.push_back(rect);
     }

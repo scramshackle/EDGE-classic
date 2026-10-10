@@ -970,6 +970,9 @@ static void TabComplete(void)
 
         EPI_ASSERT((int)strlen(name) >= input_position);
 
+        for (int i = 0; i < input_position; i++)
+            input_line[i] = name[i];
+
         for (name += input_position; *name; name++)
             InsertChar(*name);
 

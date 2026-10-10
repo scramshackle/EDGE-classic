@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "epi.h"
+#include "epi_math.h"
 #include "i_system.h"
 #include "r_backend.h"
 
@@ -845,16 +846,6 @@ void Gles2Immediate::DrawMovieQuad(const RendererVertex *vertices)
     draw_count_++;
 }
 
-static int32_t Gles2NextPowerOfTwo(int32_t value)
-{
-    int32_t result = 1;
-
-    while (result < value)
-        result <<= 1;
-
-    return result;
-}
-
 bool Gles2Immediate::AttachRenderTargetDepth(int32_t width, int32_t height)
 {
     struct Gles2DepthFormat
@@ -944,7 +935,7 @@ bool Gles2Immediate::EnsureRenderTarget(int32_t width, int32_t height)
     if (CreateRenderTarget(width, height, width, height))
         return true;
 
-    return CreateRenderTarget(width, height, Gles2NextPowerOfTwo(width), Gles2NextPowerOfTwo(height));
+    return CreateRenderTarget(width, height, epi::NextPowerOfTwo(width), epi::NextPowerOfTwo(height));
 }
 
 bool Gles2Immediate::CreateRenderTarget(int32_t width, int32_t height, int32_t texture_width, int32_t texture_height)

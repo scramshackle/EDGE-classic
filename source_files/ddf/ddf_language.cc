@@ -37,6 +37,7 @@
 
 #include "ddf_language.h"
 
+#include <string_view>
 #include <unordered_map>
 
 #include "ddf_local.h"

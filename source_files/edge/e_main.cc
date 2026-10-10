@@ -39,6 +39,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include "am_map.h"
@@ -265,8 +266,10 @@ class StartupProgress
 
         if (!need_wipe && epi::StringCompare(video_overlay.s_, "None") != 0)
         {
-            ImageData   *ov_data = available_overlays[video_overlay.s_].first;
-            unsigned int tex_id  = available_overlays[video_overlay.s_].second;
+            std::map<std::string, std::pair<ImageData *, unsigned int>>::iterator overlay =
+                available_overlays.find(video_overlay.s_);
+            ImageData   *ov_data = (overlay != available_overlays.end()) ? overlay->second.first : nullptr;
+            unsigned int tex_id  = (overlay != available_overlays.end()) ? overlay->second.second : 0;
             if (ov_data && tex_id)
                 HUDRawFromTexID(0, 0, current_screen_width, current_screen_height, tex_id, kOpacityComplex, 0, 0,
                                 (float)current_screen_width / ov_data->width_,
@@ -740,8 +743,10 @@ void EdgeDisplay(void)
 
     if (!need_wipe && epi::StringCompare(video_overlay.s_, "None") != 0)
     {
-        ImageData   *ov_data = available_overlays[video_overlay.s_].first;
-        unsigned int tex_id  = available_overlays[video_overlay.s_].second;
+        std::map<std::string, std::pair<ImageData *, unsigned int>>::iterator overlay =
+            available_overlays.find(video_overlay.s_);
+        ImageData   *ov_data = (overlay != available_overlays.end()) ? overlay->second.first : nullptr;
+        unsigned int tex_id  = (overlay != available_overlays.end()) ? overlay->second.second : 0;
         if (ov_data && tex_id)
             HUDRawFromTexID(0, 0, current_screen_width, current_screen_height, tex_id, kOpacityComplex, 0, 0,
                             (float)current_screen_width / ov_data->width_,

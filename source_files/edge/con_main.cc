@@ -21,6 +21,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <string_view>
+
 #include "con_var.h"
 #include "ddf_language.h"
 #include "ddf_sfx.h"
@@ -676,7 +678,7 @@ int ConsoleCommandShowCommands(char **argv, int argc)
     for (int i = 0; builtin_commands[i].name; i++)
     {
         if (match && *match)
-            if (!strstr(builtin_commands[i].name, match))
+            if (epi::StringCaseFindASCII(builtin_commands[i].name, match) == std::string_view::npos)
                 continue;
 
         LogPrint("  %-15s\n", builtin_commands[i].name);

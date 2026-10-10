@@ -18,7 +18,9 @@
 
 #pragma once
 
-#include <string>
+#include <stddef.h>
+
+#include <string_view>
 
 namespace epi
 {
@@ -30,6 +32,8 @@ int StringPrefixCompare(std::string_view A, std::string_view B);
 int StringCaseCompareASCII(std::string_view A, std::string_view B);
 int StringCaseCompareMaxASCII(std::string_view A, std::string_view B, size_t n);
 int StringPrefixCaseCompareASCII(std::string_view A, std::string_view B);
+
+size_t StringCaseFindASCII(std::string_view haystack, std::string_view needle);
 
 } // namespace epi
 

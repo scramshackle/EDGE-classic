@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 #include "epi_file.h"

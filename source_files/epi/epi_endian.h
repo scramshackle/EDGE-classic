@@ -87,9 +87,10 @@ static inline uint64_t __Swap64(uint64_t n)
 }
 #endif
 
-#if defined(__LITTLE_ENDIAN__) || defined(__i386__) || defined(__ia64__) || defined(WIN32) || defined(__alpha__) ||    \
-    defined(__alpha) || defined(__arm__) || (defined(__mips__) && defined(__MIPSEL__)) || defined(__SYMBIAN32__) ||    \
-    defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__)
+#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) && !defined(_WIN32)
+#pragma message("epi_endian.h: unknown byte order, assuming little-endian")
+#endif
 constexpr Endianness kByteOrder = kLittleEndian;
 
 inline uint16_t AlignedLittleEndianU16(const uint16_t x)
@@ -194,48 +195,6 @@ inline int64_t AlignedBigEndianS64(const uint64_t x)
     return (int64_t)x;
 }
 #endif
-
-namespace epi
-{
-
-// Get LE/BE values from pointer regardless of buffer alignment
-inline uint16_t UnalignedLittleEndianU16(const uint8_t *p)
-{
-    return AlignedLittleEndianU16(p[1] << 8 | p[0]);
-}
-
-inline int16_t UnalignedLittleEndianS16(const uint8_t *p)
-{
-    return (int16_t)UnalignedLittleEndianU16(p);
-}
-inline uint32_t UnalignedLittleEndianU32(const uint8_t *p)
-{
-    return AlignedLittleEndianU32(p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0]);
-}
-inline int32_t UnalignedLittleEndianS32(const uint8_t *p)
-{
-    return (int32_t)UnalignedLittleEndianU32(p);
-}
-
-inline uint16_t UnalignedBigEndianU16(const uint8_t *p)
-{
-    return AlignedBigEndianU16(p[0] << 8 | p[1]);
-}
-
-inline int16_t GetUnalignedS16BE(const uint8_t *p)
-{
-    return (int16_t)UnalignedBigEndianU16(p);
-}
-inline uint32_t UnalignedBigEndianU32(const uint8_t *p)
-{
-    return AlignedBigEndianU32(p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]);
-}
-inline int32_t UnalignedBigEndianS32(const uint8_t *p)
-{
-    return (int32_t)UnalignedBigEndianU32(p);
-}
-
-} // namespace epi
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "epi_math.h"
 #include "gles2_loader.h"
 #include "r_lightgrid.h"
 
@@ -21,16 +22,6 @@ static int list_texture_height   = 0;
 static std::vector<uint8_t> light_data_pixels;
 static std::vector<uint8_t> header_pixels;
 static std::vector<uint8_t> list_pixels;
-
-static int NextPowerOfTwo(int value)
-{
-    int result = 1;
-
-    while (result < value)
-        result *= 2;
-
-    return result;
-}
 
 static void EncodeUnitPair(uint8_t *destination, float value)
 {
@@ -204,8 +195,8 @@ void Gles2UploadLightGrid(const LightGrid *grid)
 
     int header_rows = grid->clusters_y * kLightGridDepthSlices;
 
-    int wanted_header_width  = NextPowerOfTwo(grid->clusters_x);
-    int wanted_header_height = NextPowerOfTwo(header_rows);
+    int wanted_header_width  = epi::NextPowerOfTwo(grid->clusters_x);
+    int wanted_header_height = epi::NextPowerOfTwo(header_rows);
 
     bool header_resized = (wanted_header_width != header_texture_width) ||
                           (wanted_header_height != header_texture_height);
@@ -249,7 +240,7 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     size_t entry_total = grid->cluster_list.size();
 
     int wanted_list_width  = 256;
-    int wanted_list_height = NextPowerOfTwo((int)((entry_total + 255) / 256) + 1);
+    int wanted_list_height = epi::NextPowerOfTwo((int)((entry_total + 255) / 256) + 1);
 
     bool list_resized = (wanted_list_width != list_texture_width) || (wanted_list_height != list_texture_height);
 

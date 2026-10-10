@@ -52,6 +52,7 @@ struct DDFFile
     DDFType     type;
     std::string source;
     std::string data;
+    bool        from_dehacked = false;
 };
 
 //--- editor settings ---

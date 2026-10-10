@@ -44,17 +44,17 @@ typedef uint32_t BAMAngle;
 namespace epi
 {
 
-inline BAMAngle BAMFromDegrees(int deg)
+constexpr BAMAngle BAMFromDegrees(int deg)
 {
-    return deg * 11930464 + deg * 7 / 10;
+    return (BAMAngle)((int64_t)deg * 11930464 + deg * 7 / 10);
 }
 
-inline BAMAngle BAMFromDegrees(float deg)
+constexpr BAMAngle BAMFromDegrees(float deg)
 {
     return (BAMAngle)((deg < 0 ? (deg + 360.0f) : double(deg)) * 11930464.7084f);
 }
 
-inline BAMAngle BAMFromDegrees(double deg)
+constexpr BAMAngle BAMFromDegrees(double deg)
 {
     return (BAMAngle)((deg < 0 ? (deg + 360.0) : deg) * 11930464.7084);
 }

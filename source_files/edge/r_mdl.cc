@@ -34,7 +34,6 @@
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_simd.h"
-#include "epi_str_compare.h"
 #include "g_game.h" //current_map
 #include "i_defs_gl.h"
 #include "im_data.h"
@@ -337,7 +336,7 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
     LogDebug("MODEL IDENT: [%c%c%c%c] VERSION: %d", header.ident[0], header.ident[1], header.ident[2], header.ident[3],
              version);
 
-    if (epi::StringPrefixCompare(header.ident, kMDLIdentifier) != 0)
+    if (strncmp(header.ident, kMDLIdentifier, 4) != 0)
     {
         FatalError("MDL_LoadModel: lump is not an MDL model!");
     }
