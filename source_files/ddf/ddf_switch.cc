@@ -108,7 +108,7 @@ static void SwitchFinishEntry(void)
 static void SwitchClearAll(void)
 {
     // 100% safe to delete all switchdefs
-    for (auto s : switchdefs)
+    for (SwitchDefinition *s : switchdefs)
     {
         delete s;
         s = nullptr;

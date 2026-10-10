@@ -19,6 +19,9 @@
 #include "epi_str_util.h"
 
 #include <stdarg.h>
+#include <string.h>
+
+#include <charconv>
 
 #include "epi.h"
 #include "stb_sprintf.h"
@@ -508,6 +511,120 @@ void CStringFree(const char *string)
     {
         free((void *)string);
     }
+}
+
+template <typename FloatingPoint>
+static bool ScanFloatingPoint(const char *text, FloatingPoint *value, const char **end)
+{
+    const char *cursor = text;
+
+    while (IsSpaceASCII(*cursor))
+        cursor++;
+
+    bool negative = false;
+
+    if (*cursor == '+' || *cursor == '-')
+    {
+        negative = (*cursor == '-');
+        cursor++;
+    }
+
+    if (*cursor == '+' || *cursor == '-')
+        return false;
+
+    const char            *limit  = cursor + strlen(cursor);
+    FloatingPoint          parsed = 0;
+    std::from_chars_result result;
+    bool                   hexadecimal = false;
+
+    if (cursor[0] == '0' && (cursor[1] == 'x' || cursor[1] == 'X'))
+    {
+        result = std::from_chars(cursor + 2, limit, parsed, std::chars_format::hex);
+
+        if (result.ec == std::errc::invalid_argument)
+            result = std::from_chars(cursor, cursor + 1, parsed);
+        else
+            hexadecimal = true;
+    }
+    else
+        result = std::from_chars(cursor, limit, parsed);
+
+    if (result.ec == std::errc::invalid_argument)
+        return false;
+
+    if (result.ec == std::errc::result_out_of_range)
+    {
+        char        exponent_marker = hexadecimal ? 'p' : 'e';
+        bool        underflow       = false;
+        bool        seen_exponent   = false;
+        bool        nonzero_integer = false;
+        bool        in_fraction     = false;
+        const char *scan            = hexadecimal ? cursor + 2 : cursor;
+
+        for (; scan < result.ptr; scan++)
+        {
+            if (ToLowerASCII(*scan) == exponent_marker)
+            {
+                seen_exponent = true;
+                underflow     = (scan + 1 < result.ptr && scan[1] == '-');
+                break;
+            }
+
+            if (*scan == '.')
+                in_fraction = true;
+            else if (!in_fraction && *scan != '0')
+                nonzero_integer = true;
+        }
+
+        if (!seen_exponent)
+            underflow = !nonzero_integer;
+
+        parsed = 0;
+
+        if (!underflow)
+        {
+            static const char kInfinityText[] = "inf";
+            std::from_chars(kInfinityText, kInfinityText + 3, parsed);
+        }
+    }
+
+    *value = negative ? -parsed : parsed;
+
+    if (end)
+        *end = result.ptr;
+
+    return true;
+}
+
+bool ScanFloat(const char *text, float *value, const char **end)
+{
+    return ScanFloatingPoint(text, value, end);
+}
+
+bool ScanDouble(const char *text, double *value, const char **end)
+{
+    return ScanFloatingPoint(text, value, end);
+}
+
+double ParseDouble(const char *text)
+{
+    double value = 0.0;
+
+    ScanFloatingPoint(text, &value, (const char **)nullptr);
+
+    return value;
+}
+
+std::string FloatToFixedString(float value, int decimals)
+{
+    char                 buffer[64];
+    std::to_chars_result result =
+        std::to_chars(buffer, buffer + sizeof(buffer), value, std::chars_format::fixed, decimals);
+
+    if (result.ec != std::errc())
+        return std::string();
+
+    return std::string(buffer, result.ptr);
 }
 
 } // namespace epi

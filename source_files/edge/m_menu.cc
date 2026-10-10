@@ -138,9 +138,6 @@ static const Image *therm_m;
 static const Image *therm_r;
 static const Image *therm_o;
 
-static const Image *menu_load_game;
-static const Image *menu_save_game;
-static const Image *menu_sound_volume;
 static const Image *menu_doom;
 static const Image *menu_new_game;
 static const Image *menu_skill;
@@ -1302,7 +1299,7 @@ static void CreateEpisodeMenu(void)
 
     int e = 0;
 
-    for (auto g : gamedefs)
+    for (GameDefinition *g : gamedefs)
     {
         if (!g)
             continue;
@@ -1460,7 +1457,7 @@ static void DoStartLevel(SkillLevel skill)
 
     std::string chosen_episodesode = epi::StringFormat("%s", EpisodeMenu[chosen_episode].name);
 
-    for (auto game : gamedefs)
+    for (GameDefinition *game : gamedefs)
     {
         // Lobo 2022: lets use text instead of M_EPIxx graphic
         if (game->description_ != "")
@@ -3078,9 +3075,6 @@ void MenuInitialize(void)
     therm_r = ImageLookup("M_THERMR");
     therm_o = ImageLookup("M_THERMO");
 
-    menu_load_game    = ImageLookup("M_LOADG");
-    menu_save_game    = ImageLookup("M_SAVEG");
-    menu_sound_volume = ImageLookup("M_SVOL");
     menu_new_game     = ImageLookup("M_NEWG");
     menu_skill        = ImageLookup("M_SKILL");
     menu_episode      = ImageLookup("M_EPISOD");

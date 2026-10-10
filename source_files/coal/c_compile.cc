@@ -23,7 +23,6 @@
 //
 //----------------------------------------------------------------------
 
-#include <ctype.h>
 #include <errno.h>
 #include <float.h>
 #include <math.h>
@@ -37,6 +36,7 @@
 #include "epi_math.h"
 #include "c_local.h"
 #include "epi.h"
+#include "epi_str_util.h"
 #include "stb_sprintf.h"
 
 [[noreturn]] extern void FatalError(const char *error, ...);
@@ -210,7 +210,7 @@ float RealVM::LexNumber()
 
     comp_.token_buf[len] = 0;
 
-    return atof(comp_.token_buf);
+    return epi::ParseDouble(comp_.token_buf);
 }
 
 void RealVM::LexVector()

@@ -313,7 +313,7 @@ bool DoMove(MapObject *actor, bool path)
     {
         actor->interpolation_number_   = HMM_MAX(1, actor->state_->tics);
         actor->interpolation_position_ = 1;
-        if (actor->old_x_ != kInvalidPosition)
+        if (!epi::AlmostEquals(actor->old_x_, kInvalidPosition))
             actor->interpolation_from_ = orig_pos;
         else
             actor->interpolation_from_ = {{actor->x, actor->y, actor->z}};

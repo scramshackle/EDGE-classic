@@ -568,8 +568,9 @@ void ScriptDamageMonsters(RADScriptTrigger *R, void *param)
     // If we have a tag, we can scan the active tagged mobj list instead
     if (tag)
     {
-        auto mobjs = active_tagged_map_objects.equal_range(tag);
-        for (auto mobj = mobjs.first; mobj != mobjs.second; ++mobj)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tagged_map_objects.equal_range(tag);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second; ++mobj)
         {
             MapObject *mo = mobj->second;
             if (info && mo->info_ != info)
@@ -634,8 +635,9 @@ void ScriptThingEvent(RADScriptTrigger *R, void *param)
     // If we have a tag, we can scan the active tagged mobj list instead
     if (tag)
     {
-        auto mobjs = active_tagged_map_objects.equal_range(tag);
-        for (auto mobj = mobjs.first; mobj != mobjs.second; ++mobj)
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> mobjs =
+            active_tagged_map_objects.equal_range(tag);
+        for (std::multimap<int, MapObject *>::iterator mobj = mobjs.first; mobj != mobjs.second; ++mobj)
         {
             MapObject *mo = mobj->second;
             if (info && mo->info_ != info)

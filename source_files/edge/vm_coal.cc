@@ -28,6 +28,7 @@
 #include "epi.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "epi_str_util.h"
 #include "g_game.h"
 #include "hu_draw.h"
 #include "hu_font.h"
@@ -391,7 +392,7 @@ static void STRINGS_tonumber(coal::VM *vm, int argc)
 
     const char *s = vm->AccessParamString(0);
 
-    vm->ReturnFloat(atof(s));
+    vm->ReturnFloat(epi::ParseDouble(s));
 }
 
 void COALRegisterBASE(coal::VM *vm)

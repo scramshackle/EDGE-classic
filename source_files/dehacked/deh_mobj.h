@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 namespace dehacked
 {
 
@@ -140,13 +142,13 @@ enum DehackedMapObjectFlag
     // kMF_STEALTH = 0x10000000, // What to do with this ? - Dasho
 
     // Translucent sprite?
-    kMF_TRANSLUCENT = 0x80000000
+    kMF_TRANSLUCENT = 0x80000000,
 
-// Pre-MBF mappings
-#define kMF_UNUSED1 kMF_TRANSLATION2
-#define kMF_UNUSED2 kMF_TOUCHY
-#define kMF_UNUSED3 kMF_BOUNCES
-#define kMF_UNUSED4 kMF_FRIEND
+    // Pre-MBF mappings
+    kMF_UNUSED1 = kMF_TRANSLATION2,
+    kMF_UNUSED2 = kMF_TOUCHY,
+    kMF_UNUSED3 = kMF_BOUNCES,
+    kMF_UNUSED4 = kMF_FRIEND
 };
 
 //
@@ -213,9 +215,9 @@ enum DehackedMapObjectFlagMBF21
     kMBF21_FULLVOLSOUNDS = 0x40000,
 };
 
-#define kMF_TRANSLATION (kMF_TRANSLATION1 | kMF_TRANSLATION2)
-#define DEHACKED_ALL_BEX_FLAGS                                                                                         \
-    (kMF_TRANSLUCENT | kMF_TOUCHY | kMF_BOUNCES | kMF_FRIEND) // Also housed kMF_STEALTH, but this is not a BEX flag
+constexpr uint32_t kMF_TRANSLATION      = kMF_TRANSLATION1 | kMF_TRANSLATION2;
+constexpr uint32_t kDehackedAllBexFlags = (uint32_t)(kMF_TRANSLUCENT | kMF_TOUCHY | kMF_BOUNCES |
+                                                     kMF_FRIEND); // Also housed kMF_STEALTH, but this is not a BEX flag
 
 enum DehackedMapObjectType
 {

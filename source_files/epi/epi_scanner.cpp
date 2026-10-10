@@ -584,7 +584,7 @@ bool Scanner::GetNextToken(bool expandState)
             }
             else
             {
-                next_state_.decimal = atof(next_state_.string.c_str());
+                next_state_.decimal = epi::ParseDouble(next_state_.string.c_str());
                 next_state_.number  = (int)next_state_.decimal;
                 next_state_.boolean = (next_state_.number != 0);
             }

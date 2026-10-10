@@ -1223,7 +1223,8 @@ bool TryMove(MapObject *thing, float x, float y)
         if (thing->player_ || (thing->extended_flags_ & kExtendedFlagMonster) ||
             !(thing->current_attack_ && (thing->current_attack_->flags_ & kAttackFlagNoTriggerLines)))
         {
-            for (auto iter = special_lines_hit.rbegin(); iter != special_lines_hit.rend(); iter++)
+            for (std::vector<Line *>::reverse_iterator iter = special_lines_hit.rbegin();
+                 iter != special_lines_hit.rend(); iter++)
             {
                 ld = *iter;
                 if (ld->special) // Shouldn't this always be a special?
@@ -1709,7 +1710,7 @@ static inline bool ShootCheckGap(float sx, float sy, float z, float floor_height
             // Check to see if hitting the side of a vertex slope sector
             HMM_Vec3 tri_v1 = {{0, 0, 0}};
             HMM_Vec3 tri_v2 = {{0, 0, 0}};
-            for (auto v : sec_check->floor_z_vertices)
+            for (HMM_Vec3 v : sec_check->floor_z_vertices)
             {
                 if (epi::AlmostEquals(ld->vertex_1->X, v.X) && epi::AlmostEquals(ld->vertex_1->Y, v.Y))
                 {
@@ -1780,7 +1781,7 @@ static inline bool ShootCheckGap(float sx, float sy, float z, float floor_height
             // Check to see if hitting the side of a vertex slope sector
             HMM_Vec3 tri_v1 = {{0, 0, 0}};
             HMM_Vec3 tri_v2 = {{0, 0, 0}};
-            for (auto v : sec_check->ceiling_z_vertices)
+            for (HMM_Vec3 v : sec_check->ceiling_z_vertices)
             {
                 if (epi::AlmostEquals(ld->vertex_1->X, v.X) && epi::AlmostEquals(ld->vertex_1->Y, v.Y))
                 {

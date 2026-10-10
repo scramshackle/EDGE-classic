@@ -1,6 +1,5 @@
 
 #pragma once
-#include <functional>
 
 #include "HandmadeMath.h"
 #include "con_var.h"
@@ -95,7 +94,11 @@ inline HMM_Vec4 EyeSpacePlane(const HMM_Mat4 &model_view, const HMM_Vec4 &plane)
 
 struct LightGrid;
 
-typedef std::function<void()> FrameFinishedCallback;
+struct FrameFinishedCallback
+{
+    void (*function)(void *context);
+    void *context;
+};
 
 struct FrameStats
 {
@@ -122,8 +125,11 @@ class RenderBackend
 
     virtual void FinishFrame() = 0;
 
-    void OnFrameFinished(FrameFinishedCallback callback)
+    void OnFrameFinished(void (*function)(void *context), void *context)
     {
+        FrameFinishedCallback callback;
+        callback.function = function;
+        callback.context  = context;
         on_frame_finished_.push_back(callback);
     }
 

@@ -144,7 +144,7 @@ void DDFReadFonts(const std::string &data)
 
 void DDFFontInit(void)
 {
-    for (auto fnt : fontdefs)
+    for (FontDefinition *fnt : fontdefs)
     {
         delete fnt;
         fnt = nullptr;

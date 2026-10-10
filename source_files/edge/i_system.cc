@@ -19,8 +19,7 @@
 #include "i_system.h"
 
 #include <SDL3/SDL.h>
-
-#include <chrono>
+#include <time.h>
 
 #include "con_main.h"
 #include "dm_defs.h"
@@ -146,9 +145,7 @@ int PureRandomNumber(void)
 
 uint64_t GetMicroseconds(void)
 {
-    return (uint64_t)std::chrono::duration_cast<std::chrono::microseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    return (uint64_t)(SDL_GetTicksNS() / SDL_NS_PER_US);
 }
 
 void SleepForMilliseconds(int millisecs)

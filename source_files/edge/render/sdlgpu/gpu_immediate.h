@@ -507,7 +507,7 @@ class GpuImmediate
     bool        light_depth_enabled_ = false;
     float       texture_offset_[2]  = {0.0f, 0.0f};
     float       light_row_offset_   = 0.0f;
-    HMM_Vec4    sprite_view_[2]     = {{{0, 0, 0, 0}}, {{0, 0, 0, 0}}};
+    HMM_Vec4    sprite_view_[2]      = {};
     float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;

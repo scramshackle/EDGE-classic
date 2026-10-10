@@ -205,7 +205,7 @@ void DDFReadStyles(const std::string &data)
 
 void DDFStyleInit(void)
 {
-    for (auto s : styledefs)
+    for (StyleDefinition *s : styledefs)
     {
         delete s;
         s = nullptr;

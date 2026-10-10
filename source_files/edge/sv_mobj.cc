@@ -864,7 +864,7 @@ void SaveGameMapObjectPutState(void *storage, int index)
         bool state_found = false;
 
         // look for real object
-        for (auto iter = mobjtypes.begin(); iter != mobjtypes.end(); iter++)
+        for (std::vector<MapObjectDefinition *>::iterator iter = mobjtypes.begin(); iter != mobjtypes.end(); iter++)
         {
             actual = *iter;
 

@@ -31,6 +31,7 @@
 #include "w_sprite.h"
 
 #include <algorithm> // sort
+#include <string_view>
 
 #include "e_main.h"
 #include "e_search.h"

@@ -25,6 +25,7 @@
 
 #include "ddf_local.h"
 #include "epi_filesystem.h"
+#include "epi_str_compare.h"
 
 static ImageDefinition *dynamic_image;
 
@@ -152,7 +153,7 @@ static void ImageFinishEntry(void)
 {
     if (dynamic_image->type_ == kImageDataFile || dynamic_image->type_ == kImageDataPackage)
     {
-        if (epi::GetExtension(dynamic_image->info_) == ".lmp")
+        if (epi::StringCaseCompareASCII(epi::GetExtension(dynamic_image->info_), ".lmp") == 0)
             dynamic_image->format_ = kLumpImageFormatDoom;
         else
             dynamic_image->format_ = kLumpImageFormatStandard;

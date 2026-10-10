@@ -125,8 +125,6 @@ static int repeat_countdown;
 // linebuffer.
 static bool keys_shifted;
 
-static bool tabbed_last;
-
 static int scroll_direction;
 
 static void ConsoleAddLine(const char *s, bool partial)
@@ -222,11 +220,6 @@ void SetConsoleVisibility(ConsoleVisibility v)
         return;
 
     console_visible = v;
-
-    if (v == kConsoleMaximal)
-    {
-        tabbed_last = false;
-    }
 
     if (!console_wipe_active)
     {
@@ -977,6 +970,9 @@ static void TabComplete(void)
 
         EPI_ASSERT((int)strlen(name) >= input_position);
 
+        for (int i = 0; i < input_position; i++)
+            input_line[i] = name[i];
+
         for (name += input_position; *name; name++)
             InsertChar(*name);
 
@@ -1112,7 +1108,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
             command_history_position++;
             GotoEndOfLine();
         }
-        tabbed_last = false;
         break;
 
     case kDownArrow:
@@ -1122,7 +1117,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
             command_history_position--;
             GotoEndOfLine();
         }
-        tabbed_last = false;
         break;
 
     case kLeftArrow:
@@ -1178,7 +1172,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
         if (bottom_row < -1)
             bottom_row = -1;
 
-        tabbed_last = false;
         break;
 
     case kBackspace:
@@ -1194,7 +1187,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
                 input_line[j] = input_line[j + 1];
         }
 
-        tabbed_last    = false;
         console_cursor = 0;
         break;
 
@@ -1209,7 +1201,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
                 input_line[j] = input_line[j + 1];
         }
 
-        tabbed_last    = false;
         console_cursor = 0;
         break;
 
@@ -1225,7 +1216,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
         ConsoleClearInputLine();
 
         command_history_position = -1;
-        tabbed_last              = false;
 
         SetConsoleVisibility(kConsoleNotVisible);
         break;
@@ -1250,7 +1240,6 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
         EditHistory();
         InsertChar(ch);
 
-        tabbed_last    = false;
         console_cursor = 0;
     }
     break;

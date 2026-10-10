@@ -175,7 +175,7 @@ static void M_ChangeMusicCheat(const char *string)
 
 static void CheatGiveWeapons(Player *pl, int key = -2)
 {
-    for (auto info : weapondefs)
+    for (WeaponDefinition *info : weapondefs)
     {
         if (info && !info->no_cheat_ && (key < 0 || info->bind_key_ == key))
         {

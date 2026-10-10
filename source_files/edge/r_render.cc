@@ -528,7 +528,7 @@ static void DrawWallPart(DrawFloor *dfloor, float x1, float y1, float lz1, float
     cmap_shader->WorldMix(GL_POLYGON, data.v_count, data.tex_id, trans, &data.pass, data.blending, data.mid_masked,
                           &data, WallCoordFunc);
 
-    render_unit_liquid = {{0, 0, 0, 0}};
+    render_unit_liquid = {};
 
     if (capture)
         StaticCaptureEnd();
@@ -1564,7 +1564,7 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
             StaticCaptureEnd();
     }
 
-    render_unit_liquid = {{0, 0, 0, 0}};
+    render_unit_liquid = {};
 }
 
 static void RenderSector(DrawSector *dsector);
@@ -1978,11 +1978,8 @@ static void InitializeCamera(MapObject *mo, bool full_height, float expand_w)
     }
 }
 
-// Render world index, the root world render is 0
-static int32_t render_world_index = 0;
-void           RendererEndFrame()
+void RendererEndFrame()
 {
-    render_world_index = 0;
 }
 
 void RendererShutdownLevel()
@@ -2203,8 +2200,6 @@ void RenderView(int x, int y, int w, int h, MapObject *camera, bool full_height,
 
     seen_dynamic_lights.clear();
     RenderTrueBSP();
-
-    render_world_index++;
 }
 
 static constexpr uint8_t kMaximumFloodVertices = 16;

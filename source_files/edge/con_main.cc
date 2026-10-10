@@ -21,6 +21,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <string_view>
+
 #include "con_var.h"
 #include "ddf_language.h"
 #include "ddf_sfx.h"
@@ -121,8 +123,8 @@ int ConsoleCommandMove(char **argv, int argc)
     }
     else
     {
-        float x = atof(argv[1]);
-        float y = atof(argv[2]);
+        float x = epi::ParseDouble(argv[1]);
+        float y = epi::ParseDouble(argv[2]);
 
         if (BlockmapGetX(x) < 0 || BlockmapGetX(x) > blockmap_width - 1)
         {
@@ -198,8 +200,8 @@ int ConsoleCommandSpawn(char **argv, int argc)
     }
     else
     {
-        x = atof(argv[2]);
-        y = atof(argv[3]);
+        x = epi::ParseDouble(argv[2]);
+        y = epi::ParseDouble(argv[3]);
         z = info->flags_ & kMapObjectFlagSpawnCeiling ? kOnCeilingZ : kOnFloorZ;
     }
 
@@ -676,7 +678,7 @@ int ConsoleCommandShowCommands(char **argv, int argc)
     for (int i = 0; builtin_commands[i].name; i++)
     {
         if (match && *match)
-            if (!strstr(builtin_commands[i].name, match))
+            if (epi::StringCaseFindASCII(builtin_commands[i].name, match) == std::string_view::npos)
                 continue;
 
         LogPrint("  %-15s\n", builtin_commands[i].name);

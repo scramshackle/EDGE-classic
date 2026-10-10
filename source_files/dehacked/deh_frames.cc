@@ -27,7 +27,6 @@
 
 #include "deh_frames.h"
 
-#include <ctype.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -96,7 +95,7 @@ bool DependRangeWasModified(int low, int high);
 
 inline bool IS_WEAPON(char group)
 {
-    return islower(group);
+    return epi::IsLowerASCII(group);
 }
 
 inline int MISC_TO_ANGLE(int m)
@@ -1618,7 +1617,7 @@ bool frames::OutputSpawnState(int first)
 
 void frames::OutputGroup(char group)
 {
-    auto GIT = groups.find(group);
+    std::unordered_map<char, GroupInfo>::iterator GIT = groups.find(group);
 
     if (GIT == groups.end())
         return;

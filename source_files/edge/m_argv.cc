@@ -26,11 +26,7 @@
 #include "epi_filesystem.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
-#include "epi_windows.h"
 #include "i_system.h"
-#ifdef _WIN32
-#include <shellapi.h>
-#endif
 
 std::vector<std::string> program_argument_list;
 
@@ -52,49 +48,6 @@ static AddedParameter *added_parameters;
 // NOTE: doesn't merge multiple uses of an option, hence
 //       using ArgvFind() will only return the first usage.
 //
-#ifdef _WIN32
-void ParseArguments(const int argc, const char *const *argv)
-{
-    EPI_UNUSED(argc);
-    EPI_UNUSED(argv);
-
-    int       win_argc = 0;
-    wchar_t **win_argv = CommandLineToArgvW(GetCommandLineW(), &win_argc);
-
-    if (!win_argv)
-        FatalError("ParseArguments: Could not retrieve command line arguments!\n");
-
-    program_argument_list.reserve(win_argc);
-
-    std::vector<std::string> argv_block;
-
-    for (int i = 0; i < win_argc; i++)
-    {
-        EPI_ASSERT(win_argv[i] != nullptr);
-        argv_block.push_back(epi::WStringToUTF8(win_argv[i]));
-    }
-
-    LocalFree(win_argv);
-
-    for (size_t i = 0; i < argv_block.size(); i++)
-    {
-        // Just place argv[0] as is
-        if (i == 0)
-        {
-            program_argument_list.emplace_back(argv_block[i]);
-            continue;
-        }
-
-        if (argv_block[i][0] == '@')
-        { // add it as a response file
-            ApplyResponseFile(&argv_block[i][1]);
-            continue;
-        }
-
-        program_argument_list.emplace_back(argv_block[i]);
-    }
-}
-#else
 void ParseArguments(const int argc, const char *const *argv)
 {
     EPI_ASSERT(argc >= 0);
@@ -125,7 +78,6 @@ void ParseArguments(const int argc, const char *const *argv)
         program_argument_list.emplace_back(argv[i]);
     }
 }
-#endif
 
 int FindArgument(std::string_view long_name, int *total_parameters)
 {

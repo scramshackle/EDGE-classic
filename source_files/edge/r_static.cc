@@ -39,23 +39,6 @@ extern ConsoleVariable sector_brightness_correction;
 
 static constexpr size_t kMaximumStaticRun = 3 * 4096;
 
-static inline BlendingMode StaticSurfaceBlending(float alpha, ImageOpacity opacity)
-{
-    BlendingMode blending;
-
-    if (alpha >= 0.99f && opacity == kOpacitySolid)
-        blending = kBlendingNone;
-    else if (alpha < 0.11f || opacity == kOpacityComplex)
-        blending = kBlendingMasked;
-    else
-        blending = kBlendingLess;
-
-    if (alpha < 0.99f || opacity == kOpacityComplex)
-        blending = (BlendingMode)(blending | kBlendingAlpha);
-
-    return blending;
-}
-
 struct StaticSpan
 {
     Sector *sector;
@@ -332,8 +315,6 @@ static int  capture_light      = 0;
 static Sector *capture_light_sector = nullptr;
 static int  capture_adjust     = 0;
 static Sector *capture_sector  = nullptr;
-static const LineSide   *capture_line_side = nullptr;
-static const MapSurface *capture_surf = nullptr;
 
 static int WallPartIndex(const LineSide *line_side, const MapSurface *surf)
 {
@@ -971,7 +952,8 @@ static int FindBatch(const Image *image, const Colormap *colormap, RegionPropert
 
         if (b.image == image && b.colormap == colormap && b.blending == blending && b.draw_pass == draw_pass &&
             b.scrolling == scrolling && b.glow_sector == glow_sector && b.fog_sky == fog_sky &&
-            b.properties->fog_color == props->fog_color && b.properties->fog_density == props->fog_density)
+            b.properties->fog_color == props->fog_color &&
+            epi::AlmostEquals(b.properties->fog_density, props->fog_density))
             return (int)i;
     }
 
@@ -1246,8 +1228,6 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
 
     capture_batch =
         FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
-    capture_line_side = line_side;
-    capture_surf      = surf;
     capture_sector    = sector;
     capture_adjust    = light_adjust;
 
@@ -1308,8 +1288,6 @@ void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, Re
 
     capture_batch =
         FindBatch(image, props->colourmap, props, sector, blending, draw_pass, capture_scroll_surface != nullptr);
-    capture_line_side = nullptr;
-    capture_surf      = nullptr;
     capture_sector    = sector;
     capture_adjust    = 0;
 
@@ -1567,8 +1545,6 @@ void StaticCaptureEnd(void)
 {
     capture_batch        = -1;
     capture_hash_key     = 0;
-    capture_line_side    = nullptr;
-    capture_surf         = nullptr;
     capture_sector       = nullptr;
     capture_light_sector = nullptr;
 }
@@ -2008,7 +1984,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         }
     }
 
-    render_unit_liquid = {{0, 0, 0, 0}};
+    render_unit_liquid = {};
 
     static_batch_light_row_offset = 0;
 }

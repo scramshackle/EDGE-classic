@@ -589,7 +589,7 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
     render_unit_whiten = do_whiten || current_image_whiten;
 
     if (current_image_blur > 0.0f)
-        render_unit_blur = {{current_image_blur, 0.0f, (float)image->width_, (float)image->height_}};
+        render_unit_blur = HMM_V4(current_image_blur, 0.0f, (float)image->width_, (float)image->height_);
 
     render_unit_liquid = LiquidShaderParameters(image, hud_tic / 35.0f);
 
@@ -614,8 +614,8 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
     FinishUnitBatch();
 
     render_unit_whiten = false;
-    render_unit_blur   = {{0, 0, 0, 0}};
-    render_unit_liquid = {{0, 0, 0, 0}};
+    render_unit_blur   = {};
+    render_unit_liquid = {};
 }
 
 void HUDRawFromTexID(float hx1, float hy1, float hx2, float hy2, unsigned int tex_id, ImageOpacity opacity, float tx1,

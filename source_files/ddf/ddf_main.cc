@@ -20,6 +20,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <string_view>
+
 #include "ddf_anim.h"
 #include "ddf_colormap.h"
 #include "ddf_font.h"
@@ -1206,7 +1208,7 @@ void DDFMainGetFloat(const char *info, void *storage)
         return;
     }
 
-    if (sscanf(info, "%f", dest) != 1)
+    if (!epi::ScanFloat(info, dest))
         DDFError("Bad floating point value: %s\n", info);
 }
 
@@ -1220,7 +1222,7 @@ void DDFMainGetAngle(const char *info, void *storage)
 
     float val;
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad angle value: %s\n", info);
 
     *dest = epi::BAMFromDegrees(val);
@@ -1233,7 +1235,7 @@ void DDFMainGetSlope(const char *info, void *storage)
 
     EPI_ASSERT(info && storage);
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad slope value: %s\n", info);
 
     if (val > +89.5f)
@@ -1250,7 +1252,7 @@ static void DoGetFloat(const char *info, void *storage)
 
     EPI_ASSERT(info && storage);
 
-    if (sscanf(info, "%f", dest) != 1)
+    if (!epi::ScanFloat(info, dest))
         DDFError("Bad floating point value: %s\n", info);
 }
 
@@ -1349,7 +1351,7 @@ void DDFMainGetTime(const char *info, void *storage)
         return;
     }
 
-    if (sscanf(info, "%f", &val) != 1)
+    if (!epi::ScanFloat(info, &val))
         DDFError("Bad time value: %s\n", info);
 
     *dest = (int)(val * (float)kTicRate);
@@ -1458,13 +1460,13 @@ void DDFMainGetWhenAppear(const char *info, void *storage)
             *result = (AppearsFlag)(*result | kAppearsWhenSkillLevel5);
     }
 
-    if (strstr(info, "SP") || strstr(info, "sp"))
+    if (epi::StringCaseFindASCII(info, "SP") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenSingle);
 
-    if (strstr(info, "COOP") || strstr(info, "coop"))
+    if (epi::StringCaseFindASCII(info, "COOP") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenCoop);
 
-    if (strstr(info, "DM") || strstr(info, "dm"))
+    if (epi::StringCaseFindASCII(info, "DM") != std::string_view::npos)
         *result = (AppearsFlag)(*result | kAppearsWhenDeathMatch);
 
     // allow more human readable strings...
@@ -2146,7 +2148,10 @@ void DDFAddFile(DDFType type, std::string &data, const std::string &source)
 void DDFAddCollection(std::vector<DDFFile> &col, const std::string &source)
 {
     for (DDFFile &it : col)
+    {
         DDFAddFile(it.type, it.data, source);
+        unread_ddf.back().from_dehacked = true;
+    }
 }
 
 void DDFDumpFile(const std::string &data)
@@ -2189,7 +2194,7 @@ static void DDFParseUnreadFile(size_t d)
             LogPrint("Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
 
             bool old_strict = strict_errors;
-            bool converted_ddf = (epi::StringCompareMax("DEHACKED", it.source, 8) == 0);
+            bool converted_ddf = it.from_dehacked;
 
             if (converted_ddf) 
             {

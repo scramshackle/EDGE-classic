@@ -869,7 +869,7 @@ void SR_LightPutType(void *storage, int index)
     }
 
     // look for it in the line types
-    for (auto ln : linetypes)
+    for (LineType *ln : linetypes)
     {
         if (src == &ln->l_)
         {
@@ -880,7 +880,7 @@ void SR_LightPutType(void *storage, int index)
     }
 
     // look for it in the sector types
-    for (auto sec : sectortypes)
+    for (SectorType *sec : sectortypes)
     {
         if (src == &sec->l_)
         {
@@ -1199,7 +1199,7 @@ void SR_PlaneMovePutType(void *storage, int index)
     }
 
     // check all the line types
-    for (auto ln : linetypes)
+    for (LineType *ln : linetypes)
     {
         if (src == &ln->f_)
         {
@@ -1217,7 +1217,7 @@ void SR_PlaneMovePutType(void *storage, int index)
     }
 
     // check all the sector types
-    for (auto sec : sectortypes)
+    for (SectorType *sec : sectortypes)
     {
         if (src == &sec->f_)
         {
@@ -1280,7 +1280,7 @@ void SR_SliderPutInfo(void *storage, int index)
 
     // check all the line types
 
-    for (auto ld_type : linetypes)
+    for (LineType *ld_type : linetypes)
     {
         if (src == &ld_type->s_)
         {

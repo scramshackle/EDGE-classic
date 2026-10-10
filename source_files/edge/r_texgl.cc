@@ -25,6 +25,7 @@
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "i_defs_gl.h"
 #include "i_system.h"
 #include "im_data.h"
@@ -107,15 +108,8 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
 
     if (!render_backend->SupportsFullNonPowerOfTwoTextures() && (!clamp || !nomip))
     {
-        int power_of_two_w = 1;
-        while (power_of_two_w < total_w)
-            power_of_two_w <<= 1;
-        total_w = power_of_two_w;
-
-        int power_of_two_h = 1;
-        while (power_of_two_h < total_h)
-            power_of_two_h <<= 1;
-        total_h = power_of_two_h;
+        total_w = epi::NextPowerOfTwo(total_w);
+        total_h = epi::NextPowerOfTwo(total_h);
     }
 
     int new_w, new_h;

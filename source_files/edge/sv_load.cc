@@ -284,6 +284,9 @@ static bool SV_LoadSTRU(void)
     if (strlen(S->marker) != 4)
         FatalError("LOADGAME: Corrupt savegame (STRU bad marker)\n");
 
+    if (numfields < 0)
+        FatalError("LOADGAME: Corrupt savegame (STRU bad field count)\n");
+
     S->fields = new SaveField[numfields + 1];
 
     EPI_CLEAR_MEMORY(S->fields, SaveField, numfields + 1);

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <string_view>
 #include <vector>
 
 #include "epi_str_util.h"

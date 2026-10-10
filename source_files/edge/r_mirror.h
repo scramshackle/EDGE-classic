@@ -393,7 +393,7 @@ class MirrorSet
 
     void ComputeNearPlane(DrawMirror *mir, const HMM_Mat4 &view_matrix)
     {
-        mir->near_plane = {{0.0f, 0.0f, 0.0f, 0.0f}};
+        mir->near_plane = {};
 
         if (active_ == 0)
             return;

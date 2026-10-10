@@ -39,13 +39,13 @@
 #include "r_state.h"
 #include "s_sound.h"
 
-typedef enum
+enum PlaneMoveResult
 {
-    RES_Ok,
-    RES_Crushed,
-    RES_PastDest,
-    RES_Impossible
-} move_result_e;
+    kPlaneMoveOk,
+    kPlaneMoveCrushed,
+    kPlaneMovePastDestination,
+    kPlaneMoveImpossible
+};
 
 std::vector<PlaneMover *>       active_planes;
 std::vector<SlidingDoorMover *> active_sliders;
@@ -232,8 +232,8 @@ void DestroyAllSliders(void)
 //    damage) and the plane height will be the new height, otherwise
 //    the plane height will remain at its current height.
 //
-static move_result_e AttemptMovePlane(Sector *sector, float speed, float dest, int crush, bool is_ceiling,
-                                      int direction)
+static PlaneMoveResult AttemptMovePlane(Sector *sector, float speed, float dest, int crush, bool is_ceiling,
+                                        int direction)
 {
     bool past = false;
     bool nofit;
@@ -253,7 +253,7 @@ static move_result_e AttemptMovePlane(Sector *sector, float speed, float dest, i
     }
 
     if (speed <= 0)
-        return RES_PastDest;
+        return kPlaneMovePastDestination;
 
     if (direction == kPlaneDirectionDown)
         speed = -speed;
@@ -261,7 +261,7 @@ static move_result_e AttemptMovePlane(Sector *sector, float speed, float dest, i
     // check if even possible
     if (!CheckSolidSectorMove(sector, is_ceiling, speed))
     {
-        return RES_Impossible;
+        return kPlaneMoveImpossible;
     }
 
     //
@@ -270,7 +270,7 @@ static move_result_e AttemptMovePlane(Sector *sector, float speed, float dest, i
     nofit = SolidSectorMove(sector, is_ceiling, speed, crush, false);
 
     if (!nofit)
-        return past ? RES_PastDest : RES_Ok;
+        return past ? kPlaneMovePastDestination : kPlaneMoveOk;
 
     // bugger, something got in our way !
 
@@ -280,12 +280,12 @@ static move_result_e AttemptMovePlane(Sector *sector, float speed, float dest, i
         SolidSectorMove(sector, is_ceiling, -speed, false, false);
     }
 
-    return past ? RES_PastDest : RES_Crushed;
+    return past ? kPlaneMovePastDestination : kPlaneMoveCrushed;
 }
 
-static move_result_e AttemptMoveSector(Sector *sector, PlaneMover *pmov, float dest, int crush)
+static PlaneMoveResult AttemptMoveSector(Sector *sector, PlaneMover *pmov, float dest, int crush)
 {
-    move_result_e res;
+    PlaneMoveResult res;
 
     if (!pmov->is_elevator)
     {
@@ -319,7 +319,7 @@ static bool MovePlane(PlaneMover *plane)
     //
     // RETURNS true if PlaneMover should be removed.
 
-    move_result_e res;
+    PlaneMoveResult res;
 
     Sector *sec = plane->sector;
 
@@ -372,7 +372,7 @@ static bool MovePlane(PlaneMover *plane)
             MakeMovingSound(&plane->sound_effect_started, plane->type->sfxdown_, &sec->sound_effects_origin);
         }
 
-        if (res == RES_PastDest)
+        if (res == kPlaneMovePastDestination)
         {
             if (!epi::AlmostEquals(plane->destination_height, plane->start_height))
             {
@@ -419,7 +419,7 @@ static bool MovePlane(PlaneMover *plane)
                 return true; // REMOVE ME
             }
         }
-        else if (res == RES_Crushed)
+        else if (res == kPlaneMoveCrushed)
         {
             if (plane->crush)
             {
@@ -446,7 +446,7 @@ static bool MovePlane(PlaneMover *plane)
                 }
             }
         }
-        else if (res == RES_Impossible)
+        else if (res == kPlaneMoveImpossible)
         {
             switch (plane->type->type_)
             {
@@ -533,7 +533,7 @@ static bool MovePlane(PlaneMover *plane)
             MakeMovingSound(&plane->sound_effect_started, plane->type->sfxup_, &sec->sound_effects_origin);
         }
 
-        if (res == RES_PastDest)
+        if (res == kPlaneMovePastDestination)
         {
             if (!epi::AlmostEquals(plane->destination_height, plane->start_height))
             {
@@ -578,7 +578,7 @@ static bool MovePlane(PlaneMover *plane)
                 return true; // REMOVE ME
             }
         }
-        else if (res == RES_Crushed)
+        else if (res == kPlaneMoveCrushed)
         {
             if (plane->crush)
             {
@@ -604,7 +604,7 @@ static bool MovePlane(PlaneMover *plane)
                 }
             }
         }
-        else if (res == RES_Impossible)
+        else if (res == kPlaneMoveImpossible)
         {
             switch (plane->type->type_)
             {

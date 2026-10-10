@@ -535,7 +535,7 @@ SectorTypeContainer::SectorTypeContainer()
 
 SectorTypeContainer::~SectorTypeContainer()
 {
-    for (auto iter = begin(); iter != end(); iter++)
+    for (std::vector<SectorType *>::iterator iter = begin(); iter != end(); iter++)
     {
         SectorType *sec = *iter;
         delete sec;
@@ -559,7 +559,7 @@ SectorType *SectorTypeContainer::Lookup(const int id)
         return lookup_cache_[slot];
     }
 
-    for (auto iter = rbegin(); iter != rend(); iter++)
+    for (std::vector<SectorType *>::reverse_iterator iter = rbegin(); iter != rend(); iter++)
     {
         SectorType *s = *iter;
 
@@ -581,7 +581,7 @@ SectorType *SectorTypeContainer::Lookup(const int id)
 //
 void SectorTypeContainer::Reset()
 {
-    for (auto iter = begin(); iter != end(); iter++)
+    for (std::vector<SectorType *>::iterator iter = begin(); iter != end(); iter++)
     {
         SectorType *sec = *iter;
         delete sec;

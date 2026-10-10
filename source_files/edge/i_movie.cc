@@ -55,10 +55,6 @@ static float     vx1          = 0.0f;
 static float     vx2          = 0.0f;
 static float     vy1          = 0.0f;
 static float     vy2          = 0.0f;
-static float     tx1          = 0.0f;
-static float     tx2          = 1.0f;
-static float     ty1          = 0.0f;
-static float     ty2          = 1.0f;
 static double           last_time        = 0;
 static double           movie_start_time = 0;
 static SDL_AudioStream *movie_stream;
@@ -195,10 +191,6 @@ void PlayMovie(const std::string &name)
     // we allow menu access/console while a movie is playing
     int frame_height = 0;
     int frame_width  = 0;
-    tx1              = 0.0f;
-    tx2              = 1.0f;
-    ty1              = 0.0f;
-    ty2              = 1.0f;
     if (movie->scaling_ == kMovieScalingAutofit)
     {
         // If movie and display ratios match (ish), stretch it

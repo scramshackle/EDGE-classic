@@ -649,10 +649,12 @@ static void DrawStdCrossHair(void)
     if (crosshair_size.f_ < 0.1 || crosshair_brightness.f_ < 0.1)
         return;
 
-    unsigned int tex_id = available_crosshairs[crosshair_image.s_];
+    std::map<std::string, unsigned int>::iterator crosshair = available_crosshairs.find(crosshair_image.s_);
 
-    if (!tex_id)
+    if (crosshair == available_crosshairs.end() || !crosshair->second)
         return;
+
+    unsigned int tex_id = crosshair->second;
 
     RGBAColor color = crosshair_colors[crosshair_color.d_ & 7];
 
@@ -2230,9 +2232,10 @@ static void SetSpriteViewParameters(void)
 {
     float skew = (mirror_view.xy_scale >= 0.99f) ? sprite_skew : 0.0f;
 
-    render_unit_sprite_view[0] = {{mirror_view.sprite_right.X, mirror_view.sprite_right.Y,
-                                   mirror_view.sprite_forward.X * skew, mirror_view.sprite_forward.Y * skew}};
-    render_unit_sprite_view[1] = {{mirror_view.reflective ? 1.0f : 0.0f, (float)render_view_extra_light, 0.0f, 0.0f}};
+    render_unit_sprite_view[0] = HMM_V4(mirror_view.sprite_right.X, mirror_view.sprite_right.Y,
+                                        mirror_view.sprite_forward.X * skew, mirror_view.sprite_forward.Y * skew);
+    render_unit_sprite_view[1] =
+        HMM_V4(mirror_view.reflective ? 1.0f : 0.0f, (float)render_view_extra_light, 0.0f, 0.0f);
 }
 
 void RenderThings(std::vector<DrawThing *> &things, std::vector<DrawThing *> &transparent_things)

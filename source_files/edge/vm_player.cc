@@ -24,6 +24,7 @@
 #include "e_main.h"
 #include "e_player.h"
 #include "epi.h"
+#include "epi_str_util.h"
 #include "f_interm.h" //Lobo: need this to get access to intermission_stats
 #include "g_game.h"
 #include "hu_draw.h"
@@ -1210,8 +1211,7 @@ static std::string GetMobjBenefits(MapObject *obj, bool KillBenefits = false)
 
         case kBenefitTypeKey:
             temp_string += "KEY";
-            temp_num = log2((int)list->sub.type);
-            temp_num++;
+            temp_num = epi::HighestSetBit((uint32_t)list->sub.type) + 1;
             temp_string += std::to_string(temp_num);
             break;
 
@@ -1344,7 +1344,7 @@ static std::string GetQueryInfoFromWeapon(MapObject *obj, int whatinfo, bool sec
 
     case 2: // ZOOM_FACTOR
         temp_num2   = 90.0f / objWep->zoom_fov_;
-        temp_string = std::to_string(temp_num2);
+        temp_string = epi::FloatToFixedString(temp_num2, 6);
         break;
 
     case 3: // AMMOTYPE

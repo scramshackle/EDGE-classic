@@ -37,6 +37,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "epi.h"
+
 namespace epi
 {
 
@@ -86,6 +88,27 @@ inline bool AlmostEquals(double first, double second)
                                                              : (biased_second - biased_first);
 
     return distance <= kAlmostEqualsMaxUlps;
+}
+
+inline int HighestSetBit(uint32_t value)
+{
+    int index = -1;
+    while (value != 0)
+    {
+        value >>= 1;
+        index++;
+    }
+    return index;
+}
+
+inline int NextPowerOfTwo(int value)
+{
+    EPI_ASSERT(value <= (1 << 30));
+
+    int result = 1;
+    while (result < value)
+        result <<= 1;
+    return result;
 }
 
 class RNG

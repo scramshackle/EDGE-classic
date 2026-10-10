@@ -146,7 +146,7 @@ void ConsoleVariable::FormatFloat(float value)
 void ConsoleVariable::ParseString()
 {
     d_ = atoi(s_.c_str());
-    f_ = atof(s_.c_str());
+    f_ = epi::ParseDouble(s_.c_str());
     if (f_ < min_ || f_ > max_)
     {
         LogWarning("Value %g exceeds lower/upper limits for %s! Resetting to default "
@@ -154,7 +154,7 @@ void ConsoleVariable::ParseString()
                    f_, name_);
         s_ = def_;
         d_ = atoi(s_.c_str());
-        f_ = atof(s_.c_str());
+        f_ = epi::ParseDouble(s_.c_str());
     }
 }
 
@@ -240,16 +240,7 @@ ConsoleVariable *FindConsoleVariable(const char *name)
 
 bool ConsoleMatchPattern(const char *name, const char *pat)
 {
-    while (*name && *pat)
-    {
-        if (*name != *pat)
-            return false;
-
-        name++;
-        pat++;
-    }
-
-    return (*pat == 0);
+    return epi::StringPrefixCaseCompareASCII(name, pat) == 0;
 }
 
 int MatchConsoleVariables(std::vector<const char *> &list, const char *pattern)
@@ -302,7 +293,7 @@ int PrintConsoleVariables(const char *match, bool show_default)
     for (ConsoleVariable *var = all_console_variables; var != nullptr; var = var->next_)
     {
         if (match && *match)
-            if (!strstr(var->name_, match))
+            if (epi::StringCaseFindASCII(var->name_, match) == std::string_view::npos)
                 continue;
 
         if (show_default)

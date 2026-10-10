@@ -92,9 +92,6 @@ static int count;
 // used for timing of background animation
 static int background_count;
 
-// signals to refresh everything for one frame
-static int first_refresh;
-
 static constexpr uint8_t kNumberOfPlayersShown = 10;
 
 static int single_player_state;
@@ -148,9 +145,6 @@ static const Image *colon;
 // 0-9 graphic
 static const Image *digits[10]; // FIXME: use FONT/STYLE
 
-// minus sign
-static const Image *wiminus;
-
 // "Finished!" graphics
 static const Image *finished;
 
@@ -162,23 +156,12 @@ static const Image *single_player_secret;
 
 // "Kills", "Scrt", "Items", "Frags"
 static const Image *kills;
-static const Image *secret;
 static const Image *items;
-static const Image *frags;
 
 // Time sucks.
 static const Image *time_image; // -ACB- 1999/09/19 Removed Conflict with <time.h>
 static const Image *par;
 static const Image *sucks;
-
-// "killers", "victims"
-static const Image *killers;
-static const Image *victims;
-
-// "Total", your face, your dead face
-static const Image *total;
-static const Image *face;
-static const Image *dead_face;
 
 // Name graphics of each level (centered)
 static const Image *level_names[2];
@@ -679,7 +662,7 @@ static void DrawEnteringLevel(void)
 static float PercentWidth(std::string &s)
 {
     float perc_width = 0;
-    for (auto c : s)
+    for (char c : s)
     {
         if (c == '%')
         {
@@ -695,7 +678,7 @@ static float PercentWidth(std::string &s)
 
 static void DrawPercent(float x, float y, std::string &s)
 {
-    for (auto c : s)
+    for (char c : s)
     {
         if (c == '%')
         {
@@ -779,7 +762,7 @@ static float TimeWidth(int t, bool drawText = false)
         else
         {
             float time_width = 0;
-            for (auto c : s)
+            for (char c : s)
             {
                 if (c == ':')
                 {
@@ -856,7 +839,7 @@ static void DrawTime(float x, float y, int t, bool drawText = false)
         }
         else
         {
-            for (auto c : s)
+            for (char c : s)
             {
                 if (c == ':')
                 {
@@ -1937,7 +1920,6 @@ static void LoadData(void)
     if (gd->splatpic_ != "")
         splat[0] = ImageLookup(gd->splatpic_.c_str());
 
-    wiminus = ImageLookup("WIMINUS"); //!!! FIXME: use the style!
     percent = ImageLookup("WIPCNT");
     colon   = ImageLookup("WICOLON");
 
@@ -1945,24 +1927,14 @@ static void LoadData(void)
     entering = ImageLookup("WIENTER");
     kills    = ImageLookup("WIOSTK", kImageNamespaceGraphic, kImageLookupNull);
     // kills = ImageLookup("WIOSTK");
-    secret = ImageLookup("WIOSTS");                       // "scrt"
 
     single_player_secret = ImageLookup("WISCRT2", kImageNamespaceGraphic,
                                        kImageLookupNull); // "secret"
 
     items      = ImageLookup("WIOSTI", kImageNamespaceGraphic, kImageLookupNull);
-    frags      = ImageLookup("WIFRGS");
     time_image = ImageLookup("WITIME", kImageNamespaceGraphic, kImageLookupNull);
     sucks      = ImageLookup("WISUCKS", kImageNamespaceGraphic, kImageLookupNull);
     par        = ImageLookup("WIPAR", kImageNamespaceGraphic, kImageLookupNull);
-    killers    = ImageLookup("WIKILRS"); // "killers" (vertical)
-
-    victims = ImageLookup("WIVCTMS");    // "victims" (horiz)
-
-    total = ImageLookup("WIMSTT");
-    face  = ImageLookup("STFST01");      // your face
-
-    dead_face = ImageLookup("STFDEAD0"); // dead face
 
     for (i = 0; i < 10; i++)
     {
@@ -1992,7 +1964,6 @@ static void InitVariables(void)
 
     accelerate_stage = false;
     count = background_count = 0;
-    first_refresh            = 1;
 
     if (intermission_stats.kills <= 0)
         intermission_stats.kills = 1;

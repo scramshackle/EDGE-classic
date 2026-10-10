@@ -39,7 +39,7 @@ void LuaLoadScripts()
         LogWarning("Lua and COAL huds detected, selecting Lua hud\n");
     }
     int top = lua_gettop(global_lua_state);
-    for (auto &info : pending_scripts)
+    for (pending_lua_script_c &info : pending_scripts)
     {
         LogPrint("Compiling: %s\n", info.source.c_str());
 

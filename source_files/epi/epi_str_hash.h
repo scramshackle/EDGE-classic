@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #ifdef EDGE_EXTRA_CHECKS
 #include <unordered_map>
 #endif

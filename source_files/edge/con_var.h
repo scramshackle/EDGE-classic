@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define EDGE_DEFINE_CONSOLE_VARIABLE(name, value, flags) ConsoleVariable name(#name, value, flags);

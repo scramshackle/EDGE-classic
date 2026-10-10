@@ -219,12 +219,12 @@ static void AttackParseField(const char *field, const char *contents, int index,
     // backward compatibility...
     if (DDFCompareName(field, "DAMAGE_RANGE") == 0)
     {
-        a_damage_range = atof(contents);
+        a_damage_range = epi::ParseDouble(contents);
         return;
     }
     else if (DDFCompareName(field, "DAMAGE_MULTI") == 0)
     {
-        a_damage_multi = atof(contents);
+        a_damage_multi = epi::ParseDouble(contents);
         return;
     }
 

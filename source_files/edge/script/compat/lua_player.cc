@@ -5,6 +5,7 @@
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_player.h"
+#include "epi_str_util.h"
 #include "f_interm.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -1190,8 +1191,7 @@ static std::string GetMobjBenefits(MapObject *obj, bool KillBenefits = false)
 
         case kBenefitTypeKey:
             temp_string += "KEY";
-            temp_num = log2((int)list->sub.type);
-            temp_num++;
+            temp_num = epi::HighestSetBit((uint32_t)list->sub.type) + 1;
             temp_string += std::to_string(temp_num);
             break;
 
@@ -1321,7 +1321,7 @@ static std::string GetQueryInfoFromWeapon(MapObject *obj, int whatinfo, bool sec
 
     case 2: // ZOOM_FACTOR
         temp_num2   = 90.0f / objWep->zoom_fov_;
-        temp_string = std::to_string(temp_num2);
+        temp_string = epi::FloatToFixedString(temp_num2, 6);
         break;
 
     case 3: // AMMOTYPE
@@ -1536,7 +1536,7 @@ static void CreateLuaTable_Benefits(lua_State *L, MapObject *obj, bool KillBenef
 
         case kBenefitTypeKey:
             BenefitName   = "KEY";
-            BenefitType   = (log2((int)list->sub.type) + 1);
+            BenefitType   = epi::HighestSetBit((uint32_t)list->sub.type) + 1;
             BenefitAmount = 1;
             break;
 
@@ -1909,9 +1909,10 @@ static int MO_tagged_info(lua_State *L)
     else
     {
         lua_createtable(L, 0, count);
-        auto findme = active_tagged_map_objects.equal_range(whattag);
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> findme =
+            active_tagged_map_objects.equal_range(whattag);
         int  index  = 1;
-        for (auto mobj = findme.first; mobj != findme.second; ++mobj, ++index)
+        for (std::multimap<int, MapObject *>::iterator mobj = findme.first; mobj != findme.second; ++mobj, ++index)
         {
             lua_pushnumber(L, index);
             CreateLuaTable_Mobj(L, mobj->second);
@@ -1936,9 +1937,10 @@ static int MO_tid_info(lua_State *L)
     else
     {
         lua_createtable(L, 0, count);
-        auto findme = active_tids.equal_range(whattid);
+        std::pair<std::multimap<int, MapObject *>::iterator, std::multimap<int, MapObject *>::iterator> findme =
+            active_tids.equal_range(whattid);
         int  index  = 1;
-        for (auto mobj = findme.first; mobj != findme.second; ++mobj, ++index)
+        for (std::multimap<int, MapObject *>::iterator mobj = findme.first; mobj != findme.second; ++mobj, ++index)
         {
             lua_pushnumber(L, index);
             CreateLuaTable_Mobj(L, mobj->second);

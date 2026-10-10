@@ -798,7 +798,7 @@ static void CheckForLevel(WadFile *wad, int lump, const char *name, const RawWad
     if (remaining < 2)
         return;
 
-    if (strncmp(raw[1].name, "THINGS", 8) == 0 && strncmp(raw[2].name, "LINEDEFS", 8) == 0 &&
+    if (remaining >= 4 && strncmp(raw[1].name, "THINGS", 8) == 0 && strncmp(raw[2].name, "LINEDEFS", 8) == 0 &&
         strncmp(raw[3].name, "SIDEDEFS", 8) == 0 && strncmp(raw[4].name, "VERTEXES", 8) == 0)
     {
         if (strlen(name) > 5)
@@ -820,7 +820,7 @@ static void CheckForLevel(WadFile *wad, int lump, const char *name, const RawWad
 
     // handle GL nodes here too
 
-    if (strncmp(raw[1].name, "GL_VERT", 8) == 0 && strncmp(raw[2].name, "GL_SEGS", 8) == 0 &&
+    if (remaining >= 4 && strncmp(raw[1].name, "GL_VERT", 8) == 0 && strncmp(raw[2].name, "GL_SEGS", 8) == 0 &&
         strncmp(raw[3].name, "GL_SSECT", 8) == 0 && strncmp(raw[4].name, "GL_NODES", 8) == 0)
     {
         wad->level_markers_.push_back(lump);
@@ -1210,7 +1210,7 @@ void ProcessWad(DataFile *df, size_t file_index)
 
 void ReadUMAPINFOLumps(void)
 {
-    for (auto df : data_files)
+    for (DataFile *df : data_files)
     {
         if (df->wad_)
         {
@@ -1254,7 +1254,7 @@ void ReadUMAPINFOLumps(void)
 
             if (epi::StringPrefixCompare(mapname, "MAP") == 0)
             {
-                for (auto c : mapname.substr(3))
+                for (char c : mapname.substr(3))
                 {
                     if (!epi::IsDigitASCII(c))
                         FatalError("UMAPINFO: Bad map name: %s!\n", mapname.c_str());
@@ -1264,7 +1264,7 @@ void ReadUMAPINFOLumps(void)
             }
             else if (mapname[0] == 'E')
             {
-                for (auto c : mapname.substr(3))
+                for (char c : mapname.substr(3))
                 {
                     if (!epi::IsDigitASCII(c) && c != 'M')
                         FatalError("UMAPINFO: Bad map name: %s!\n", mapname.c_str());
@@ -1637,7 +1637,7 @@ void ReadUMAPINFOLumps(void)
 
             // Validate episode entry
             bool good_epi = false;
-            for (auto g : gamedefs)
+            for (GameDefinition *g : gamedefs)
             {
                 if (temp_level->episode_name_ == g->name_)
                 {

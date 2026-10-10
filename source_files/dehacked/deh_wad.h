@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "ddf_collection.h"
+#include "epi.h"
 
 namespace dehacked
 {
@@ -30,11 +31,7 @@ namespace wad
 extern std::vector<DDFFile> *dest_container;
 
 void NewLump(DDFType type);
-#ifdef __GNUC__
-void Printf(const char *str, ...) __attribute__((format(printf, 1, 2)));
-#else
-void Printf(const char *str, ...);
-#endif
+void Printf(const char *str, ...) EPI_PRINTF_FORMAT(1, 2);
 } // namespace wad
 
 } // namespace dehacked
