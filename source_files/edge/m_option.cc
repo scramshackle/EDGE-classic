@@ -75,8 +75,8 @@
 
 #include "m_option.h"
 
-#include <math.h>
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include <set>
 
@@ -113,7 +113,6 @@
 #include "s_midi.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 int  option_menu_on    = 0;
@@ -1261,7 +1260,7 @@ void OptionMenuDrawer()
             }
             else
             {
-                stbsp_sprintf(tempstring, "Invalid");
+                epi::FormatToBufferSized(tempstring, sizeof(tempstring), "Invalid");
             }
 
             HUDWriteText(style, StyleDefinition::kTextSectionAlternate, (current_menu->menu_center) + 15, curry,
@@ -1320,14 +1319,16 @@ static void OptionMenuResOptDrawer(Style *style, int topy, int bottomy, int dy, 
     int   fontType  = StyleDefinition::kTextSectionAlternate;
     float TEXTscale = style->definition_->text_[fontType].scale_;
 
-    stbsp_sprintf(tempstring, "%s",
-                  new_window_mode.window_mode == kWindowModeBorderless ? "Borderless Fullscreen" : "Windowed");
+    epi::FormatToBufferSized(tempstring, sizeof(tempstring), "%s",
+                             new_window_mode.window_mode == kWindowModeBorderless ? "Borderless Fullscreen"
+                                                                                  : "Windowed");
     HUDWriteText(style, fontType, centrex + 15, y, tempstring);
 
     if (new_window_mode.window_mode == kWindowModeWindowed)
     {
         y += dy;
-        stbsp_sprintf(tempstring, "%dx%d", new_window_mode.width, new_window_mode.height);
+        epi::FormatToBufferSized(tempstring, sizeof(tempstring), "%dx%d", new_window_mode.width,
+                                 new_window_mode.height);
         HUDWriteText(style, fontType, centrex + 15, y, tempstring);
     }
 
@@ -1337,7 +1338,7 @@ static void OptionMenuResOptDrawer(Style *style, int topy, int bottomy, int dy, 
     fontType  = StyleDefinition::kTextSectionHelp;
     TEXTscale = style->definition_->text_[fontType].scale_;
 
-    stbsp_sprintf(tempstring, "Current Resolution:");
+    epi::FormatToBufferSized(tempstring, sizeof(tempstring), "Current Resolution:");
     HUDWriteText(style, fontType, 160 - (style->fonts_[fontType]->StringWidth(tempstring) * TEXTscale / 2), y,
                  tempstring);
 
@@ -1347,9 +1348,10 @@ static void OptionMenuResOptDrawer(Style *style, int topy, int bottomy, int dy, 
     y += dy;
     y += 5;
     if (current_window_mode == kWindowModeBorderless)
-        stbsp_sprintf(tempstring, "%s", "Borderless Fullscreen");
+        epi::FormatToBufferSized(tempstring, sizeof(tempstring), "%s", "Borderless Fullscreen");
     else
-        stbsp_sprintf(tempstring, "%d x %d %s", current_screen_width, current_screen_height, "Windowed");
+        epi::FormatToBufferSized(tempstring, sizeof(tempstring), "%d x %d %s", current_screen_width,
+                                 current_screen_height, "Windowed");
 
     HUDWriteText(style, fontType, 160 - (style->fonts_[fontType]->StringWidth(tempstring) * TEXTscale / 2), y,
                  tempstring);
@@ -1955,7 +1957,7 @@ static void OptionMenuChangeMonitorSize(int key_pressed, ConsoleVariable *consol
         1.60000, 1.77777, 2.33333  // 16:10  16:9  21:9
     };
 
-    monitor_size = HMM_Clamp(0, monitor_size, 5);
+    monitor_size = epi::Clamp(monitor_size, 0, 5);
 
     monitor_aspect_ratio = ratios[monitor_size];
 }
@@ -2113,7 +2115,7 @@ static void OptionMenuChangeRenderScale(int key_pressed, ConsoleVariable *consol
     EPI_UNUSED(key_pressed);
     EPI_UNUSED(console_variable);
 
-    render_scale_index = HMM_Clamp(0, render_scale_index, kTotalRenderScaleSteps - 1);
+    render_scale_index = epi::Clamp(render_scale_index, 0, kTotalRenderScaleSteps - 1);
 
     render_scale = render_scale_steps[render_scale_index];
 }

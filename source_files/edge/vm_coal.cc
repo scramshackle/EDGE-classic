@@ -35,7 +35,6 @@
 #include "m_random.h"
 #include "n_network.h"
 #include "r_modes.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -49,7 +48,7 @@ void COALPrinter(const char *msg, ...)
     va_list argptr;
 
     va_start(argptr, msg);
-    stbsp_vsnprintf(buffer, sizeof(buffer), msg, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), msg, argptr);
     va_end(argptr);
 
     buffer[sizeof(buffer) - 1] = 0;
@@ -238,7 +237,7 @@ static void MATH_cos(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(cos(val * HMM_PI / 180.0));
+    vm->ReturnFloat(cos(val * epi::kPi / 180.0));
 }
 
 // math.sin(val)
@@ -247,7 +246,7 @@ static void MATH_sin(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(sin(val * HMM_PI / 180.0));
+    vm->ReturnFloat(sin(val * epi::kPi / 180.0));
 }
 
 // math.tan(val)
@@ -256,7 +255,7 @@ static void MATH_tan(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(tan(val * HMM_PI / 180.0));
+    vm->ReturnFloat(tan(val * epi::kPi / 180.0));
 }
 
 // math.acos(val)
@@ -265,7 +264,7 @@ static void MATH_acos(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(acos(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(acos(val) * 180.0 / epi::kPi);
 }
 
 // math.asin(val)
@@ -274,7 +273,7 @@ static void MATH_asin(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(asin(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(asin(val) * 180.0 / epi::kPi);
 }
 
 // math.atan(val)
@@ -283,7 +282,7 @@ static void MATH_atan(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(atan(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(atan(val) * 180.0 / epi::kPi);
 }
 
 // math.atan2(x, y)
@@ -294,7 +293,7 @@ static void MATH_atan2(coal::VM *vm, int argc)
     double x = *vm->AccessParam(0);
     double y = *vm->AccessParam(1);
 
-    vm->ReturnFloat(atan2(y, x) * 180.0 / HMM_PI);
+    vm->ReturnFloat(atan2(y, x) * 180.0 / epi::kPi);
 }
 
 // math.log(val)

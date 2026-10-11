@@ -283,8 +283,8 @@ class MD2Model
     }
 };
 
-static HMM_Vec3 render_position;
-static HMM_Vec2 render_texture_coordinates;
+static epi::Vec3 render_position;
+static epi::Vec2 render_texture_coordinates;
 
 static std::vector<RendererVertex> model_vertices;
 
@@ -407,11 +407,11 @@ static void MD2UploadMesh(MD2Model *md)
             destination[v * 3 + 1] = vert->y;
             destination[v * 3 + 2] = vert->z;
 
-            const HMM_Vec3 &normal = md_normals[vert->normal_idx];
+            const epi::Vec3 &normal = md_normals[vert->normal_idx];
 
-            normal_destination[v * 3 + 0] = normal.X;
-            normal_destination[v * 3 + 1] = normal.Y;
-            normal_destination[v * 3 + 2] = normal.Z;
+            normal_destination[v * 3 + 0] = normal.x;
+            normal_destination[v * 3 + 1] = normal.y;
+            normal_destination[v * 3 + 2] = normal.z;
         }
     }
 
@@ -624,8 +624,8 @@ MD2Model *MD2Load(epi::File *f, float &radius)
                 good_V->normal_idx = (good_V->normal_idx % kTotalMDFormatNormals);
             }
 
-            HMM_Vec3 vr = {{good_V->x, good_V->y, good_V->z}};
-            float    r  = HMM_Len(vr);
+            epi::Vec3 vr = {good_V->x, good_V->y, good_V->z};
+            float     r  = epi::VectorLength(vr);
 
             if (r > radius)
             {
@@ -692,9 +692,9 @@ static uint8_t MD2FindNormal(float x, float y, float z)
     {
         int n = md_normal_groups[i][0];
 
-        float nx = md_normals[n].X;
-        float ny = md_normals[n].Y;
-        float nz = md_normals[n].Z;
+        float nx = md_normals[n].x;
+        float ny = md_normals[n].y;
+        float nz = md_normals[n].z;
 
         float dot = (x * nx + y * ny + z * nz);
 
@@ -718,7 +718,7 @@ static void MD3CreateNormalMap(void)
     float sintab[160];
 
     for (int i = 0; i < 160; i++)
-        sintab[i] = sin(i * HMM_PI / 64.0);
+        sintab[i] = sin(i * epi::kPi / 64.0);
 
     for (int pitch = 0; pitch < 128; pitch++)
     {
@@ -865,8 +865,8 @@ MD2Model *MD3Load(epi::File *f, float &radius)
 
             good_V->normal_idx = md3_normal_to_md2[vert.pitch >> 1][vert.yaw >> 1];
 
-            HMM_Vec3 vr = {{good_V->x, good_V->y, good_V->z}};
-            float    r  = HMM_Len(vr);
+            epi::Vec3 vr = {good_V->x, good_V->y, good_V->z};
+            float     r  = epi::VectorLength(vr);
 
             if (r > radius)
             {
@@ -923,30 +923,30 @@ class MD2CoordinateData
 
     // fuzzy info
     float    fuzz_multiplier_;
-    HMM_Vec2 fuzz_add_;
+    epi::Vec2 fuzz_add_;
 
     // mlook vectors
-    HMM_Vec2 mouselook_x_matrix_;
-    HMM_Vec2 mouselook_z_matrix_;
+    epi::Vec2 mouselook_x_matrix_;
+    epi::Vec2 mouselook_z_matrix_;
 
     // rotation vectors
-    HMM_Vec2 rotation_x_matrix_;
-    HMM_Vec2 rotation_y_matrix_;
+    epi::Vec2 rotation_x_matrix_;
+    epi::Vec2 rotation_y_matrix_;
 
   public:
-    void CalculatePosition(HMM_Vec3 &pos, float x1, float y1, float z1) const
+    void CalculatePosition(epi::Vec3 &pos, float x1, float y1, float z1) const
     {
         x1 *= xy_scale_;
         y1 *= xy_scale_;
         z1 *= z_scale_;
 
-        float x2 = x1 * mouselook_x_matrix_.X + z1 * mouselook_x_matrix_.Y;
-        float z2 = x1 * mouselook_z_matrix_.X + z1 * mouselook_z_matrix_.Y;
+        float x2 = x1 * mouselook_x_matrix_.x + z1 * mouselook_x_matrix_.y;
+        float z2 = x1 * mouselook_z_matrix_.x + z1 * mouselook_z_matrix_.y;
         float y2 = y1;
 
-        pos.X = x_ + x2 * rotation_x_matrix_.X + y2 * rotation_x_matrix_.Y;
-        pos.Y = y_ + x2 * rotation_y_matrix_.X + y2 * rotation_y_matrix_.Y;
-        pos.Z = z_ + z2;
+        pos.x = x_ + x2 * rotation_x_matrix_.x + y2 * rotation_x_matrix_.y;
+        pos.y = y_ + x2 * rotation_y_matrix_.x + y2 * rotation_y_matrix_.y;
+        pos.z = z_ + z2;
     }
 };
 
@@ -1071,13 +1071,13 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
         skin_tex = ImageCache(fuzz_image, false);
 
         data.fuzz_multiplier_ = 0.8;
-        data.fuzz_add_        = {{0, 0}};
+        data.fuzz_add_        = {0, 0};
 
         if (!data.is_weapon && !view_is_zoomed)
         {
             float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
 
-            data.fuzz_multiplier_ = 70.0 / HMM_Clamp(35, dist, 700);
+            data.fuzz_multiplier_ = 70.0 / epi::Clamp(dist, 35.0f, 700.0f);
         }
 
         FuzzAdjust(&data.fuzz_add_, mo);
@@ -1257,7 +1257,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
     info.light_depth_fixed = is_weapon;
     info.light_fixed_depth = is_weapon ? WeaponModelLightDepth(mo) : 0.0f;
     info.fuzzy             = data.is_fuzzy_;
-    info.tint = {{render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier}};
+    info.tint              = {render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier};
 
     if (blending & kBlendingLess)
         info.alpha_test = trans * 0.66f;
@@ -1268,7 +1268,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
 
     if (data.is_fuzzy_)
     {
-        info.texture_scale  = {{data.fuzz_multiplier_, data.fuzz_multiplier_}};
+        info.texture_scale  = {data.fuzz_multiplier_, data.fuzz_multiplier_};
         info.texture_offset = data.fuzz_add_;
     }
 
@@ -1327,13 +1327,13 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
         const ModelMeshVertex *point = &mesh.vertices_[(size_t)v];
         const MD2Vertex       *vert  = &frame_ptr->vertices[point->vert_idx];
 
-        render_texture_coordinates = {{point->skin_s, point->skin_t}};
+        render_texture_coordinates = {point->skin_s, point->skin_t};
 
         float dx = vert->x * xscale;
         float dy = vert->y * xscale;
         float dz = (vert->z + info->model_bias_) * yscale;
 
-        render_position = {{x + dy, y + dz, dx / 256.0f}};
+        render_position = {x + dy, y + dz, dx / 256.0f};
 
         StoreModelVertex(v, model_rgba);
     }

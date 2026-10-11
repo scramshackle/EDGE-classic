@@ -18,13 +18,15 @@
 
 #include "r_sky.h"
 
-#include <algorithm>
 #include <float.h>
 #include <math.h>
 
+#include <algorithm>
+
 #include "dm_state.h"
-#include "epi.h"
 #include "edge_profiling.h"
+#include "epi.h"
+#include "epi_str_util.h"
 #include "g_game.h" // current_map
 #include "i_defs_gl.h"
 #include "im_data.h"
@@ -42,7 +44,6 @@
 #include "r_static.h"
 #include "r_texgl.h"
 #include "r_units.h"
-#include "stb_sprintf.h"
 #include "w_flat.h"
 #include "w_wad.h"
 
@@ -58,8 +59,8 @@ extern ImageData *ReadAsEpiBlock(Image *rim);
 
 extern ConsoleVariable draw_culling;
 
-static HMM_Vec2 ddf_sky_scroll     = {{0, 0}};
-static HMM_Vec2 ddf_old_sky_scroll = {{0, 0}};
+static epi::Vec2 ddf_sky_scroll     = {0, 0};
+static epi::Vec2 ddf_old_sky_scroll = {0, 0};
 static int      ddf_scroll_tic     = -1;
 
 SkyStretch current_sky_stretch = kSkyStretchUnset;
@@ -333,7 +334,7 @@ static std::vector<SkyMirrorBucket> sky_mirror_buckets;
 static int32_t sky_current_bucket = -1;
 
 static bool     sky_mirror_active  = false;
-static HMM_Mat4 sky_mirror_inverse = {};
+static epi::Mat4 sky_mirror_inverse = {};
 
 static bool sky_backdrop_pass = false;
 
@@ -622,15 +623,15 @@ void SkyResidentInvalidateSector(Sector *sec)
 
 static bool SkyEntryFacesView(const LineSide *line_side)
 {
-    float x1 = line_side->vertex_1->X;
-    float y1 = line_side->vertex_1->Y;
-    float x2 = line_side->vertex_2->X;
-    float y2 = line_side->vertex_2->Y;
+    float x1 = line_side->vertex_1->x;
+    float y1 = line_side->vertex_1->y;
+    float x2 = line_side->vertex_2->x;
+    float y2 = line_side->vertex_2->y;
 
     return (view_x - x1) * (y2 - y1) - (view_y - y1) * (x2 - x1) > 0.0f;
 }
 
-static void PushSkyVertex(int section, const HMM_Vec3 &position)
+static void PushSkyVertex(int section, const epi::Vec3 &position)
 {
     RendererVertex vertex;
 
@@ -835,17 +836,17 @@ void SkyResidentOrganize(void)
 
             for (int v = span.start; v < span.start + span.count; v++)
             {
-                const HMM_Vec3 &p = section.resident_vertices[(size_t)v].position;
+                const epi::Vec3 &p = section.resident_vertices[(size_t)v].position;
 
-                b[0] = HMM_MIN(b[0], p.X);
-                b[1] = HMM_MIN(b[1], p.Y);
-                b[2] = HMM_MAX(b[2], p.X);
-                b[3] = HMM_MAX(b[3], p.Y);
+                b[0] = epi::Min(b[0], p.x);
+                b[1] = epi::Min(b[1], p.y);
+                b[2] = epi::Max(b[2], p.x);
+                b[3] = epi::Max(b[3], p.y);
             }
 
-            origin_x = HMM_MIN(origin_x, b[0]);
-            origin_y = HMM_MIN(origin_y, b[1]);
-            limit_x  = HMM_MAX(limit_x, b[2]);
+            origin_x = epi::Min(origin_x, b[0]);
+            origin_y = epi::Min(origin_y, b[1]);
+            limit_x  = epi::Max(limit_x, b[2]);
         }
 
         int64_t columns = (int64_t)((limit_x - origin_x) / kSkyCellSize) + 1;
@@ -872,8 +873,8 @@ void SkyResidentOrganize(void)
             if (span.facing_side)
             {
                 entry.group = span.entry_needed ? 2 : 3;
-                entry.angle = atan2f(span.facing_side->vertex_2->Y - span.facing_side->vertex_1->Y,
-                                     span.facing_side->vertex_2->X - span.facing_side->vertex_1->X);
+                entry.angle = atan2f(span.facing_side->vertex_2->y - span.facing_side->vertex_1->y,
+                                     span.facing_side->vertex_2->x - span.facing_side->vertex_1->x);
             }
             else
                 entry.group = SkySpanHeightVaries(span) ? 1 : 0;
@@ -920,10 +921,10 @@ void SkyResidentOrganize(void)
             {
                 SkyCell &cell = section.cells.back();
 
-                cell.bounds[0] = HMM_MIN(cell.bounds[0], b[0]);
-                cell.bounds[1] = HMM_MIN(cell.bounds[1], b[1]);
-                cell.bounds[2] = HMM_MAX(cell.bounds[2], b[2]);
-                cell.bounds[3] = HMM_MAX(cell.bounds[3], b[3]);
+                cell.bounds[0] = epi::Min(cell.bounds[0], b[0]);
+                cell.bounds[1] = epi::Min(cell.bounds[1], b[1]);
+                cell.bounds[2] = epi::Max(cell.bounds[2], b[2]);
+                cell.bounds[3] = epi::Max(cell.bounds[3], b[3]);
             }
 
             int start = (int)vertices.size();
@@ -1114,14 +1115,14 @@ static void RebuildSkyRuns(SkySection &section)
         }
 
         if (span.view_z_minimum <= view_z)
-            low = HMM_MAX(low, span.view_z_minimum);
+            low = epi::Max(low, span.view_z_minimum);
         else
-            high = HMM_MIN(high, span.view_z_minimum);
+            high = epi::Min(high, span.view_z_minimum);
 
         if (span.view_z_maximum <= view_z)
-            low = HMM_MAX(low, span.view_z_maximum);
+            low = epi::Max(low, span.view_z_maximum);
         else
-            high = HMM_MIN(high, span.view_z_maximum);
+            high = epi::Min(high, span.view_z_maximum);
 
         if (view_z <= span.view_z_minimum || view_z >= span.view_z_maximum)
             continue;
@@ -1153,9 +1154,9 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
         {
             glvert[i]                        = RendererVertex{};
             glvert[i].rgba                   = kRGBAWhite;
-            glvert[i].position               = {{kBackdropCorners[i][0], kBackdropCorners[i][1], 1.0f}};
-            glvert[i].texture_coordinates[0] = {{0.0f, 0.0f}};
-            glvert[i].texture_coordinates[1] = {{0.0f, 0.0f}};
+            glvert[i].position               = {kBackdropCorners[i][0], kBackdropCorners[i][1], 1.0f};
+            glvert[i].texture_coordinates[0] = {0.0f, 0.0f};
+            glvert[i].texture_coordinates[1] = {0.0f, 0.0f};
         }
 
         EndRenderUnit(6);
@@ -1274,7 +1275,7 @@ static void RenderSkyEquirect(const SkySection &section)
     RendererRevertSkyMatrices();
 
     if (sky_mirror_active)
-        sky_pass_info.inverse_view = HMM_MulM4(sky_mirror_inverse, sky_pass_info.inverse_view);
+        sky_pass_info.inverse_view = epi::MultiplyMatrices(sky_mirror_inverse, sky_pass_info.inverse_view);
 
     float ty = 2.0f;
 
@@ -1310,17 +1311,17 @@ static void RenderSkyEquirect(const SkySection &section)
     {
         bool sky_ref_frozen = console_active || paused || menu_active || time_stop_active || erraticism_active;
 
-        if (!epi::AlmostEquals(sky_ref->old_offset.Y, sky_ref->offset.Y) && !sky_ref_frozen)
-            offy = HMM_Lerp(sky_ref->old_offset.Y, fractional_tic, sky_ref->offset.Y) - sky_ref->base_offset.Y;
+        if (!epi::AlmostEquals(sky_ref->old_offset.y, sky_ref->offset.y) && !sky_ref_frozen)
+            offy = epi::Lerp(sky_ref->old_offset.y, sky_ref->offset.y, fractional_tic) - sky_ref->base_offset.y;
         else
-            offy = sky_ref->offset.Y - sky_ref->base_offset.Y;
+            offy = sky_ref->offset.y - sky_ref->base_offset.y;
 
         offy /= sky_image->ScaledHeight();
 
-        if (!epi::AlmostEquals(sky_ref->old_offset.X, sky_ref->offset.X) && !sky_ref_frozen)
-            sky_rotation = HMM_Lerp(sky_ref->old_offset.X, fractional_tic, sky_ref->offset.X);
+        if (!epi::AlmostEquals(sky_ref->old_offset.x, sky_ref->offset.x) && !sky_ref_frozen)
+            sky_rotation = epi::Lerp(sky_ref->old_offset.x, sky_ref->offset.x, fractional_tic);
         else
-            sky_rotation = sky_ref->offset.X;
+            sky_rotation = sky_ref->offset.x;
 
         sky_rotation /= 65536.0f;
     }
@@ -1329,23 +1330,23 @@ static void RenderSkyEquirect(const SkySection &section)
         if (ddf_scroll_tic != game_tic)
         {
             ddf_old_sky_scroll = ddf_sky_scroll;
-            ddf_sky_scroll.X += current_map->sky_scroll_x_;
-            ddf_sky_scroll.Y += current_map->sky_scroll_y_;
+            ddf_sky_scroll.x += current_map->sky_scroll_x_;
+            ddf_sky_scroll.y += current_map->sky_scroll_y_;
             ddf_scroll_tic = game_tic;
         }
         if (!epi::AlmostEquals(current_map->sky_scroll_x_, 0.0f))
         {
             if (!console_active && !paused && !menu_active && !time_stop_active && !erraticism_active)
-                offx = HMM_Lerp(ddf_old_sky_scroll.X, fractional_tic, ddf_sky_scroll.X);
+                offx = epi::Lerp(ddf_old_sky_scroll.x, ddf_sky_scroll.x, fractional_tic);
             else
-                offx = ddf_sky_scroll.X;
+                offx = ddf_sky_scroll.x;
         }
         if (!epi::AlmostEquals(current_map->sky_scroll_y_, 0.0f))
         {
             if (!console_active && !paused && !menu_active && !time_stop_active && !erraticism_active)
-                offy = HMM_Lerp(ddf_old_sky_scroll.Y, fractional_tic, ddf_sky_scroll.Y);
+                offy = epi::Lerp(ddf_old_sky_scroll.y, ddf_sky_scroll.y, fractional_tic);
             else
-                offy = ddf_sky_scroll.Y;
+                offy = ddf_sky_scroll.y;
         }
 
     }
@@ -1353,7 +1354,7 @@ static void RenderSkyEquirect(const SkySection &section)
     float sky_horizontal_tilings = 4.0f;
 
     if (sky_image->ScaledWidth() > 256)
-        sky_horizontal_tilings = HMM_MAX(roundf(1024.0f / (float)sky_image->ScaledWidth()), 1.0f);
+        sky_horizontal_tilings = epi::Max(roundf(1024.0f / (float)sky_image->ScaledWidth()), 1.0f);
 
     float sky_u_scale  = -sky_horizontal_tilings;
     float sky_u_offset = (0.75f - sky_rotation) * sky_horizontal_tilings - offx;
@@ -1375,8 +1376,8 @@ static void RenderSkyEquirect(const SkySection &section)
         horizon_shift = (1.0f - 2.0f * band_fraction) * view_y_slope;
     }
 
-    sky_pass_info.viewport_origin    = {{(float)view_window_x, (float)view_window_y}};
-    sky_pass_info.viewport_size      = {{(float)view_window_width, (float)view_window_height}};
+    sky_pass_info.viewport_origin    = {(float)view_window_x, (float)view_window_y};
+    sky_pass_info.viewport_size      = {(float)view_window_width, (float)view_window_height};
     sky_pass_info.stretch_mode       = (int)current_sky_stretch;
     sky_pass_info.ty                 = ty;
     sky_pass_info.u_scale            = sky_u_scale;
@@ -1423,10 +1424,10 @@ static void RenderSkybox(const SkySection &section)
     RendererRevertSkyMatrices();
 
     if (sky_mirror_active)
-        sky_pass_info.inverse_view = HMM_MulM4(sky_mirror_inverse, sky_pass_info.inverse_view);
+        sky_pass_info.inverse_view = epi::MultiplyMatrices(sky_mirror_inverse, sky_pass_info.inverse_view);
 
-    sky_pass_info.viewport_origin = {{(float)view_window_x, (float)view_window_y}};
-    sky_pass_info.viewport_size   = {{(float)view_window_width, (float)view_window_height}};
+    sky_pass_info.viewport_origin = {(float)view_window_x, (float)view_window_y};
+    sky_pass_info.viewport_size   = {(float)view_window_width, (float)view_window_height};
     sky_pass_info.fog_depth       = renderer_far_clip.f_ / 2.0f;
     sky_pass_info.cube_texture    = current_fake_box->cubemap;
     sky_pass_info.is_box          = 1;
@@ -1559,9 +1560,12 @@ void FinishSkyForMirror(const DrawMirror *mir)
     const Image *saved_sky_image = sky_image;
     MapSurface  *saved_sky_ref   = sky_ref;
 
-    sky_mirror_inverse = HMM_InvGeneralM4(mir->view_matrix);
+    sky_mirror_inverse = epi::InverseMatrix(mir->view_matrix);
 
-    sky_mirror_inverse.Columns[3] = HMM_V4(0.0f, 0.0f, 0.0f, 1.0f);
+    sky_mirror_inverse.elements[3][0] = 0.0f;
+    sky_mirror_inverse.elements[3][1] = 0.0f;
+    sky_mirror_inverse.elements[3][2] = 0.0f;
+    sky_mirror_inverse.elements[3][3] = 1.0f;
 
     sky_mirror_active = true;
 
@@ -1664,7 +1668,7 @@ void RenderSkyPlane(Sector *sector, float h, Sector *sky_owner, int face, DrawMi
         {
             const Vertex *point = poly->points[poly->indices[i + k]];
 
-            PushSkyVertex(group, {{point->X, point->Y, h}});
+            PushSkyVertex(group, {point->x, point->y, h});
         }
     }
 
@@ -1705,17 +1709,17 @@ void RenderSkyWall(LineSide *line_side, float h1, float h2, Sector *sky_owner, i
         SkyAddCaptureDependency(line_side->back_sector);
     }
 
-    float x1 = line_side->vertex_1->X;
-    float y1 = line_side->vertex_1->Y;
-    float x2 = line_side->vertex_2->X;
-    float y2 = line_side->vertex_2->Y;
+    float x1 = line_side->vertex_1->x;
+    float y1 = line_side->vertex_1->y;
+    float x2 = line_side->vertex_2->x;
+    float y2 = line_side->vertex_2->y;
 
-    PushSkyVertex(group, {{x1, y1, h1}});
-    PushSkyVertex(group, {{x1, y1, h2}});
-    PushSkyVertex(group, {{x2, y2, h2}});
-    PushSkyVertex(group, {{x2, y2, h1}});
-    PushSkyVertex(group, {{x2, y2, h2}});
-    PushSkyVertex(group, {{x1, y1, h1}});
+    PushSkyVertex(group, {x1, y1, h1});
+    PushSkyVertex(group, {x1, y1, h2});
+    PushSkyVertex(group, {x2, y2, h2});
+    PushSkyVertex(group, {x2, y2, h1});
+    PushSkyVertex(group, {x2, y2, h2});
+    PushSkyVertex(group, {x1, y1, h1});
 
     SkyCaptureEnd();
 }
@@ -1727,7 +1731,7 @@ static const char *UserSkyFaceName(const char *base, int face)
     static char       buffer[64];
     static const char letters[] = "NESWTB";
 
-    stbsp_sprintf(buffer, "%s_%c", base, letters[face]);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%s_%c", base, letters[face]);
     return buffer;
 }
 
@@ -1863,8 +1867,8 @@ void ShutdownSky(void)
 
     sky_ref            = nullptr;
     ddf_scroll_tic     = -1;
-    ddf_sky_scroll     = {{0, 0}};
-    ddf_old_sky_scroll = {{0, 0}};
+    ddf_sky_scroll     = {0, 0};
+    ddf_old_sky_scroll = {0, 0};
 }
 
 //--- editor settings ---

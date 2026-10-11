@@ -52,7 +52,6 @@
 #include "epi.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
 namespace dehacked
 {
 
@@ -196,8 +195,8 @@ void HandleFrames(const DehackedMapObjectDefinition *info, int mt_num)
         count += frames::BeginGroup('S', info->spawnstate);
 
         if (count != 2)
-            LogDebug("Dehacked: Warning - Brain cube is missing spawn/fire "
-                     "states.\n");
+            epi::LogDebug("Dehacked: Warning - Brain cube is missing spawn/fire "
+                          "states.\n");
 
         if (count == 0)
         {
@@ -224,7 +223,7 @@ void HandleFrames(const DehackedMapObjectDefinition *info, int mt_num)
 
     if (count == 0)
     {
-        LogDebug("Dehacked: Warning - Attack [%s] has no states.\n", things::GetMobjName(mt_num) + 1);
+        epi::LogDebug("Dehacked: Warning - Attack [%s] has no states.\n", things::GetMobjName(mt_num) + 1);
         frames::force_fullbright = false;
         return;
     }
@@ -338,7 +337,7 @@ const char *Attacks::AddScratchAttack(int damage, const std::string &sfx)
     }
 
     static char namebuf[256];
-    stbsp_snprintf(namebuf, sizeof(namebuf), "SCRATCH_%s_%d", safe_sfx.c_str(), damage);
+    epi::FormatToBufferSized(namebuf, sizeof(namebuf), "SCRATCH_%s_%d", safe_sfx.c_str(), damage);
 
     // already have it?
     for (size_t i = 0; i < scratchers.size(); i++)
@@ -407,7 +406,7 @@ void Attacks::ConvertAttack(const DehackedMapObjectDefinition *info, int mt_num,
         }
 
     if (!ext)
-        FatalError("Dehacked: Error - Missing attack %s in extra table.\n", things::GetMobjName(mt_num) + 1);
+        epi::FatalError("Dehacked: Error - Missing attack %s in extra table.\n", things::GetMobjName(mt_num) + 1);
 
     wad::Printf("ATTACKTYPE = %s;\n", ext->atk_type);
 
@@ -485,7 +484,8 @@ void Attacks::ConvertAttack(const DehackedMapObjectDefinition *info, int mt_num,
 
     if (frames::attack_slot[0] || frames::attack_slot[1] || frames::attack_slot[2])
     {
-        LogDebug("Dehacked: Warning - Attack [%s] contained an attacking action.\n", things::GetMobjName(mt_num) + 1);
+        epi::LogDebug("Dehacked: Warning - Attack [%s] contained an attacking action.\n",
+                      things::GetMobjName(mt_num) + 1);
         things::HandleAttacks(info, mt_num);
     }
 
@@ -645,9 +645,9 @@ const char *things::GetMobjName(int mt_num)
     static char buffer[64];
 
     if (kMT_EXTRA00 <= mt_num && mt_num <= kMT_EXTRA99)
-        stbsp_snprintf(buffer, sizeof(buffer), "MT_EXTRA%02d", mt_num - kMT_EXTRA00);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "MT_EXTRA%02d", mt_num - kMT_EXTRA00);
     else
-        stbsp_snprintf(buffer, sizeof(buffer), "DEHACKED_%d", mt_num + 1);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "DEHACKED_%d", mt_num + 1);
 
     return buffer;
 }
@@ -824,7 +824,7 @@ int ParseBits(const FlagName *list, char *bit_str)
             if (sscanf(token, " %i ", &flags) == 1)
                 new_flags |= flags;
             else
-                LogDebug("Dehacked: Warning - Line %d: unreadable BITS value: %s\n", patch::line_num, token);
+                epi::LogDebug("Dehacked: Warning - Line %d: unreadable BITS value: %s\n", patch::line_num, token);
 
             continue;
         }
@@ -837,7 +837,7 @@ int ParseBits(const FlagName *list, char *bit_str)
 
         if (list[i].bex == nullptr)
         {
-            LogDebug("Dehacked: Warning - Line %d: unknown BITS mnemonic: %s\n", patch::line_num, token);
+            epi::LogDebug("Dehacked: Warning - Line %d: unknown BITS mnemonic: %s\n", patch::line_num, token);
             continue;
         }
 
@@ -1174,7 +1174,7 @@ void CollectTheCast()
 
         if (order >= kCastMaximum)
         {
-            FatalError("CollectTheCast() - Overflow");
+            epi::FatalError("CollectTheCast() - Overflow");
         }
 
         cast_mobjs[order] = mt_num;
@@ -1189,9 +1189,9 @@ const char *GetSpeed(int speed)
     static char num_buf[128];
 
     if (speed >= 1024)
-        stbsp_sprintf(num_buf, "%1.2f", FixedToFloat(speed));
+        epi::FormatToBufferSized(num_buf, sizeof(num_buf), "%1.2f", FixedToFloat(speed));
     else
-        stbsp_sprintf(num_buf, "%d", speed);
+        epi::FormatToBufferSized(num_buf, sizeof(num_buf), "%d", speed);
 
     return num_buf;
 }
@@ -1252,7 +1252,7 @@ void HandleFrames(const DehackedMapObjectDefinition *info, int mt_num)
 
         if (0 == frames::BeginGroup('E', tfog->spawnstate))
         {
-            LogDebug("Dehacked: Warning - Teleport fog has no spawn states.\n");
+            epi::LogDebug("Dehacked: Warning - Teleport fog has no spawn states.\n");
             return;
         }
 
@@ -1282,7 +1282,7 @@ void HandleFrames(const DehackedMapObjectDefinition *info, int mt_num)
         // with teleport target (handled above) and brain spit targets.
 
         if (mt_num != kMT_BOSSTARGET)
-            LogDebug("Dehacked: Warning - Mobj [%s:%d] has no states.\n", GetMobjName(mt_num), info->doomednum);
+            epi::LogDebug("Dehacked: Warning - Mobj [%s:%d] has no states.\n", GetMobjName(mt_num), info->doomednum);
 
         wad::Printf("TRANSLUCENCY = 0%%;\n");
 
@@ -1473,8 +1473,8 @@ void HandleItem(const DehackedMapObjectDefinition *info, int mt_num)
 
     if (pu->benefit == nullptr) // not found
     {
-        LogDebug("Dehacked: Warning - Unknown pickup sprite \"%s\" for item [%s]\n", sprites::GetOriginalName(spr_num),
-                 GetMobjName(mt_num));
+        epi::LogDebug("Dehacked: Warning - Unknown pickup sprite \"%s\" for item [%s]\n",
+                      sprites::GetOriginalName(spr_num), GetMobjName(mt_num));
         return;
     }
 
@@ -1689,7 +1689,7 @@ void things::HandleAttacks(const DehackedMapObjectDefinition *info, int mt_num)
     }
     else if (info->meleestate && info->name[0] != '*')
     {
-        LogDebug("Dehacked: Warning - No close attack in melee states of [%s].\n", GetMobjName(mt_num));
+        epi::LogDebug("Dehacked: Warning - No close attack in melee states of [%s].\n", GetMobjName(mt_num));
         wad::Printf("CLOSE_ATTACK = DEMON_CLOSECOMBAT; // dummy attack\n");
     }
 
@@ -1928,7 +1928,7 @@ void things::AlterThing(int new_val)
 
     if (!FieldAlter(mobj_field, field_name, raw_obj, new_val))
     {
-        LogDebug("Dehacked: Warning - UNKNOWN THING FIELD: %s\n", field_name);
+        epi::LogDebug("Dehacked: Warning - UNKNOWN THING FIELD: %s\n", field_name);
     }
 }
 

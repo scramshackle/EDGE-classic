@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <stdarg.h>
 #include <stdint.h>
 
 #include <string>
@@ -97,6 +98,8 @@ void  CStringFree(const char *string);
 
 void TextureNameFromFilename(std::string &buf, std::string_view stem);
 std::string              StringFormat(const char *fmt, ...) EPI_PRINTF_FORMAT(1, 2);
+int FormatToBufferSized(char *buffer, int buffer_size, const char *format, ...) EPI_PRINTF_FORMAT(3, 4);
+int FormatToBufferSizedArgs(char *buffer, int buffer_size, const char *format, va_list arguments);
 std::vector<std::string> SeparatedStringVector(std::string_view str, char separator);
 
 bool        ScanFloat(const char *text, float *value, const char **end = nullptr);

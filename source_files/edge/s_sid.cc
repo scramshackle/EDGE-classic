@@ -23,6 +23,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 #include "libcRSID.h"
 #include "s_blit.h"
 #include "s_cache.h"

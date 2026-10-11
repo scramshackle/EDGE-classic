@@ -144,7 +144,7 @@ static void StyleStartEntry(const char *name, bool extend)
 static void StyleParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("STYLE_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("STYLE_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -185,7 +185,7 @@ static void StyleFinishEntry(void)
 
 static void StyleClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in styles.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in styles.ddf\n");
 }
 
 void DDFReadStyles(const std::string &data)
@@ -216,14 +216,14 @@ void DDFStyleInit(void)
 void DDFStyleCleanUp(void)
 {
     if (styledefs.empty())
-        FatalError("There are no styles defined in DDF !\n");
+        epi::FatalError("There are no styles defined in DDF !\n");
 
     default_style = styledefs.Lookup("DEFAULT");
 
     if (!default_style)
-        FatalError("Styles.ddf is missing the [DEFAULT] style.\n");
+        epi::FatalError("Styles.ddf is missing the [DEFAULT] style.\n");
     else if (!default_style->text_[0].font_)
-        LogWarning("The [DEFAULT] style is missing TEXT.FONT\n");
+        epi::LogWarning("The [DEFAULT] style is missing TEXT.FONT\n");
 
     styledefs.shrink_to_fit();
 }

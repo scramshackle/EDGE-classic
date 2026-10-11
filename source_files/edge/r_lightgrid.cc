@@ -25,9 +25,9 @@ static constexpr float kLightGridMinimumW = 0.0001f;
 struct LightGridCollected
 {
     MapObject *object;
-    HMM_Vec3   world_position;
+    epi::Vec3  world_position;
     float      radius;
-    HMM_Vec3   color;
+    epi::Vec3  color;
     float      additive;
 };
 
@@ -36,7 +36,7 @@ static std::vector<LightGridCollected> collected_lights;
 static std::vector<LightGridGlowSet>   glow_sets;
 static std::unordered_map<const Sector *, int> glow_set_lookup;
 
-static HMM_Mat4 glow_model_view;
+static epi::Mat4 glow_model_view;
 
 static int glow_dropped = 0;
 
@@ -66,7 +66,7 @@ static void LightGridCollect(MapObject *mo, void *data)
     if (entry.radius <= 0.0f)
         return;
 
-    if (entry.color.X <= 0.0f && entry.color.Y <= 0.0f && entry.color.Z <= 0.0f)
+    if (entry.color.x <= 0.0f && entry.color.y <= 0.0f && entry.color.z <= 0.0f)
         return;
 
     collected_lights.push_back(entry);
@@ -111,7 +111,7 @@ static bool BuildGlowForObject(MapObject *mo, const Sector *sec, LightGridGlow *
     if (!mo->info_->force_fullbright_ && mo->state_->bright <= 0)
         return false;
 
-    HMM_Vec4 plane;
+    epi::Vec4 plane;
 
     if (mo->info_->glow_type_ == kSectorGlowTypeWall)
     {
@@ -120,20 +120,22 @@ static bool BuildGlowForObject(MapObject *mo, const Sector *sec, LightGridGlow *
         if (!ld || ld->length <= 0.0f)
             return false;
 
-        float norm_x = (ld->vertex_1->Y - ld->vertex_2->Y) / ld->length;
-        float norm_y = (ld->vertex_2->X - ld->vertex_1->X) / ld->length;
+        float norm_x = (ld->vertex_1->y - ld->vertex_2->y) / ld->length;
+        float norm_y = (ld->vertex_2->x - ld->vertex_1->x) / ld->length;
 
-        plane = HMM_V4(-norm_x, -norm_y, 0.0f, ld->vertex_1->X * norm_x + ld->vertex_1->Y * norm_y);
+        plane = epi::Vec4{-norm_x, -norm_y, 0.0f, ld->vertex_1->x * norm_x + ld->vertex_1->y * norm_y};
     }
     else if (mo->info_->glow_type_ == kSectorGlowTypeFloor)
-        plane = HMM_V4(0.0f, 0.0f, 1.0f, -sec->floor_height);
+        plane = epi::Vec4{0.0f, 0.0f, 1.0f, -sec->floor_height};
     else
-        plane = HMM_V4(0.0f, 0.0f, 1.0f, -sec->ceiling_height);
+        plane = epi::Vec4{0.0f, 0.0f, 1.0f, -sec->ceiling_height};
 
-    HMM_Vec4 eye_plane = EyeSpacePlane(glow_model_view, plane);
+    epi::Vec4 eye_plane = EyeSpacePlane(glow_model_view, plane);
 
-    for (int i = 0; i < 4; i++)
-        out->plane[i] = eye_plane.Elements[i];
+    out->plane[0] = eye_plane.x;
+    out->plane[1] = eye_plane.y;
+    out->plane[2] = eye_plane.z;
+    out->plane[3] = eye_plane.w;
 
     RGBAColor color = mo->dynamic_light_.color;
 
@@ -206,10 +208,10 @@ int LightGridSliceFromDepth(float eye_depth, float near_plane, float far_plane)
 
     int slice = (int)(ratio * (float)kLightGridDepthSlices);
 
-    return HMM_Clamp(0, slice, kLightGridDepthSlices - 1);
+    return epi::Clamp(slice, 0, kLightGridDepthSlices - 1);
 }
 
-static bool LightGridScreenBounds(const HMM_Mat4 &view_projection, const LightGridCollected &light, float *out_min_x,
+static bool LightGridScreenBounds(const epi::Mat4 &view_projection, const LightGridCollected &light, float *out_min_x,
                                   float *out_min_y, float *out_max_x, float *out_max_y)
 {
     float minimum_x = 0.0f;
@@ -221,20 +223,20 @@ static bool LightGridScreenBounds(const HMM_Mat4 &view_projection, const LightGr
 
     for (int corner = 0; corner < 8; corner++)
     {
-        HMM_Vec4 world;
+        epi::Vec4 world;
 
-        world.X = light.world_position.X + ((corner & 1) ? light.radius : -light.radius);
-        world.Y = light.world_position.Y + ((corner & 2) ? light.radius : -light.radius);
-        world.Z = light.world_position.Z + ((corner & 4) ? light.radius : -light.radius);
-        world.W = 1.0f;
+        world.x = light.world_position.x + ((corner & 1) ? light.radius : -light.radius);
+        world.y = light.world_position.y + ((corner & 2) ? light.radius : -light.radius);
+        world.z = light.world_position.z + ((corner & 4) ? light.radius : -light.radius);
+        world.w = 1.0f;
 
-        HMM_Vec4 clip = HMM_MulM4V4(view_projection, world);
+        epi::Vec4 clip = epi::TransformVector(view_projection, world);
 
-        if (clip.W <= kLightGridMinimumW)
+        if (clip.w <= kLightGridMinimumW)
             continue;
 
-        float screen_x = (float)view_window_x + ((clip.X / clip.W) * 0.5f + 0.5f) * (float)view_window_width;
-        float screen_y = (float)view_window_y + ((clip.Y / clip.W) * 0.5f + 0.5f) * (float)view_window_height;
+        float screen_x = (float)view_window_x + ((clip.x / clip.w) * 0.5f + 0.5f) * (float)view_window_width;
+        float screen_y = (float)view_window_y + ((clip.y / clip.w) * 0.5f + 0.5f) * (float)view_window_height;
 
         in_front++;
 
@@ -245,10 +247,10 @@ static bool LightGridScreenBounds(const HMM_Mat4 &view_projection, const LightGr
         }
         else
         {
-            minimum_x = HMM_MIN(minimum_x, screen_x);
-            maximum_x = HMM_MAX(maximum_x, screen_x);
-            minimum_y = HMM_MIN(minimum_y, screen_y);
-            maximum_y = HMM_MAX(maximum_y, screen_y);
+            minimum_x = epi::Min(minimum_x, screen_x);
+            maximum_x = epi::Max(maximum_x, screen_x);
+            minimum_y = epi::Min(minimum_y, screen_y);
+            maximum_y = epi::Max(maximum_y, screen_y);
         }
     }
 
@@ -293,10 +295,10 @@ static bool LightGridSliceRect(const LightGridLight &light, int slice, LightGrid
     slice_near *= 0.99f;
     slice_far *= 1.01f;
 
-    float depth = -light.eye_position.Z;
+    float depth = -light.eye_position.z;
 
-    float low  = HMM_MAX(slice_near, depth - light.radius);
-    float high = HMM_MIN(slice_far, depth + light.radius);
+    float low  = epi::Max(slice_near, depth - light.radius);
+    float high = epi::Min(slice_far, depth + light.radius);
 
     if (low > high)
         return false;
@@ -308,7 +310,7 @@ static bool LightGridSliceRect(const LightGridLight &light, int slice, LightGrid
     else if (depth > high)
         gap = depth - high;
 
-    float reach = sqrtf(HMM_MAX(0.0f, light.radius * light.radius - gap * gap)) + 1.0f;
+    float reach = sqrtf(epi::Max(0.0f, light.radius * light.radius - gap * gap)) + 1.0f;
 
     float flip = fliplevels.d_ ? -1.0f : 1.0f;
 
@@ -320,14 +322,14 @@ static bool LightGridSliceRect(const LightGridLight &light, int slice, LightGrid
         float corner_depth = (corner & 1) ? high : low;
         float side         = (corner & 2) ? reach : -reach;
 
-        ndc_x[corner] = (light.eye_position.X + side) / (corner_depth * view_x_slope) * flip;
-        ndc_y[corner] = (light.eye_position.Y + side) / (corner_depth * view_y_slope);
+        ndc_x[corner] = (light.eye_position.x + side) / (corner_depth * view_x_slope) * flip;
+        ndc_y[corner] = (light.eye_position.y + side) / (corner_depth * view_y_slope);
     }
 
-    float minimum_x = HMM_MIN(HMM_MIN(ndc_x[0], ndc_x[1]), HMM_MIN(ndc_x[2], ndc_x[3]));
-    float maximum_x = HMM_MAX(HMM_MAX(ndc_x[0], ndc_x[1]), HMM_MAX(ndc_x[2], ndc_x[3]));
-    float minimum_y = HMM_MIN(HMM_MIN(ndc_y[0], ndc_y[1]), HMM_MIN(ndc_y[2], ndc_y[3]));
-    float maximum_y = HMM_MAX(HMM_MAX(ndc_y[0], ndc_y[1]), HMM_MAX(ndc_y[2], ndc_y[3]));
+    float minimum_x = epi::Min(epi::Min(ndc_x[0], ndc_x[1]), epi::Min(ndc_x[2], ndc_x[3]));
+    float maximum_x = epi::Max(epi::Max(ndc_x[0], ndc_x[1]), epi::Max(ndc_x[2], ndc_x[3]));
+    float minimum_y = epi::Min(epi::Min(ndc_y[0], ndc_y[1]), epi::Min(ndc_y[2], ndc_y[3]));
+    float maximum_y = epi::Max(epi::Max(ndc_y[0], ndc_y[1]), epi::Max(ndc_y[2], ndc_y[3]));
 
     if (minimum_x > 1.0f || maximum_x < -1.0f || minimum_y > 1.0f || maximum_y < -1.0f)
         return false;
@@ -335,15 +337,15 @@ static bool LightGridSliceRect(const LightGridLight &light, int slice, LightGrid
     float clusters_per_ndc_x = (float)current_light_grid.view_width / (2.0f * (float)kLightGridClusterSize);
     float clusters_per_ndc_y = (float)current_light_grid.view_height / (2.0f * (float)kLightGridClusterSize);
 
-    int first_x = (int)floorf((HMM_MAX(minimum_x, -1.0f) + 1.0f) * clusters_per_ndc_x);
-    int last_x  = (int)floorf((HMM_MIN(maximum_x, 1.0f) + 1.0f) * clusters_per_ndc_x);
-    int first_y = (int)floorf((HMM_MAX(minimum_y, -1.0f) + 1.0f) * clusters_per_ndc_y);
-    int last_y  = (int)floorf((HMM_MIN(maximum_y, 1.0f) + 1.0f) * clusters_per_ndc_y);
+    int first_x = (int)floorf((epi::Max(minimum_x, -1.0f) + 1.0f) * clusters_per_ndc_x);
+    int last_x  = (int)floorf((epi::Min(maximum_x, 1.0f) + 1.0f) * clusters_per_ndc_x);
+    int first_y = (int)floorf((epi::Max(minimum_y, -1.0f) + 1.0f) * clusters_per_ndc_y);
+    int last_y  = (int)floorf((epi::Min(maximum_y, 1.0f) + 1.0f) * clusters_per_ndc_y);
 
-    cover->cluster_x1 = HMM_MAX(cover->cluster_x1, first_x);
-    cover->cluster_x2 = HMM_MIN(cover->cluster_x2, last_x);
-    cover->cluster_y1 = HMM_MAX(cover->cluster_y1, first_y);
-    cover->cluster_y2 = HMM_MIN(cover->cluster_y2, last_y);
+    cover->cluster_x1 = epi::Max(cover->cluster_x1, first_x);
+    cover->cluster_x2 = epi::Min(cover->cluster_x2, last_x);
+    cover->cluster_y1 = epi::Max(cover->cluster_y1, first_y);
+    cover->cluster_y2 = epi::Min(cover->cluster_y2, last_y);
 
     cover->slice = slice;
 
@@ -405,8 +407,8 @@ void BuildLightGrid(void)
 
     uint64_t bin_mark = GetMicroseconds();
 
-    HMM_Mat4 model_view      = render_backend->WorldModelView();
-    HMM_Mat4 view_projection = render_backend->WorldViewProjection();
+    epi::Mat4 model_view      = render_backend->WorldModelView();
+    epi::Mat4 view_projection = render_backend->WorldViewProjection();
 
     glow_model_view = model_view;
 
@@ -418,8 +420,8 @@ void BuildLightGrid(void)
     current_light_grid.clusters_x = (view_window_width + kLightGridClusterSize - 1) / kLightGridClusterSize;
     current_light_grid.clusters_y = (view_window_height + kLightGridClusterSize - 1) / kLightGridClusterSize;
 
-    current_light_grid.cluster_near = HMM_MAX(1.0f, renderer_near_clip.f_);
-    current_light_grid.cluster_far  = HMM_MAX(current_light_grid.cluster_near * 2.0f, renderer_far_clip.f_);
+    current_light_grid.cluster_near = epi::Max(1.0f, renderer_near_clip.f_);
+    current_light_grid.cluster_far  = epi::Max(current_light_grid.cluster_near * 2.0f, renderer_far_clip.f_);
 
     int cluster_total = current_light_grid.ClusterTotal();
 
@@ -448,30 +450,30 @@ void BuildLightGrid(void)
         if (!LightGridScreenBounds(view_projection, light, &minimum_x, &minimum_y, &maximum_x, &maximum_y))
             continue;
 
-        HMM_Vec4 world = HMM_V4(light.world_position.X, light.world_position.Y, light.world_position.Z, 1.0f);
+        epi::Vec4 world = epi::Vec4{light.world_position.x, light.world_position.y, light.world_position.z, 1.0f};
 
-        HMM_Vec4 eye = HMM_MulM4V4(model_view, world);
+        epi::Vec4 eye = epi::TransformVector(model_view, world);
 
         LightGridLight entry;
 
-        entry.eye_position = {{eye.X, eye.Y, eye.Z}};
+        entry.eye_position = {eye.x, eye.y, eye.z};
         entry.radius       = light.radius;
         entry.color        = light.color;
         entry.additive     = light.additive;
 
         LightGridCoverage cover;
 
-        cover.cluster_x1 = HMM_MAX(0, (int)floorf((minimum_x - (float)view_window_x) / (float)kLightGridClusterSize));
-        cover.cluster_y1 = HMM_MAX(0, (int)floorf((minimum_y - (float)view_window_y) / (float)kLightGridClusterSize));
-        cover.cluster_x2 = HMM_MIN(current_light_grid.clusters_x - 1,
-                                   (int)floorf((maximum_x - (float)view_window_x) / (float)kLightGridClusterSize));
-        cover.cluster_y2 = HMM_MIN(current_light_grid.clusters_y - 1,
-                                   (int)floorf((maximum_y - (float)view_window_y) / (float)kLightGridClusterSize));
+        cover.cluster_x1 = epi::Max(0, (int)floorf((minimum_x - (float)view_window_x) / (float)kLightGridClusterSize));
+        cover.cluster_y1 = epi::Max(0, (int)floorf((minimum_y - (float)view_window_y) / (float)kLightGridClusterSize));
+        cover.cluster_x2 = epi::Min(current_light_grid.clusters_x - 1,
+                                    (int)floorf((maximum_x - (float)view_window_x) / (float)kLightGridClusterSize));
+        cover.cluster_y2 = epi::Min(current_light_grid.clusters_y - 1,
+                                    (int)floorf((maximum_y - (float)view_window_y) / (float)kLightGridClusterSize));
 
         if (cover.cluster_x1 > cover.cluster_x2 || cover.cluster_y1 > cover.cluster_y2)
             continue;
 
-        float depth = -eye.Z;
+        float depth = -eye.z;
 
         cover.slice1 = LightGridSliceFromDepth(depth - light.radius, current_light_grid.cluster_near,
                                                current_light_grid.cluster_far);

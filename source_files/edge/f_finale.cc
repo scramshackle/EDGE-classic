@@ -37,6 +37,7 @@
 #include "dstrings.h"
 #include "e_main.h"
 #include "epi.h"
+#include "epi_str_util.h"
 #include "f_interm.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -56,7 +57,6 @@
 #include "r_state.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_model.h"
 #include "w_wad.h"
 
@@ -926,7 +926,7 @@ static void BunnyScroll(void)
         laststage = stage;
     }
 
-    stbsp_sprintf(name, "END%i", stage);
+    epi::FormatToBufferSized(name, sizeof(name), "END%i", stage);
 
     p1 = ImageLookup(name);
 
@@ -950,7 +950,7 @@ void FinaleDrawer(void)
 
     case kFinaleStagePicture: {
         const Image *image =
-            ImageLookup(finale->pics_[HMM_MIN((size_t)picture_number, finale->pics_.size() - 1)].c_str());
+            ImageLookup(finale->pics_[epi::Min((size_t)picture_number, finale->pics_.size() - 1)].c_str());
         if (title_scaling.d_) // Fill Border
         {
             HUDStretchImageBlurred(-320, -200, 960, 600, image);

@@ -32,10 +32,11 @@
 
 #include <float.h>
 
-#include "epi_math.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "g_game.h"
 #include "m_random.h"
 #include "p_action.h"
@@ -178,7 +179,7 @@ void A_NoiseAlert(MapObject *actor)
 //
 bool DoMove(MapObject *actor, bool path)
 {
-    HMM_Vec3 orig_pos{{actor->x, actor->y, actor->z}};
+    epi::Vec3 orig_pos{actor->x, actor->y, actor->z};
 
     float tryx;
     float tryy;
@@ -223,7 +224,7 @@ bool DoMove(MapObject *actor, bool path)
 
     speed *= fric;
 
-    speed = HMM_Clamp(1.0f, speed, actor->speed_);
+    speed = epi::Clamp(speed, 1.0f, actor->speed_);
 
     if (path)
     {
@@ -311,12 +312,12 @@ bool DoMove(MapObject *actor, bool path)
     // -AJA- 2008/01/16: position interpolation
     if ((actor->state_->flags & kStateFrameFlagModel) || (actor->flags_ & kMapObjectFlagFloat))
     {
-        actor->interpolation_number_   = HMM_MAX(1, actor->state_->tics);
+        actor->interpolation_number_   = epi::Max(1, actor->state_->tics);
         actor->interpolation_position_ = 1;
         if (!epi::AlmostEquals(actor->old_x_, kInvalidPosition))
             actor->interpolation_from_ = orig_pos;
         else
-            actor->interpolation_from_ = {{actor->x, actor->y, actor->z}};
+            actor->interpolation_from_ = {actor->x, actor->y, actor->z};
     }
 
     return true;
@@ -603,9 +604,9 @@ static void SpawnDeathMissile(MapObject *source, float x, float y, float z)
     th->SetRealSource(source);
     th->SetSpawnSource(source);
 
-    th->momentum_.X = (x - source->x) / 50.0f;
-    th->momentum_.Y = -0.25f;
-    th->momentum_.Z = (z - source->z) / 50.0f;
+    th->momentum_.x = (x - source->x) / 50.0f;
+    th->momentum_.y = -0.25f;
+    th->momentum_.z = (z - source->z) / 50.0f;
 
     th->tics_ -= RandomByte() & 7;
 

@@ -5,6 +5,7 @@
 
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
 #include "i_system.h"
 #include "r_backend.h"
 
@@ -15,35 +16,35 @@ static_assert(offsetof(RendererVertex, rgba) == 0, "RendererVertex::rgba offset"
 static_assert(offsetof(RendererVertex, position) == 4, "RendererVertex::position offset");
 static_assert(offsetof(RendererVertex, texture_coordinates) == 16, "RendererVertex::texture_coordinates offset");
 
-static HMM_Mat4 Gles2FrustumMatrix(float left, float right, float bottom, float top, float z_near, float z_far)
+static epi::Mat4 Gles2FrustumMatrix(float left, float right, float bottom, float top, float z_near, float z_far)
 {
-    HMM_Mat4 result = {};
+    epi::Mat4 result = {};
 
-    result.Elements[0][0] = (2.0f * z_near) / (right - left);
-    result.Elements[1][1] = (2.0f * z_near) / (top - bottom);
+    result.elements[0][0] = (2.0f * z_near) / (right - left);
+    result.elements[1][1] = (2.0f * z_near) / (top - bottom);
 
-    result.Elements[2][0] = (right + left) / (right - left);
-    result.Elements[2][1] = (top + bottom) / (top - bottom);
-    result.Elements[2][2] = -z_far / (z_far - z_near);
-    result.Elements[2][3] = -1.0f;
+    result.elements[2][0] = (right + left) / (right - left);
+    result.elements[2][1] = (top + bottom) / (top - bottom);
+    result.elements[2][2] = -z_far / (z_far - z_near);
+    result.elements[2][3] = -1.0f;
 
-    result.Elements[3][2] = -(z_far * z_near) / (z_far - z_near);
+    result.elements[3][2] = -(z_far * z_near) / (z_far - z_near);
 
     return result;
 }
 
-static HMM_Mat4 Gles2OrthographicMatrix(float left, float right, float bottom, float top, float z_near, float z_far)
+static epi::Mat4 Gles2OrthographicMatrix(float left, float right, float bottom, float top, float z_near, float z_far)
 {
-    HMM_Mat4 result = {};
+    epi::Mat4 result = {};
 
-    result.Elements[0][0] = 2.0f / (right - left);
-    result.Elements[1][1] = 2.0f / (top - bottom);
-    result.Elements[2][2] = -1.0f / (z_far - z_near);
-    result.Elements[3][3] = 1.0f;
+    result.elements[0][0] = 2.0f / (right - left);
+    result.elements[1][1] = 2.0f / (top - bottom);
+    result.elements[2][2] = -1.0f / (z_far - z_near);
+    result.elements[3][3] = 1.0f;
 
-    result.Elements[3][0] = -(right + left) / (right - left);
-    result.Elements[3][1] = -(top + bottom) / (top - bottom);
-    result.Elements[3][2] = -z_near / (z_far - z_near);
+    result.elements[3][0] = -(right + left) / (right - left);
+    result.elements[3][1] = -(top + bottom) / (top - bottom);
+    result.elements[3][2] = -z_near / (z_far - z_near);
 
     return result;
 }
@@ -146,7 +147,7 @@ bool Gles2Immediate::Init()
     for (int32_t i = 0; i < kGles2MatrixModeTotal; i++)
     {
         matrix_top_[i]       = 0;
-        matrix_stack_[i][0]  = HMM_M4D(1.0f);
+        matrix_stack_[i][0]  = epi::IdentityMatrix();
     }
 
     glEnableVertexAttribArray(kGles2AttributePosition);
@@ -220,7 +221,7 @@ void Gles2Immediate::BeginFrame()
     for (int32_t i = 0; i < kGles2MatrixModeTotal; i++)
     {
         matrix_top_[i]      = 0;
-        matrix_stack_[i][0] = HMM_M4D(1.0f);
+        matrix_stack_[i][0] = epi::IdentityMatrix();
     }
 
     matrices_dirty_ = true;
@@ -228,7 +229,7 @@ void Gles2Immediate::BeginFrame()
 
 void Gles2Immediate::LoadIdentity()
 {
-    matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = HMM_M4D(1.0f);
+    matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = epi::IdentityMatrix();
 
     MarkMatrixDirty();
 }
@@ -263,35 +264,35 @@ void Gles2Immediate::PopMatrix()
     MarkMatrixDirty();
 }
 
-void Gles2Immediate::LoadMatrix(const HMM_Mat4 &matrix)
+void Gles2Immediate::LoadMatrix(const epi::Mat4 &matrix)
 {
     matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = matrix;
 
     MarkMatrixDirty();
 }
 
-void Gles2Immediate::MultiplyMatrix(const HMM_Mat4 &matrix)
+void Gles2Immediate::MultiplyMatrix(const epi::Mat4 &matrix)
 {
-    HMM_Mat4 &current = matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]];
+    epi::Mat4 &current = matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]];
 
-    current = HMM_MulM4(current, matrix);
+    current = epi::MultiplyMatrices(current, matrix);
 
     MarkMatrixDirty();
 }
 
 void Gles2Immediate::Translate(float x, float y, float z)
 {
-    MultiplyMatrix(HMM_Translate(HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::TranslationMatrix(epi::Vec3{x, y, z}));
 }
 
 void Gles2Immediate::Rotate(float radians, float x, float y, float z)
 {
-    MultiplyMatrix(HMM_Rotate_RH(radians, HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::RotationMatrix(radians, epi::Vec3{x, y, z}));
 }
 
 void Gles2Immediate::Scale(float x, float y, float z)
 {
-    MultiplyMatrix(HMM_Scale(HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::ScaleMatrix(epi::Vec3{x, y, z}));
 }
 
 void Gles2Immediate::Orthographic(float left, float right, float bottom, float top, float z_near, float z_far)
@@ -313,11 +314,11 @@ void Gles2Immediate::ApplyMatrices()
 
     matrices_dirty_ = false;
 
-    const HMM_Mat4 &model_view = matrix_stack_[kGles2MatrixModeModelView][matrix_top_[kGles2MatrixModeModelView]];
-    const HMM_Mat4 &projection = matrix_stack_[kGles2MatrixModeProjection][matrix_top_[kGles2MatrixModeProjection]];
+    const epi::Mat4 &model_view = matrix_stack_[kGles2MatrixModeModelView][matrix_top_[kGles2MatrixModeModelView]];
+    const epi::Mat4 &projection = matrix_stack_[kGles2MatrixModeProjection][matrix_top_[kGles2MatrixModeProjection]];
 
     gles2_program.SetModelView(model_view);
-    gles2_program.SetModelViewProjection(HMM_MulM4(projection, model_view));
+    gles2_program.SetModelViewProjection(epi::MultiplyMatrices(projection, model_view));
 }
 
 void Gles2Immediate::Viewport(int32_t x, int32_t y, int32_t width, int32_t height)
@@ -1191,17 +1192,17 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
     for (int32_t i = 0; i < 4; i++)
         quad[i].rgba = kRGBAWhite;
 
-    quad[0].position               = {{-1.0f, -1.0f, 0.0f}};
-    quad[0].texture_coordinates[0] = {{u0, v0}};
+    quad[0].position               = {-1.0f, -1.0f, 0.0f};
+    quad[0].texture_coordinates[0] = {u0, v0};
 
-    quad[1].position               = {{1.0f, -1.0f, 0.0f}};
-    quad[1].texture_coordinates[0] = {{u1, v0}};
+    quad[1].position               = {1.0f, -1.0f, 0.0f};
+    quad[1].texture_coordinates[0] = {u1, v0};
 
-    quad[2].position               = {{1.0f, 1.0f, 0.0f}};
-    quad[2].texture_coordinates[0] = {{u1, v1}};
+    quad[2].position               = {1.0f, 1.0f, 0.0f};
+    quad[2].texture_coordinates[0] = {u1, v1};
 
-    quad[3].position               = {{-1.0f, 1.0f, 0.0f}};
-    quad[3].texture_coordinates[0] = {{u0, v1}};
+    quad[3].position               = {-1.0f, 1.0f, 0.0f};
+    quad[3].texture_coordinates[0] = {u0, v1};
 
     size_t offset = StreamVertices(quad, 4);
 
@@ -1249,8 +1250,8 @@ void Gles2Immediate::ResolveRenderTarget(const Gles2ResolveRect &source, const G
 
     gles2_program.Use();
 
-    gles2_program.SetModelViewProjection(HMM_M4D(1.0f));
-    gles2_program.SetModelView(HMM_M4D(1.0f));
+    gles2_program.SetModelViewProjection(epi::IdentityMatrix());
+    gles2_program.SetModelView(epi::IdentityMatrix());
     gles2_program.SetMultiTexture(false);
     gles2_program.SetLineMode(false);
     gles2_program.SetSkipRGB(false);
@@ -1286,17 +1287,17 @@ void Gles2Immediate::ResolveRenderTarget(const Gles2ResolveRect &source, const G
     for (int32_t i = 0; i < 4; i++)
         quad[i].rgba = kRGBAWhite;
 
-    quad[0].position               = {{x0, y0, 0.0f}};
-    quad[0].texture_coordinates[0] = {{u0, v0}};
+    quad[0].position               = {x0, y0, 0.0f};
+    quad[0].texture_coordinates[0] = {u0, v0};
 
-    quad[1].position               = {{x1, y0, 0.0f}};
-    quad[1].texture_coordinates[0] = {{u1, v0}};
+    quad[1].position               = {x1, y0, 0.0f};
+    quad[1].texture_coordinates[0] = {u1, v0};
 
-    quad[2].position               = {{x1, y1, 0.0f}};
-    quad[2].texture_coordinates[0] = {{u1, v1}};
+    quad[2].position               = {x1, y1, 0.0f};
+    quad[2].texture_coordinates[0] = {u1, v1};
 
-    quad[3].position               = {{x0, y1, 0.0f}};
-    quad[3].texture_coordinates[0] = {{u0, v1}};
+    quad[3].position               = {x0, y1, 0.0f};
+    quad[3].texture_coordinates[0] = {u0, v1};
 
     size_t offset = StreamVertices(quad, 4);
 

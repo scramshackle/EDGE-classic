@@ -178,13 +178,13 @@ void RendererColourmapEffect(Player *player)
             y2 = view_window_y;
 
             glvert->rgba       = unit_col;
-            glvert++->position = {{x1, y1, 0}};
+            glvert++->position = {x1, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y1, 0}};
+            glvert++->position = {x2, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y2, 0}};
+            glvert++->position = {x2, y2, 0};
             glvert->rgba       = unit_col;
-            glvert->position   = {{x1, y2, 0}};
+            glvert->position   = {x1, y2, 0};
 
             EndRenderUnit(4);
 
@@ -194,7 +194,7 @@ void RendererColourmapEffect(Player *player)
         {
             float old_alpha = HUDGetAlpha();
             HUDSetAlpha(0.0f);
-            s = HMM_MAX(0.5f, s);
+            s = epi::Max(0.5f, s);
             HUDThinBox(hud_x_left, hud_visible_top, hud_x_right, hud_visible_bottom, epi::MakeRGBAFloat(s, s, s), 25.0f,
                        kBlendingInvert);
             HUDSetAlpha(old_alpha);
@@ -239,12 +239,12 @@ void RendererPaletteEffect(Player *player)
     {
         PalettedColourToRGB(playpal_black, rgb_data, player->last_damage_colour_, player->damage_count_);
 
-        int rgb_max = HMM_MAX(rgb_data[0], HMM_MAX(rgb_data[1], rgb_data[2]));
+        int rgb_max = epi::Max(rgb_data[0], epi::Max(rgb_data[1], rgb_data[2]));
 
         if (rgb_max == 0)
             return;
 
-        rgb_max = HMM_MIN(200, rgb_max);
+        rgb_max = epi::Min(200, rgb_max);
 
         if (!reduce_flash)
             unit_col = epi::MakeRGBAFloat((float)rgb_data[0] / (float)rgb_max, (float)rgb_data[1] / (float)rgb_max,
@@ -269,13 +269,13 @@ void RendererPaletteEffect(Player *player)
             BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
 
         glvert->rgba       = unit_col;
-        glvert++->position = {{0, (float)current_screen_height, 0}};
+        glvert++->position = {0, (float)current_screen_height, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{(float)current_screen_width, (float)current_screen_height, 0}};
+        glvert++->position = {(float)current_screen_width, (float)current_screen_height, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{(float)current_screen_width, 0, 0}};
+        glvert++->position = {(float)current_screen_width, 0, 0};
         glvert->rgba       = unit_col;
-        glvert->position   = {{0, 0, 0}};
+        glvert->position   = {0, 0, 0};
 
         EndRenderUnit(4);
 
@@ -303,10 +303,10 @@ void FuzzUpdate(void)
     fuzz_y_offset = ((hud_tic * 3) & 1023) / 256.0;
 }
 
-void FuzzAdjust(HMM_Vec2 *tc, MapObject *mo)
+void FuzzAdjust(epi::Vec2 *tc, MapObject *mo)
 {
-    tc->X += fmod(HMM_Lerp(mo->old_x_, fractional_tic, mo->x) / 520.0, 1.0);
-    tc->Y += fmod(HMM_Lerp(mo->old_y_, fractional_tic, mo->y) / 520.0, 1.0) + fuzz_y_offset;
+    tc->x += fmod(epi::Lerp(mo->old_x_, mo->x, fractional_tic) / 520.0, 1.0);
+    tc->y += fmod(epi::Lerp(mo->old_y_, mo->y, fractional_tic) / 520.0, 1.0) + fuzz_y_offset;
 }
 
 //--- editor settings ---

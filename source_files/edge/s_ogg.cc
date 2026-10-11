@@ -24,6 +24,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 // clang-format off
 #define OV_EXCLUDE_STATIC_CALLBACKS
 #include "minivorbis.h"

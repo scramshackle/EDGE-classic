@@ -232,6 +232,7 @@ endif()
 
 if (EDGE_EXTRA_CHECKS)
   add_compile_definitions(EDGE_EXTRA_CHECKS)
+  set(EPI_EXTRA_CHECKS ON)
 endif()
 
 if (EDGE_PROFILING)

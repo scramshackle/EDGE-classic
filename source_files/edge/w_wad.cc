@@ -47,11 +47,11 @@
 #include "ddf_switch.h"
 #include "ddf_wadfixes.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "dstrings.h"
 #include "e_main.h"
 #include "e_search.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -66,7 +66,6 @@
 #include "r_image.h"
 #include "rad_trig.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "vm_coal.h"
 #include "w_epk.h"
 #include "w_files.h"
@@ -2266,7 +2265,7 @@ static const char *UserSkyboxName(const char *base, int face)
     static char       buffer[64];
     static const char letters[] = "NESWTB";
 
-    stbsp_sprintf(buffer, "%s_%c", base, letters[face]);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%s_%c", base, letters[face]);
     return buffer;
 }
 

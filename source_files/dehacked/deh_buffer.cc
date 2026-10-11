@@ -40,7 +40,7 @@ namespace dehacked
 InputBuffer::InputBuffer(const char *data, int length) : data_(data), pointer_(data), length_(length)
 {
     if (length_ < 0)
-        FatalError("Dehacked: Error - Illegal length of lump (%d bytes)\n", length_);
+        epi::FatalError("Dehacked: Error - Illegal length of lump (%d bytes)\n", length_);
 }
 
 InputBuffer::~InputBuffer()

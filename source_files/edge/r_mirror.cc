@@ -1,14 +1,14 @@
 
 #include "r_mirror.h"
 
-#include "epi_doomdefs.h"
-#include "r_backend.h"
+#include "dm_format.h"
 #include "i_system.h"
+#include "r_backend.h"
 #include "r_image.h"
 #include "r_lightgrid.h"
-#include "r_state.h"
 #include "r_render.h"
 #include "r_sky.h"
+#include "r_state.h"
 #include "r_units.h"
 
 extern bool solid_mode;
@@ -22,9 +22,9 @@ void ResetMirrorView(void)
     mirror_view.reflective     = false;
     mirror_view.xy_scale       = 1.0f;
     mirror_view.z_scale        = 1.0f;
-    mirror_view.sprite_right   = {{view_sine, -view_cosine}};
-    mirror_view.sprite_forward = {{view_cosine, view_sine}};
-    mirror_view.view_position  = {{view_x, view_y, view_z}};
+    mirror_view.sprite_right   = {view_sine, -view_cosine};
+    mirror_view.sprite_forward = {view_cosine, view_sine};
+    mirror_view.view_position  = {view_x, view_y, view_z};
     mirror_view.view_plane     = view_forward;
 }
 
@@ -32,7 +32,7 @@ void InstallMirrorNearPlane(const DrawMirror *mir)
 {
     if (!mir)
     {
-        render_backend->SetObliqueNearPlane(false, HMM_V4(0.0f, 0.0f, 0.0f, 0.0f));
+        render_backend->SetObliqueNearPlane(false, epi::Vec4{0.0f, 0.0f, 0.0f, 0.0f});
         return;
     }
 
@@ -43,21 +43,21 @@ static void DrawMirrorAperturePolygon(const DrawMirror *mir, bool push_to_far_pl
 {
     Line *ld = mir->line_side->linedef;
 
-    float x1 = mir->line_side->vertex_1->X;
-    float y1 = mir->line_side->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->x;
+    float y1 = mir->line_side->vertex_1->y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->line_side->vertex_2->X;
-    float y2 = mir->line_side->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->x;
+    float y2 = mir->line_side->vertex_2->y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     RendererVertex quad[4];
     EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
 
-    quad[0].position = {{x1, y1, z1}};
-    quad[1].position = {{x1, y1, z2}};
-    quad[2].position = {{x2, y2, z2}};
-    quad[3].position = {{x2, y2, z1}};
+    quad[0].position = {x1, y1, z1};
+    quad[1].position = {x1, y1, z2};
+    quad[2].position = {x2, y2, z2};
+    quad[3].position = {x2, y2, z1};
 
     if (push_to_far_plane)
     {
@@ -65,12 +65,12 @@ static void DrawMirrorAperturePolygon(const DrawMirror *mir, bool push_to_far_pl
 
         for (int32_t v = 0; v < 4; v++)
         {
-            HMM_Vec3 ray = HMM_SubV3(quad[v].position, mirror_view.view_position);
+            epi::Vec3 ray = epi::SubtractVectors(quad[v].position, mirror_view.view_position);
 
-            float distance = HMM_LenV3(ray);
+            float distance = epi::VectorLength(ray);
 
             if (distance > 0.001f && distance < limit)
-                quad[v].position = HMM_AddV3(mirror_view.view_position, HMM_MulV3F(ray, limit / distance));
+                quad[v].position = epi::AddVectors(mirror_view.view_position, epi::ScaleVector(ray, limit / distance));
         }
     }
 
@@ -177,25 +177,25 @@ static void DrawMirrorPolygon(DrawMirror *mir)
     else
         unit_col = epi::MakeRGBA(255, 0, 0, (uint8_t)(alpha * 255.0f));
 
-    float x1 = mir->line_side->vertex_1->X;
-    float y1 = mir->line_side->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->x;
+    float y1 = mir->line_side->vertex_1->y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->line_side->vertex_2->X;
-    float y2 = mir->line_side->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->x;
+    float y2 = mir->line_side->vertex_2->y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
                                              alpha < 0.99f ? kBlendingAlpha : kBlendingNone);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, z1}};
+    glvert++->position = {x1, y1, z1};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, z2}};
+    glvert++->position = {x1, y1, z2};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y2, z2}};
+    glvert++->position = {x2, y2, z2};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x2, y2, z1}};
+    glvert->position   = {x2, y2, z1};
 
     EndRenderUnit(4);
 }
@@ -223,12 +223,12 @@ static void DrawPortalPolygon(DrawMirror *mir)
     epi::SetRGBAAlpha(unit_col, alpha);
 
     // get polygon coordinates
-    float x1 = mir->line_side->vertex_1->X;
-    float y1 = mir->line_side->vertex_1->Y;
+    float x1 = mir->line_side->vertex_1->x;
+    float y1 = mir->line_side->vertex_1->y;
     float z1 = ld->front_sector->interpolated_floor_height;
 
-    float x2 = mir->line_side->vertex_2->X;
-    float y2 = mir->line_side->vertex_2->Y;
+    float x2 = mir->line_side->vertex_2->x;
+    float y2 = mir->line_side->vertex_2->y;
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     // get texture coordinates
@@ -241,27 +241,27 @@ static void DrawPortalPolygon(DrawMirror *mir)
     float ty1 = 0;
     float ty2 = (z2 - z1);
 
-    tx1 = tx1 * surf->x_matrix.X / total_w;
-    tx2 = tx2 * surf->x_matrix.X / total_w;
+    tx1 = tx1 * surf->x_matrix.x / total_w;
+    tx2 = tx2 * surf->x_matrix.x / total_w;
 
-    ty1 = ty1 * surf->y_matrix.Y / total_h;
-    ty2 = ty2 * surf->y_matrix.Y / total_h;
+    ty1 = ty1 * surf->y_matrix.y / total_h;
+    ty2 = ty2 * surf->y_matrix.y / total_h;
 
     RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0,
                                              0, alpha < 0.99f ? kBlendingAlpha : kBlendingNone);
 
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x1, y1, z1}};
-    glvert++->texture_coordinates[0] = {{tx1, ty1}};
+    glvert->position                 = {x1, y1, z1};
+    glvert++->texture_coordinates[0] = {tx1, ty1};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x1, y1, z2}};
-    glvert++->texture_coordinates[0] = {{tx1, ty2}};
+    glvert->position                 = {x1, y1, z2};
+    glvert++->texture_coordinates[0] = {tx1, ty2};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x2, y2, z2}};
-    glvert++->texture_coordinates[0] = {{tx2, ty2}};
+    glvert->position                 = {x2, y2, z2};
+    glvert++->texture_coordinates[0] = {tx2, ty2};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x2, y2, z1}};
-    glvert->texture_coordinates[0]   = {{tx2, ty1}};
+    glvert->position                 = {x2, y2, z1};
+    glvert->texture_coordinates[0]   = {tx2, ty1};
 
     EndRenderUnit(4);
 }

@@ -528,10 +528,10 @@ class Gles2RenderState : public RenderState
 
         gles2_model_program.Use();
 
-        const HMM_Mat4 &model_view = gles2_immediate.ModelViewMatrix();
-        const HMM_Mat4 &projection = gles2_immediate.ProjectionMatrix();
+        const epi::Mat4 &model_view = gles2_immediate.ModelViewMatrix();
+        const epi::Mat4 &projection = gles2_immediate.ProjectionMatrix();
 
-        gles2_model_program.SetMatrices(HMM_MulM4(projection, model_view), model_view);
+        gles2_model_program.SetMatrices(epi::MultiplyMatrices(projection, model_view), model_view);
         gles2_model_program.SetTransform(info.transform);
         gles2_model_program.SetLerp(info.lerp);
         gles2_model_program.SetTextureTransform(info.texture_scale, info.texture_offset);

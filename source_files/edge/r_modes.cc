@@ -63,10 +63,10 @@ bool EquivalentDisplayDepth(int depth1, int depth2)
     if (depth1 == depth2)
         return true;
 
-    if (HMM_MIN(depth1, depth2) == 15 && HMM_MAX(depth1, depth2) == 16)
+    if (epi::Min(depth1, depth2) == 15 && epi::Max(depth1, depth2) == 16)
         return true;
 
-    if (HMM_MIN(depth1, depth2) == 24 && HMM_MAX(depth1, depth2) == 32)
+    if (epi::Min(depth1, depth2) == 24 && epi::Max(depth1, depth2) == 32)
         return true;
 
     return false;
@@ -196,7 +196,7 @@ bool IncrementResolution(DisplayMode *mode, int what, int dir)
                 continue;
         }
 
-        diff = HMM_ABS(diff);
+        diff = epi::Abs(diff);
 
         if (diff < best_diff)
         {
@@ -316,15 +316,15 @@ struct CompareResolutionPredicate
 
         if (A->width != B->width)
         {
-            int a_diff_w = HMM_ABS(current_screen_width - A->width);
-            int b_diff_w = HMM_ABS(current_screen_width - B->width);
+            int a_diff_w = epi::Abs(current_screen_width - A->width);
+            int b_diff_w = epi::Abs(current_screen_width - B->width);
 
             return (a_diff_w < b_diff_w);
         }
         else
         {
-            int a_diffloor_height = HMM_ABS(current_screen_height - A->height);
-            int b_diffloor_height = HMM_ABS(current_screen_height - B->height);
+            int a_diffloor_height = epi::Abs(current_screen_height - A->height);
+            int b_diffloor_height = epi::Abs(current_screen_height - B->height);
 
             return (a_diffloor_height < b_diffloor_height);
         }

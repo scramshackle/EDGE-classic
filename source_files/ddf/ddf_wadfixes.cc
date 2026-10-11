@@ -78,7 +78,7 @@ static void FixParseField(const char *field, const char *contents, int index, bo
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
 #if (DDF_DEBUG)
-    LogDebug("FIX_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("FIX_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFMainParseField(fix_commands, field, contents, (uint8_t *)dynamic_fixdef))

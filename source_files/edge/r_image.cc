@@ -42,11 +42,11 @@
 #include "ddf_flat.h"
 #include "ddf_font.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -97,7 +97,7 @@ void NormalizeLiquidSwirl(void)
     }
 }
 
-HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
+epi::Vec4 LiquidShaderParameters(const Image *image, float seconds)
 {
     if (!image || image->liquid_type_ == kLiquidImageNone || swirling_flats == kLiquidSwirlVanilla)
         return {};
@@ -114,7 +114,7 @@ HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
     if (image->liquid_type_ == kLiquidImageThick)
         time *= 0.5f;
 
-    return HMM_V4(mode, time, (float)image->width_, (float)image->height_);
+    return epi::Vec4{mode, time, (float)image->width_, (float)image->height_};
 }
 
 extern ImageData *ReadAsEpiBlock(Image *rim);
@@ -334,7 +334,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
     bool is_patch = false;
     bool solid    = false;
 
-    int  header_len = HMM_MIN((int)sizeof(header), packfile_len);
+    int         header_len = epi::Min((int)sizeof(header), packfile_len);
     ImageFormat fmt        = DetectImageFormat(header, header_len, packfile_len);
 
     if (fmt == kImageOther)
@@ -475,7 +475,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
     bool is_patch = false;
     bool solid    = false;
 
-    int  header_len = HMM_MIN((int)sizeof(header), lump_len);
+    int         header_len = epi::Min((int)sizeof(header), lump_len);
     ImageFormat fmt        = DetectImageFormat(header, header_len, lump_len);
 
     if (fmt == kImageOther)
@@ -804,7 +804,7 @@ static Image *AddImageUser(ImageDefinition *def)
             f->Read(header, sizeof(header));
             f->Seek(0, epi::File::kSeekpointStart);
 
-            int header_len = HMM_MIN((int)sizeof(header), file_size);
+            int header_len = epi::Min((int)sizeof(header), file_size);
             fmt            = DetectImageFormat(header, header_len, file_size);
         }
         else

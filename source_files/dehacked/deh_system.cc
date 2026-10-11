@@ -33,7 +33,7 @@
 #include <string.h>
 
 #include "deh_edge.h"
-#include "stb_sprintf.h"
+#include "epi_str_util.h"
 
 namespace dehacked
 {
@@ -56,7 +56,7 @@ void SetErrorMsg(const char *str, ...)
     va_list args;
 
     va_start(args, str);
-    stbsp_vsnprintf(global_error_buf, sizeof(global_error_buf), str, args);
+    epi::FormatToBufferSizedArgs(global_error_buf, sizeof(global_error_buf), str, args);
     va_end(args);
 
     has_error_msg = true;

@@ -305,7 +305,7 @@ static void S_PlaySound(int idx, const SoundEffectDefinition *def, int category,
         else
             chan->minimum_distance_ = kMinimumOccludedSoundClipDistance;
 
-        HMM_Vec3 emitter = {{pos->x, pos->z, -pos->y}};
+        epi::Vec3 emitter = {pos->x, pos->z, -pos->y};
 
         chan->spatializer_.Update(spatial_listener, emitter, chan->minimum_distance_, kMaximumSoundClipDistance,
                                   chan->volume_);

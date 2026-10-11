@@ -16,11 +16,12 @@
 //
 //----------------------------------------------------------------------------
 
+#include "s_midi.h"
+
 #include <stdint.h>
 
 #include <set>
 
-#include "HandmadeMath.h"
 #include "dm_state.h"
 #include "egtlib.h"
 #include "epi.h"
@@ -34,7 +35,6 @@
 #include "i_system.h"
 #include "m_misc.h"
 #include "s_blit.h"
-#include "s_midi.h"
 #include "s_music.h"
 #include "w_files.h"
 

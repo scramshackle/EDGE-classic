@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "HandmadeMath.h"
 #include "epi_color.h"
+#include "epi_vector.h"
 #include "i_defs_gl.h"
 
 constexpr uint16_t kDummyClamp             = 789;
@@ -38,8 +38,8 @@ constexpr uint16_t kDefaultAutomapLines    = kMaximumLocalVertices / 2;
 struct RendererVertex
 {
     RGBAColor rgba;
-    HMM_Vec3  position;
-    HMM_Vec2  texture_coordinates[2];
+    epi::Vec3 position;
+    epi::Vec2 texture_coordinates[2];
 };
 
 constexpr int kSpriteLightLevels = 32;
@@ -64,7 +64,7 @@ struct SpriteLightTable
 constexpr float kSpriteInstanceMirrorFlip = 1.0f;
 constexpr float kSpriteInstanceFuzzy      = 2.0f;
 
-extern HMM_Vec4 render_unit_sprite_view[2];
+extern epi::Vec4 render_unit_sprite_view[2];
 
 extern RGBAColor culling_fog_color;
 
@@ -72,8 +72,8 @@ extern float    static_batch_light_row_offset;
 
 extern bool     render_unit_whiten;
 extern int      render_unit_filter;
-extern HMM_Vec4 render_unit_blur;
-extern HMM_Vec4 render_unit_liquid;
+extern epi::Vec4 render_unit_blur;
+extern epi::Vec4 render_unit_liquid;
 
 void StartUnitBatch(bool sort_em);
 void FinishUnitBatch(void);
@@ -143,13 +143,13 @@ struct ModelDrawInfo
     int   frame2 = 0;
     float lerp   = 0.0f;
 
-    HMM_Mat4 transform = HMM_M4D(1.0f);
+    epi::Mat4 transform = epi::IdentityMatrix();
 
     float alpha      = 1.0f;
     float alpha_test = 0.0f;
 
-    HMM_Vec2 texture_scale  = {{1.0f, 1.0f}};
-    HMM_Vec2 texture_offset = {{0.0f, 0.0f}};
+    epi::Vec2 texture_scale  = {1.0f, 1.0f};
+    epi::Vec2 texture_offset = {0.0f, 0.0f};
 
     int first_vertex = 0;
     int vertex_count = 0;
@@ -167,7 +167,7 @@ struct ModelDrawInfo
     float    light_fixed_depth = 0.0f;
     bool     light_depth_fixed = false;
     bool     fuzzy             = false;
-    HMM_Vec3 tint              = {{1.0f, 1.0f, 1.0f}};
+    epi::Vec3 tint              = {1.0f, 1.0f, 1.0f};
 };
 
 struct RendererScissor
@@ -180,10 +180,10 @@ struct RendererScissor
 
 struct SkyPassInfo
 {
-    HMM_Mat4 inverse_projection = HMM_M4D(1.0f);
-    HMM_Mat4 inverse_view       = HMM_M4D(1.0f);
-    HMM_Vec2 viewport_origin    = {{0.0f, 0.0f}};
-    HMM_Vec2 viewport_size      = {{1.0f, 1.0f}};
+    epi::Mat4 inverse_projection = epi::IdentityMatrix();
+    epi::Mat4 inverse_view       = epi::IdentityMatrix();
+    epi::Vec2 viewport_origin    = {0.0f, 0.0f};
+    epi::Vec2 viewport_size      = {1.0f, 1.0f};
     int      stretch_mode       = 0;
     float    ty                 = 2.0f;
     float    u_scale            = 1.0f;

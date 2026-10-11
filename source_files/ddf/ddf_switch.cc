@@ -84,7 +84,7 @@ static void SwitchParseField(const char *field, const char *contents, int index,
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
 #if (DDF_DEBUG)
-    LogDebug("SWITCH_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("SWITCH_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFMainParseField(switch_commands, field, contents, (uint8_t *)dynamic_switchdef))
@@ -134,13 +134,13 @@ void DDFReadSwitch(const std::string &data)
     epi::array_iterator_c it;
     SwitchDefinition     *sw;
 
-    LogDebug("DDFReadSW: Switch List:\n");
+    epi::LogDebug("DDFReadSW: Switch List:\n");
 
     for (it = switchdefs.GetBaseIterator(); it.IsValid(); it++)
     {
         sw = ITERATOR_TO_TYPE(it, SwitchDefinition *);
 
-        LogDebug("  Num: %d  ON: '%s'  OFF: '%s'\n", i, sw->on_name, sw->off_name);
+        epi::LogDebug("  Num: %d  ON: '%s'  OFF: '%s'\n", i, sw->on_name, sw->off_name);
     }
 #endif
 }
@@ -247,7 +247,7 @@ void DDFConvertSwitchesLump(const uint8_t *data, int size)
         memcpy(on_name, data + 9, 8);
         on_name[8] = 0;
 
-        LogDebug("- SWITCHES LUMP: off '%s' : on '%s'\n", off_name, on_name);
+        epi::LogDebug("- SWITCHES LUMP: off '%s' : on '%s'\n", off_name, on_name);
 
         // ignore zero-length names
         if (off_name[0] == 0 || on_name[0] == 0)

@@ -1,6 +1,4 @@
 #include "r_static.h"
-#include "r_backend.h"
-#include "r_misc.h"
 
 #include <limits.h>
 #include <math.h>
@@ -11,22 +9,23 @@
 
 #include "con_var.h"
 #include "ddf_main.h"
+#include "dm_format.h"
 #include "dm_state.h"
+#include "edge_profiling.h"
 #include "epi.h"
 #include "epi_color.h"
-#include "epi_doomdefs.h"
-#include "edge_profiling.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
 #include "i_system.h"
 #include "n_network.h"
 #include "p_mobj.h"
 #include "p_tick.h"
+#include "r_backend.h"
 #include "r_colormap.h"
 #include "r_defs.h"
 #include "r_gldefs.h"
-#include "r_lightgrid.h"
 #include "r_image.h"
+#include "r_lightgrid.h"
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_shader.h"
@@ -56,8 +55,8 @@ struct StaticSpan
     bool    live;
 
     const MapSurface *scroll_surface;
-    HMM_Vec2          scroll_scale;
-    HMM_Vec2          scroll_applied;
+    epi::Vec2         scroll_scale;
+    epi::Vec2         scroll_applied;
 
     float low[3];
     float high[3];
@@ -90,7 +89,7 @@ struct StaticBatch
 
     std::vector<RendererVertex> vertices;
     std::vector<StaticSpan>     spans;
-    std::vector<HMM_Vec2>       scroll_base;
+    std::vector<epi::Vec2>      scroll_base;
 
     uint32_t gpu_handle   = 0;
     int      gpu_capacity = 0;
@@ -176,8 +175,8 @@ static int LiveHeightKey(const Sector *front, const Sector *back)
 }
 
 static const MapSurface *capture_scroll_surface = nullptr;
-static HMM_Vec2          capture_scroll_uv      = {{0, 0}};
-static HMM_Vec2          capture_uv_scale       = {{0, 0}};
+static epi::Vec2         capture_scroll_uv      = {0, 0};
+static epi::Vec2         capture_uv_scale       = {0, 0};
 static bool              capture_flip_winding   = false;
 
 static bool SurfaceScrolls(const MapSurface *surf)
@@ -185,30 +184,30 @@ static bool SurfaceScrolls(const MapSurface *surf)
     return surf && surf->scrolls;
 }
 
-static HMM_Vec2 SurfaceScrollShift(const MapSurface *surf, const HMM_Vec2 &uv_scale)
+static epi::Vec2 SurfaceScrollShift(const MapSurface *surf, const epi::Vec2 &uv_scale)
 {
     bool interpolate = !console_active && !paused && !menu_active && !time_stop_active && !erraticism_active;
 
-    float offset_x = surf->offset.X;
-    float offset_y = surf->offset.Y;
+    float offset_x = surf->offset.x;
+    float offset_y = surf->offset.y;
 
-    if (interpolate && !epi::AlmostEquals(surf->old_offset.X, surf->offset.X))
-        offset_x = fmod(HMM_Lerp(surf->old_offset.X, fractional_tic, surf->offset.X), surf->image->width_);
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.x, surf->offset.x))
+        offset_x = fmod(epi::Lerp(surf->old_offset.x, surf->offset.x, fractional_tic), surf->image->width_);
 
-    if (interpolate && !epi::AlmostEquals(surf->old_offset.Y, surf->offset.Y))
-        offset_y = fmod(HMM_Lerp(surf->old_offset.Y, fractional_tic, surf->offset.Y), surf->image->height_);
+    if (interpolate && !epi::AlmostEquals(surf->old_offset.y, surf->offset.y))
+        offset_y = fmod(epi::Lerp(surf->old_offset.y, surf->offset.y, fractional_tic), surf->image->height_);
 
-    HMM_Vec2 shift;
+    epi::Vec2 shift;
 
-    shift.X = (offset_x - surf->base_offset.X) * uv_scale.X;
-    shift.Y = (offset_y - surf->base_offset.Y) * uv_scale.Y;
+    shift.x = (offset_x - surf->base_offset.x) * uv_scale.x;
+    shift.y = (offset_y - surf->base_offset.y) * uv_scale.y;
 
     return shift;
 }
 
-static void SetCaptureScrollOffset(const MapSurface *surf, const HMM_Vec2 &uv_scale)
+static void SetCaptureScrollOffset(const MapSurface *surf, const epi::Vec2 &uv_scale)
 {
-    capture_scroll_uv      = {{0, 0}};
+    capture_scroll_uv      = {0, 0};
     capture_uv_scale       = uv_scale;
     capture_scroll_surface = nullptr;
 
@@ -1210,7 +1209,7 @@ bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, con
 void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
                         float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
-                        const HMM_Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef)
+                        const epi::Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
@@ -1274,7 +1273,7 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
 }
 
 void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
-                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const HMM_Vec2 &uv_scale,
+                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const epi::Vec2 &uv_scale,
                             const Extrafloor *plane_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
@@ -1367,16 +1366,16 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 
     for (int axis = 0; axis < 3; axis++)
     {
-        span.low[axis]  = verts[0].position.Elements[axis];
-        span.high[axis] = verts[0].position.Elements[axis];
+        span.low[axis]  = epi::VectorComponent(verts[0].position, axis);
+        span.high[axis] = epi::VectorComponent(verts[0].position, axis);
     }
 
     for (int v = 1; v < count; v++)
     {
         for (int axis = 0; axis < 3; axis++)
         {
-            span.low[axis]  = HMM_MIN(span.low[axis], verts[v].position.Elements[axis]);
-            span.high[axis] = HMM_MAX(span.high[axis], verts[v].position.Elements[axis]);
+            span.low[axis]  = epi::Min(span.low[axis], epi::VectorComponent(verts[v].position, axis));
+            span.high[axis] = epi::Max(span.high[axis], epi::VectorComponent(verts[v].position, axis));
         }
     }
 
@@ -1410,14 +1409,14 @@ void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
 
         dest.rgba = epi::MakeRGBA(255, 255, 255, epi::GetRGBAAlpha(dest.rgba));
 
-        dest.texture_coordinates[1].Y = span_light_row;
+        dest.texture_coordinates[1].y = span_light_row;
 
         if (batch.scrolling)
         {
-            HMM_Vec2 base = dest.texture_coordinates[0];
+            epi::Vec2 base = dest.texture_coordinates[0];
 
-            base.X -= capture_scroll_uv.X;
-            base.Y -= capture_scroll_uv.Y;
+            base.x -= capture_scroll_uv.x;
+            base.y -= capture_scroll_uv.y;
 
             batch.scroll_base.push_back(base);
         }
@@ -1607,10 +1606,10 @@ static void RefreshStaticLighting(void)
             float light = StaticLightRow(current, span.light_adjust);
 
             for (int v = span.start; v < span.start + span.count; v++)
-                batch.vertices[v].texture_coordinates[1].Y = light;
+                batch.vertices[v].texture_coordinates[1].y = light;
 
-            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
-            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
+            batch.dirty_low  = epi::Min(batch.dirty_low, span.start);
+            batch.dirty_high = epi::Max(batch.dirty_high, span.start + span.count);
         }
     }
 }
@@ -1774,7 +1773,7 @@ static void UploadStaticBatch(StaticBatch &batch)
         if (batch.gpu_handle)
             DeleteStaticVertexBuffer(batch.gpu_handle);
 
-        int capacity = HMM_MAX(total + total / 2, 4096);
+        int capacity = epi::Max(total + total / 2, 4096);
 
         batch.gpu_handle   = CreateStaticVertexBufferWithCapacity(batch.vertices.data(), total, capacity);
         batch.gpu_capacity = batch.gpu_handle ? capacity : 0;
@@ -1800,7 +1799,7 @@ static void UploadStaticBatch(StaticBatch &batch)
         EDGE_ZoneScopedN("StaticMesh range update");
 
         int low  = batch.dirty_low;
-        int high = HMM_MIN(batch.dirty_high, batch.gpu_count);
+        int high = epi::Min(batch.dirty_high, batch.gpu_count);
 
         if (high > low)
             UpdateStaticVertexBuffer(batch.gpu_handle, low, batch.vertices.data() + low, high - low);
@@ -1823,21 +1822,21 @@ static void RefreshStaticScrolling(void)
             if (!span.live || !span.scroll_surface)
                 continue;
 
-            HMM_Vec2 shift = SurfaceScrollShift(span.scroll_surface, span.scroll_scale);
+            epi::Vec2 shift = SurfaceScrollShift(span.scroll_surface, span.scroll_scale);
 
-            if (epi::AlmostEquals(shift.X, span.scroll_applied.X) && epi::AlmostEquals(shift.Y, span.scroll_applied.Y))
+            if (epi::AlmostEquals(shift.x, span.scroll_applied.x) && epi::AlmostEquals(shift.y, span.scroll_applied.y))
                 continue;
 
             span.scroll_applied = shift;
 
             for (int v = span.start; v < span.start + span.count; v++)
             {
-                batch.vertices[v].texture_coordinates[0].X = batch.scroll_base[v].X + shift.X;
-                batch.vertices[v].texture_coordinates[0].Y = batch.scroll_base[v].Y + shift.Y;
+                batch.vertices[v].texture_coordinates[0].x = batch.scroll_base[v].x + shift.x;
+                batch.vertices[v].texture_coordinates[0].y = batch.scroll_base[v].y + shift.y;
             }
 
-            batch.dirty_low  = HMM_MIN(batch.dirty_low, span.start);
-            batch.dirty_high = HMM_MAX(batch.dirty_high, span.start + span.count);
+            batch.dirty_low  = epi::Min(batch.dirty_low, span.start);
+            batch.dirty_high = epi::Max(batch.dirty_high, span.start + span.count);
         }
     }
 }
@@ -1966,7 +1965,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
             if (resident)
             {
-                int count = HMM_MIN(run.count, batch.gpu_count - run.start);
+                int count = epi::Min(run.count, batch.gpu_count - run.start);
 
                 if (count > 0)
                     shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
@@ -1976,7 +1975,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
 
             for (int offset = 0; offset < run.count; offset += (int)kMaximumStaticRun)
             {
-                int count = HMM_MIN((int)kMaximumStaticRun, run.count - offset);
+                int count = epi::Min((int)kMaximumStaticRun, run.count - offset);
 
                 shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run.start + offset, count, tex_id, 1.0f,
                                    &pass, blending, glow_set);

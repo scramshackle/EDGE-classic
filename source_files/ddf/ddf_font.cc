@@ -87,7 +87,7 @@ static void FontStartEntry(const char *name, bool extend)
 static void FontParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("FONT_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("FONT_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -124,7 +124,7 @@ static void FontFinishEntry(void)
 
 static void FontClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in fonts.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in fonts.ddf\n");
 }
 
 void DDFReadFonts(const std::string &data)
@@ -155,7 +155,7 @@ void DDFFontInit(void)
 void DDFFontCleanUp(void)
 {
     if (fontdefs.empty())
-        FatalError("There are no fonts defined in DDF !\n");
+        epi::FatalError("There are no fonts defined in DDF !\n");
 
     fontdefs.shrink_to_fit(); // <-- Reduce to allocated size
 }

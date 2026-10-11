@@ -134,7 +134,7 @@ void sprites::AlterBexSprite(const char *new_val)
 
     if (strlen(new_val) != 4)
     {
-        LogDebug("Dehacked: Warning - Bad length for sprite name '%s'.\n", new_val);
+        epi::LogDebug("Dehacked: Warning - Bad length for sprite name '%s'.\n", new_val);
         return;
     }
 
@@ -144,7 +144,7 @@ void sprites::AlterBexSprite(const char *new_val)
         int num = atoi(old_val);
         if (num < 0)
         {
-            LogDebug("Dehacked: Warning - Line %d: illegal sprite entry '%s'.\n", patch::line_num, old_val);
+            epi::LogDebug("Dehacked: Warning - Line %d: illegal sprite entry '%s'.\n", patch::line_num, old_val);
         }
         else
         {
@@ -156,12 +156,12 @@ void sprites::AlterBexSprite(const char *new_val)
 
     if (strlen(old_val) != 4)
     {
-        LogDebug("Dehacked: Warning - Bad length for sprite name '%s'.\n", old_val);
+        epi::LogDebug("Dehacked: Warning - Bad length for sprite name '%s'.\n", old_val);
         return;
     }
 
     if (!ReplaceSprite(old_val, new_val))
-        LogDebug("Dehacked: Warning - Line %d: unknown sprite name '%s'.\n", patch::line_num, old_val);
+        epi::LogDebug("Dehacked: Warning - Line %d: unknown sprite name '%s'.\n", patch::line_num, old_val);
 }
 
 const char *sprites::GetSprite(int spr_num)

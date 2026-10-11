@@ -40,7 +40,6 @@
 #include "epi.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
 namespace dehacked
 {
 
@@ -338,7 +337,7 @@ void sounds::AlterSound(int new_val)
 
     if (epi::StringCaseCompareASCII(deh_field, "Offset") == 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: raw sound Offset not supported.\n", patch::line_num);
+        epi::LogDebug("Dehacked: Warning - Line %d: raw sound Offset not supported.\n", patch::line_num);
         return;
     }
 
@@ -346,7 +345,7 @@ void sounds::AlterSound(int new_val)
     {
         if (new_val < 0)
         {
-            LogDebug("Dehacked: Warning - Line %d: bad sound priority value: %d.\n", patch::line_num, new_val);
+            epi::LogDebug("Dehacked: Warning - Line %d: bad sound priority value: %d.\n", patch::line_num, new_val);
             new_val = 0;
         }
 
@@ -356,7 +355,7 @@ void sounds::AlterSound(int new_val)
         return;
     }
 
-    LogDebug("Dehacked: Warning - UNKNOWN SOUND FIELD: %s\n", deh_field);
+    epi::LogDebug("Dehacked: Warning - UNKNOWN SOUND FIELD: %s\n", deh_field);
 }
 
 std::string sounds::GetEdgeSfxName(int sound_id)
@@ -480,7 +479,7 @@ void sounds::WriteSound(int sound_id)
 
     std::string ddf_name = GetEdgeSfxName(sound_id);
     if (ddf_name.empty())
-        FatalError("Dehacked: Error - No DDF name for sound %d ??\n", sound_id);
+        epi::FatalError("Dehacked: Error - No DDF name for sound %d ??\n", sound_id);
 
     wad::Printf("[%s]\n", ddf_name.c_str());
 
@@ -566,7 +565,7 @@ void sounds::AlterBexSound(const char *new_val)
 
     if (strlen(new_val) < 1 || strlen(new_val) > 6)
     {
-        LogDebug("Dehacked: Warning - Bad length for sound name '%s'.\n", new_val);
+        epi::LogDebug("Dehacked: Warning - Bad length for sound name '%s'.\n", new_val);
         return;
     }
 
@@ -576,7 +575,7 @@ void sounds::AlterBexSound(const char *new_val)
         int num = atoi(old_val);
         if (num < 1)
         {
-            LogDebug("Dehacked: Warning - Line %d: illegal sound number '%s'.\n", patch::line_num, old_val);
+            epi::LogDebug("Dehacked: Warning - Line %d: illegal sound number '%s'.\n", patch::line_num, old_val);
         }
         else
         {
@@ -588,12 +587,12 @@ void sounds::AlterBexSound(const char *new_val)
 
     if (strlen(old_val) < 1 || strlen(old_val) > 6)
     {
-        LogDebug("Dehacked: Warning - Bad length for sound name '%s'.\n", old_val);
+        epi::LogDebug("Dehacked: Warning - Bad length for sound name '%s'.\n", old_val);
         return;
     }
 
     if (!ReplaceSound(old_val, new_val))
-        LogDebug("Dehacked: Warning - Line %d: unknown sound name '%s'.\n", patch::line_num, old_val);
+        epi::LogDebug("Dehacked: Warning - Line %d: unknown sound name '%s'.\n", patch::line_num, old_val);
 }
 
 } // namespace dehacked

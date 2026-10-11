@@ -66,7 +66,7 @@ static void DoLight(LightSpecial *light)
     case kLightSpecialTypeFade: {
         int diff = light->maximum_light - light->minimum_light;
 
-        if (HMM_ABS(diff) < type->step_)
+        if (epi::Abs(diff) < type->step_)
         {
             light->sector->properties.light_level = light->maximum_light;
 

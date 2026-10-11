@@ -62,7 +62,7 @@ void ReverbDefinition::StartEntry(const char *name, bool extend)
 void ReverbDefinition::ParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("REVERB_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("REVERB_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -120,7 +120,7 @@ void ReverbDefinition::FinishEntry(void)
 
 void ReverbDefinition::ClearEntries(void)
 {
-    LogWarning("Ignoring #CLEARALL in reverbs.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in reverbs.ddf\n");
 }
 
 void ReverbDefinition::ReadDDF(const std::string &data)

@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include "HandmadeMath.h"
 #include "i_defs_gl.h"
 
 struct LightGrid;

@@ -34,7 +34,6 @@
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "p_action.h"
-#include "stb_sprintf.h"
 
 void ReadRADScript(const std::string &_data, const std::string &source);
 
@@ -97,40 +96,40 @@ std::string cur_ddf_linedata;
 
     // put actual error message on first line
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
     if (cur_ddf_filename != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)),
-                       "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)),
+                                 "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_entryname != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred in entry: %s\n",
-                       cur_ddf_entryname.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred in entry: %s\n",
+                                 cur_ddf_entryname.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_linedata != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
-                       cur_ddf_linedata.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                                 cur_ddf_linedata.c_str());
         pos += strlen(pos);
     }
 
     // check for buffer overflow
     if (buffer[2047] != 0)
-        FatalError("Buffer overflow in DDFError\n");
+        epi::FatalError("Buffer overflow in DDFError\n");
 
     // add a blank line for readability under DOS/Linux.
-    LogPrint("\n");
+    epi::LogPrint("\n");
 
-    FatalError("%s", buffer);
+    epi::FatalError("%s", buffer);
 }
 
 void DDFWarning(const char *err, ...)
@@ -142,24 +141,24 @@ void DDFWarning(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
-    LogWarning("%s", buffer);
+    epi::LogWarning("%s", buffer);
 
     if (!cur_ddf_filename.empty())
     {
-        LogPrint("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::LogPrint("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
     }
 
     if (!cur_ddf_entryname.empty())
     {
-        LogPrint("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
+        epi::LogPrint("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
     }
 
     if (!cur_ddf_linedata.empty())
     {
-        LogPrint("  with line contents: %s\n", cur_ddf_linedata.c_str());
+        epi::LogPrint("  with line contents: %s\n", cur_ddf_linedata.c_str());
     }
 }
 
@@ -172,24 +171,24 @@ void DDFDebug(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
-    LogDebug("%s", buffer);
+    epi::LogDebug("%s", buffer);
 
     if (!cur_ddf_filename.empty())
     {
-        LogDebug("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::LogDebug("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
     }
 
     if (!cur_ddf_entryname.empty())
     {
-        LogDebug("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
+        epi::LogDebug("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
     }
 
     if (!cur_ddf_linedata.empty())
     {
-        LogDebug("  with line contents: %s\n", cur_ddf_linedata.c_str());
+        epi::LogDebug("  with line contents: %s\n", cur_ddf_linedata.c_str());
     }
 }
 
@@ -199,7 +198,7 @@ void DDFWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)
@@ -329,7 +328,7 @@ void DDFGetLumpNameForFile(const char *filename, char *lumpname)
     FILE *fp = fopen(filename, "r");
 
     if (!fp)
-        FatalError("Couldn't open DDF file: %s\n", filename);
+        epi::FatalError("Couldn't open DDF file: %s\n", filename);
 
     bool in_comment = false;
 
@@ -393,13 +392,13 @@ void DDFGetLumpNameForFile(const char *filename, char *lumpname)
             }
 
             fclose(fp);
-            FatalError("Unknown marker <%s> in DDF file: %s\n", tag_buf, filename);
+            epi::FatalError("Unknown marker <%s> in DDF file: %s\n", tag_buf, filename);
         }
         break;
     }
 
     fclose(fp);
-    FatalError("Missing <..> marker in DDF file: %s\n", filename);
+    epi::FatalError("Missing <..> marker in DDF file: %s\n", filename);
 }
 
 //
@@ -684,9 +683,9 @@ static DDFReadCharReturn DDFMainProcessChar(char character, std::string &token, 
         }
 
     default: // doh!
-        FatalError("DDFMainProcessChar: INTERNAL ERROR: "
-                   "Bad status value %d !\n",
-                   status);
+        epi::FatalError("DDFMainProcessChar: INTERNAL ERROR: "
+                        "Bad status value %d !\n",
+                        status);
     }
 
     return kDDFReadCharReturnNothing;
@@ -997,11 +996,11 @@ void DDFMainReadFile(DDFReadInfo *readinfo, const std::string &data)
         case kDDFReadCharReturnOK:
 #if (DDF_DEBUG_READ)
             charcount++;
-            LogDebug("%c", character);
+            epi::LogDebug("%c", character);
             if (charcount == 75)
             {
                 charcount = 0;
-                LogDebug("\n");
+                epi::LogDebug("\n");
             }
 #endif
             break;
@@ -1190,7 +1189,7 @@ int DDFMainLookupDirector(const MapObjectDefinition *info, const char *ref)
     int state = DDFStateFindLabel(info->state_grp_, director.c_str(), true);
     if (state == 0)
         return state;
-    int offset = p ? HMM_MAX(0, atoi(p + 1) - 1) : 0;
+    int offset = p ? epi::Max(0, atoi(p + 1) - 1) : 0;
 
     // FIXME: check for overflow
     return state + offset;
@@ -1243,7 +1242,7 @@ void DDFMainGetSlope(const char *info, void *storage)
     if (val < -89.5f)
         val = -89.5f;
 
-    *dest = tan(val * HMM_PI / 180.0);
+    *dest = tan(val * epi::kPi / 180.0);
 }
 
 static void DoGetFloat(const char *info, void *storage)
@@ -1280,7 +1279,7 @@ void DDFMainGetPercent(const char *info, void *storage)
         DDFWarnError("Bad percent value '%s': Should be a number followed by %%\n", info);
         // -AJA- 2001/01/27: backwards compatibility
         DoGetFloat(s, &f);
-        *dest = HMM_MAX(0, HMM_MIN(1, f));
+        *dest = epi::Max(0.0f, epi::Min(1.0f, f));
         return;
     }
 
@@ -1527,7 +1526,7 @@ static int FindSpecialFlag(const char *prefix, const char *name, const DDFSpecia
         if (current[0] == '!')
             current++;
 
-        stbsp_sprintf(try_name, "%s%s", prefix, current);
+        epi::FormatToBufferSized(try_name, sizeof(try_name), "%s%s", prefix, current);
 
         if (DDFCompareName(name, try_name) == 0)
             return i;
@@ -2156,7 +2155,7 @@ void DDFAddCollection(std::vector<DDFFile> &col, const std::string &source)
 
 void DDFDumpFile(const std::string &data)
 {
-    LogDebug("\n");
+    epi::LogDebug("\n");
 
     // we need to break it into lines
     std::string line;
@@ -2170,13 +2169,13 @@ void DDFDumpFile(const std::string &data)
 
         if (data[pos] == '\n')
         {
-            LogDebug("%s", line.c_str());
+            epi::LogDebug("%s", line.c_str());
             line.clear();
         }
     }
 
     if (line.size() > 0)
-        LogDebug("%s", line.c_str());
+        epi::LogDebug("%s", line.c_str());
 }
 
 void DDFDumpCollection(const std::vector<DDFFile> &col)
@@ -2191,7 +2190,7 @@ static void DDFParseUnreadFile(size_t d)
     {
         if (it.type == ddf_readers[d].type)
         {
-            LogPrint("Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
+            epi::LogPrint("Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
 
             bool old_strict = strict_errors;
             bool converted_ddf = it.from_dehacked;

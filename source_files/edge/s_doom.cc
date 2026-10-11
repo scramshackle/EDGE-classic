@@ -22,6 +22,7 @@
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "i_system.h"
 #include "s_blit.h"
 #include "s_cache.h"
 #include "snd_gather.h"

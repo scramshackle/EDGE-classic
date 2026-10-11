@@ -135,14 +135,14 @@ class dynlight_shader_c : public AbstractShader
         float light_y = mo->y;
         float light_z = MapObjectMidZ(mo);
 
-        out->position = {{light_x, light_y, light_z}};
+        out->position = {light_x, light_y, light_z};
         out->radius   = WhatRadius();
 
         RGBAColor col = WhatColor();
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
 
-        out->color = {{L * epi::GetRGBARed(col), L * epi::GetRGBAGreen(col), L * epi::GetRGBABlue(col)}};
+        out->color = {L * epi::GetRGBARed(col), L * epi::GetRGBAGreen(col), L * epi::GetRGBABlue(col)};
 
         out->additive = (WhatType() == kDynamicLightTypeAdd);
 
@@ -252,7 +252,7 @@ class wall_glow_c : public AbstractShader
 
     inline float Dist(float x, float y)
     {
-        return (ld->vertex_1->X - x) * norm_x + (ld->vertex_1->Y - y) * norm_y;
+        return (ld->vertex_1->x - x) * norm_x + (ld->vertex_1->y - y) * norm_y;
     }
 
     inline float WhatRadius()
@@ -275,8 +275,8 @@ class wall_glow_c : public AbstractShader
     {
         EPI_ASSERT(mo->dynamic_light_.glow_wall);
         ld     = mo->dynamic_light_.glow_wall;
-        norm_x = (ld->vertex_1->Y - ld->vertex_2->Y) / ld->length;
-        norm_y = (ld->vertex_2->X - ld->vertex_1->X) / ld->length;
+        norm_x = (ld->vertex_1->y - ld->vertex_2->y) / ld->length;
+        norm_y = (ld->vertex_2->x - ld->vertex_1->x) / ld->length;
     }
 
     ~wall_glow_c()

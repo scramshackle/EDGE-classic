@@ -22,6 +22,7 @@
 #include "epi_filesystem.h"
 #include "epi_math.h"
 #include "epi_str_util.h"
+#include "i_system.h"
 #include "miniz.h"
 #include "stb_image.h"
 #include "stb_rect_pack.h"

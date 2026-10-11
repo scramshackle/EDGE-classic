@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 
 constexpr int kLightGridClusterSize       = 16;
 constexpr int kLightGridMaximumLights     = 254;
@@ -14,10 +14,10 @@ constexpr int kLightGridMaximumGlows      = 2;
 
 struct LightGridLight
 {
-    HMM_Vec3 eye_position;
+    epi::Vec3 eye_position;
     float    radius;
 
-    HMM_Vec3 color;
+    epi::Vec3 color;
 
     float additive;
 };

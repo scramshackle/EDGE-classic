@@ -143,13 +143,13 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
         if (!currline)
             return false;
 
-        new_x = currline->vertex_1->X + currline->delta_x / 2.0f;
-        new_y = currline->vertex_1->Y + currline->delta_y / 2.0f;
+        new_x = currline->vertex_1->x + currline->delta_x / 2.0f;
+        new_y = currline->vertex_1->y + currline->delta_y / 2.0f;
 
         new_z = currline->front_sector ? currline->front_sector->floor_height : -32000;
 
         if (currline->back_sector)
-            new_z = HMM_MAX(new_z, currline->back_sector->floor_height);
+            new_z = epi::Max(new_z, currline->back_sector->floor_height);
 
         dest_ang = PointToAngle(0, 0, currline->delta_x, currline->delta_y) + kBAMAngle90;
 
@@ -196,9 +196,9 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
         float pos = 0;
 
         if (fabs(line->delta_x) > fabs(line->delta_y))
-            pos = (oldx - line->vertex_1->X) / line->delta_x;
+            pos = (oldx - line->vertex_1->x) / line->delta_x;
         else
-            pos = (oldy - line->vertex_1->Y) / line->delta_y;
+            pos = (oldy - line->vertex_1->y) / line->delta_y;
 
         if (currline)
         {
@@ -266,8 +266,8 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
 
     if (thing->flags_ & kMapObjectFlagMissile)
     {
-        thing->momentum_.X = thing->speed_ * epi::BAMCos(new_ang);
-        thing->momentum_.Y = thing->speed_ * epi::BAMSin(new_ang);
+        thing->momentum_.x = thing->speed_ * epi::BAMCos(new_ang);
+        thing->momentum_.y = thing->speed_ * epi::BAMSin(new_ang);
     }
     else if (def->special_ & kTeleportSpecialSameSpeed)
     {
@@ -277,18 +277,18 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
         float s = epi::BAMSin(mom_ang);
         float c = epi::BAMCos(mom_ang);
 
-        float mx = thing->momentum_.X;
-        float my = thing->momentum_.Y;
+        float mx = thing->momentum_.x;
+        float my = thing->momentum_.y;
 
-        thing->momentum_.X = mx * c - my * s;
-        thing->momentum_.Y = my * c + mx * s;
+        thing->momentum_.x = mx * c - my * s;
+        thing->momentum_.y = my * c + mx * s;
     }
     else if (player)
     {
         // don't move for a bit
         thing->reaction_time_ = def->delay_;
 
-        thing->momentum_.X = thing->momentum_.Y = thing->momentum_.Z = 0;
+        thing->momentum_.x = thing->momentum_.y = thing->momentum_.z = 0;
 
         player->actual_speed_ = 0;
     }

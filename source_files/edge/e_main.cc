@@ -33,10 +33,10 @@
 
 #include "e_main.h"
 
+#include <SDL3/SDL.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
-#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <string_view>
@@ -90,7 +90,6 @@
 #include "s_music.h"
 #include "s_sound.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "version.h"
@@ -294,13 +293,13 @@ class StartupProgress
             float y2 = 0;
 
             glvert->rgba       = unit_col;
-            glvert++->position = {{x1, y1, 0}};
+            glvert++->position = {x1, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y1, 0}};
+            glvert++->position = {x2, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y2, 0}};
+            glvert++->position = {x2, y2, 0};
             glvert->rgba       = unit_col;
-            glvert->position   = {{x1, y2, 0}};
+            glvert->position   = {x1, y2, 0};
 
             EndRenderUnit(4);
 
@@ -324,13 +323,13 @@ class StartupProgress
             float y2 = 0;
 
             glvert->rgba       = unit_col;
-            glvert++->position = {{x1, y1, 0}};
+            glvert++->position = {x1, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y1, 0}};
+            glvert++->position = {x2, y1, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{x2, y2, 0}};
+            glvert++->position = {x2, y2, 0};
             glvert->rgba       = unit_col;
-            glvert->position   = {{x1, y2, 0}};
+            glvert->position   = {x1, y2, 0};
 
             EndRenderUnit(4);
 
@@ -771,13 +770,13 @@ void EdgeDisplay(void)
         float y2 = 0;
 
         glvert->rgba       = unit_col;
-        glvert++->position = {{x1, y1, 0}};
+        glvert++->position = {x1, y1, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{x2, y1, 0}};
+        glvert++->position = {x2, y1, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{x2, y2, 0}};
+        glvert++->position = {x2, y2, 0};
         glvert->rgba       = unit_col;
-        glvert->position   = {{x1, y2, 0}};
+        glvert->position   = {x1, y2, 0};
 
         EndRenderUnit(4);
 
@@ -801,13 +800,13 @@ void EdgeDisplay(void)
         float y2 = 0;
 
         glvert->rgba       = unit_col;
-        glvert++->position = {{x1, y1, 0}};
+        glvert++->position = {x1, y1, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{x2, y1, 0}};
+        glvert++->position = {x2, y1, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{x2, y2, 0}};
+        glvert++->position = {x2, y2, 0};
         glvert->rgba       = unit_col;
-        glvert->position   = {{x1, y2, 0}};
+        glvert->position   = {x1, y2, 0};
 
         EndRenderUnit(4);
 
@@ -1863,9 +1862,9 @@ static void ShowDateAndVersion(void)
         if (hour_12 == 0)
             hour_12 = 12;
 
-        stbsp_snprintf(timebuf, sizeof(timebuf), "%02d:%02d %s on %02d/%s/%d", hour_12, local_time->tm_min,
-                       local_time->tm_hour < 12 ? "AM" : "PM", local_time->tm_mday,
-                       month_abbreviations[local_time->tm_mon], local_time->tm_year + 1900);
+        epi::FormatToBufferSized(timebuf, sizeof(timebuf), "%02d:%02d %s on %02d/%s/%d", hour_12, local_time->tm_min,
+                                 local_time->tm_hour < 12 ? "AM" : "PM", local_time->tm_mday,
+                                 month_abbreviations[local_time->tm_mon], local_time->tm_year + 1900);
     }
 
     LogDebug("[Log file created at %s]\n\n", timebuf);
@@ -2116,6 +2115,381 @@ void EdgeShutdown(void)
     ProfilerShutdown();
 }
 
+#ifdef EDGE_EXTRA_CHECKS
+// Register strings that were created via the EPI_KNOWN_STRINGHASH macro
+// in various parts of the program
+static void RegisterKnownStringHashes(void)
+{
+    // UDMF
+    epi::StringHash::Register("SPECIAL");
+    epi::StringHash::Register("ID");
+    epi::StringHash::Register("X");
+    epi::StringHash::Register("Y");
+    epi::StringHash::Register("SECTOR");
+    epi::StringHash::Register("THING");
+    epi::StringHash::Register("VERTEX");
+    epi::StringHash::Register("LINEDEF");
+    epi::StringHash::Register("SIDEDEF");
+    epi::StringHash::Register("ZFLOOR");
+    epi::StringHash::Register("ZCEILING");
+    epi::StringHash::Register("V1");
+    epi::StringHash::Register("V2");
+    epi::StringHash::Register("SIDEFRONT");
+    epi::StringHash::Register("SIDEBACK");
+    epi::StringHash::Register("BLOCKING");
+    epi::StringHash::Register("BLOCKMONSTERS");
+    epi::StringHash::Register("TWOSIDED");
+    epi::StringHash::Register("DONTPEGTOP");
+    epi::StringHash::Register("DONTPEGBOTTOM");
+    epi::StringHash::Register("SECRET");
+    epi::StringHash::Register("BLOCKSOUND");
+    epi::StringHash::Register("DONTDRAW");
+    epi::StringHash::Register("MAPPED");
+    epi::StringHash::Register("PASSUSE");
+    epi::StringHash::Register("BLOCKPLAYERS");
+    epi::StringHash::Register("BLOCKSIGHT");
+    epi::StringHash::Register("OFFSETX");
+    epi::StringHash::Register("OFFSETY");
+    epi::StringHash::Register("OFFSETX_BOTTOM");
+    epi::StringHash::Register("OFFSETX_MID");
+    epi::StringHash::Register("OFFSETX_TOP");
+    epi::StringHash::Register("OFFSETY_BOTTOM");
+    epi::StringHash::Register("OFFSETY_MID");
+    epi::StringHash::Register("OFFSETY_TOP");
+    epi::StringHash::Register("SCALEX_BOTTOM");
+    epi::StringHash::Register("SCALEX_MID");
+    epi::StringHash::Register("SCALEX_TOP");
+    epi::StringHash::Register("SCALEY_BOTTOM");
+    epi::StringHash::Register("SCALEY_MID");
+    epi::StringHash::Register("SCALEY_TOP");
+    epi::StringHash::Register("TEXTURETOP");
+    epi::StringHash::Register("TEXTUREBOTTOM");
+    epi::StringHash::Register("TEXTUREMIDDLE");
+    epi::StringHash::Register("HEIGHTFLOOR");
+    epi::StringHash::Register("HEIGHTCEILING");
+    epi::StringHash::Register("TEXTUREFLOOR");
+    epi::StringHash::Register("TEXTURECEILING");
+    epi::StringHash::Register("LIGHTLEVEL");
+    epi::StringHash::Register("LIGHTCOLOR");
+    epi::StringHash::Register("FADECOLOR");
+    epi::StringHash::Register("FOGDENSITY");
+    epi::StringHash::Register("XPANNINGFLOOR");
+    epi::StringHash::Register("YPANNINGFLOOR");
+    epi::StringHash::Register("XPANNINGCEILING");
+    epi::StringHash::Register("YPANNINGCEILING");
+    epi::StringHash::Register("XSCALEFLOOR");
+    epi::StringHash::Register("YSCALEFLOOR");
+    epi::StringHash::Register("XSCALECEILING");
+    epi::StringHash::Register("YSCALECEILING");
+    epi::StringHash::Register("ALPHAFLOOR");
+    epi::StringHash::Register("ALPHACEILING");
+    epi::StringHash::Register("ROTATIONFLOOR");
+    epi::StringHash::Register("ROTATIONCEILING");
+    epi::StringHash::Register("GRAVITY");
+    epi::StringHash::Register("REVERBPRESET");
+    epi::StringHash::Register("HEIGHT");
+    epi::StringHash::Register("ANGLE");
+    epi::StringHash::Register("TYPE");
+    epi::StringHash::Register("SKILL1");
+    epi::StringHash::Register("SKILL2");
+    epi::StringHash::Register("SKILL3");
+    epi::StringHash::Register("SKILL4");
+    epi::StringHash::Register("SKILL5");
+    epi::StringHash::Register("AMBUSH");
+    epi::StringHash::Register("SINGLE");
+    epi::StringHash::Register("DM");
+    epi::StringHash::Register("COOP");
+    epi::StringHash::Register("FRIEND");
+    epi::StringHash::Register("HEALTH");
+    epi::StringHash::Register("ALPHA");
+    epi::StringHash::Register("SCALE");
+    epi::StringHash::Register("SCALEX");
+    epi::StringHash::Register("SCALEY");
+
+    // UMAPINFO
+    epi::StringHash::Register("LEVELNAME");
+    epi::StringHash::Register("LABEL");
+    epi::StringHash::Register("NEXT");
+    epi::StringHash::Register("NEXTSECRET");
+    epi::StringHash::Register("LEVELPIC");
+    epi::StringHash::Register("SKYTEXTURE");
+    epi::StringHash::Register("MUSIC");
+    epi::StringHash::Register("ENDPIC");
+    epi::StringHash::Register("ENDCAST");
+    epi::StringHash::Register("ENDBUNNY");
+    epi::StringHash::Register("ENDGAME");
+    epi::StringHash::Register("EXITPIC");
+    epi::StringHash::Register("ENTERPIC");
+    epi::StringHash::Register("NOINTERMISSION");
+    epi::StringHash::Register("PARTIME");
+    epi::StringHash::Register("INTERTEXT");
+    epi::StringHash::Register("INTERTEXTSECRET");
+    epi::StringHash::Register("INTERBACKDROP");
+    epi::StringHash::Register("INTERMUSIC");
+    epi::StringHash::Register("EPISODE");
+    epi::StringHash::Register("BOSSACTION");
+    epi::StringHash::Register("AUTHOR");
+    epi::StringHash::Register("DOOMPLAYER");
+    epi::StringHash::Register("ZOMBIEMAN");
+    epi::StringHash::Register("SHOTGUNGUY");
+    epi::StringHash::Register("ARCHVILE");
+    epi::StringHash::Register("ARCHVILEFIRE");
+    epi::StringHash::Register("REVENANT");
+    epi::StringHash::Register("REVENANTTRACER");
+    epi::StringHash::Register("REVENANTTRACERSMOKE");
+    epi::StringHash::Register("FATSO");
+    epi::StringHash::Register("FATSHOT");
+    epi::StringHash::Register("CHAINGUNGUY");
+    epi::StringHash::Register("DOOMIMP");
+    epi::StringHash::Register("DEMON");
+    epi::StringHash::Register("SPECTRE");
+    epi::StringHash::Register("CACODEMON");
+    epi::StringHash::Register("BARONOFHELL");
+    epi::StringHash::Register("BARONBALL");
+    epi::StringHash::Register("HELLKNIGHT");
+    epi::StringHash::Register("LOSTSOUL");
+    epi::StringHash::Register("SPIDERMASTERMIND");
+    epi::StringHash::Register("ARACHNOTRON");
+    epi::StringHash::Register("CYBERDEMON");
+    epi::StringHash::Register("PAINELEMENTAL");
+    epi::StringHash::Register("WOLFENSTEINSS");
+    epi::StringHash::Register("COMMANDERKEEN");
+    epi::StringHash::Register("BOSSBRAIN");
+    epi::StringHash::Register("BOSSEYE");
+    epi::StringHash::Register("BOSSTARGET");
+    epi::StringHash::Register("SPAWNSHOT");
+    epi::StringHash::Register("SPAWNFIRE");
+    epi::StringHash::Register("EXPLOSIVEBARREL");
+    epi::StringHash::Register("DOOMIMPBALL");
+    epi::StringHash::Register("CACODEMONBALL");
+    epi::StringHash::Register("ROCKET");
+    epi::StringHash::Register("PLASMABALL");
+    epi::StringHash::Register("BFGBALL");
+    epi::StringHash::Register("ARACHNOTRONPLASMA");
+    epi::StringHash::Register("BULLETPUFF");
+    epi::StringHash::Register("BLOOD");
+    epi::StringHash::Register("TELEPORTFOG");
+    epi::StringHash::Register("ITEMFOG");
+    epi::StringHash::Register("TELEPORTDEST");
+    epi::StringHash::Register("BFGEXTRA");
+    epi::StringHash::Register("GREENARMOR");
+    epi::StringHash::Register("BLUEARMOR");
+    epi::StringHash::Register("HEALTHBONUS");
+    epi::StringHash::Register("ARMORBONUS");
+    epi::StringHash::Register("BLUECARD");
+    epi::StringHash::Register("REDCARD");
+    epi::StringHash::Register("YELLOWCARD");
+    epi::StringHash::Register("YELLOWSKULL");
+    epi::StringHash::Register("REDSKULL");
+    epi::StringHash::Register("BLUESKULL");
+    epi::StringHash::Register("STIMPACK");
+    epi::StringHash::Register("MEDIKIT");
+    epi::StringHash::Register("SOULSPHERE");
+    epi::StringHash::Register("INVULNERABILITYSPHERE");
+    epi::StringHash::Register("BERSERK");
+    epi::StringHash::Register("BLURSPHERE");
+    epi::StringHash::Register("RADSUIT");
+    epi::StringHash::Register("ALLMAP");
+    epi::StringHash::Register("INFRARED");
+    epi::StringHash::Register("MEGASPHERE");
+    epi::StringHash::Register("CLIP");
+    epi::StringHash::Register("CLIPBOX");
+    epi::StringHash::Register("ROCKETAMMO");
+    epi::StringHash::Register("ROCKETBOX");
+    epi::StringHash::Register("CELL");
+    epi::StringHash::Register("CELLPACK");
+    epi::StringHash::Register("SHELL");
+    epi::StringHash::Register("SHELLBOX");
+    epi::StringHash::Register("BACKPACK");
+    epi::StringHash::Register("BFG9000");
+    epi::StringHash::Register("CHAINGUN");
+    epi::StringHash::Register("CHAINSAW");
+    epi::StringHash::Register("ROCKETLAUNCHER");
+    epi::StringHash::Register("PLASMARIFLE");
+    epi::StringHash::Register("SHOTGUN");
+    epi::StringHash::Register("SUPERSHOTGUN");
+    epi::StringHash::Register("TECHLAMP");
+    epi::StringHash::Register("TECHLAMP2");
+    epi::StringHash::Register("COLUMN");
+    epi::StringHash::Register("TALLGREENCOLUMN");
+    epi::StringHash::Register("SHORTGREENCOLUMN");
+    epi::StringHash::Register("TALLREDCOLUMN");
+    epi::StringHash::Register("SHORTREDCOLUMN");
+    epi::StringHash::Register("SKULLCOLUMN");
+    epi::StringHash::Register("HEARTCOLUMN");
+    epi::StringHash::Register("EVILEYE");
+    epi::StringHash::Register("FLOATINGSKULL");
+    epi::StringHash::Register("TORCHTREE");
+    epi::StringHash::Register("BLUETORCH");
+    epi::StringHash::Register("GREENTORCH");
+    epi::StringHash::Register("REDTORCH");
+    epi::StringHash::Register("SHORTBLUETORCH");
+    epi::StringHash::Register("SHORTGREENTORCH");
+    epi::StringHash::Register("SHORTREDTORCH");
+    epi::StringHash::Register("STALAGTITE");
+    epi::StringHash::Register("TECHPILLAR");
+    epi::StringHash::Register("CANDLESTICK");
+    epi::StringHash::Register("CANDELABRA");
+    epi::StringHash::Register("BLOODYTWITCH");
+    epi::StringHash::Register("MEAT2");
+    epi::StringHash::Register("MEAT3");
+    epi::StringHash::Register("MEAT4");
+    epi::StringHash::Register("MEAT5");
+    epi::StringHash::Register("NONSOLIDMEAT2");
+    epi::StringHash::Register("NONSOLIDMEAT4");
+    epi::StringHash::Register("NONSOLIDMEAT3");
+    epi::StringHash::Register("NONSOLIDMEAT5");
+    epi::StringHash::Register("NONSOLIDTWITCH");
+    epi::StringHash::Register("DEADCACODEMON");
+    epi::StringHash::Register("DEADMARINE");
+    epi::StringHash::Register("DEADZOMBIEMAN");
+    epi::StringHash::Register("DEADDEMON");
+    epi::StringHash::Register("DEADLOSTSOUL");
+    epi::StringHash::Register("DEADDOOMIMP");
+    epi::StringHash::Register("DEADSHOTGUNGUY");
+    epi::StringHash::Register("GIBBEDMARINE");
+    epi::StringHash::Register("GIBBEDMARINEEXTRA");
+    epi::StringHash::Register("HEADSONASTICK");
+    epi::StringHash::Register("GIBS");
+    epi::StringHash::Register("HEADONASTICK");
+    epi::StringHash::Register("HEADCANDLES");
+    epi::StringHash::Register("DEADSTICK");
+    epi::StringHash::Register("LIVESTICK");
+    epi::StringHash::Register("BIGTREE");
+    epi::StringHash::Register("BURNINGBARREL");
+    epi::StringHash::Register("HANGNOGUTS");
+    epi::StringHash::Register("HANGBNOBRAIN");
+    epi::StringHash::Register("HANGTLOOKINGDOWN");
+    epi::StringHash::Register("HANGTSKULL");
+    epi::StringHash::Register("HANGTLOOKINGUP");
+    epi::StringHash::Register("HANGTNOBRAIN");
+    epi::StringHash::Register("COLONGIBS");
+    epi::StringHash::Register("SMALLBLOODPOOL");
+    epi::StringHash::Register("BRAINSTEM");
+    epi::StringHash::Register("POINTPUSHER");
+    epi::StringHash::Register("POINTPULLER");
+    epi::StringHash::Register("MBFHELPERDOG");
+    epi::StringHash::Register("PLASMABALL1");
+    epi::StringHash::Register("PLASMABALL2");
+    epi::StringHash::Register("EVILSCEPTRE");
+    epi::StringHash::Register("UNHOLYBIBLE");
+    epi::StringHash::Register("MUSICCHANGER");
+    epi::StringHash::Register("DEH_ACTOR_145");
+    epi::StringHash::Register("DEH_ACTOR_146");
+    epi::StringHash::Register("DEH_ACTOR_147");
+    epi::StringHash::Register("DEH_ACTOR_148");
+    epi::StringHash::Register("DEH_ACTOR_149");
+    epi::StringHash::Register("DEH_ACTOR_150");
+    epi::StringHash::Register("DEH_ACTOR_151");
+    epi::StringHash::Register("DEH_ACTOR_152");
+    epi::StringHash::Register("DEH_ACTOR_153");
+    epi::StringHash::Register("DEH_ACTOR_154");
+    epi::StringHash::Register("DEH_ACTOR_155");
+    epi::StringHash::Register("DEH_ACTOR_156");
+    epi::StringHash::Register("DEH_ACTOR_157");
+    epi::StringHash::Register("DEH_ACTOR_158");
+    epi::StringHash::Register("DEH_ACTOR_159");
+    epi::StringHash::Register("DEH_ACTOR_160");
+    epi::StringHash::Register("DEH_ACTOR_161");
+    epi::StringHash::Register("DEH_ACTOR_162");
+    epi::StringHash::Register("DEH_ACTOR_163");
+    epi::StringHash::Register("DEH_ACTOR_164");
+    epi::StringHash::Register("DEH_ACTOR_165");
+    epi::StringHash::Register("DEH_ACTOR_166");
+    epi::StringHash::Register("DEH_ACTOR_167");
+    epi::StringHash::Register("DEH_ACTOR_168");
+    epi::StringHash::Register("DEH_ACTOR_169");
+    epi::StringHash::Register("DEH_ACTOR_170");
+    epi::StringHash::Register("DEH_ACTOR_171");
+    epi::StringHash::Register("DEH_ACTOR_172");
+    epi::StringHash::Register("DEH_ACTOR_173");
+    epi::StringHash::Register("DEH_ACTOR_174");
+    epi::StringHash::Register("DEH_ACTOR_175");
+    epi::StringHash::Register("DEH_ACTOR_176");
+    epi::StringHash::Register("DEH_ACTOR_177");
+    epi::StringHash::Register("DEH_ACTOR_178");
+    epi::StringHash::Register("DEH_ACTOR_179");
+    epi::StringHash::Register("DEH_ACTOR_180");
+    epi::StringHash::Register("DEH_ACTOR_181");
+    epi::StringHash::Register("DEH_ACTOR_182");
+    epi::StringHash::Register("DEH_ACTOR_183");
+    epi::StringHash::Register("DEH_ACTOR_184");
+    epi::StringHash::Register("DEH_ACTOR_185");
+    epi::StringHash::Register("DEH_ACTOR_186");
+    epi::StringHash::Register("DEH_ACTOR_187");
+    epi::StringHash::Register("DEH_ACTOR_188");
+    epi::StringHash::Register("DEH_ACTOR_189");
+    epi::StringHash::Register("DEH_ACTOR_190");
+    epi::StringHash::Register("DEH_ACTOR_191");
+    epi::StringHash::Register("DEH_ACTOR_192");
+    epi::StringHash::Register("DEH_ACTOR_193");
+    epi::StringHash::Register("DEH_ACTOR_194");
+    epi::StringHash::Register("DEH_ACTOR_195");
+    epi::StringHash::Register("DEH_ACTOR_196");
+    epi::StringHash::Register("DEH_ACTOR_197");
+    epi::StringHash::Register("DEH_ACTOR_198");
+    epi::StringHash::Register("DEH_ACTOR_199");
+    epi::StringHash::Register("DEH_ACTOR_200");
+    epi::StringHash::Register("DEH_ACTOR_201");
+    epi::StringHash::Register("DEH_ACTOR_202");
+    epi::StringHash::Register("DEH_ACTOR_203");
+    epi::StringHash::Register("DEH_ACTOR_204");
+    epi::StringHash::Register("DEH_ACTOR_205");
+    epi::StringHash::Register("DEH_ACTOR_206");
+    epi::StringHash::Register("DEH_ACTOR_207");
+    epi::StringHash::Register("DEH_ACTOR_208");
+    epi::StringHash::Register("DEH_ACTOR_209");
+    epi::StringHash::Register("DEH_ACTOR_210");
+    epi::StringHash::Register("DEH_ACTOR_211");
+    epi::StringHash::Register("DEH_ACTOR_212");
+    epi::StringHash::Register("DEH_ACTOR_213");
+    epi::StringHash::Register("DEH_ACTOR_214");
+    epi::StringHash::Register("DEH_ACTOR_215");
+    epi::StringHash::Register("DEH_ACTOR_216");
+    epi::StringHash::Register("DEH_ACTOR_217");
+    epi::StringHash::Register("DEH_ACTOR_218");
+    epi::StringHash::Register("DEH_ACTOR_219");
+    epi::StringHash::Register("DEH_ACTOR_220");
+    epi::StringHash::Register("DEH_ACTOR_221");
+    epi::StringHash::Register("DEH_ACTOR_222");
+    epi::StringHash::Register("DEH_ACTOR_223");
+    epi::StringHash::Register("DEH_ACTOR_224");
+    epi::StringHash::Register("DEH_ACTOR_225");
+    epi::StringHash::Register("DEH_ACTOR_226");
+    epi::StringHash::Register("DEH_ACTOR_227");
+    epi::StringHash::Register("DEH_ACTOR_228");
+    epi::StringHash::Register("DEH_ACTOR_229");
+    epi::StringHash::Register("DEH_ACTOR_230");
+    epi::StringHash::Register("DEH_ACTOR_231");
+    epi::StringHash::Register("DEH_ACTOR_232");
+    epi::StringHash::Register("DEH_ACTOR_233");
+    epi::StringHash::Register("DEH_ACTOR_234");
+    epi::StringHash::Register("DEH_ACTOR_235");
+    epi::StringHash::Register("DEH_ACTOR_236");
+    epi::StringHash::Register("DEH_ACTOR_237");
+    epi::StringHash::Register("DEH_ACTOR_238");
+    epi::StringHash::Register("DEH_ACTOR_239");
+    epi::StringHash::Register("DEH_ACTOR_240");
+    epi::StringHash::Register("DEH_ACTOR_241");
+    epi::StringHash::Register("DEH_ACTOR_242");
+    epi::StringHash::Register("DEH_ACTOR_243");
+    epi::StringHash::Register("DEH_ACTOR_244");
+    epi::StringHash::Register("DEH_ACTOR_245");
+    epi::StringHash::Register("DEH_ACTOR_246");
+    epi::StringHash::Register("DEH_ACTOR_247");
+    epi::StringHash::Register("DEH_ACTOR_248");
+    epi::StringHash::Register("DEH_ACTOR_249");
+
+    // DDF
+    epi::StringHash::Register("ROOMSIZE");
+    epi::StringHash::Register("DAMPINGLEVEL");
+    epi::StringHash::Register("WETLEVEL");
+    epi::StringHash::Register("DRYLEVEL");
+    epi::StringHash::Register("REVERBWIDTH");
+    epi::StringHash::Register("REVERBGAIN");
+}
+#endif
+
 static void EdgeStartup(void)
 {
     ConsoleInit();
@@ -2149,7 +2523,9 @@ static void EdgeStartup(void)
 
     DoSystemStartup();
 
-    epi::Initialize();
+#ifdef EDGE_EXTRA_CHECKS
+    RegisterKnownStringHashes();
+#endif
     InitializeDDF();
     CollectSearchPaths();
     IdentifyVersion();
@@ -2279,7 +2655,7 @@ static void InitialState(void)
         warp_deathmatch = 1;
 
         if (pp + 1 < int(program_argument_list.size()) && !ArgumentIsOption(pp + 1))
-            warp_deathmatch = HMM_MAX(1, atoi(program_argument_list[pp + 1].c_str()));
+            warp_deathmatch = epi::Max(1, atoi(program_argument_list[pp + 1].c_str()));
 
         warp = true;
     }
@@ -2338,6 +2714,8 @@ static void InitialState(void)
 //
 void EdgeMain(int argc, const char **argv)
 {
+    SetupEPIHandlers();
+
     // Seed RandomByte RNG
     InitRandomState();
 

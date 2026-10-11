@@ -316,13 +316,13 @@ void MovieDrawer()
                 BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
 
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx1, vy2, 0}};
+            glvert++->position = {vx1, vy2, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx2, vy2, 0}};
+            glvert++->position = {vx2, vy2, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx2, vy1, 0}};
+            glvert++->position = {vx2, vy1, 0};
             glvert->rgba       = unit_col;
-            glvert->position   = {{vx1, vy1, 0}};
+            glvert->position   = {vx1, vy1, 0};
 
             EndRenderUnit(4);
         }
@@ -360,13 +360,13 @@ void MovieDrawer()
                             fadeout > 0.25f ? kBlendingNone : kBlendingAlpha);
 
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx1, vy2, 0}};
+        glvert++->position = {vx1, vy2, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx2, vy2, 0}};
+        glvert++->position = {vx2, vy2, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx2, vy1, 0}};
+        glvert++->position = {vx2, vy1, 0};
         glvert->rgba       = unit_col;
-        glvert->position   = {{vx1, vy1, 0}};
+        glvert->position   = {vx1, vy1, 0};
 
         EndRenderUnit(4);
 

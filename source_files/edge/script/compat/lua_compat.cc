@@ -3,6 +3,7 @@
 #include "lua_compat.h"
 
 #include "epi_file.h"
+#include "i_system.h"
 #include "w_wad.h"
 
 extern bool GetCOALDetected();

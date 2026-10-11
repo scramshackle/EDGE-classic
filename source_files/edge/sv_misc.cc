@@ -37,7 +37,6 @@
 #include "epi_str_util.h"
 #include "r_misc.h"
 #include "rad_trig.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 
@@ -1081,7 +1080,7 @@ void SaveGamePutRADScript(void *storage, int index)
     if (!temp)
         FatalError("SaveGamePutRADScript: invalid ScriptPtr %p\n", src);
 
-    stbsp_sprintf(buffer, "B:%s:%d:%X", src->mapid, idx_val, src->crc.GetCRC());
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "B:%s:%d:%X", src->mapid, idx_val, src->crc.GetCRC());
 
     SaveChunkPutString(buffer);
 }

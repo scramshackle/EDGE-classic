@@ -61,7 +61,6 @@
 #include "r_modes.h"
 #include "rad_act.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 // Static Scripts.  Never change once all scripts have been read in.
@@ -125,7 +124,7 @@ class rts_menu_c
         if (key)
         {
             char buffer[8];
-            stbsp_sprintf(buffer, "%c. ", key);
+            epi::FormatToBufferSized(buffer, sizeof(buffer), "%c. ", key);
 
             choice_line = "  " + std::string(buffer) + choice_line;
         }
@@ -1001,7 +1000,7 @@ void ScriptMenuFinish(int result)
     EPI_ASSERT(rts_curr_menu);
 
     // zero is cancelled, otherwise result is 1..N
-    if (result < 0 || result > HMM_MAX(1, rts_curr_menu->NumChoices()))
+    if (result < 0 || result > epi::Max(1, rts_curr_menu->NumChoices()))
         return;
 
     rts_curr_menu->NotifyResult(result);

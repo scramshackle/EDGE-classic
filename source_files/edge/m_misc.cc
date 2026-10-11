@@ -64,7 +64,6 @@
 #include "r_wipe.h"
 #include "s_blit.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 //
 // DEFAULTS
@@ -503,7 +502,7 @@ void WarningOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -527,7 +526,7 @@ void DebugOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -559,7 +558,7 @@ void LogDebug(const char *message, ...)
     va_list argptr;
 
     va_start(argptr, message);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), message, argptr);
+    epi::FormatToBufferSizedArgs(message_buf, sizeof(message_buf), message, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...

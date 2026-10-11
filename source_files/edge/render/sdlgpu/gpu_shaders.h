@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 #include "r_units.h"
 
 constexpr uint32_t kGpuAttributePosition        = 0;
@@ -40,7 +40,7 @@ constexpr uint32_t kGpuSamplerSlotMovieChromaRed  = 2;
 
 struct GpuMovieVertexParameters
 {
-    HMM_Mat4 mvp;
+    epi::Mat4 mvp;
 };
 
 struct GpuMovieFragmentParameters
@@ -68,9 +68,9 @@ enum GpuFogMode
 
 struct GpuVertexParameters
 {
-    HMM_Mat4 mvp;
-    HMM_Mat4 tm;
-    HMM_Mat4 mv;
+    epi::Mat4 mvp;
+    epi::Mat4 tm;
+    epi::Mat4 mv;
     float    sky_pass;
     float    sky_fog_depth;
     float    light_depth;
@@ -95,8 +95,8 @@ struct GpuFragmentParameters
     float   fog_end;
     float   fog_scale;
 
-    HMM_Mat4 sky_inverse_projection;
-    HMM_Mat4 sky_inverse_view;
+    epi::Mat4 sky_inverse_projection;
+    epi::Mat4 sky_inverse_view;
     float    sky_viewport[4];
     float    sky_stretch_mode;
     float    sky_u_scale;
@@ -121,9 +121,9 @@ struct GpuFragmentParameters
 
 struct GpuModelVertexParameters
 {
-    HMM_Mat4 mvp;
-    HMM_Mat4 mv;
-    HMM_Mat4 model_transform;
+    epi::Mat4 mvp;
+    epi::Mat4 mv;
+    epi::Mat4 model_transform;
     float    lerp;
     float    vertex_padding0;
     float    texture_scale[2];

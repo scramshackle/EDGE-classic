@@ -31,13 +31,13 @@
 
 #include <limits.h>
 
-#include "epi_math.h"
 #include "con_main.h"
 #include "ddf_switch.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "f_interm.h"
@@ -193,9 +193,9 @@ float FindSurroundingHeight(const TriggerHeightReference ref, const Sector *sec)
         count++;
 
         if (ref & kTriggerHeightReferenceHighest)
-            height = HMM_MAX(height, other_h);
+            height = epi::Max(height, other_h);
         else
-            height = HMM_MIN(height, other_h);
+            height = epi::Min(height, other_h);
     }
 
     if ((ref & kTriggerHeightReferenceNext) && count == 0)
@@ -417,20 +417,20 @@ static void AdjustScrollParts(Side *side, bool left, ScrollingPart parts, float 
 
     if (parts & (left ? kScrollingPartLeftUpper : kScrollingPartRightUpper))
     {
-        side->top.scroll.X += x_speed * xmul;
-        side->top.scroll.Y += y_speed * ymul;
+        side->top.scroll.x += x_speed * xmul;
+        side->top.scroll.y += y_speed * ymul;
         SetSurfaceScrolls(&side->top, side->sector);
     }
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
     {
-        side->middle.scroll.X += x_speed * xmul;
-        side->middle.scroll.Y += y_speed * ymul;
+        side->middle.scroll.x += x_speed * xmul;
+        side->middle.scroll.y += y_speed * ymul;
         SetSurfaceScrolls(&side->middle, side->sector);
     }
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
     {
-        side->bottom.scroll.X += x_speed * xmul;
-        side->bottom.scroll.Y += y_speed * ymul;
+        side->bottom.scroll.x += x_speed * xmul;
+        side->bottom.scroll.y += y_speed * ymul;
         SetSurfaceScrolls(&side->bottom, side->sector);
     }
 }
@@ -445,18 +445,18 @@ static void AdjustScaleParts(Side *side, bool left, ScrollingPart parts, float f
 
     if (parts & (left ? kScrollingPartLeftUpper : kScrollingPartRightUpper))
     {
-        side->top.x_matrix.X *= factor;
-        side->top.y_matrix.Y *= factor;
+        side->top.x_matrix.x *= factor;
+        side->top.y_matrix.y *= factor;
     }
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
     {
-        side->middle.x_matrix.X *= factor;
-        side->middle.y_matrix.Y *= factor;
+        side->middle.x_matrix.x *= factor;
+        side->middle.y_matrix.y *= factor;
     }
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
     {
-        side->bottom.x_matrix.X *= factor;
-        side->bottom.y_matrix.Y *= factor;
+        side->bottom.x_matrix.x *= factor;
+        side->bottom.y_matrix.y *= factor;
     }
 }
 
@@ -476,10 +476,10 @@ static void AdjustStretchParts(Side *side, bool left, ScrollingPart parts, float
             factor = side->top.image->ScaledWidth() / linelength;
 
         if (widthOnly)
-            side->top.x_matrix.X *= factor;
+            side->top.x_matrix.x *= factor;
 
         if (!widthOnly)
-            side->top.y_matrix.Y *= factor;
+            side->top.y_matrix.y *= factor;
     }
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
     {
@@ -487,10 +487,10 @@ static void AdjustStretchParts(Side *side, bool left, ScrollingPart parts, float
             factor = side->middle.image->ScaledWidth() / linelength;
 
         if (widthOnly)
-            side->middle.x_matrix.X *= factor;
+            side->middle.x_matrix.x *= factor;
 
         if (!widthOnly)
-            side->middle.y_matrix.Y *= factor;
+            side->middle.y_matrix.y *= factor;
     }
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
     {
@@ -498,10 +498,10 @@ static void AdjustStretchParts(Side *side, bool left, ScrollingPart parts, float
             factor = side->bottom.image->ScaledWidth() / linelength;
 
         if (widthOnly)
-            side->bottom.x_matrix.X *= factor;
+            side->bottom.x_matrix.x *= factor;
 
         if (!widthOnly)
-            side->bottom.y_matrix.Y *= factor;
+            side->bottom.y_matrix.y *= factor;
     }
 }
 
@@ -514,13 +514,13 @@ static void AdjustSkewParts(Side *side, bool left, ScrollingPart parts, float sk
         parts = (ScrollingPart)(kScrollingPartLeft | kScrollingPartRight);
 
     if (parts & (left ? kScrollingPartLeftUpper : kScrollingPartRightUpper))
-        side->top.y_matrix.X = skew * side->top.y_matrix.Y;
+        side->top.y_matrix.x = skew * side->top.y_matrix.y;
 
     if (parts & (left ? kScrollingPartLeftMiddle : kScrollingPartRightMiddle))
-        side->middle.y_matrix.X = skew * side->middle.y_matrix.Y;
+        side->middle.y_matrix.x = skew * side->middle.y_matrix.y;
 
     if (parts & (left ? kScrollingPartLeftLower : kScrollingPartRightLower))
-        side->bottom.y_matrix.X = skew * side->bottom.y_matrix.Y;
+        side->bottom.y_matrix.x = skew * side->bottom.y_matrix.y;
 }
 
 static void AdjustLightParts(Side *side, bool left, ScrollingPart parts, RegionProperties *p)
@@ -676,8 +676,8 @@ static void P_SpawnLineEffectDebris(Line *TheLine, const LineType *special)
     float midz = 0;
 
     // calculate midpoint
-    midx = (TheLine->vertex_1->X + TheLine->vertex_2->X) / 2;
-    midy = (TheLine->vertex_1->Y + TheLine->vertex_2->Y) / 2;
+    midx = (TheLine->vertex_1->x + TheLine->vertex_2->x) / 2;
+    midy = (TheLine->vertex_1->y + TheLine->vertex_2->y) / 2;
     midz = kOnFloorZ;
 
     float dx = RandomByteDeterministic() * info->radius_ / 255.0f;
@@ -689,8 +689,8 @@ static void P_SpawnLineEffectDebris(Line *TheLine, const LineType *special)
 
     SpawnDebris(midx, midy, midz, 0 + kBAMAngle180, info);
 
-    midx = (TheLine->vertex_1->X + TheLine->vertex_2->X) / 2;
-    midy = (TheLine->vertex_1->Y + TheLine->vertex_2->Y) / 2;
+    midx = (TheLine->vertex_1->x + TheLine->vertex_2->x) / 2;
+    midy = (TheLine->vertex_1->y + TheLine->vertex_2->y) / 2;
 
     // move slightly backward to spawn the debris
     midx -= dx + info->radius_;
@@ -751,8 +751,8 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
 
     if ((special->line_effect_ & kLineEffectTypeOffsetScroll) && target->side[0])
     {
-        float x_speed = -target->side[0]->middle.offset.X;
-        float y_speed = target->side[0]->middle.offset.Y;
+        float x_speed = -target->side[0]->middle.offset.x;
+        float y_speed = target->side[0]->middle.offset.y;
 
         AdjustScrollParts(target->side[0], 0, special->line_parts_, x_speed, y_speed);
 
@@ -765,8 +765,8 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
         anim.target = target;
         if (special->scroll_type_ == BoomScrollerTypeNone)
         {
-            anim.side_0_x_speed = -source->side[0]->middle.offset.X / 8.0;
-            anim.side_0_y_speed = source->side[0]->middle.offset.Y / 8.0;
+            anim.side_0_x_speed = -source->side[0]->middle.offset.x / 8.0;
+            anim.side_0_y_speed = source->side[0]->middle.offset.y / 8.0;
         }
         else
         {
@@ -777,8 +777,8 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
                 anim.scroll_sector_reference  = source->side[0]->sector;
                 anim.scroll_special_reference = special;
                 anim.scroll_line_reference    = source;
-                anim.side_0_x_offset_speed    = -source->side[0]->middle.offset.X / 8.0;
-                anim.side_0_y_offset_speed    = source->side[0]->middle.offset.Y / 8.0;
+                anim.side_0_x_offset_speed    = -source->side[0]->middle.offset.x / 8.0;
+                anim.side_0_y_offset_speed    = source->side[0]->middle.offset.y / 8.0;
                 anim.last_height = anim.scroll_sector_reference->original_height;
             }
         }
@@ -795,13 +795,13 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
         float dy    = source->delta_y / 32.0f;
         float ldx   = target->delta_x;
         float ldy   = target->delta_y;
-        float x     = HMM_ABS(ldx);
-        float y     = HMM_ABS(ldy);
+        float x     = epi::Abs(ldx);
+        float y     = epi::Abs(ldy);
         if (y > x)
             std::swap(x, y);
         if (x)
         {
-            float d = x / HMM_SINF(atan(y / x) + HMM_PI / 2.0);
+            float d = x / sinf(atan(y / x) + epi::kPi / 2.0);
             if (isfinite(d))
             {
                 x = -(dy * ldy + dx * ldx) / d;
@@ -880,17 +880,17 @@ static void P_LineEffect(Line *target, Line *source, const LineType *special)
     // experimental: skew wall texture(s) by sidedef Y offset
     if ((special->line_effect_ & kLineEffectTypeSkew) && source->side[0])
     {
-        float skew = source->side[0]->top.offset.X / 128.0f;
+        float skew = source->side[0]->top.offset.x / 128.0f;
 
         AdjustSkewParts(target->side[0], 0, special->line_parts_, skew);
         AdjustSkewParts(target->side[1], 1, special->line_parts_, skew);
 
         if (target == source)
         {
-            source->side[0]->middle.offset.X     = 0;
-            source->side[0]->bottom.offset.X     = 0;
-            source->side[0]->middle.old_offset.X = 0;
-            source->side[0]->bottom.old_offset.X = 0;
+            source->side[0]->middle.offset.x     = 0;
+            source->side[0]->bottom.offset.x     = 0;
+            source->side[0]->middle.old_offset.x = 0;
+            source->side[0]->bottom.old_offset.x = 0;
         }
     }
 
@@ -944,18 +944,18 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
         {
             if (special->sector_effect_ & kSectorEffectTypeScrollFloor)
             {
-                anim.floor_scroll.X -= source->delta_x / 32.0f;
-                anim.floor_scroll.Y -= source->delta_y / 32.0f;
+                anim.floor_scroll.x -= source->delta_x / 32.0f;
+                anim.floor_scroll.y -= source->delta_y / 32.0f;
             }
             if (special->sector_effect_ & kSectorEffectTypeScrollCeiling)
             {
-                anim.ceil_scroll.X -= source->delta_x / 32.0f;
-                anim.ceil_scroll.Y -= source->delta_y / 32.0f;
+                anim.ceil_scroll.x -= source->delta_x / 32.0f;
+                anim.ceil_scroll.y -= source->delta_y / 32.0f;
             }
             if (special->sector_effect_ & kSectorEffectTypePushThings)
             {
-                anim.push.X += source->delta_x / 32.0f * kBoomCarryFactor;
-                anim.push.Y += source->delta_y / 32.0f * kBoomCarryFactor;
+                anim.push.x += source->delta_x / 32.0f * kBoomCarryFactor;
+                anim.push.y += source->delta_y / 32.0f * kBoomCarryFactor;
             }
         }
         else
@@ -989,13 +989,13 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
             {
                 float bigfric               = ((0x1EB8 * length) / 0x80 + 0xD000);
                 target->properties.friction = bigfric / 65536.0f;
-                target->properties.friction = HMM_Clamp(0.0f, target->properties.friction, 1.0f);
+                target->properties.friction = epi::Clamp(target->properties.friction, 0.0f, 1.0f);
                 float movefactor;
                 if (target->properties.friction > kFrictionDefault)
                     movefactor = (((0x10092 - bigfric) * (0x70)) / 0x158) / 65536.0f;
                 else
                     movefactor = (((bigfric - 0xDB34) * (0xA)) / 0x80) / 65536.0f;
-                movefactor = HMM_Clamp(kMoveFactorMinimum, movefactor, kMoveFactorDefault);
+                movefactor = epi::Clamp(movefactor, kMoveFactorMinimum, kMoveFactorDefault);
                 movefactor *= 32.0f;
                 target->properties.movefactor = movefactor;
             }
@@ -1018,38 +1018,38 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
     if (special->sector_effect_ & kSectorEffectTypeResetFloor)
     {
         target->floor.override_properties = nullptr;
-        target->floor.scroll.X = target->floor.scroll.Y = 0;
-        target->properties.push.X = target->properties.push.Y = target->properties.push.Z = 0;
+        target->floor.scroll.x = target->floor.scroll.y = 0;
+        target->properties.push.x = target->properties.push.y = target->properties.push.z = 0;
     }
     if (special->sector_effect_ & kSectorEffectTypeResetCeiling)
     {
         target->ceiling.override_properties = nullptr;
-        target->ceiling.scroll.X = target->ceiling.scroll.Y = 0;
+        target->ceiling.scroll.x = target->ceiling.scroll.y = 0;
     }
 
     // set texture alignment
     if (special->sector_effect_ & kSectorEffectTypeAlignFloor)
     {
-        target->floor.offset.X = -source->vertex_1->X;
-        target->floor.offset.Y = -source->vertex_1->Y;
+        target->floor.offset.x = -source->vertex_1->x;
+        target->floor.offset.y = -source->vertex_1->y;
         if (source->side[0]) // Lobo: Experiment to read and apply line offsets
                              // to floor offsets
         {
-            target->floor.offset.X += source->side[0]->bottom.offset.X;
-            target->floor.offset.Y += source->side[0]->bottom.offset.Y;
+            target->floor.offset.x += source->side[0]->bottom.offset.x;
+            target->floor.offset.y += source->side[0]->bottom.offset.y;
         }
         target->floor.old_offset = target->floor.offset;
         target->floor.rotation   = angle;
     }
     if (special->sector_effect_ & kSectorEffectTypeAlignCeiling)
     {
-        target->ceiling.offset.X = -source->vertex_1->X;
-        target->ceiling.offset.Y = -source->vertex_1->Y;
+        target->ceiling.offset.x = -source->vertex_1->x;
+        target->ceiling.offset.y = -source->vertex_1->y;
         if (source->side[0]) // Lobo: Experiment to read and apply line offsets
                              // to floor offsets
         {
-            target->ceiling.offset.X += source->side[0]->bottom.offset.X;
-            target->ceiling.offset.Y += source->side[0]->bottom.offset.Y;
+            target->ceiling.offset.x += source->side[0]->bottom.offset.x;
+            target->ceiling.offset.y += source->side[0]->bottom.offset.y;
         }
         target->ceiling.old_offset = target->ceiling.offset;
         target->ceiling.rotation   = angle;
@@ -1061,20 +1061,20 @@ static void SectorEffect(Sector *target, Line *source, const LineType *special)
         bool  aligned = (special->sector_effect_ & kSectorEffectTypeAlignFloor) != 0;
         float factor  = ScaleFactorForPlane(target->floor, length, is_vert && !aligned);
 
-        target->floor.x_matrix.X *= factor;
-        target->floor.x_matrix.Y *= factor;
-        target->floor.y_matrix.X *= factor;
-        target->floor.y_matrix.Y *= factor;
+        target->floor.x_matrix.x *= factor;
+        target->floor.x_matrix.y *= factor;
+        target->floor.y_matrix.x *= factor;
+        target->floor.y_matrix.y *= factor;
     }
     if (special->sector_effect_ & kSectorEffectTypeScaleCeiling)
     {
         bool  aligned = (special->sector_effect_ & kSectorEffectTypeAlignCeiling) != 0;
         float factor  = ScaleFactorForPlane(target->ceiling, length, is_vert && !aligned);
 
-        target->ceiling.x_matrix.X *= factor;
-        target->ceiling.x_matrix.Y *= factor;
-        target->ceiling.y_matrix.X *= factor;
-        target->ceiling.y_matrix.Y *= factor;
+        target->ceiling.x_matrix.x *= factor;
+        target->ceiling.x_matrix.y *= factor;
+        target->ceiling.y_matrix.x *= factor;
+        target->ceiling.y_matrix.y *= factor;
     }
 
     // killough 3/7/98 and AJA 2022:
@@ -1211,10 +1211,10 @@ static SlopePlane *DetailSlope_BoundIt(Line *ld, Sector *sec, float dz1, float d
         {
             Vertex *V = (vert == 0) ? sec->lines[k]->vertex_1 : sec->lines[k]->vertex_2;
 
-            float dist = nx * (V->X - ld->vertex_1->X) + ny * (V->Y - ld->vertex_1->Y);
+            float dist = nx * (V->x - ld->vertex_1->x) + ny * (V->y - ld->vertex_1->y);
 
-            d_close = HMM_MIN(d_close, dist);
-            d_far   = HMM_MAX(d_far, dist);
+            d_close = epi::Min(d_close, dist);
+            d_far   = epi::Max(d_far, dist);
         }
     }
 
@@ -1229,12 +1229,12 @@ static SlopePlane *DetailSlope_BoundIt(Line *ld, Sector *sec, float dz1, float d
 
     SlopePlane *result = new SlopePlane;
 
-    result->x1       = ld->vertex_1->X + nx * d_close;
-    result->y1       = ld->vertex_1->Y + ny * d_close;
+    result->x1       = ld->vertex_1->x + nx * d_close;
+    result->y1       = ld->vertex_1->y + ny * d_close;
     result->delta_z1 = dz1;
 
-    result->x2       = ld->vertex_1->X + nx * d_far;
-    result->y2       = ld->vertex_1->Y + ny * d_far;
+    result->x2       = ld->vertex_1->x + nx * d_far;
+    result->y2       = ld->vertex_1->y + ny * d_far;
     result->delta_z2 = dz2;
 
     return result;
@@ -1276,7 +1276,7 @@ static void DetailSlope_Floor(Line *ld)
     ld->blocked = false;
 
     // limit height difference to no more than player step
-    z1 = HMM_MAX(z1, z2 - 24.0);
+    z1 = epi::Max<double>(z1, z2 - 24.0);
 
     sec->floor_slope = DetailSlope_BoundIt(ld, sec, z1 - sec->floor_height, z2 - sec->floor_height);
 }
@@ -1456,7 +1456,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
         (thing->info_->extended_flags_ & kExtendedFlagMonster) &&
         !(thing->flags_ & (kMapObjectFlagTeleport | kMapObjectFlagDropOff | kMapObjectFlagFloat)))
     {
-        if (HMM_ABS(line->front_sector->floor_height - line->back_sector->floor_height) > thing->info_->step_size_)
+        if (epi::Abs(line->front_sector->floor_height - line->back_sector->floor_height) > thing->info_->step_size_)
             return false;
     }
 
@@ -1678,7 +1678,7 @@ static bool P_ActivateSpecialLine(Line *line, const LineType *special, int tag, 
                 movefactor = (((0x10092 - (special->friction_ * 65536.0f)) * (0x70)) / 0x158) / 65536.0f;
             else
                 movefactor = ((((special->friction_ * 65536.0f) - 0xDB34) * (0xA)) / 0x80) / 65536.0f;
-            movefactor = HMM_Clamp(kMoveFactorMinimum, movefactor, kMoveFactorDefault);
+            movefactor = epi::Clamp(movefactor, kMoveFactorMinimum, kMoveFactorDefault);
             movefactor *= 32.0f;
             tsec->properties.movefactor = movefactor;
             texSwitch                   = true;
@@ -2161,20 +2161,20 @@ void UpdateSpecials()
                 if (ld->side[0]->top.image)
                 {
                     ld->side[0]->top.scrolls = true;
-                    ld->side[0]->top.net_scroll.X += line_animations[i].side_0_x_speed;
-                    ld->side[0]->top.net_scroll.Y += line_animations[i].side_0_y_speed;
+                    ld->side[0]->top.net_scroll.x += line_animations[i].side_0_x_speed;
+                    ld->side[0]->top.net_scroll.y += line_animations[i].side_0_y_speed;
                 }
                 if (ld->side[0]->middle.image)
                 {
                     ld->side[0]->middle.scrolls = true;
-                    ld->side[0]->middle.net_scroll.X += line_animations[i].side_0_x_speed;
-                    ld->side[0]->middle.net_scroll.Y += line_animations[i].side_0_y_speed;
+                    ld->side[0]->middle.net_scroll.x += line_animations[i].side_0_x_speed;
+                    ld->side[0]->middle.net_scroll.y += line_animations[i].side_0_y_speed;
                 }
                 if (ld->side[0]->bottom.image)
                 {
                     ld->side[0]->bottom.scrolls = true;
-                    ld->side[0]->bottom.net_scroll.X += line_animations[i].side_0_x_speed;
-                    ld->side[0]->bottom.net_scroll.Y += line_animations[i].side_0_y_speed;
+                    ld->side[0]->bottom.net_scroll.x += line_animations[i].side_0_x_speed;
+                    ld->side[0]->bottom.net_scroll.y += line_animations[i].side_0_y_speed;
                 }
             }
             if (ld->side[1])
@@ -2182,20 +2182,20 @@ void UpdateSpecials()
                 if (ld->side[1]->top.image)
                 {
                     ld->side[1]->top.scrolls = true;
-                    ld->side[1]->top.net_scroll.X += line_animations[i].side_1_x_speed;
-                    ld->side[1]->top.net_scroll.Y += line_animations[i].side_1_y_speed;
+                    ld->side[1]->top.net_scroll.x += line_animations[i].side_1_x_speed;
+                    ld->side[1]->top.net_scroll.y += line_animations[i].side_1_y_speed;
                 }
                 if (ld->side[1]->middle.image)
                 {
                     ld->side[1]->middle.scrolls = true;
-                    ld->side[1]->middle.net_scroll.X += line_animations[i].side_1_x_speed;
-                    ld->side[1]->middle.net_scroll.Y += line_animations[i].side_1_y_speed;
+                    ld->side[1]->middle.net_scroll.x += line_animations[i].side_1_x_speed;
+                    ld->side[1]->middle.net_scroll.y += line_animations[i].side_1_y_speed;
                 }
                 if (ld->side[1]->bottom.image)
                 {
                     ld->side[1]->bottom.scrolls = true;
-                    ld->side[1]->bottom.net_scroll.X += line_animations[i].side_1_x_speed;
-                    ld->side[1]->bottom.net_scroll.Y += line_animations[i].side_1_y_speed;
+                    ld->side[1]->bottom.net_scroll.x += line_animations[i].side_1_x_speed;
+                    ld->side[1]->bottom.net_scroll.y += line_animations[i].side_1_y_speed;
                 }
             }
 
@@ -2220,20 +2220,20 @@ void UpdateSpecials()
                     if (ld->side[0]->top.image)
                     {
                         ld->side[0]->top.scrolls = true;
-                        ld->side[0]->top.net_scroll.X += sx;
-                        ld->side[0]->top.net_scroll.Y += sy;
+                        ld->side[0]->top.net_scroll.x += sx;
+                        ld->side[0]->top.net_scroll.y += sy;
                     }
                     if (ld->side[0]->middle.image)
                     {
                         ld->side[0]->middle.scrolls = true;
-                        ld->side[0]->middle.net_scroll.X += sx;
-                        ld->side[0]->middle.net_scroll.Y += sy;
+                        ld->side[0]->middle.net_scroll.x += sx;
+                        ld->side[0]->middle.net_scroll.y += sy;
                     }
                     if (ld->side[0]->bottom.image)
                     {
                         ld->side[0]->bottom.scrolls = true;
-                        ld->side[0]->bottom.net_scroll.X += sx;
-                        ld->side[0]->bottom.net_scroll.Y += sy;
+                        ld->side[0]->bottom.net_scroll.x += sx;
+                        ld->side[0]->bottom.net_scroll.y += sy;
                     }
                 }
                 if (ld->side[1])
@@ -2241,20 +2241,20 @@ void UpdateSpecials()
                     if (ld->side[1]->top.image)
                     {
                         ld->side[1]->top.scrolls = true;
-                        ld->side[1]->top.net_scroll.X += sx;
-                        ld->side[1]->top.net_scroll.Y += sy;
+                        ld->side[1]->top.net_scroll.x += sx;
+                        ld->side[1]->top.net_scroll.y += sy;
                     }
                     if (ld->side[1]->middle.image)
                     {
                         ld->side[1]->middle.scrolls = true;
-                        ld->side[1]->middle.net_scroll.X += sx;
-                        ld->side[1]->middle.net_scroll.Y += sy;
+                        ld->side[1]->middle.net_scroll.x += sx;
+                        ld->side[1]->middle.net_scroll.y += sy;
                     }
                     if (ld->side[1]->bottom.image)
                     {
                         ld->side[1]->bottom.scrolls = true;
-                        ld->side[1]->bottom.net_scroll.X += sx;
-                        ld->side[1]->bottom.net_scroll.Y += sy;
+                        ld->side[1]->bottom.net_scroll.x += sx;
+                        ld->side[1]->bottom.net_scroll.y += sy;
                     }
                 }
             }
@@ -2271,20 +2271,20 @@ void UpdateSpecials()
                     if (ld->side[0]->top.image)
                     {
                         ld->side[0]->top.scrolls = true;
-                        ld->side[0]->top.net_scroll.X += sx;
-                        ld->side[0]->top.net_scroll.Y += sy;
+                        ld->side[0]->top.net_scroll.x += sx;
+                        ld->side[0]->top.net_scroll.y += sy;
                     }
                     if (ld->side[0]->middle.image)
                     {
                         ld->side[0]->middle.scrolls = true;
-                        ld->side[0]->middle.net_scroll.X += sx;
-                        ld->side[0]->middle.net_scroll.Y += sy;
+                        ld->side[0]->middle.net_scroll.x += sx;
+                        ld->side[0]->middle.net_scroll.y += sy;
                     }
                     if (ld->side[0]->bottom.image)
                     {
                         ld->side[0]->bottom.scrolls = true;
-                        ld->side[0]->bottom.net_scroll.X += sx;
-                        ld->side[0]->bottom.net_scroll.Y += sy;
+                        ld->side[0]->bottom.net_scroll.x += sx;
+                        ld->side[0]->bottom.net_scroll.y += sy;
                     }
                 }
             }
@@ -2306,36 +2306,36 @@ void UpdateSpecials()
             {
                 if (ld->side[0]->top.image)
                 {
-                    ld->side[0]->top.old_scroll.X = ld->side[0]->top.scroll.X;
-                    ld->side[0]->top.old_scroll.Y = ld->side[0]->top.scroll.Y;
+                    ld->side[0]->top.old_scroll.x = ld->side[0]->top.scroll.x;
+                    ld->side[0]->top.old_scroll.y = ld->side[0]->top.scroll.y;
                 }
                 if (ld->side[0]->middle.image)
                 {
-                    ld->side[0]->middle.old_scroll.X = ld->side[0]->middle.scroll.X;
-                    ld->side[0]->middle.old_scroll.Y = ld->side[0]->middle.scroll.Y;
+                    ld->side[0]->middle.old_scroll.x = ld->side[0]->middle.scroll.x;
+                    ld->side[0]->middle.old_scroll.y = ld->side[0]->middle.scroll.y;
                 }
                 if (ld->side[0]->bottom.image)
                 {
-                    ld->side[0]->bottom.old_scroll.X = ld->side[0]->bottom.scroll.X;
-                    ld->side[0]->bottom.old_scroll.Y = ld->side[0]->bottom.scroll.Y;
+                    ld->side[0]->bottom.old_scroll.x = ld->side[0]->bottom.scroll.x;
+                    ld->side[0]->bottom.old_scroll.y = ld->side[0]->bottom.scroll.y;
                 }
             }
             if (ld->side[1])
             {
                 if (ld->side[1]->top.image)
                 {
-                    ld->side[1]->top.old_scroll.X = ld->side[1]->top.scroll.X;
-                    ld->side[1]->top.old_scroll.Y = ld->side[1]->top.scroll.Y;
+                    ld->side[1]->top.old_scroll.x = ld->side[1]->top.scroll.x;
+                    ld->side[1]->top.old_scroll.y = ld->side[1]->top.scroll.y;
                 }
                 if (ld->side[1]->middle.image)
                 {
-                    ld->side[1]->middle.old_scroll.X = ld->side[1]->middle.scroll.X;
-                    ld->side[1]->middle.old_scroll.Y = ld->side[1]->middle.scroll.Y;
+                    ld->side[1]->middle.old_scroll.x = ld->side[1]->middle.scroll.x;
+                    ld->side[1]->middle.old_scroll.y = ld->side[1]->middle.scroll.y;
                 }
                 if (ld->side[1]->bottom.image)
                 {
-                    ld->side[1]->bottom.old_scroll.X = ld->side[1]->bottom.scroll.X;
-                    ld->side[1]->bottom.old_scroll.Y = ld->side[1]->bottom.scroll.Y;
+                    ld->side[1]->bottom.old_scroll.x = ld->side[1]->bottom.scroll.x;
+                    ld->side[1]->bottom.old_scroll.y = ld->side[1]->bottom.scroll.y;
                 }
             }
             ld->old_stored = true;
@@ -2346,36 +2346,36 @@ void UpdateSpecials()
             {
                 if (ld->side[0]->top.image)
                 {
-                    ld->side[0]->top.scroll.X = ld->side[0]->top.old_scroll.X;
-                    ld->side[0]->top.scroll.Y = ld->side[0]->top.old_scroll.Y;
+                    ld->side[0]->top.scroll.x = ld->side[0]->top.old_scroll.x;
+                    ld->side[0]->top.scroll.y = ld->side[0]->top.old_scroll.y;
                 }
                 if (ld->side[0]->middle.image)
                 {
-                    ld->side[0]->middle.scroll.X = ld->side[0]->middle.old_scroll.X;
-                    ld->side[0]->middle.scroll.Y = ld->side[0]->middle.old_scroll.Y;
+                    ld->side[0]->middle.scroll.x = ld->side[0]->middle.old_scroll.x;
+                    ld->side[0]->middle.scroll.y = ld->side[0]->middle.old_scroll.y;
                 }
                 if (ld->side[0]->bottom.image)
                 {
-                    ld->side[0]->bottom.scroll.X = ld->side[0]->bottom.old_scroll.X;
-                    ld->side[0]->bottom.scroll.Y = ld->side[0]->bottom.old_scroll.Y;
+                    ld->side[0]->bottom.scroll.x = ld->side[0]->bottom.old_scroll.x;
+                    ld->side[0]->bottom.scroll.y = ld->side[0]->bottom.old_scroll.y;
                 }
             }
             if (ld->side[1])
             {
                 if (ld->side[1]->top.image)
                 {
-                    ld->side[1]->top.scroll.X = ld->side[1]->top.old_scroll.X;
-                    ld->side[1]->top.scroll.Y = ld->side[1]->top.old_scroll.Y;
+                    ld->side[1]->top.scroll.x = ld->side[1]->top.old_scroll.x;
+                    ld->side[1]->top.scroll.y = ld->side[1]->top.old_scroll.y;
                 }
                 if (ld->side[1]->middle.image)
                 {
-                    ld->side[1]->middle.scroll.X = ld->side[1]->middle.old_scroll.X;
-                    ld->side[1]->middle.scroll.Y = ld->side[1]->middle.old_scroll.Y;
+                    ld->side[1]->middle.scroll.x = ld->side[1]->middle.old_scroll.x;
+                    ld->side[1]->middle.scroll.y = ld->side[1]->middle.old_scroll.y;
                 }
                 if (ld->side[1]->bottom.image)
                 {
-                    ld->side[1]->bottom.scroll.X = ld->side[1]->bottom.old_scroll.X;
-                    ld->side[1]->bottom.scroll.Y = ld->side[1]->bottom.old_scroll.Y;
+                    ld->side[1]->bottom.scroll.x = ld->side[1]->bottom.old_scroll.x;
+                    ld->side[1]->bottom.scroll.y = ld->side[1]->bottom.old_scroll.y;
                 }
             }
         }
@@ -2387,33 +2387,29 @@ void UpdateSpecials()
             if (ld->side[0]->top.image)
             {
                 ld->side[0]->top.old_offset = ld->side[0]->top.offset;
-                ld->side[0]->top.offset.X =
-                    ld->side[0]->top.offset.X + ld->side[0]->top.scroll.X + ld->side[0]->top.net_scroll.X;
-                ld->side[0]->top.offset.Y =
-                    ld->side[0]->top.offset.Y + ld->side[0]->top.scroll.Y + ld->side[0]->top.net_scroll.Y;
-                ld->side[0]->top.net_scroll = {{0, 0}};
+                ld->side[0]->top.offset.x =
+                    ld->side[0]->top.offset.x + ld->side[0]->top.scroll.x + ld->side[0]->top.net_scroll.x;
+                ld->side[0]->top.offset.y =
+                    ld->side[0]->top.offset.y + ld->side[0]->top.scroll.y + ld->side[0]->top.net_scroll.y;
+                ld->side[0]->top.net_scroll = {0, 0};
             }
             if (ld->side[0]->middle.image)
             {
                 ld->side[0]->middle.old_offset = ld->side[0]->middle.offset;
-                ld->side[0]->middle.offset.X =
-                    ld->side[0]->middle.offset.X +
-                    ld->side[0]->middle.scroll.X + ld->side[0]->middle.net_scroll.X;
-                ld->side[0]->middle.offset.Y =
-                    ld->side[0]->middle.offset.Y +
-                    ld->side[0]->middle.scroll.Y + ld->side[0]->middle.net_scroll.Y;
-                ld->side[0]->middle.net_scroll = {{0, 0}};
+                ld->side[0]->middle.offset.x =
+                    ld->side[0]->middle.offset.x + ld->side[0]->middle.scroll.x + ld->side[0]->middle.net_scroll.x;
+                ld->side[0]->middle.offset.y =
+                    ld->side[0]->middle.offset.y + ld->side[0]->middle.scroll.y + ld->side[0]->middle.net_scroll.y;
+                ld->side[0]->middle.net_scroll = {0, 0};
             }
             if (ld->side[0]->bottom.image)
             {
                 ld->side[0]->bottom.old_offset = ld->side[0]->bottom.offset;
-                ld->side[0]->bottom.offset.X =
-                    ld->side[0]->bottom.offset.X +
-                    ld->side[0]->bottom.scroll.X + ld->side[0]->bottom.net_scroll.X;
-                ld->side[0]->bottom.offset.Y =
-                    ld->side[0]->bottom.offset.Y +
-                    ld->side[0]->bottom.scroll.Y + ld->side[0]->bottom.net_scroll.Y;
-                ld->side[0]->bottom.net_scroll = {{0, 0}};
+                ld->side[0]->bottom.offset.x =
+                    ld->side[0]->bottom.offset.x + ld->side[0]->bottom.scroll.x + ld->side[0]->bottom.net_scroll.x;
+                ld->side[0]->bottom.offset.y =
+                    ld->side[0]->bottom.offset.y + ld->side[0]->bottom.scroll.y + ld->side[0]->bottom.net_scroll.y;
+                ld->side[0]->bottom.net_scroll = {0, 0};
             }
         }
 
@@ -2422,33 +2418,29 @@ void UpdateSpecials()
             if (ld->side[1]->top.image)
             {
                 ld->side[1]->top.old_offset = ld->side[1]->top.offset;
-                ld->side[1]->top.offset.X =
-                    ld->side[1]->top.offset.X + ld->side[1]->top.scroll.X + ld->side[1]->top.net_scroll.X;
-                ld->side[1]->top.offset.Y =
-                    ld->side[1]->top.offset.Y + ld->side[1]->top.scroll.Y + ld->side[1]->top.net_scroll.Y;
-                ld->side[1]->top.net_scroll = {{0, 0}};
+                ld->side[1]->top.offset.x =
+                    ld->side[1]->top.offset.x + ld->side[1]->top.scroll.x + ld->side[1]->top.net_scroll.x;
+                ld->side[1]->top.offset.y =
+                    ld->side[1]->top.offset.y + ld->side[1]->top.scroll.y + ld->side[1]->top.net_scroll.y;
+                ld->side[1]->top.net_scroll = {0, 0};
             }
             if (ld->side[1]->middle.image)
             {
                 ld->side[1]->middle.old_offset = ld->side[1]->middle.offset;
-                ld->side[1]->middle.offset.X =
-                    ld->side[1]->middle.offset.X +
-                    ld->side[1]->middle.scroll.X + ld->side[1]->middle.net_scroll.X;
-                ld->side[1]->middle.offset.Y =
-                    ld->side[1]->middle.offset.Y +
-                    ld->side[1]->middle.scroll.Y + ld->side[1]->middle.net_scroll.Y;
-                ld->side[1]->middle.net_scroll = {{0, 0}};
+                ld->side[1]->middle.offset.x =
+                    ld->side[1]->middle.offset.x + ld->side[1]->middle.scroll.x + ld->side[1]->middle.net_scroll.x;
+                ld->side[1]->middle.offset.y =
+                    ld->side[1]->middle.offset.y + ld->side[1]->middle.scroll.y + ld->side[1]->middle.net_scroll.y;
+                ld->side[1]->middle.net_scroll = {0, 0};
             }
             if (ld->side[1]->bottom.image)
             {
                 ld->side[1]->bottom.old_offset = ld->side[1]->bottom.offset;
-                ld->side[1]->bottom.offset.X =
-                    ld->side[1]->bottom.offset.X +
-                    ld->side[1]->bottom.scroll.X + ld->side[1]->bottom.net_scroll.X;
-                ld->side[1]->bottom.offset.Y =
-                    ld->side[1]->bottom.offset.Y +
-                    ld->side[1]->bottom.scroll.Y + ld->side[1]->bottom.net_scroll.Y;
-                ld->side[1]->bottom.net_scroll = {{0, 0}};
+                ld->side[1]->bottom.offset.x =
+                    ld->side[1]->bottom.offset.x + ld->side[1]->bottom.scroll.x + ld->side[1]->bottom.net_scroll.x;
+                ld->side[1]->bottom.offset.y =
+                    ld->side[1]->bottom.offset.y + ld->side[1]->bottom.scroll.y + ld->side[1]->bottom.net_scroll.y;
+                ld->side[1]->bottom.net_scroll = {0, 0};
             }
         }
     }
@@ -2463,14 +2455,14 @@ void UpdateSpecials()
                 continue;
 
             // Add static values
-            sec->properties.net_push.X += sector_animations[i].push.X;
-            sec->properties.net_push.Y += sector_animations[i].push.Y;
+            sec->properties.net_push.x += sector_animations[i].push.x;
+            sec->properties.net_push.y += sector_animations[i].push.y;
             sec->floor.scrolls = true;
-            sec->floor.net_scroll.X += sector_animations[i].floor_scroll.X;
-            sec->floor.net_scroll.Y += sector_animations[i].floor_scroll.Y;
+            sec->floor.net_scroll.x += sector_animations[i].floor_scroll.x;
+            sec->floor.net_scroll.y += sector_animations[i].floor_scroll.y;
             sec->ceiling.scrolls = true;
-            sec->ceiling.net_scroll.X += sector_animations[i].ceil_scroll.X;
-            sec->ceiling.net_scroll.Y += sector_animations[i].ceil_scroll.Y;
+            sec->ceiling.net_scroll.x += sector_animations[i].ceil_scroll.x;
+            sec->ceiling.net_scroll.y += sector_animations[i].ceil_scroll.y;
 
             // Update dynamic values
             struct Sector  *sec_ref     = sector_animations[i].scroll_sector_reference;
@@ -2490,22 +2482,22 @@ void UpdateSpecials()
                        ((sec_ref->floor_height + sec_ref->ceiling_height) - heightref);
             if (special_ref->sector_effect_ & kSectorEffectTypePushThings)
             {
-                sec->properties.net_push.Y += kBoomCarryFactor * sy;
-                sec->properties.net_push.X += kBoomCarryFactor * sx;
+                sec->properties.net_push.y += kBoomCarryFactor * sy;
+                sec->properties.net_push.x += kBoomCarryFactor * sx;
             }
             if (special_ref->sector_effect_ & kSectorEffectTypeScrollFloor)
             {
                 sec->floor.scrolls = true;
-                sec->floor.net_scroll.Y -= sy;
+                sec->floor.net_scroll.y -= sy;
                 sec->floor.scrolls = true;
-                sec->floor.net_scroll.X -= sx;
+                sec->floor.net_scroll.x -= sx;
             }
             if (special_ref->sector_effect_ & kSectorEffectTypeScrollCeiling)
             {
                 sec->ceiling.scrolls = true;
-                sec->ceiling.net_scroll.Y -= sy;
+                sec->ceiling.net_scroll.y -= sy;
                 sec->ceiling.scrolls = true;
-                sec->ceiling.net_scroll.X -= sx;
+                sec->ceiling.net_scroll.x -= sx;
             }
             sector_animations[i].last_height = sec_ref->floor_height + sec_ref->ceiling_height;
         }
@@ -2520,40 +2512,40 @@ void UpdateSpecials()
 
         if (!sec->old_stored)
         {
-            sec->floor.old_scroll.X    = sec->floor.scroll.X;
-            sec->floor.old_scroll.Y    = sec->floor.scroll.Y;
-            sec->ceiling.old_scroll.X  = sec->ceiling.scroll.X;
-            sec->ceiling.old_scroll.Y  = sec->ceiling.scroll.Y;
-            sec->properties.old_push.X = sec->properties.push.X;
-            sec->properties.old_push.Y = sec->properties.push.Y;
-            sec->properties.old_push.Z = sec->properties.push.Z;
+            sec->floor.old_scroll.x    = sec->floor.scroll.x;
+            sec->floor.old_scroll.y    = sec->floor.scroll.y;
+            sec->ceiling.old_scroll.x  = sec->ceiling.scroll.x;
+            sec->ceiling.old_scroll.y  = sec->ceiling.scroll.y;
+            sec->properties.old_push.x = sec->properties.push.x;
+            sec->properties.old_push.y = sec->properties.push.y;
+            sec->properties.old_push.z = sec->properties.push.z;
             sec->old_stored            = true;
         }
         else
         {
-            sec->floor.scroll.X    = sec->floor.old_scroll.X;
-            sec->floor.scroll.Y    = sec->floor.old_scroll.Y;
-            sec->ceiling.scroll.X  = sec->ceiling.old_scroll.X;
-            sec->ceiling.scroll.Y  = sec->ceiling.old_scroll.Y;
-            sec->properties.push.X = sec->properties.old_push.X;
-            sec->properties.push.Y = sec->properties.old_push.Y;
-            sec->properties.push.Z = sec->properties.old_push.Z;
+            sec->floor.scroll.x    = sec->floor.old_scroll.x;
+            sec->floor.scroll.y    = sec->floor.old_scroll.y;
+            sec->ceiling.scroll.x  = sec->ceiling.old_scroll.x;
+            sec->ceiling.scroll.y  = sec->ceiling.old_scroll.y;
+            sec->properties.push.x = sec->properties.old_push.x;
+            sec->properties.push.y = sec->properties.old_push.y;
+            sec->properties.push.z = sec->properties.old_push.z;
         }
 
         sec->floor.old_offset   = sec->floor.offset;
         sec->ceiling.old_offset = sec->ceiling.offset;
 
-        sec->floor.offset.X    = sec->floor.offset.X + sec->floor.scroll.X + sec->floor.net_scroll.X;
-        sec->floor.offset.Y    = sec->floor.offset.Y + sec->floor.scroll.Y + sec->floor.net_scroll.Y;
-        sec->ceiling.offset.X  = sec->ceiling.offset.X + sec->ceiling.scroll.X + sec->ceiling.net_scroll.X;
-        sec->ceiling.offset.Y  = sec->ceiling.offset.Y + sec->ceiling.scroll.Y + sec->ceiling.net_scroll.Y;
-        sec->properties.push.X = sec->properties.push.X + sec->properties.net_push.X;
-        sec->properties.push.Y = sec->properties.push.Y + sec->properties.net_push.Y;
+        sec->floor.offset.x    = sec->floor.offset.x + sec->floor.scroll.x + sec->floor.net_scroll.x;
+        sec->floor.offset.y    = sec->floor.offset.y + sec->floor.scroll.y + sec->floor.net_scroll.y;
+        sec->ceiling.offset.x  = sec->ceiling.offset.x + sec->ceiling.scroll.x + sec->ceiling.net_scroll.x;
+        sec->ceiling.offset.y  = sec->ceiling.offset.y + sec->ceiling.scroll.y + sec->ceiling.net_scroll.y;
+        sec->properties.push.x = sec->properties.push.x + sec->properties.net_push.x;
+        sec->properties.push.y = sec->properties.push.y + sec->properties.net_push.y;
 
         // Reset dynamic stuff
-        sec->properties.net_push = {{0, 0, 0}};
-        sec->floor.net_scroll    = {{0, 0}};
-        sec->ceiling.net_scroll  = {{0, 0}};
+        sec->properties.net_push = {0, 0, 0};
+        sec->floor.net_scroll    = {0, 0};
+        sec->ceiling.net_scroll  = {0, 0};
     }
 
     // DO BUTTONS
@@ -2808,9 +2800,9 @@ void SpawnMapSpecials2(int autotag)
         {
             float mul = secSpecial->push_speed_ / 100.0f;
 
-            sector->properties.push.X += epi::BAMCos(secSpecial->push_angle_) * mul;
-            sector->properties.push.Y += epi::BAMSin(secSpecial->push_angle_) * mul;
-            sector->properties.push.Z += secSpecial->push_zspeed_ / 100.0f;
+            sector->properties.push.x += epi::BAMCos(secSpecial->push_angle_) * mul;
+            sector->properties.push.y += epi::BAMSin(secSpecial->push_angle_) * mul;
+            sector->properties.push.z += secSpecial->push_zspeed_ / 100.0f;
             if (secSpecial->special_flags_ & kSectorFlagPushConstant)
                 sector->properties.push_constant = true;
         }
@@ -2824,8 +2816,8 @@ void SpawnMapSpecials2(int autotag)
             float dx = epi::BAMCos(secSpecial->f_.scroll_angle_);
             float dy = epi::BAMSin(secSpecial->f_.scroll_angle_);
 
-            anim.floor_scroll.X -= dx * secSpecial->f_.scroll_speed_ / 32.0f;
-            anim.floor_scroll.Y -= dy * secSpecial->f_.scroll_speed_ / 32.0f;
+            anim.floor_scroll.x -= dx * secSpecial->f_.scroll_speed_ / 32.0f;
+            anim.floor_scroll.y -= dy * secSpecial->f_.scroll_speed_ / 32.0f;
 
             anim.last_height = sector->original_height;
 
@@ -2841,8 +2833,8 @@ void SpawnMapSpecials2(int autotag)
             float dx = epi::BAMCos(secSpecial->c_.scroll_angle_);
             float dy = epi::BAMSin(secSpecial->c_.scroll_angle_);
 
-            anim.ceil_scroll.X -= dx * secSpecial->c_.scroll_speed_ / 32.0f;
-            anim.ceil_scroll.Y -= dy * secSpecial->c_.scroll_speed_ / 32.0f;
+            anim.ceil_scroll.x -= dx * secSpecial->c_.scroll_speed_ / 32.0f;
+            anim.ceil_scroll.y -= dy * secSpecial->c_.scroll_speed_ / 32.0f;
 
             anim.last_height = sector->original_height;
 
@@ -2942,7 +2934,7 @@ void SectorChangeSpecial(Sector *sec, int new_type)
 {
     DemoteSectorToDynamic(sec);
 
-    sec->properties.type = HMM_MAX(0, new_type);
+    sec->properties.type = epi::Max(0, new_type);
 
     sec->properties.special = LookupSectorType(sec->properties.type);
 }

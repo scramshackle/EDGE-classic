@@ -20,8 +20,8 @@
 
 #include <stdint.h>
 
-#include "HandmadeMath.h"
 #include "epi_endian.h"
+#include "epi_math.h"
 
 // RGBA 8:8:8:8
 typedef uint32_t RGBAColor;
@@ -206,10 +206,10 @@ inline RGBAColor MakeRGBAFloat(float r, float g, float b, float a = 1.0f)
 
 inline RGBAColor MakeRGBAClamped(int r, int g, int b, int a = 255)
 {
-    uint32_t nr = HMM_Clamp(0, r, 255);
-    uint32_t ng = HMM_Clamp(0, g, 255);
-    uint32_t nb = HMM_Clamp(0, b, 255);
-    uint32_t na = HMM_Clamp(0, a, 255);
+    uint32_t nr = epi::Clamp(r, 0, 255);
+    uint32_t ng = epi::Clamp(g, 0, 255);
+    uint32_t nb = epi::Clamp(b, 0, 255);
+    uint32_t na = epi::Clamp(a, 0, 255);
 
     return (RGBAColor)((nr << kRGBARedShift) | (ng << kRGBAGreenShift) | (nb << kRGBABlueShift) |
                        (na << kRGBAAlphaShift));

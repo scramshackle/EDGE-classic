@@ -111,6 +111,40 @@ inline int NextPowerOfTwo(int value)
     return result;
 }
 
+constexpr double kPi               = 3.14159265358979323846;
+constexpr float  kPiFloat          = 3.14159265359f;
+constexpr float  kDegreesToRadians = (float)(kPi / 180.0);
+
+template <typename T> constexpr T Min(T a, T b)
+{
+    return (a > b) ? b : a;
+}
+
+template <typename T> constexpr T Max(T a, T b)
+{
+    return (a < b) ? b : a;
+}
+
+template <typename T> constexpr T Abs(T value)
+{
+    return (value > 0) ? value : -value;
+}
+
+template <typename T> constexpr T Clamp(T value, T low, T high)
+{
+    T result = value;
+    if (result < low)
+        result = low;
+    if (result > high)
+        result = high;
+    return result;
+}
+
+inline float Lerp(float a, float b, float time)
+{
+    return (1.0f - time) * a + time * b;
+}
+
 class RNG
 {
 public:

@@ -33,11 +33,11 @@
 
 #include <limits.h>
 
+#include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -147,8 +147,8 @@ static ImageData *ReadFlatAsEpiBlock(Image *rim)
 {
     EPI_ASSERT(rim->source_type_ == kImageSourceFlat || rim->source_type_ == kImageSourceRawBlock);
 
-    int tw = HMM_MAX(rim->width_, 1);
-    int th = HMM_MAX(rim->height_, 1);
+    int tw = epi::Max<int>(rim->width_, 1);
+    int th = epi::Max<int>(rim->height_, 1);
 
     int w = rim->width_;
     int h = rim->height_;
@@ -242,9 +242,9 @@ static ImageData *ReadTextureAsEpiBlock(Image *rim)
         int y1 = patch->origin_y;
         int x2 = x1 + AlignedLittleEndianS16(realpatch->width);
 
-        int x = HMM_MAX(0, x1);
+        int x = epi::Max(0, x1);
 
-        x2 = HMM_MIN(tdef->width, x2);
+        x2 = epi::Min<int>(tdef->width, x2);
 
         for (; x < x2; x++)
         {
@@ -419,8 +419,8 @@ static ImageData *ReadDummyAsEpiBlock(Image *rim)
 
 static ImageData *CreateUserColourImage(Image *rim, ImageDefinition *def)
 {
-    int tw = HMM_MAX(rim->width_, 1);
-    int th = HMM_MAX(rim->height_, 1);
+    int tw = epi::Max<int>(rim->width_, 1);
+    int th = epi::Max<int>(rim->height_, 1);
 
     ImageData *img = new ImageData(tw, th, 3);
 

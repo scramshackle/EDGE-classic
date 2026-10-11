@@ -247,7 +247,7 @@ enum LiquidSwirl
 extern LiquidSwirl swirling_flats;
 
 void     NormalizeLiquidSwirl(void);
-HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds);
+epi::Vec4 LiquidShaderParameters(const Image *image, float seconds);
 
 bool InitializeImages(void);
 void AnimationTicker(void);

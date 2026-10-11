@@ -59,7 +59,7 @@ bool        IsPathAbsolute(std::string_view path);
 void        ReplaceExtension(std::string &path, std::string_view ext);
 
 // Directory Functions
-#ifndef EDGE_WEB
+#ifndef __EMSCRIPTEN__
 std::string CurrentDirectoryGet();
 #endif
 bool IsDirectory(std::string_view dir);

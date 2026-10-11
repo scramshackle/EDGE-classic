@@ -206,7 +206,7 @@ class MapObject : public Position
     float alpha_  = 1.0f;
 
     // Momentum, used to update position.
-    HMM_Vec3 momentum_ = {{0, 0, 0}};
+    epi::Vec3 momentum_ = {0, 0, 0};
 
     // Track hover phase for time stop shenanigans
     float phase_ = 0.0f;
@@ -363,7 +363,7 @@ class MapObject : public Position
     short interpolation_number_   = 0;
     short interpolation_position_ = 0;
 
-    HMM_Vec3 interpolation_from_ = {{0, 0, 0}};
+    epi::Vec3 interpolation_from_ = {0, 0, 0};
 
     // touch list: sectors this thing is in or touches
     struct TouchNode *touch_sectors_ = nullptr;

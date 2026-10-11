@@ -30,11 +30,25 @@
 #define EPI_PRINTF_FORMAT(format_index, first_argument)
 #endif
 
-/* Important functions provided by Engine code */
+namespace epi
+{
+
+enum LogLevel
+{
+    kLogLevelPrint,
+    kLogLevelWarning,
+    kLogLevelDebug
+};
+
+void SetFatalErrorHandler(void (*handler)(const char *message));
+void SetLogHandler(void (*handler)(LogLevel level, const char *message));
+
 [[noreturn]] void FatalError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
 void              LogWarning(const char *warning, ...) EPI_PRINTF_FORMAT(1, 2);
 void              LogPrint(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
 void              LogDebug(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
+
+} // namespace epi
 
 // Move these to dedicated EPI math file - Dasho
 inline int RoundToInteger(float x)
@@ -47,18 +61,14 @@ inline int RoundToInteger(double x)
 }
 
 // Assertion macro
-#define EPI_ASSERT(cond) ((cond) ? (void)0 : FatalError("Assertion '%s' failed (%s:%d).\n", #cond, __FILE__, __LINE__))
+#define EPI_ASSERT(cond)                                                                                               \
+    ((cond) ? (void)0 : epi::FatalError("Assertion '%s' failed (%s:%d).\n", #cond, __FILE__, __LINE__))
 
 // Clears memory to zero.
 #define EPI_CLEAR_MEMORY(ptr, type, num) memset((void *)(ptr), ((ptr) - ((type *)(ptr))), (num) * sizeof(type))
 
 // Used for params/variables that we know are unused but still need to exist
 #define EPI_UNUSED(x) (void)x
-
-namespace epi
-{
-void Initialize(void);
-}
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

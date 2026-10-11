@@ -22,7 +22,7 @@
 extern ConsoleVariable fliplevels;
 extern SkyStretch      current_sky_stretch;
 
-static constexpr float kGles2DegreesToRadians = HMM_DegToRad;
+static constexpr float kGles2DegreesToRadians = epi::kDegreesToRadians;
 
 void SetupSkyMatrices(void)
 {
@@ -97,10 +97,10 @@ void RendererRevertSkyMatrices(void)
     gles2_immediate.PopMatrix();
 }
 
-void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view)
+void GetSkyInverseMatrices(epi::Mat4 &inverse_projection, epi::Mat4 &inverse_view)
 {
-    inverse_projection = HMM_InvGeneralM4(gles2_immediate.ProjectionMatrix());
-    inverse_view       = HMM_InvGeneralM4(gles2_immediate.ModelViewMatrix());
+    inverse_projection = epi::InverseMatrix(gles2_immediate.ProjectionMatrix());
+    inverse_view       = epi::InverseMatrix(gles2_immediate.ModelViewMatrix());
 }
 
 static const GLenum kSkyCubeFaceTargets[6] = {

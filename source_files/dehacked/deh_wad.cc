@@ -35,7 +35,7 @@
 #include "deh_edge.h"
 #include "deh_system.h"
 #include "epi.h"
-#include "stb_sprintf.h"
+#include "epi_str_util.h"
 
 namespace dehacked
 {
@@ -52,7 +52,7 @@ char wad_msg_buf[1024];
 void NewLump(DDFType type)
 {
     if (dest_container == nullptr)
-        FatalError("Dehacked: Error - WAD_NewLump: no container!\n");
+        epi::FatalError("Dehacked: Error - WAD_NewLump: no container!\n");
 
     dest_container->push_back({type, "", ""});
 
@@ -62,12 +62,12 @@ void NewLump(DDFType type)
 void Printf(const char *str, ...)
 {
     if (cur_lump == nullptr)
-        FatalError("Dehacked: Error - WAD_Printf: not started.\n");
+        epi::FatalError("Dehacked: Error - WAD_Printf: not started.\n");
 
     va_list args;
 
     va_start(args, str);
-    stbsp_vsnprintf(wad_msg_buf, sizeof(wad_msg_buf), str, args);
+    epi::FormatToBufferSizedArgs(wad_msg_buf, sizeof(wad_msg_buf), str, args);
     va_end(args);
 
     cur_lump->data += (const char *)wad_msg_buf;

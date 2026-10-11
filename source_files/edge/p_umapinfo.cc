@@ -35,6 +35,7 @@
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
+#include "i_system.h"
 
 MapList Maps;
 

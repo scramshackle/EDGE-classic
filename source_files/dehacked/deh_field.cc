@@ -57,8 +57,8 @@ static bool FieldValidateValue(const FieldReference *reference, int new_val)
 
     if (new_val < 0 || (new_val == 0 && reference->field_type == kFieldTypeOneOrGreater))
     {
-        LogDebug("Dehacked: Warning - Line %d: bad value '%d' for %s\n", patch::line_num, new_val,
-                 reference->dehacked_name);
+        epi::LogDebug("Dehacked: Warning - Line %d: bad value '%d' for %s\n", patch::line_num, new_val,
+                      reference->dehacked_name);
         return false;
     }
 
@@ -92,7 +92,7 @@ static bool FieldValidateValue(const FieldReference *reference, int new_val)
             break;
 
         default:
-            FatalError("Dehacked: Error - Bad field type %d\n", reference->field_type);
+            epi::FatalError("Dehacked: Error - Bad field type %d\n", reference->field_type);
         }
     }
     else /* patch_fmt == 6, allow BOOM/MBF stuff */
@@ -118,14 +118,14 @@ static bool FieldValidateValue(const FieldReference *reference, int new_val)
             break;
 
         default:
-            FatalError("Dehacked: Error - Bad field type %d\n", reference->field_type);
+            epi::FatalError("Dehacked: Error - Bad field type %d\n", reference->field_type);
         }
     }
 
     if (new_val < min_obj || new_val > max_obj)
     {
-        LogDebug("Dehacked: Warning - Line %d: bad value '%d' for %s\n", patch::line_num, new_val,
-                 reference->dehacked_name);
+        epi::LogDebug("Dehacked: Warning - Line %d: bad value '%d' for %s\n", patch::line_num, new_val,
+                      reference->dehacked_name);
 
         return false;
     }

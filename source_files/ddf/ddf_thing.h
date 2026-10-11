@@ -26,7 +26,7 @@
 
 inline float DynamicLightCompatibilityRadius(float x)
 {
-    return 10.0f * HMM_SQRTF(x);
+    return 10.0f * sqrtf(x);
 }
 
 //

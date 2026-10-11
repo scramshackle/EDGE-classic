@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 #include "i_defs_gl.h"
 #include "r_units.h"
 
@@ -47,9 +47,9 @@ class Gles2Program
 
     void Use();
 
-    void SetModelViewProjection(const HMM_Mat4 &matrix);
+    void SetModelViewProjection(const epi::Mat4 &matrix);
 
-    void SetModelView(const HMM_Mat4 &matrix);
+    void SetModelView(const epi::Mat4 &matrix);
 
     void SetMultiTexture(bool enabled);
 
@@ -77,7 +77,7 @@ class Gles2Program
 
     void SetOit(float mode, float scale);
 
-    void SetTextureOffset(const HMM_Vec2 &offset);
+    void SetTextureOffset(const epi::Vec2 &offset);
 
     void SetLightRowOffset(float offset);
 
@@ -85,15 +85,15 @@ class Gles2Program
 
     void SetSpriteLightTable(const SpriteLightTable *light_table);
 
-    void SetSpriteView(const HMM_Vec4 view[2]);
+    void SetSpriteView(const epi::Vec4 view[2]);
 
-    void SetLiquid(const HMM_Vec4 &liquid);
+    void SetLiquid(const epi::Vec4 &liquid);
 
     void SetColorLookup(int slot);
 
     void SetWhiten(bool enabled);
 
-    void SetBlur(const HMM_Vec4 &blur);
+    void SetBlur(const epi::Vec4 &blur);
 
     float OitModeShadow() const
     {
@@ -181,9 +181,8 @@ class Gles2Program
     GLint uniform_whiten_                 = -1;
     GLint uniform_blur_                   = -1;
 
-    HMM_Mat4 shadow_model_view_projection_ = {};
-    HMM_Mat4 shadow_model_view_            = {};
-
+    epi::Mat4 shadow_model_view_projection_ = {};
+    epi::Mat4 shadow_model_view_            = {};
 
     float shadow_multi_texture_ = -1.0f;
     float shadow_light_falloff_ = -1.0f;
@@ -206,18 +205,18 @@ class Gles2Program
     float shadow_oit_mode_  = -1.0f;
     float shadow_oit_scale_ = -1.0f;
 
-    HMM_Vec2 shadow_texture_offset_ = {{-1.0e30f, -1.0e30f}};
+    epi::Vec2 shadow_texture_offset_   = {-1.0e30f, -1.0e30f};
     float    shadow_light_row_offset_ = -1.0e30f;
     float    shadow_sprite_mode_      = -1.0f;
-    HMM_Vec4 shadow_sprite_view_[2]   = {HMM_V4(-1.0e30f, 0, 0, 0), HMM_V4(-1.0e30f, 0, 0, 0)};
+    epi::Vec4 shadow_sprite_view_[2]   = {epi::Vec4{-1.0e30f, 0, 0, 0}, epi::Vec4{-1.0e30f, 0, 0, 0}};
 
     const SpriteLightTable *shadow_sprite_light_table_ = nullptr;
-    HMM_Vec4                shadow_liquid_             = HMM_V4(-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f);
+    epi::Vec4               shadow_liquid_             = epi::Vec4{-1.0e30f, -1.0e30f, -1.0e30f, -1.0e30f};
 
     float shadow_color_lookup_enabled_ = -1.0f;
     float shadow_whiten_               = -1.0f;
 
-    HMM_Vec4 shadow_blur_ = HMM_V4(-1.0f, -1.0f, -1.0f, -1.0f);
+    epi::Vec4 shadow_blur_ = epi::Vec4{-1.0f, -1.0f, -1.0f, -1.0f};
 
     uint32_t uniform_update_count_ = 0;
 };
@@ -233,13 +232,13 @@ class Gles2ModelProgram
 
     void Use();
 
-    void SetMatrices(const HMM_Mat4 &model_view_projection, const HMM_Mat4 &model_view);
+    void SetMatrices(const epi::Mat4 &model_view_projection, const epi::Mat4 &model_view);
 
-    void SetTransform(const HMM_Mat4 &transform);
+    void SetTransform(const epi::Mat4 &transform);
 
     void SetLerp(float lerp);
 
-    void SetTextureTransform(const HMM_Vec2 &scale, const HMM_Vec2 &offset);
+    void SetTextureTransform(const epi::Vec2 &scale, const epi::Vec2 &offset);
 
     void SetAlpha(float alpha);
 
@@ -333,7 +332,7 @@ class Gles2MovieProgram
 
     void Use();
 
-    void SetMatrices(const HMM_Mat4 &model_view, const HMM_Mat4 &projection);
+    void SetMatrices(const epi::Mat4 &model_view, const epi::Mat4 &projection);
 
     void SetPlaneScales(float luma_x, float luma_y, float chroma_x, float chroma_y);
 

@@ -26,13 +26,15 @@
 #include <float.h>
 #include <math.h>
 
-#include "epi_math.h"
 #include "bot_think.h"
 #include "coal.h"
 #include "ddf_colormap.h"
 #include "ddf_reverb.h"
 #include "dm_state.h"
 #include "e_input.h"
+#include "epi_math.h"
+#include "epi_str_util.h"
+#include "epi_vector.h"
 #include "g_game.h"
 #include "i_sound.h"
 #include "i_system.h"
@@ -46,7 +48,6 @@
 #include "s_music.h"
 #include "s_sound.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "vm_coal.h"
 
 extern coal::VM *ui_vm;
@@ -71,7 +72,7 @@ static SoundEffect *sfx_jpflow;
 // Test for "measuring" size of room
 static bool P_RoomPath(PathIntercept *in, void *dataptr)
 {
-    HMM_Vec2 *blocker = (HMM_Vec2 *)dataptr;
+    epi::Vec2 *blocker = (epi::Vec2 *)dataptr;
 
     if (in->line)
     {
@@ -82,16 +83,16 @@ static bool P_RoomPath(PathIntercept *in, void *dataptr)
             if ((EDGE_IMAGE_IS_SKY(ld->back_sector->ceiling) && !EDGE_IMAGE_IS_SKY(ld->front_sector->ceiling)) ||
                 (!EDGE_IMAGE_IS_SKY(ld->back_sector->ceiling) && EDGE_IMAGE_IS_SKY(ld->front_sector->ceiling)))
             {
-                blocker->X = (ld->vertex_1->X + ld->vertex_2->X) / 2;
-                blocker->Y = (ld->vertex_1->Y + ld->vertex_2->Y) / 2;
+                blocker->x = (ld->vertex_1->x + ld->vertex_2->x) / 2;
+                blocker->y = (ld->vertex_1->y + ld->vertex_2->y) / 2;
                 return false;
             }
         }
 
         if (ld->blocked)
         {
-            blocker->X = (ld->vertex_1->X + ld->vertex_2->X) / 2;
-            blocker->Y = (ld->vertex_1->Y + ld->vertex_2->Y) / 2;
+            blocker->x = (ld->vertex_1->x + ld->vertex_2->x) / 2;
+            blocker->y = (ld->vertex_1->y + ld->vertex_2->y) / 2;
             return false;
         }
     }
@@ -123,7 +124,7 @@ static void CalcHeight(Player *player)
     player->standard_view_height_ = player->map_object_->height_ * player->map_object_->info_->viewheight_;
 
     if (sink_mult < 1.0f)
-        player->delta_view_height_ = HMM_MAX(player->delta_view_height_ - 1.0f, -1.0f);
+        player->delta_view_height_ = epi::Max(player->delta_view_height_ - 1.0f, -1.0f);
 
     // calculate the walking / running height adjustment.
 
@@ -137,8 +138,8 @@ static void CalcHeight(Player *player)
     if (erraticism.d_)
         player->bob_factor_ = 12.0f;
     else
-        player->bob_factor_ = (player->map_object_->momentum_.X * player->map_object_->momentum_.X +
-                               player->map_object_->momentum_.Y * player->map_object_->momentum_.Y) /
+        player->bob_factor_ = (player->map_object_->momentum_.x * player->map_object_->momentum_.x +
+                               player->map_object_->momentum_.y * player->map_object_->momentum_.y) /
                               8;
 
     if (player->bob_factor_ > kMaximumBob)
@@ -172,7 +173,7 @@ static void CalcHeight(Player *player)
         {
             float thresh = player->standard_view_height_ / 2;
             if (sink_mult < 1.0f)
-                thresh = HMM_MIN(thresh, player->standard_view_height_ * sink_mult);
+                thresh = epi::Min(thresh, player->standard_view_height_ * sink_mult);
             if (player->view_height_ < thresh)
             {
                 player->view_height_ = thresh;
@@ -197,7 +198,7 @@ static void CalcHeight(Player *player)
 
     if (player->map_object_->info_->falling_sound_ && player->health_ > 0)
     {
-        if ((player->map_object_->momentum_.Z <= -35.0) && (player->map_object_->momentum_.Z >= -36.0))
+        if ((player->map_object_->momentum_.z <= -35.0) && (player->map_object_->momentum_.z >= -36.0))
         {
             if (!epi::AlmostEquals(player->map_object_->floor_z_, -32768.0f))
             {
@@ -234,7 +235,7 @@ static void CalcHeight(Player *player)
 
 void PlayerJump(Player *pl, float dz, int wait)
 {
-    pl->map_object_->momentum_.Z += dz;
+    pl->map_object_->momentum_.z += dz;
 
     if (pl->jump_wait_ < wait)
         pl->jump_wait_ = wait;
@@ -413,17 +414,17 @@ static void MovePlayer(Player *player)
         }
     }
 
-    fric = HMM_Clamp(0.0f, fric, 1.0f);
+    fric = epi::Clamp(fric, 0.0f, 1.0f);
 
-    player->map_object_->momentum_.X +=
+    player->map_object_->momentum_.x +=
         (F_vec[0] * cmd->forward_move + S_vec[0] * cmd->side_move + U_vec[0] * cmd->upward_move) * fric;
 
-    player->map_object_->momentum_.Y +=
+    player->map_object_->momentum_.y +=
         (F_vec[1] * cmd->forward_move + S_vec[1] * cmd->side_move + U_vec[1] * cmd->upward_move) * fric;
 
     if (flying || swimming || !onground || onladder)
     {
-        player->map_object_->momentum_.Z +=
+        player->map_object_->momentum_.z +=
             F_vec[2] * cmd->forward_move + S_vec[2] * cmd->side_move + U_vec[2] * cmd->upward_move;
     }
 
@@ -483,7 +484,7 @@ static void MovePlayer(Player *player)
     {
         if (mo->height_ > mo->info_->crouchheight_)
         {
-            mo->height_                     = HMM_MAX(mo->height_ - 2.0f, mo->info_->crouchheight_);
+            mo->height_                     = epi::Max(mo->height_ - 2.0f, mo->info_->crouchheight_);
             mo->player_->delta_view_height_ = -1.0f;
         }
     }
@@ -491,7 +492,7 @@ static void MovePlayer(Player *player)
     {
         if (mo->height_ < mo->info_->height_)
         {
-            float new_height = HMM_MIN(mo->height_ + 2, mo->info_->height_);
+            float new_height = epi::Min(mo->height_ + 2, mo->info_->height_);
 
             // prevent standing up inside a solid area
             if ((mo->flags_ & kMapObjectFlagNoClip) || mo->z + new_height <= mo->ceiling_z_)
@@ -557,7 +558,7 @@ static void DeathThink(Player *player)
         delta = angle - player->map_object_->angle_;
 
         slope   = ApproximateSlope(dx, dy, dz);
-        slope   = HMM_MIN(1.7f, HMM_MAX(-1.7f, slope));
+        slope   = epi::Min(1.7f, epi::Max(-1.7f, slope));
         delta_s = epi::BAMFromATan(slope) - player->map_object_->vertical_angle_;
 
         if ((delta <= kBAMAngle1 / 2 || delta >= (BAMAngle)(0 - kBAMAngle1 / 2)) &&
@@ -681,13 +682,13 @@ static void UpdatePowerups(Player *player)
 
         // -ACB- FIXME!!! Catch lookup failure!
         player->effect_colourmap_ = colormaps.Lookup("ALLWHITE");
-        player->effect_left_      = (s <= 0) ? 0 : HMM_MIN(int(s), kMaximumEffectTime);
+        player->effect_left_      = (s <= 0) ? 0 : epi::Min<int>(int(s), kMaximumEffectTime);
     }
     else if (player->powers_[kPowerTypeInfrared] > 0)
     {
         float s = player->powers_[kPowerTypeInfrared];
 
-        player->effect_left_ = (s <= 0) ? 0 : HMM_MIN(int(s), kMaximumEffectTime);
+        player->effect_left_ = (s <= 0) ? 0 : epi::Min<int>(int(s), kMaximumEffectTime);
     }
     else if (player->powers_[kPowerTypeNightVision] > 0) // -ACB- 1998/07/15 NightVision Code
     {
@@ -695,14 +696,14 @@ static void UpdatePowerups(Player *player)
 
         // -ACB- FIXME!!! Catch lookup failure!
         player->effect_colourmap_ = colormaps.Lookup("ALLGREEN");
-        player->effect_left_      = (s <= 0) ? 0 : HMM_MIN(int(s), kMaximumEffectTime);
+        player->effect_left_      = (s <= 0) ? 0 : epi::Min<int>(int(s), kMaximumEffectTime);
     }
     else if (player->powers_[kPowerTypeBerserk] > 0) // Lobo 2021: Un-Hardcode Berserk colour tint
     {
         float s = player->powers_[kPowerTypeBerserk];
 
         player->effect_colourmap_ = colormaps.Lookup("BERSERK");
-        player->effect_left_      = (s <= 0) ? 0 : HMM_MIN(int(s), kMaximumEffectTime);
+        player->effect_left_      = (s <= 0) ? 0 : epi::Min<int>(int(s), kMaximumEffectTime);
     }
 }
 
@@ -857,10 +858,10 @@ bool PlayerThink(Player *player)
              (epi::AlmostEquals(player->delta_view_height_, 0.0f) || sinking)))
         {
             should_think = false;
-            if (!player->map_object_->momentum_.Z)
+            if (!player->map_object_->momentum_.z)
             {
-                player->map_object_->momentum_.X = 0;
-                player->map_object_->momentum_.Y = 0;
+                player->map_object_->momentum_.x = 0;
+                player->map_object_->momentum_.y = 0;
             }
         }
     }
@@ -918,9 +919,9 @@ bool PlayerThink(Player *player)
 
     if (LuaUseLuaHUD())
         LuaSetVector3(LuaGetGlobalVM(), "player", "inventory_event_handler",
-                      HMM_Vec3{{cmd->extended_buttons & kExtendedButtonCodeInventoryPrevious ? 1.0f : 0.0f,
+                      epi::Vec3{cmd->extended_buttons & kExtendedButtonCodeInventoryPrevious ? 1.0f : 0.0f,
                                 cmd->extended_buttons & kExtendedButtonCodeInventoryUse ? 1.0f : 0.0f,
-                                cmd->extended_buttons & kExtendedButtonCodeInventoryNext ? 1.0f : 0.0f}});
+                                cmd->extended_buttons & kExtendedButtonCodeInventoryNext ? 1.0f : 0.0f});
     else
         COALSetVector(ui_vm, "player", "inventory_event_handler",
                       cmd->extended_buttons & kExtendedButtonCodeInventoryPrevious ? 1 : 0,
@@ -970,30 +971,30 @@ bool PlayerThink(Player *player)
         else if (dynamic_reverb.d_)
         {
             sector_reverb = false;
-            HMM_Vec2 room_checker;
+            epi::Vec2 room_checker;
             float    room_check = 0;
             float    player_x   = player->map_object_->x;
             float    player_y   = player->map_object_->y;
             PathTraverse(player_x, player_y, player_x, 32768.0f, kPathAddLines, P_RoomPath, &room_checker);
-            room_check += abs(room_checker.Y - player_y);
+            room_check += abs(room_checker.y - player_y);
             PathTraverse(player_x, player_y, 32768.0f + player_x, 32768.0f + player_y, kPathAddLines, P_RoomPath,
                          &room_checker);
-            room_check += PointToDistance(player_x, player_y, room_checker.X, room_checker.Y);
+            room_check += PointToDistance(player_x, player_y, room_checker.x, room_checker.y);
             PathTraverse(player_x, player_y, -32768.0f + player_x, 32768.0f + player_y, kPathAddLines, P_RoomPath,
                          &room_checker);
-            room_check += PointToDistance(player_x, player_y, room_checker.X, room_checker.Y);
+            room_check += PointToDistance(player_x, player_y, room_checker.x, room_checker.y);
             PathTraverse(player_x, player_y, player_x, -32768.0f, kPathAddLines, P_RoomPath, &room_checker);
-            room_check += abs(player_y - room_checker.Y);
+            room_check += abs(player_y - room_checker.y);
             PathTraverse(player_x, player_y, -32768.0f + player_x, -32768.0f + player_y, kPathAddLines, P_RoomPath,
                          &room_checker);
-            room_check += PointToDistance(player_x, player_y, room_checker.X, room_checker.Y);
+            room_check += PointToDistance(player_x, player_y, room_checker.x, room_checker.y);
             PathTraverse(player_x, player_y, 32768.0f + player_x, -32768.0f + player_y, kPathAddLines, P_RoomPath,
                          &room_checker);
-            room_check += PointToDistance(player_x, player_y, room_checker.X, room_checker.Y);
+            room_check += PointToDistance(player_x, player_y, room_checker.x, room_checker.y);
             PathTraverse(player_x, player_y, -32768.0f, player_y, kPathAddLines, P_RoomPath, &room_checker);
-            room_check += abs(player_x - room_checker.X);
+            room_check += abs(player_x - room_checker.x);
             PathTraverse(player_x, player_y, 32768.0f, player_y, kPathAddLines, P_RoomPath, &room_checker);
-            room_check += abs(room_checker.X - player_x);
+            room_check += abs(room_checker.x - player_x);
             room_check *= 0.125f;
             if (EDGE_IMAGE_IS_SKY(player->map_object_->sector_->ceiling))
             {
@@ -1055,7 +1056,7 @@ void CreatePlayer(int pnum, bool is_bot)
 
     // determine name
     char namebuf[32];
-    stbsp_sprintf(namebuf, "Player%dName", pnum + 1);
+    epi::FormatToBufferSized(namebuf, sizeof(namebuf), "Player%dName", pnum + 1);
 
     if (language.IsValidRef(namebuf))
     {
@@ -1065,7 +1066,7 @@ void CreatePlayer(int pnum, bool is_bot)
     else
     {
         // -ES- Default to player##
-        stbsp_sprintf(p->player_name_, "Player%d", pnum + 1);
+        epi::FormatToBufferSized(p->player_name_, sizeof(p->player_name_), "Player%d", pnum + 1);
     }
 
     if (is_bot)

@@ -20,7 +20,7 @@
 
 #include "ddf_local.h"
 #include "epi_str_compare.h"
-#include "stb_sprintf.h"
+#include "epi_str_util.h"
 
 static Colormap *dynamic_colmap;
 
@@ -87,7 +87,7 @@ static void ColmapStartEntry(const char *name, bool extend)
 static void ColmapParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("COLMAP_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("COLMAP_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -141,7 +141,7 @@ static void ColmapFinishEntry(void)
 
 static void ColmapClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in colormap.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in colormap.ddf\n");
 }
 
 void DDFReadColourMaps(const std::string &data)
@@ -323,12 +323,12 @@ void DDFAddRawColourmap(const char *name, int size, const char *pack_name, int i
 {
     if (size < 256)
     {
-        LogWarning("WAD Colourmap '%s' too small (%d < %d)\n", name, size, 256);
+        epi::LogWarning("WAD Colourmap '%s' too small (%d < %d)\n", name, size, 256);
         return;
     }
 
     // limit length to 32
-    size = HMM_MIN(32, size / 256);
+    size = epi::Min(32, size / 256);
 
     std::string text = "<COLOURMAPS>\n\n";
 
@@ -356,7 +356,7 @@ void DDFAddRawColourmap(const char *name, int size, const char *pack_name, int i
     }
 
     char length_buf[64];
-    stbsp_snprintf(length_buf, sizeof(length_buf), "%d", size);
+    epi::FormatToBufferSized(length_buf, sizeof(length_buf), "%d", size);
 
     text += "start  = 0;\n";
     text += "length = ";
@@ -368,7 +368,7 @@ void DDFAddRawColourmap(const char *name, int size, const char *pack_name, int i
 
     DDFAddFile(kDDFTypeColourMap, text, pack_name ? pack_name : name);
 
-    LogDebug("- Added RAW colormap '%s' start=0 length=%s\n", name, length_buf);
+    epi::LogDebug("- Added RAW colormap '%s' start=0 length=%s\n", name, length_buf);
 }
 
 //--- editor settings ---

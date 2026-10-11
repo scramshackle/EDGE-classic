@@ -50,7 +50,7 @@ extern ConsoleVariable renderer_near_clip;
 
 inline float FastApproximateDistance(float delta_x, float delta_y)
 {
-    return ((delta_x) + (delta_y)-0.5f * HMM_MIN((delta_x), (delta_y)));
+    return ((delta_x) + (delta_y)-0.5f * epi::Min((delta_x), (delta_y)));
 }
 
 //----------------------------------------------------------------------------
@@ -138,21 +138,21 @@ struct DrawMirror
 
     bool is_portal = false;
 
-    HMM_Mat4 local_matrix;
-    HMM_Mat4 view_matrix;
+    epi::Mat4 local_matrix;
+    epi::Mat4 view_matrix;
 
-    HMM_Vec2 sprite_right;
-    HMM_Vec2 sprite_forward;
+    epi::Vec2 sprite_right;
+    epi::Vec2 sprite_forward;
 
-    HMM_Vec3 view_position;
-    HMM_Vec3 view_plane;
+    epi::Vec3 view_position;
+    epi::Vec3 view_plane;
 
     float xy_scale;
     float z_scale;
 
     bool reflective;
 
-    HMM_Vec4 near_plane;
+    epi::Vec4 near_plane;
 
     std::list<DrawSector *> draw_sectors;
     std::vector<DrawThing *> draw_things;

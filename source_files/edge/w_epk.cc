@@ -595,7 +595,7 @@ class ZIPFile : public epi::File
 
         while (count > 0)
         {
-            size_t want = HMM_MIN((size_t)count, sizeof(buffer));
+            size_t want = epi::Min((size_t)count, sizeof(buffer));
             size_t got  = mz_zip_reader_extract_iter_read(iter, buffer, want);
 
             // reached end of file?

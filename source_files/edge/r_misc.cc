@@ -30,13 +30,14 @@
 
 #include <math.h>
 
-#include "epi_math.h"
 #include "am_map.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "i_defs_gl.h"
 #include "m_misc.h"
 #include "n_network.h"
@@ -62,9 +63,9 @@ int view_window_height;
 BAMAngle view_angle          = 0;
 BAMAngle view_vertical_angle = 0;
 
-HMM_Vec3 view_forward;
-HMM_Vec3 view_up;
-HMM_Vec3 view_right;
+epi::Vec3 view_forward;
+epi::Vec3 view_up;
+epi::Vec3 view_right;
 
 BAMAngle normal_field_of_view, zoomed_field_of_view;
 bool     view_is_zoomed = false;
@@ -105,7 +106,7 @@ void FreeBSP(void);
 
 static float ApproximateAtan2(float y, float x)
 {
-    static constexpr float kHalfPi = HMM_PI32 / 2.0f;
+    static constexpr float kHalfPi = epi::kPiFloat / 2.0f;
 
     // Avoid division by zero
     if (x == 0.0f)
@@ -125,16 +126,16 @@ static float ApproximateAtan2(float y, float x)
         if (x < 0.0f)
         {
             if (y < 0.0f)
-                return atan - HMM_PI32;
+                return atan - epi::kPiFloat;
             else
-                return atan + HMM_PI32;
+                return atan + epi::kPiFloat;
         }
     }
     else
     {
         atan = kHalfPi - z / (z * z + 0.28f);
         if (y < 0.0f)
-            return atan - HMM_PI32;
+            return atan - epi::kPiFloat;
     }
 
     return atan;
@@ -147,10 +148,12 @@ BAMAngle PointToAngle(float x1, float y1, float x, float y, bool precise)
 
     if (precise)
     {
-        return (epi::AlmostEquals(x, 0.0f) && epi::AlmostEquals(y, 0.0f)) ? 0 : epi::BAMFromDegrees(atan2(y, x) * (180 / HMM_PI));
+        return (epi::AlmostEquals(x, 0.0f) && epi::AlmostEquals(y, 0.0f))
+                   ? 0
+                   : epi::BAMFromDegrees(atan2(y, x) * (180 / epi::kPi));
     }
 
-    return epi::BAMFromDegrees(ApproximateAtan2(y, x) * (180 / HMM_PI));
+    return epi::BAMFromDegrees(ApproximateAtan2(y, x) * (180 / epi::kPi));
 }
 
 float PointToDistance(float x1, float y1, float x2, float y2)
@@ -196,7 +199,7 @@ void RendererStartup(void)
 
     for (int i = 0; i < kSineTableSize; i++)
     {
-        sine_table[i] = HMM_SINF(HMM_AngleDeg(i * 360.0f / ((float)(kSineTableMask))));
+        sine_table[i] = sinf((i * 360.0f / ((float)(kSineTableMask))) * epi::kDegreesToRadians);
     }
 
     render_frame_count = 0;
@@ -225,8 +228,8 @@ Sector *PointInSector(float x, float y)
 
     DividingLine div;
 
-    div.x       = ld->vertex_1->X;
-    div.y       = ld->vertex_1->Y;
+    div.x       = ld->vertex_1->x;
+    div.y       = ld->vertex_1->y;
     div.delta_x = ld->delta_x;
     div.delta_y = ld->delta_y;
 

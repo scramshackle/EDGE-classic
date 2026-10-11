@@ -9,7 +9,7 @@ add_library(
   c_memory.cc
 )
 
-target_link_libraries(coal PRIVATE epi stb)
+target_link_libraries(coal PRIVATE epi)
 
 target_include_directories(coal PUBLIC ./)
 

@@ -16,17 +16,88 @@
 //
 //----------------------------------------------------------------------------
 
-#include "epi_str_hash.h"
+#include "epi.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "epi_str_util.h"
 
 namespace epi
 {
 
-// Various (if needed) EPI startup functions
-void Initialize(void)
+static constexpr int kMessageBufferSize = 4096;
+
+static void DefaultFatalErrorHandler(const char *message)
 {
-#ifdef EDGE_EXTRA_CHECKS
-    StringHash::RegisterKnownStrings();
-#endif
+    fflush(stdout);
+    fprintf(stderr, "ERROR: %s\n", message);
+}
+
+static void DefaultLogHandler(LogLevel level, const char *message)
+{
+    if (level == kLogLevelPrint)
+        fputs(message, stdout);
+    else if (level == kLogLevelWarning)
+        fprintf(stderr, "WARNING: %s", message);
+}
+
+static void (*fatal_error_handler)(const char *message)         = DefaultFatalErrorHandler;
+static void (*log_handler)(LogLevel level, const char *message) = DefaultLogHandler;
+
+void SetFatalErrorHandler(void (*handler)(const char *message))
+{
+    fatal_error_handler = handler ? handler : DefaultFatalErrorHandler;
+}
+
+void SetLogHandler(void (*handler)(LogLevel level, const char *message))
+{
+    log_handler = handler ? handler : DefaultLogHandler;
+}
+
+[[noreturn]] void FatalError(const char *error, ...)
+{
+    char    message[kMessageBufferSize];
+    va_list arguments;
+
+    va_start(arguments, error);
+    FormatToBufferSizedArgs(message, sizeof(message), error, arguments);
+    va_end(arguments);
+
+    fatal_error_handler(message);
+    abort();
+}
+
+static void LogMessage(LogLevel level, const char *format, va_list arguments)
+{
+    char message[kMessageBufferSize];
+    FormatToBufferSizedArgs(message, sizeof(message), format, arguments);
+    log_handler(level, message);
+}
+
+void LogWarning(const char *warning, ...)
+{
+    va_list arguments;
+    va_start(arguments, warning);
+    LogMessage(kLogLevelWarning, warning, arguments);
+    va_end(arguments);
+}
+
+void LogPrint(const char *message, ...)
+{
+    va_list arguments;
+    va_start(arguments, message);
+    LogMessage(kLogLevelPrint, message, arguments);
+    va_end(arguments);
+}
+
+void LogDebug(const char *message, ...)
+{
+    va_list arguments;
+    va_start(arguments, message);
+    LogMessage(kLogLevelDebug, message, arguments);
+    va_end(arguments);
 }
 
 } // namespace epi

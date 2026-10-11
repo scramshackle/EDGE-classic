@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "ddf_local.h"
-#include "stb_sprintf.h"
+#include "epi_str_util.h"
 
 static AnimationDefinition *dynamic_anim;
 
@@ -107,7 +107,7 @@ static void AnimStartEntry(const char *name, bool extend)
 static void AnimParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("ANIM_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("ANIM_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -279,7 +279,7 @@ void DDFConvertAnimatedLump(const uint8_t *data, int size)
         memcpy(first, data + 10, 8);
         last[8] = 0;
 
-        LogDebug("- ANIMATED LUMP: start '%s' : end '%s'\n", first, last);
+        epi::LogDebug("- ANIMATED LUMP: start '%s' : end '%s'\n", first, last);
 
         // ignore zero-length names
         if (first[0] == 0 || last[0] == 0)
@@ -304,7 +304,7 @@ void DDFConvertAnimatedLump(const uint8_t *data, int size)
         text += "\";\n";
 
         char speed_buf[64];
-        stbsp_snprintf(speed_buf, sizeof(speed_buf), "%dT", speed);
+        epi::FormatToBufferSized(speed_buf, sizeof(speed_buf), "%dT", speed);
 
         text += "speed = ";
         text += speed_buf;

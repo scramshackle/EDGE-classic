@@ -142,7 +142,7 @@ static void DDFMusicParseInfo(const char *info)
 
 static void PlaylistStartEntry(const char *name, bool extend)
 {
-    int number = HMM_MAX(0, atoi(name));
+    int number = epi::Max(0, atoi(name));
 
     if (number == 0)
         DDFError("Bad music number in playlist.ddf: %s\n", name);
@@ -174,7 +174,7 @@ static void PlaylistStartEntry(const char *name, bool extend)
 static void PlaylistParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("PLAYLIST_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("PLAYLIST_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);

@@ -39,7 +39,6 @@
 #include "r_misc.h"
 #include "r_static.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_files.h"
 #include "w_wad.h"

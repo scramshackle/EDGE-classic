@@ -909,8 +909,8 @@ static void BobWeapon(Player *p, WeaponDefinition *info)
 
     PlayerSprite *psp = &p->player_sprites_[p->action_player_sprite_];
 
-    float new_sx = p->map_object_->momentum_.Z ? psp->screen_x : 0;
-    float new_sy = p->map_object_->momentum_.Z ? psp->screen_y : 0;
+    float new_sx = p->map_object_->momentum_.z ? psp->screen_x : 0;
+    float new_sy = p->map_object_->momentum_.z ? psp->screen_y : 0;
 
     // bob the weapon based on movement speed
     if (p->powers_[kPowerTypeJetpack] <= 0) // Don't bob when using jetpack
@@ -2007,7 +2007,7 @@ void A_WeaponTransSet(MapObject *mo)
     if (psp->state && psp->state->action_par)
     {
         value = ((float *)psp->state->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     psp->visibility = psp->target_visibility = value;
@@ -2023,7 +2023,7 @@ void A_WeaponTransFade(MapObject *mo)
     if (psp->state && psp->state->action_par)
     {
         value = ((float *)psp->state->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     psp->target_visibility = value;
@@ -2196,8 +2196,8 @@ void WA_MoveFwd(MapObject *mo)
         float dx = epi::BAMCos(mo->angle_);
         float dy = epi::BAMSin(mo->angle_);
 
-        mo->momentum_.X += dx * amount;
-        mo->momentum_.Y += dy * amount;
+        mo->momentum_.x += dx * amount;
+        mo->momentum_.y += dy * amount;
     }
 }
 
@@ -2215,8 +2215,8 @@ void WA_MoveRight(MapObject *mo)
         float dx = epi::BAMCos(mo->angle_ - kBAMAngle90);
         float dy = epi::BAMSin(mo->angle_ - kBAMAngle90);
 
-        mo->momentum_.X += dx * amount;
-        mo->momentum_.Y += dy * amount;
+        mo->momentum_.x += dx * amount;
+        mo->momentum_.y += dy * amount;
     }
 }
 
@@ -2228,7 +2228,7 @@ void WA_MoveUp(MapObject *mo)
     const State *st = psp->state;
 
     if (st && st->action_par)
-        mo->momentum_.Z += *(float *)st->action_par;
+        mo->momentum_.z += *(float *)st->action_par;
 }
 
 void WA_TurnDir(MapObject *mo)

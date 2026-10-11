@@ -27,7 +27,6 @@
 #include "epi_bitset.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
 
 AttackDefinitionContainer atkdefs;
 
@@ -121,7 +120,7 @@ static MapObjectDefinition *CreateAtkMobj(const char *atk_name)
     // determine a name
     char mobj_name[256];
 
-    stbsp_snprintf(mobj_name, sizeof(mobj_name) - 2, "atk:%s", atk_name);
+    epi::FormatToBufferSized(mobj_name, sizeof(mobj_name) - 2, "atk:%s", atk_name);
     mobj_name[255] = 0;
 
     mobj->name_   = mobj_name; // copies it
@@ -207,7 +206,7 @@ static void AttackDoTemplate(const char *contents)
 static void AttackParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("ATTACK_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("ATTACK_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFCompareName(field, "TEMPLATE") == 0)
@@ -330,7 +329,7 @@ static void AttackFinishEntry(void)
 
 static void AttackClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in attacks.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in attacks.ddf\n");
 }
 
 void DDFReadAtks(const std::string &data)
@@ -518,7 +517,7 @@ static void DDFAtkGetLabel(const char *info, void *storage)
         DDFError("Bad State `%s'.\n", info);
 
     lab->label_  = std::string(info, i);
-    lab->offset_ = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    lab->offset_ = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 }
 
 // Attack definition class

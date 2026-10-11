@@ -21,15 +21,15 @@
 #include <algorithm>
 #include <forward_list>
 
-#include "epi_math.h"
 #include "bot_think.h"
 #include "con_main.h"
 #include "ddf_main.h"
 #include "ddf_thing.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "m_bbox.h"
 #include "m_random.h"
 #include "p_local.h"
@@ -239,8 +239,8 @@ void nav_area_c::compute_middle(const Sector &sector)
 
     for (int i = 0; i < sector.line_count; i++, total += 1)
     {
-        sum_x += sector.lines[i]->vertex_1->X;
-        sum_y += sector.lines[i]->vertex_1->Y;
+        sum_x += sector.lines[i]->vertex_1->x;
+        sum_y += sector.lines[i]->vertex_1->y;
     }
 
     if (total == 0)
@@ -461,8 +461,8 @@ static float BotTraverseLinkCost(int cur, const nav_link_c &link, bool allow_doo
         else
         {
             // enough vertical space?
-            float high_f = HMM_MAX(s1->floor_height, s2->floor_height);
-            float low_c  = HMM_MIN(s1->ceiling_height, s2->ceiling_height);
+            float high_f = epi::Max(s1->floor_height, s2->floor_height);
+            float low_c  = epi::Min(s1->ceiling_height, s2->ceiling_height);
 
             if (low_c - high_f < 56.0f)
                 return -1;
@@ -539,8 +539,8 @@ static void BotStoreSegMiddle(BotPath *path, int flags, const LineSide *line_sid
     // calc middle of the adjoining seg
     Position pos;
 
-    pos.x = (line_side->vertex_1->X + line_side->vertex_2->X) * 0.5f;
-    pos.y = (line_side->vertex_1->Y + line_side->vertex_2->Y) * 0.5f;
+    pos.x = (line_side->vertex_1->x + line_side->vertex_2->x) * 0.5f;
+    pos.y = (line_side->vertex_1->y + line_side->vertex_2->y) * 0.5f;
     pos.z = line_side->front_sector->floor_height;
 
     path->nodes_.push_back(BotPathNode{pos, flags, line_side});

@@ -4,6 +4,7 @@
 
 #include "epi.h"
 #include "epi_filesystem.h"
+#include "i_system.h"
 #include "m_argv.h"
 
 #ifdef EDGE_PROFILING

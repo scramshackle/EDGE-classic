@@ -34,18 +34,18 @@ void SetSpatialGainSmoothTime(int frequency)
         spatial_gain_smooth_frames = 1;
 }
 
-static const HMM_Vec3 kChannelDirections[kSpatialChannels] = {{{-1.0f, 0.0f, 0.0f}}, {{+1.0f, 0.0f, 0.0f}}};
+static const epi::Vec3 kChannelDirections[kSpatialChannels] = {{-1.0f, 0.0f, 0.0f}, {+1.0f, 0.0f, 0.0f}};
 
 static constexpr float kChannelConversionGain = 0.5f;
 
-static const HMM_Vec3 kWorldUp = {{0.0f, 1.0f, 0.0f}};
+static const epi::Vec3 kWorldUp = {0.0f, 1.0f, 0.0f};
 
-static inline HMM_Vec3 SafeNormalize(const HMM_Vec3 &v)
+static inline epi::Vec3 SafeNormalize(const epi::Vec3 &v)
 {
-    if (HMM_LenSqrV3(v) == 0.0f)
+    if (epi::VectorLengthSquared(v) == 0.0f)
         return v;
 
-    return HMM_NormV3(v);
+    return epi::NormalizeVector(v);
 }
 
 static float AttenuationExponential(float distance, float minimum_distance, float maximum_distance, float rolloff)
@@ -63,21 +63,21 @@ static float AttenuationExponential(float distance, float minimum_distance, floa
     return (float)pow((double)(clamped / minimum_distance), (double)-rolloff);
 }
 
-static HMM_Vec3 ToListenerSpace(const SpatialListener &listener, const HMM_Vec3 &emitter)
+static epi::Vec3 ToListenerSpace(const SpatialListener &listener, const epi::Vec3 &emitter)
 {
-    HMM_Vec3 axis_z = SafeNormalize(listener.direction);
-    HMM_Vec3 axis_x = SafeNormalize(HMM_Cross(axis_z, kWorldUp));
+    epi::Vec3 axis_z = SafeNormalize(listener.direction);
+    epi::Vec3 axis_x = SafeNormalize(epi::CrossProduct(axis_z, kWorldUp));
 
-    if (HMM_LenSqrV3(axis_x) == 0.0f)
-        axis_x = {{1.0f, 0.0f, 0.0f}};
+    if (epi::VectorLengthSquared(axis_x) == 0.0f)
+        axis_x = {1.0f, 0.0f, 0.0f};
 
-    HMM_Vec3 axis_y     = HMM_Cross(axis_x, axis_z);
-    HMM_Vec3 negative_z = {{-axis_z.X, -axis_z.Y, -axis_z.Z}};
+    epi::Vec3 axis_y     = epi::CrossProduct(axis_x, axis_z);
+    epi::Vec3 negative_z = {-axis_z.x, -axis_z.y, -axis_z.z};
 
-    HMM_Vec3 result;
-    result.X = HMM_DotV3(axis_x, emitter) - HMM_DotV3(axis_x, listener.position);
-    result.Y = HMM_DotV3(axis_y, emitter) - HMM_DotV3(axis_y, listener.position);
-    result.Z = HMM_DotV3(negative_z, emitter) - HMM_DotV3(negative_z, listener.position);
+    epi::Vec3 result;
+    result.x = epi::DotProduct(axis_x, emitter) - epi::DotProduct(axis_x, listener.position);
+    result.y = epi::DotProduct(axis_y, emitter) - epi::DotProduct(axis_y, listener.position);
+    result.z = epi::DotProduct(negative_z, emitter) - epi::DotProduct(negative_z, listener.position);
 
     return result;
 }
@@ -132,12 +132,12 @@ void SoundSpatializer::SetUniformGain(float gain)
     SetGains(gains);
 }
 
-void SoundSpatializer::Update(const SpatialListener &listener, const HMM_Vec3 &emitter, float minimum_distance,
+void SoundSpatializer::Update(const SpatialListener &listener, const epi::Vec3 &emitter, float minimum_distance,
                               float maximum_distance, float volume)
 {
-    HMM_Vec3 relative = ToListenerSpace(listener, emitter);
+    epi::Vec3 relative = ToListenerSpace(listener, emitter);
 
-    float distance = HMM_LenV3(relative);
+    float distance = epi::VectorLength(relative);
 
     float gain = AttenuationExponential(distance, minimum_distance, maximum_distance, 1.0f);
 
@@ -155,11 +155,11 @@ void SoundSpatializer::Update(const SpatialListener &listener, const HMM_Vec3 &e
 
     if (distance > 0.001f)
     {
-        HMM_Vec3 unit = HMM_MulV3F(relative, 1.0f / distance);
+        epi::Vec3 unit = epi::ScaleVector(relative, 1.0f / distance);
 
         for (int i = 0; i < kSpatialChannels; i++)
         {
-            float d = HMM_DotV3(unit, kChannelDirections[i]);
+            float d = epi::DotProduct(unit, kChannelDirections[i]);
 
             d = (d + 1.0f) * 0.5f;
 

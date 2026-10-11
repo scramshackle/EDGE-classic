@@ -174,7 +174,7 @@ static double PolygonLoopArea(const std::vector<int> &loop)
         const Vertex *a = level_vertexes + loop[i];
         const Vertex *b = level_vertexes + loop[(i + 1) % count];
 
-        total += (double)a->X * (double)b->Y - (double)b->X * (double)a->Y;
+        total += (double)a->x * (double)b->y - (double)b->x * (double)a->y;
     }
 
     return total * 0.5;
@@ -190,9 +190,9 @@ static bool PolygonPointInLoop(const std::vector<int> &loop, float px, float py)
         const Vertex *a = level_vertexes + loop[i];
         const Vertex *b = level_vertexes + loop[(i + 1) % count];
 
-        if ((a->Y > py) != (b->Y > py))
+        if ((a->y > py) != (b->y > py))
         {
-            float cross_x = a->X + (py - a->Y) / (b->Y - a->Y) * (b->X - a->X);
+            float cross_x = a->x + (py - a->y) / (b->y - a->y) * (b->x - a->x);
 
             if (cross_x > px)
                 inside = !inside;
@@ -214,8 +214,8 @@ static void PolygonLoopProbe(const std::vector<int> &loop, double area, float *p
         const Vertex *a = level_vertexes + loop[i];
         const Vertex *b = level_vertexes + loop[(i + 1) % count];
 
-        float dx     = b->X - a->X;
-        float dy     = b->Y - a->Y;
+        float dx     = b->x - a->x;
+        float dy     = b->y - a->y;
         float length = dx * dx + dy * dy;
 
         if (length > best_length)
@@ -228,22 +228,22 @@ static void PolygonLoopProbe(const std::vector<int> &loop, double area, float *p
     const Vertex *a = level_vertexes + loop[best];
     const Vertex *b = level_vertexes + loop[(best + 1) % count];
 
-    float dx     = b->X - a->X;
-    float dy     = b->Y - a->Y;
+    float dx     = b->x - a->x;
+    float dy     = b->y - a->y;
     float length = sqrtf(dx * dx + dy * dy);
 
     if (length <= 0.0f)
     {
-        *probe_x = a->X;
-        *probe_y = a->Y;
+        *probe_x = a->x;
+        *probe_y = a->y;
 
         return;
     }
 
     float side = (area < 0.0) ? 1.0f : -1.0f;
 
-    *probe_x = (a->X + b->X) * 0.5f + side * 0.01f * dy / length;
-    *probe_y = (a->Y + b->Y) * 0.5f - side * 0.01f * dx / length;
+    *probe_x = (a->x + b->x) * 0.5f + side * 0.01f * dy / length;
+    *probe_y = (a->y + b->y) * 0.5f - side * 0.01f * dx / length;
 }
 
 class PolygonEarClipper
@@ -385,14 +385,14 @@ void PolygonEarClipper::Triangulate(const std::vector<float> &coords, const std:
 
         do
         {
-            min_x_ = std::min(min_x_, p->x);
-            min_y_ = std::min(min_y_, p->y);
-            max_x  = std::max(max_x, p->x);
-            max_y  = std::max(max_y, p->y);
+            min_x_ = epi::Min(min_x_, p->x);
+            min_y_ = epi::Min(min_y_, p->y);
+            max_x  = epi::Max(max_x, p->x);
+            max_y  = epi::Max(max_y, p->y);
             p      = p->next;
         } while (p != outer_node);
 
-        inverse_size_ = std::max(max_x - min_x_, max_y - min_y_);
+        inverse_size_ = epi::Max(max_x - min_x_, max_y - min_y_);
         inverse_size_ = epi::AlmostEquals(inverse_size_, 0.0) ? 0.0 : 32767.0 / inverse_size_;
     }
 
@@ -625,10 +625,10 @@ PolygonEarClipper::EarTriangle PolygonEarClipper::MakeEarTriangle(const Node *ea
     triangle.a     = ear->prev;
     triangle.b     = ear;
     triangle.c     = ear->next;
-    triangle.min_x = std::min(triangle.a->x, std::min(triangle.b->x, triangle.c->x));
-    triangle.min_y = std::min(triangle.a->y, std::min(triangle.b->y, triangle.c->y));
-    triangle.max_x = std::max(triangle.a->x, std::max(triangle.b->x, triangle.c->x));
-    triangle.max_y = std::max(triangle.a->y, std::max(triangle.b->y, triangle.c->y));
+    triangle.min_x = epi::Min(triangle.a->x, epi::Min(triangle.b->x, triangle.c->x));
+    triangle.min_y = epi::Min(triangle.a->y, epi::Min(triangle.b->y, triangle.c->y));
+    triangle.max_x = epi::Max(triangle.a->x, epi::Max(triangle.b->x, triangle.c->x));
+    triangle.max_y = epi::Max(triangle.a->y, epi::Max(triangle.b->y, triangle.c->y));
 
     return triangle;
 }
@@ -858,8 +858,8 @@ PolygonEarClipper::Node *PolygonEarClipper::FindHoleBridge(Node *hole, Node *out
 
     double mx           = m->x;
     double my           = m->y;
-    double triangle_min = std::min(hy, my);
-    double triangle_max = std::max(hy, my);
+    double triangle_min = epi::Min(hy, my);
+    double triangle_max = epi::Max(hy, my);
     double tangent_min  = DBL_MAX;
 
     for (size_t block = 0; block < block_count_; block++)
@@ -934,10 +934,10 @@ void PolygonEarClipper::IndexSegment(Node *head, Node *stop)
 
             p->z = (int32_t)block;
 
-            block_min_x = std::min(block_min_x, std::min(p->x, c->x));
-            block_min_y = std::min(block_min_y, std::min(p->y, c->y));
-            block_max_x = std::max(block_max_x, std::max(p->x, c->x));
-            block_max_y = std::max(block_max_y, std::max(p->y, c->y));
+            block_min_x = epi::Min(block_min_x, epi::Min(p->x, c->x));
+            block_min_y = epi::Min(block_min_y, epi::Min(p->y, c->y));
+            block_max_x = epi::Max(block_max_x, epi::Max(p->x, c->x));
+            block_max_y = epi::Max(block_max_y, epi::Max(p->y, c->y));
 
             p = c;
         } while (++edge_count < kEdgesPerBlock && p != stop);
@@ -957,10 +957,10 @@ void PolygonEarClipper::GrowBlock(const Node *head, const Node *tail)
 {
     double *bounds = &block_bounds_[(size_t)head->z * 4];
 
-    bounds[0] = std::min(bounds[0], tail->x);
-    bounds[1] = std::min(bounds[1], tail->y);
-    bounds[2] = std::max(bounds[2], tail->x);
-    bounds[3] = std::max(bounds[3], tail->y);
+    bounds[0] = epi::Min(bounds[0], tail->x);
+    bounds[1] = epi::Min(bounds[1], tail->y);
+    bounds[2] = epi::Max(bounds[2], tail->x);
+    bounds[3] = epi::Max(bounds[3], tail->y);
 }
 
 PolygonEarClipper::Node *PolygonEarClipper::LiveBlockHead(size_t block)
@@ -1136,16 +1136,16 @@ bool PolygonEarClipper::SegmentsIntersect(const Node *p1, const Node *q1, const 
 
 bool PolygonEarClipper::OnSegment(const Node *p, const Node *q, const Node *r)
 {
-    return q->x <= std::max(p->x, r->x) && q->x >= std::min(p->x, r->x) && q->y <= std::max(p->y, r->y) &&
-           q->y >= std::min(p->y, r->y);
+    return q->x <= epi::Max(p->x, r->x) && q->x >= epi::Min(p->x, r->x) && q->y <= epi::Max(p->y, r->y) &&
+           q->y >= epi::Min(p->y, r->y);
 }
 
 bool PolygonEarClipper::IntersectsPolygon(const Node *a, const Node *b)
 {
-    double diagonal_min_x = std::min(a->x, b->x);
-    double diagonal_max_x = std::max(a->x, b->x);
-    double diagonal_min_y = std::min(a->y, b->y);
-    double diagonal_max_y = std::max(a->y, b->y);
+    double diagonal_min_x = epi::Min(a->x, b->x);
+    double diagonal_max_x = epi::Max(a->x, b->x);
+    double diagonal_min_y = epi::Min(a->y, b->y);
+    double diagonal_max_y = epi::Max(a->y, b->y);
 
     const Node *p = a;
 
@@ -1223,8 +1223,8 @@ static void PolygonAppendRing(std::vector<float> &ring_coords, std::vector<uint3
     {
         const Vertex *point = level_vertexes + loop[i];
 
-        ring_coords.push_back(point->X);
-        ring_coords.push_back(point->Y);
+        ring_coords.push_back(point->x);
+        ring_coords.push_back(point->y);
 
         ring_vertices.push_back(loop[i]);
     }
@@ -1307,17 +1307,17 @@ static void PolygonRefreshBounds(SectorPolygon *poly)
     {
         const Vertex *point = level_vertexes + poly->loop_points[i];
 
-        if (point->X < poly->bounds[0])
-            poly->bounds[0] = point->X;
+        if (point->x < poly->bounds[0])
+            poly->bounds[0] = point->x;
 
-        if (point->Y < poly->bounds[1])
-            poly->bounds[1] = point->Y;
+        if (point->y < poly->bounds[1])
+            poly->bounds[1] = point->y;
 
-        if (point->X > poly->bounds[2])
-            poly->bounds[2] = point->X;
+        if (point->x > poly->bounds[2])
+            poly->bounds[2] = point->x;
 
-        if (point->Y > poly->bounds[3])
-            poly->bounds[3] = point->Y;
+        if (point->y > poly->bounds[3])
+            poly->bounds[3] = point->y;
     }
 }
 
@@ -1338,9 +1338,9 @@ static bool PolygonSectorContains(const SectorPolygon *poly, float px, float py)
             const Vertex *a = level_vertexes + poly->loop_points[begin + k];
             const Vertex *b = level_vertexes + poly->loop_points[begin + (k + 1) % count];
 
-            if ((a->Y > py) != (b->Y > py))
+            if ((a->y > py) != (b->y > py))
             {
-                float cross_x = a->X + (py - a->Y) / (b->Y - a->Y) * (b->X - a->X);
+                float cross_x = a->x + (py - a->y) / (b->y - a->y) * (b->x - a->x);
 
                 if (cross_x > px)
                     inside = !inside;
@@ -1380,10 +1380,10 @@ static void BuildSectorGrid(void)
         if (poly->loop_points.empty())
             continue;
 
-        min_x = HMM_MIN(min_x, poly->bounds[0]);
-        min_y = HMM_MIN(min_y, poly->bounds[1]);
-        max_x = HMM_MAX(max_x, poly->bounds[2]);
-        max_y = HMM_MAX(max_y, poly->bounds[3]);
+        min_x = epi::Min(min_x, poly->bounds[0]);
+        min_y = epi::Min(min_y, poly->bounds[1]);
+        max_x = epi::Max(max_x, poly->bounds[2]);
+        max_y = epi::Max(max_y, poly->bounds[3]);
     }
 
     if (min_x > max_x || min_y > max_y)
@@ -1461,7 +1461,7 @@ static bool PolygonCellHitLess(const PolygonCellHit &a, const PolygonCellHit &b)
 static bool SegmentTouchesRectangle(double ax, double ay, double bx, double by, double x0, double y0, double x1,
                                     double y1)
 {
-    if (HMM_MAX(ax, bx) < x0 || HMM_MIN(ax, bx) > x1 || HMM_MAX(ay, by) < y0 || HMM_MIN(ay, by) > y1)
+    if (epi::Max(ax, bx) < x0 || epi::Min(ax, bx) > x1 || epi::Max(ay, by) < y0 || epi::Min(ay, by) > y1)
         return false;
 
     double dx = bx - ax;
@@ -1488,7 +1488,7 @@ static double PointSegmentDistance(double px, double py, double ax, double ay, d
     double length = dx * dx + dy * dy;
     double t      = (length > 0.0) ? ((px - ax) * dx + (py - ay) * dy) / length : 0.0;
 
-    t = HMM_MAX(0.0, HMM_MIN(1.0, t));
+    t = epi::Max(0.0, epi::Min(1.0, t));
 
     double nx = ax + t * dx - px;
     double ny = ay + t * dy - py;
@@ -1524,18 +1524,18 @@ static void BuildPolygonCellEdges(void)
                 const Vertex *a = level_vertexes + vertex_a;
                 const Vertex *b = level_vertexes + vertex_b;
 
-                if (epi::AlmostEquals(a->X, b->X) && epi::AlmostEquals(a->Y, b->Y))
+                if (epi::AlmostEquals(a->x, b->x) && epi::AlmostEquals(a->y, b->y))
                     continue;
 
-                double low_x  = HMM_MIN(a->X, b->X) - kPolygonCellMargin;
-                double low_y  = HMM_MIN(a->Y, b->Y) - kPolygonCellMargin;
-                double high_x = HMM_MAX(a->X, b->X) + kPolygonCellMargin;
-                double high_y = HMM_MAX(a->Y, b->Y) + kPolygonCellMargin;
+                double low_x  = epi::Min(a->x, b->x) - kPolygonCellMargin;
+                double low_y  = epi::Min(a->y, b->y) - kPolygonCellMargin;
+                double high_x = epi::Max(a->x, b->x) + kPolygonCellMargin;
+                double high_y = epi::Max(a->y, b->y) + kPolygonCellMargin;
 
-                int x0 = HMM_MAX(0, (int)floor((low_x - grid_origin_x) / grid_cell));
-                int y0 = HMM_MAX(0, (int)floor((low_y - grid_origin_y) / grid_cell));
-                int x1 = HMM_MIN(grid_width - 1, (int)floor((high_x - grid_origin_x) / grid_cell));
-                int y1 = HMM_MIN(grid_height - 1, (int)floor((high_y - grid_origin_y) / grid_cell));
+                int x0 = epi::Max(0, (int)floor((low_x - grid_origin_x) / grid_cell));
+                int y0 = epi::Max(0, (int)floor((low_y - grid_origin_y) / grid_cell));
+                int x1 = epi::Min(grid_width - 1, (int)floor((high_x - grid_origin_x) / grid_cell));
+                int y1 = epi::Min(grid_height - 1, (int)floor((high_y - grid_origin_y) / grid_cell));
 
                 for (int y = y0; y <= y1; y++)
                 {
@@ -1546,7 +1546,7 @@ static void BuildPolygonCellEdges(void)
                         double cell_x1 = cell_x0 + grid_cell + 2.0 * kPolygonCellMargin;
                         double cell_y1 = cell_y0 + grid_cell + 2.0 * kPolygonCellMargin;
 
-                        if (!SegmentTouchesRectangle(a->X, a->Y, b->X, b->Y, cell_x0, cell_y0, cell_x1, cell_y1))
+                        if (!SegmentTouchesRectangle(a->x, a->y, b->x, b->y, cell_x0, cell_y0, cell_x1, cell_y1))
                             continue;
 
                         hits.push_back(PolygonCellHit{y * grid_width + x, (int)i, vertex_a, vertex_b});
@@ -1596,7 +1596,7 @@ static void BuildPolygonCellEdges(void)
                 const Vertex *a = level_vertexes + hits[h].vertex_a;
                 const Vertex *b = level_vertexes + hits[h].vertex_b;
 
-                cell_edges.push_back(PolygonCellEdge{a->X, a->Y, b->X, b->Y});
+                cell_edges.push_back(PolygonCellEdge{a->x, a->y, b->x, b->y});
                 entry.edge_count++;
                 h++;
             }
@@ -1659,10 +1659,10 @@ static int PolygonCellCrossings(const PolygonCellEntry *entry, float px, float p
     if (rp_length < kPolygonCellTolerance)
         return -1;
 
-    double low_x  = HMM_MIN(rx, (double)px) - kPolygonCellTolerance;
-    double low_y  = HMM_MIN(ry, (double)py) - kPolygonCellTolerance;
-    double high_x = HMM_MAX(rx, (double)px) + kPolygonCellTolerance;
-    double high_y = HMM_MAX(ry, (double)py) + kPolygonCellTolerance;
+    double low_x  = epi::Min(rx, (double)px) - kPolygonCellTolerance;
+    double low_y  = epi::Min(ry, (double)py) - kPolygonCellTolerance;
+    double high_x = epi::Max(rx, (double)px) + kPolygonCellTolerance;
+    double high_y = epi::Max(ry, (double)py) + kPolygonCellTolerance;
 
     int crossings = 0;
 
@@ -1670,8 +1670,8 @@ static int PolygonCellCrossings(const PolygonCellEntry *entry, float px, float p
     {
         const PolygonCellEdge &edge = cell_edges[(size_t)(entry->edge_first + e)];
 
-        if (HMM_MAX(edge.x1, edge.x2) < low_x || HMM_MIN(edge.x1, edge.x2) > high_x ||
-            HMM_MAX(edge.y1, edge.y2) < low_y || HMM_MIN(edge.y1, edge.y2) > high_y)
+        if (epi::Max(edge.x1, edge.x2) < low_x || epi::Min(edge.x1, edge.x2) > high_x ||
+            epi::Max(edge.y1, edge.y2) < low_y || epi::Min(edge.y1, edge.y2) > high_y)
             continue;
 
         double ex = (double)edge.x2 - edge.x1;
@@ -1851,8 +1851,8 @@ static void PolygonCloseGaps(std::vector<PolygonEdge> &edges)
 
             const Vertex *to = level_vertexes + open_starts[k];
 
-            double dx = (double)to->X - (double)from->X;
-            double dy = (double)to->Y - (double)from->Y;
+            double dx = (double)to->x - (double)from->x;
+            double dy = (double)to->y - (double)from->y;
 
             candidates.push_back(PolygonGapCandidate{dx * dx + dy * dy, (int)e, (int)k});
         }
@@ -1964,7 +1964,7 @@ static bool PolygonTraceLoops(const Sector *sec, std::vector<PolygonEdge> &edges
             const Vertex *here = level_vertexes + cur;
             const Vertex *back = level_vertexes + prev;
 
-            float reverse_angle = PolygonPseudoAngle(back->X - here->X, back->Y - here->Y);
+            float reverse_angle = PolygonPseudoAngle(back->x - here->x, back->y - here->y);
 
             int   pick       = -1;
             float pick_delta = FLT_MAX;
@@ -1976,7 +1976,7 @@ static bool PolygonTraceLoops(const Sector *sec, std::vector<PolygonEdge> &edges
 
                 const Vertex *ahead = level_vertexes + edges[k].end;
 
-                float delta = PolygonPseudoAngle(ahead->X - here->X, ahead->Y - here->Y) - reverse_angle;
+                float delta = PolygonPseudoAngle(ahead->x - here->x, ahead->y - here->y) - reverse_angle;
 
                 if (delta < 0.0f)
                     delta += 4.0f;
@@ -2425,7 +2425,7 @@ static void PolygonFinishSector(int sector_index)
         const Vertex *b = level_vertexes + triangles[i + 1];
         const Vertex *c = level_vertexes + triangles[i + 2];
 
-        double doubled = (double)(b->X - a->X) * (double)(c->Y - a->Y) - (double)(c->X - a->X) * (double)(b->Y - a->Y);
+        double doubled = (double)(b->x - a->x) * (double)(c->y - a->y) - (double)(c->x - a->x) * (double)(b->y - a->y);
 
         if (fabs(doubled) < 0.0001)
             continue;

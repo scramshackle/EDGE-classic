@@ -33,7 +33,6 @@
 #include <map>
 #include <unordered_map>
 
-#include "HandmadeMath.h"
 #include "deh_buffer.h"
 #include "deh_edge.h"
 #include "deh_field.h"
@@ -49,7 +48,6 @@
 #include "epi.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
 namespace dehacked
 {
 
@@ -923,8 +921,8 @@ void frames::UpdateAttacks(char group, char *act_name, int action)
 
     if (epi::StringCaseCompareASCII(act_name, "BRAINSPIT") == 0)
     {
-        LogDebug("Dehacked: Warning - Multiple range attacks used with "
-                 "kA_BrainSpit.\n");
+        epi::LogDebug("Dehacked: Warning - Multiple range attacks used with "
+                      "kA_BrainSpit.\n");
         return;
     }
 
@@ -935,8 +933,8 @@ void frames::UpdateAttacks(char group, char *act_name, int action)
     {
         if (group != 'L' && group != 'M')
         {
-            LogDebug("Dehacked: Warning - Not enough attack slots for "
-                     "COMBOATTACK.\n");
+            epi::LogDebug("Dehacked: Warning - Not enough attack slots for "
+                          "COMBOATTACK.\n");
         }
 
         if ((group == 'L' && kind2 == kAttackMethodCombat) || (group == 'M' && kind2 == kAttackMethodRanged))
@@ -958,7 +956,7 @@ void frames::UpdateAttacks(char group, char *act_name, int action)
             break;
 
         default:
-            FatalError("Dehacked: Error - Bad attack kind %d\n", kind1);
+            epi::FatalError("Dehacked: Error - Bad attack kind %d\n", kind1);
         }
     }
 
@@ -1005,7 +1003,7 @@ const char *frames::GroupToName(char group)
         return "FLASH";
 
     default:
-        FatalError("Dehacked: Error - GroupToName: BAD GROUP '%c'\n", group);
+        epi::FatalError("Dehacked: Error - GroupToName: BAD GROUP '%c'\n", group);
     }
 }
 
@@ -1017,7 +1015,7 @@ const char *frames::RedirectorName(int next_st)
     // which we collected/processed as a group.
     if (group_for_state.find(next_st) == group_for_state.end())
     {
-        LogDebug("Dehacked: Warning - Redirection to state %d FAILED\n", next_st);
+        epi::LogDebug("Dehacked: Warning - Redirection to state %d FAILED\n", next_st);
         return "IDLE";
     }
 
@@ -1028,9 +1026,9 @@ const char *frames::RedirectorName(int next_st)
     EPI_ASSERT(next_ofs > 0);
 
     if (next_ofs == 1)
-        stbsp_snprintf(name_buf, sizeof(name_buf), "%s", GroupToName(next_group));
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "%s", GroupToName(next_group));
     else
-        stbsp_snprintf(name_buf, sizeof(name_buf), "%s:%d", GroupToName(next_group), next_ofs);
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "%s:%d", GroupToName(next_group), next_ofs);
 
     return name_buf;
 }
@@ -1064,17 +1062,17 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
             if (perc > 100)
                 perc = 100;
 
-            stbsp_sprintf(act_name, "JUMP(%s,%d%%)", RedirectorName(next), perc);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "JUMP(%s,%d%%)", RedirectorName(next), perc);
         }
     }
     break;
 
     case kA_Turn:
-        stbsp_sprintf(act_name, "TURN(%d)", MISC_TO_ANGLE(ReadArg(st, 0)));
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "TURN(%d)", MISC_TO_ANGLE(ReadArg(st, 0)));
         break;
 
     case kA_Face:
-        stbsp_sprintf(act_name, "FACE(%d)", MISC_TO_ANGLE(ReadArg(st, 0)));
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "FACE(%d)", MISC_TO_ANGLE(ReadArg(st, 0)));
         break;
 
     case kA_PlaySound: {
@@ -1083,7 +1081,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (epi::StringCaseCompareASCII(sfx, "NULL") == 0)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "PLAYSOUND(\"%s\")", sfx.c_str());
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "PLAYSOUND(\"%s\")", sfx.c_str());
     }
     break;
 
@@ -1093,7 +1091,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
 
         if (damage == 0 && sfx_id == 0)
         {
-            stbsp_sprintf(act_name, "NOTHING");
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "NOTHING");
         }
         else
         {
@@ -1104,7 +1102,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
                 sfx.clear();
 
             const char *atk_name = things::AddScratchAttack(damage, sfx);
-            stbsp_sprintf(act_name, "CLOSE_ATTACK(%s)", atk_name);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "CLOSE_ATTACK(%s)", atk_name);
         }
     }
     break;
@@ -1116,7 +1114,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (misc1 <= 0)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "ACTIVATE_LINETYPE(%d,%d)", misc1, misc2);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "ACTIVATE_LINETYPE(%d,%d)", misc1, misc2);
     }
     break;
 
@@ -1125,13 +1123,13 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
 
         if (!things::IsSpawnable(mt_num))
         {
-            LogDebug("Dehacked: Warning - Action kA_SPAWN unusable type (%d)\n", mt_num);
+            epi::LogDebug("Dehacked: Warning - Action kA_SPAWN unusable type (%d)\n", mt_num);
             strcpy(act_name, "NOTHING");
         }
         else
         {
             things::UseThing(mt_num);
-            stbsp_sprintf(act_name, "SPAWN(%s)", things::GetMobjName(mt_num));
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "SPAWN(%s)", things::GetMobjName(mt_num));
         }
     }
     break;
@@ -1151,7 +1149,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
                 perc = -1; // We use the negative percentage in kA_RefireTo
                            // to denote skipping the ammo check (or will)
 
-            stbsp_sprintf(act_name, "REFIRE_TO(%s,%d%%)", RedirectorName(next), perc);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "REFIRE_TO(%s,%d%%)", RedirectorName(next),
+                                     perc);
         }
     }
     break;
@@ -1165,7 +1164,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
 
         sounds::MarkSound(sound);
 
-        stbsp_sprintf(act_name, "DEH_WEAPON_MELEE(%d,%d,%d,%d,%d)", damagebase, damagedice, zerkfactor, sound, range);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_MELEE(%d,%d,%d,%d,%d)", damagebase,
+                                 damagedice, zerkfactor, sound, range);
     }
     break;
 
@@ -1175,7 +1175,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
 
         sounds::MarkSound(sound);
 
-        stbsp_sprintf(act_name, "DEH_WEAPON_SOUND(%d,%d)", sound, full_volume);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_SOUND(%d,%d)", sound, full_volume);
     }
     break;
 
@@ -1186,8 +1186,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int damagebase = ReadArg(st, 3);
         int damagedice = ReadArg(st, 4);
 
-        stbsp_sprintf(act_name, "DEH_WEAPON_BULLET(%d,%d,%d,%d,%d)", hspread, vspread, numbullets, damagebase,
-                      damagedice);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_BULLET(%d,%d,%d,%d,%d)", hspread,
+                                 vspread, numbullets, damagebase, damagedice);
     }
     break;
 
@@ -1205,14 +1205,15 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (name[0] == '*')
             name = "deh_atk_" + name.substr(1);
 
-        stbsp_sprintf(act_name, "DEH_WEAPON_PROJECTILE(%s,%d,%d,%d,%d)", name.c_str(), angle, pitch, hoffset, voffset);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_PROJECTILE(%s,%d,%d,%d,%d)",
+                                 name.c_str(), angle, pitch, hoffset, voffset);
     }
     break;
 
     case kA_ConsumeAmmo: {
         int amount = ReadArg(st, 0);
 
-        stbsp_sprintf(act_name, "DEH_WEAPON_CONSUMEAMMO(%d)", amount);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_CONSUMEAMMO(%d)", amount);
     }
     break;
 
@@ -1223,7 +1224,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_WEAPON_CHECKAMMO(%s,%d)", RedirectorName(next), amount);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_CHECKAMMO(%s,%d)",
+                                     RedirectorName(next), amount);
     }
     break;
 
@@ -1237,7 +1239,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         }
         else
         {
-            stbsp_sprintf(act_name, "DEH_WEAPON_GUNFLASH_TO(%s,%d)", RedirectorName(state), nothirdperson);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_WEAPON_GUNFLASH_TO(%s,%d)",
+                                     RedirectorName(state), nothirdperson);
         }
     }
     break;
@@ -1246,7 +1249,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int damage = ReadArg(st, 0);
         int radius = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "DEH_RADIUS_DAMAGE(%d,%d)", damage, radius);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_RADIUS_DAMAGE(%d,%d)", damage, radius);
     }
     break;
 
@@ -1262,7 +1265,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         }
         else
         {
-            stbsp_sprintf(act_name, "DEH_HEAL_CHASE(%s,%d)", RedirectorName(state), sound);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_HEAL_CHASE(%s,%d)", RedirectorName(state),
+                                     sound);
         }
     }
     break;
@@ -1286,8 +1290,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (name[0] == '*')
             name = name.substr(1);
 
-        stbsp_sprintf(act_name, "DEH_SPAWN_OBJECT(%s,%d,%d,%d,%d,%d,%d,%d)", name.c_str(), angle, x_offset, y_offset,
-                      z_offset, x_velocity, y_velocity, z_velocity);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_SPAWN_OBJECT(%s,%d,%d,%d,%d,%d,%d,%d)",
+                                 name.c_str(), angle, x_offset, y_offset, z_offset, x_velocity, y_velocity, z_velocity);
     }
     break;
 
@@ -1305,7 +1309,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (name[0] == '*')
             name = "deh_atk_" + name.substr(1);
 
-        stbsp_sprintf(act_name, "DEH_MONSTER_PROJECTILE(%s,%d,%d,%d,%d)", name.c_str(), angle, pitch, hoffset, voffset);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_MONSTER_PROJECTILE(%s,%d,%d,%d,%d)",
+                                 name.c_str(), angle, pitch, hoffset, voffset);
     }
     break;
 
@@ -1316,8 +1321,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int damagebase = ReadArg(st, 3);
         int damagedice = ReadArg(st, 4);
 
-        stbsp_sprintf(act_name, "DEH_MONSTER_BULLET(%d,%d,%d,%d,%d)", hspread, vspread, numbullets, damagebase,
-                      damagedice);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_MONSTER_BULLET(%d,%d,%d,%d,%d)", hspread,
+                                 vspread, numbullets, damagebase, damagedice);
     }
     break;
 
@@ -1329,7 +1334,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
 
         sounds::MarkSound(sound);
 
-        stbsp_sprintf(act_name, "DEH_MONSTER_MELEE(%d,%d,%d,%d)", damagebase, damagedice, sound, range);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_MONSTER_MELEE(%d,%d,%d,%d)", damagebase,
+                                 damagedice, sound, range);
     }
     break;
 
@@ -1340,7 +1346,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_HEALTH_JUMP(%s,%d)", RedirectorName(next), health);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_HEALTH_JUMP(%s,%d)", RedirectorName(next),
+                                     health);
     }
     break;
 
@@ -1348,7 +1355,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int threshold    = ReadArg(st, 0);
         int maxturnangle = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "DEH_SEEK_TRACER(%d,%d)", threshold, maxturnangle);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_SEEK_TRACER(%d,%d)", threshold, maxturnangle);
     }
     break;
 
@@ -1356,7 +1363,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int fov         = ReadArg(st, 0);
         int rangeblocks = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "DEH_FIND_TRACER(%d,%d)", fov, rangeblocks);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_FIND_TRACER(%d,%d)", fov, rangeblocks);
     }
     break;
 
@@ -1367,7 +1374,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_TARGET_SIGHT_JUMP(%s,%d)", RedirectorName(next), fov);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_TARGET_SIGHT_JUMP(%s,%d)",
+                                     RedirectorName(next), fov);
     }
     break;
 
@@ -1378,7 +1386,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_TARGET_CLOSER_JUMP(%s,%d)", RedirectorName(next), distance);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_TARGET_CLOSER_JUMP(%s,%d)",
+                                     RedirectorName(next), distance);
     }
     break;
 
@@ -1389,7 +1398,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_TRACER_SIGHT_JUMP(%s,%d)", RedirectorName(next), fov);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_TRACER_SIGHT_JUMP(%s,%d)",
+                                     RedirectorName(next), fov);
     }
     break;
 
@@ -1400,7 +1410,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_TRACER_CLOSER_JUMP(%s,%d)", RedirectorName(next), distance);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_TRACER_CLOSER_JUMP(%s,%d)",
+                                     RedirectorName(next), distance);
     }
     break;
 
@@ -1412,7 +1423,8 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         if (next <= 0 || NewStateElseOld(next) == nullptr)
             strcpy(act_name, "NOTHING");
         else
-            stbsp_sprintf(act_name, "DEH_FLAG_JUMP(%s,%d,%d)", RedirectorName(next), flags, flags2);
+            epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_FLAG_JUMP(%s,%d,%d)",
+                                     RedirectorName(next), flags, flags2);
     }
     break;
 
@@ -1420,7 +1432,7 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int flags1 = ReadArg(st, 0);
         int flags2 = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "DEH_ADD_FLAGS(%d,%d)", flags1, flags2);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_ADD_FLAGS(%d,%d)", flags1, flags2);
     }
     break;
 
@@ -1428,14 +1440,14 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int flags1 = ReadArg(st, 0);
         int flags2 = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "DEH_REMOVE_FLAGS(%d,%d)", flags1, flags2);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_REMOVE_FLAGS(%d,%d)", flags1, flags2);
     }
     break;
 
     case kA_FireCGun: {
         EPI_ASSERT(current_weap);
         int flash_to = current_weap->flashstate + cur - kS_CHAIN1;
-        stbsp_sprintf(act_name, "DEH_FIRE_CHAINGUN(%s)", RedirectorName(flash_to));
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "DEH_FIRE_CHAINGUN(%s)", RedirectorName(flash_to));
     }
     break;
 
@@ -1443,12 +1455,12 @@ void frames::SpecialAction(char *act_name, const State *st, int cur)
         int height = ReadArg(st, 0);
         int speed  = ReadArg(st, 1);
 
-        stbsp_sprintf(act_name, "MUSHROOM(%d,%d)", height, speed);
+        epi::FormatToBufferSized(act_name, kMaximumActionNameLength, "MUSHROOM(%d,%d)", height, speed);
     }
     break;
 
     default:
-        FatalError("Dehacked: Error - Bad special action %d\n", st->action);
+        epi::FatalError("Dehacked: Error - Bad special action %d\n", st->action);
     }
 }
 
@@ -1472,7 +1484,7 @@ void frames::OutputState(char group, int cur, bool do_action)
         act_flags |= kActionFlagThingState;
 
     if (action_info[action].act_flags & kActionFlagUnimplemented)
-        LogDebug("Dehacked: Warning - Frame %d: action %s is not yet supported.\n", cur, bex_name);
+        epi::LogDebug("Dehacked: Warning - Frame %d: action %s is not yet supported.\n", cur, bex_name);
 
     char act_name[kMaximumActionNameLength];
 
@@ -1497,13 +1509,13 @@ void frames::OutputState(char group, int cur, bool do_action)
     if (action != kA_NULL && (weap_act == !IS_WEAPON(group)) && epi::StringCaseCompareASCII(act_name, "NOTHING") != 0)
     {
         if (weap_act)
-            LogDebug("Dehacked: Warning - Frame %d: weapon action %s used in "
-                     "thing.\n",
-                     cur, bex_name);
+            epi::LogDebug("Dehacked: Warning - Frame %d: weapon action %s used in "
+                          "thing.\n",
+                          cur, bex_name);
         else
-            LogDebug("Dehacked: Warning - Frame %d: thing action %s used in "
-                     "weapon.\n",
-                     cur, bex_name);
+            epi::LogDebug("Dehacked: Warning - Frame %d: thing action %s used in "
+                          "weapon.\n",
+                          cur, bex_name);
 
         strcpy(act_name, "NOTHING");
     }
@@ -1567,7 +1579,7 @@ void frames::OutputState(char group, int cur, bool do_action)
     }
 
     if (cur_f != 0)
-        LogDebug("Dehacked: Warning - Unconverted flags 0x%08x in frame %d\n", cur_f, st->frame);
+        epi::LogDebug("Dehacked: Warning - Unconverted flags 0x%08x in frame %d\n", cur_f, st->frame);
 
     if (flagstring.empty())
         wad::Printf("    %s:%c:%d:%s:%s", sprites::GetSprite(st->sprite), 'A' + ((int)st->frame & 31), tics,
@@ -1706,7 +1718,7 @@ void frames::AlterFrame(int new_val)
 
     if (epi::StringCaseCompareASCII(field_name, "Action pointer") == 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: raw Action pointer not supported.\n", patch::line_num);
+        epi::LogDebug("Dehacked: Warning - Line %d: raw Action pointer not supported.\n", patch::line_num);
         return;
     }
 
@@ -1734,7 +1746,7 @@ void frames::AlterFrame(int new_val)
 
     if (!FieldAlter(frame_field, field_name, (int *)st, new_val))
     {
-        LogDebug("Dehacked: Warning - UNKNOWN FRAME FIELD: %s\n", field_name);
+        epi::LogDebug("Dehacked: Warning - UNKNOWN FRAME FIELD: %s\n", field_name);
         return;
     }
 
@@ -1759,13 +1771,13 @@ void frames::AlterPointer(int new_val)
 
     if (epi::StringCaseCompareASCII(deh_field, "Codep Frame") != 0)
     {
-        LogDebug("Dehacked: Warning - UNKNOWN POINTER FIELD: %s\n", deh_field);
+        epi::LogDebug("Dehacked: Warning - UNKNOWN POINTER FIELD: %s\n", deh_field);
         return;
     }
 
     if (new_val < 0 || new_val >= kTotalMBFStates)
     {
-        LogDebug("Dehacked: Warning - Line %d: Illegal Codep frame number: %d\n", patch::line_num, new_val);
+        epi::LogDebug("Dehacked: Warning - Line %d: Illegal Codep frame number: %d\n", patch::line_num, new_val);
         return;
     }
 
@@ -1778,9 +1790,9 @@ void frames::AlterBexCodePtr(const char *new_action)
 
     if (epi::StringPrefixCaseCompareASCII(bex_field, "FRAME ") != 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: bad code pointer '%s' - must begin "
-                 "with FRAME.\n",
-                 patch::line_num, bex_field);
+        epi::LogDebug("Dehacked: Warning - Line %d: bad code pointer '%s' - must begin "
+                      "with FRAME.\n",
+                      patch::line_num, bex_field);
         return;
     }
 
@@ -1788,13 +1800,13 @@ void frames::AlterBexCodePtr(const char *new_action)
 
     if (sscanf(bex_field + 6, " %i ", &st_num) != 1)
     {
-        LogDebug("Dehacked: Warning - Line %d: unreadable FRAME number: %s\n", patch::line_num, bex_field + 6);
+        epi::LogDebug("Dehacked: Warning - Line %d: unreadable FRAME number: %s\n", patch::line_num, bex_field + 6);
         return;
     }
 
     if (st_num < 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: illegal FRAME number: %d\n", patch::line_num, st_num);
+        epi::LogDebug("Dehacked: Warning - Line %d: illegal FRAME number: %d\n", patch::line_num, st_num);
         return;
     }
 
@@ -1831,7 +1843,7 @@ void frames::AlterBexCodePtr(const char *new_action)
         }
     }
 
-    LogDebug("Dehacked: Warning - Line %d: unknown action %s for CODEPTR.\n", patch::line_num, new_action);
+    epi::LogDebug("Dehacked: Warning - Line %d: unknown action %s for CODEPTR.\n", patch::line_num, new_action);
 }
 
 } // namespace dehacked

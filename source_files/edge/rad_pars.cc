@@ -37,7 +37,6 @@
 #include "rad_act.h"
 #include "rad_trig.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -89,17 +88,17 @@ static char *pending_label     = nullptr;
 
     // put actual message on first line
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
-    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred near line %d of %s\n",
-                   current_script_line_number, current_script_filename);
+    epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred near line %d of %s\n",
+                             current_script_line_number, current_script_filename);
     pos += strlen(pos);
 
-    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
-                   current_script_line.c_str());
+    epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                             current_script_line.c_str());
     pos += strlen(pos);
 
     // check for buffer overflow
@@ -121,7 +120,7 @@ void ScriptWarning(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     LogWarning("\n");
@@ -136,7 +135,7 @@ void ScriptWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)
@@ -1135,7 +1134,7 @@ static void ScriptParsePathEvent(std::vector<const char *> &pars)
     this_script->path_event_label = new char[i + 1];
     epi::CStringCopyMax((char *)this_script->path_event_label, pars[1], i);
 
-    this_script->path_event_offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    this_script->path_event_offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 }
 
 static void ScriptParseOnDeath(std::vector<const char *> &pars)
@@ -1454,7 +1453,7 @@ static void HandleSpawnKeyword(const char *par, ScriptThingParameter *t)
         int val;
         ScriptCheckForInt(par + 6, &val);
 
-        if (HMM_ABS(val) <= 360)
+        if (epi::Abs(val) <= 360)
             t->angle = epi::BAMFromDegrees((float)val);
         else
             t->angle = val << 16;
@@ -1540,7 +1539,7 @@ static void ScriptParseSpawnThing(std::vector<const char *> &pars)
 
         ScriptCheckForInt(angle_str, &val);
 
-        if (HMM_ABS(val) <= 360)
+        if (epi::Abs(val) <= 360)
             t->angle = epi::BAMFromDegrees((float)val);
         else
             t->angle = val << 16;
@@ -1786,7 +1785,7 @@ static void ScriptParseThingEvent(std::vector<const char *> &pars)
     tev->label = new char[i + 1];
     epi::CStringCopyMax((char *)tev->label, pars[2], i);
 
-    tev->offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    tev->offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 
     // parse the tag value
     if (pars.size() >= 4)
@@ -2253,7 +2252,7 @@ static void ScriptParseWeaponEvent(std::vector<const char *> &pars)
     tev->label = new char[i + 1];
     epi::CStringCopyMax((char *)tev->label, pars[2], i);
 
-    tev->offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    tev->offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 
     AddStateToScript(this_script, 0, ScriptWeaponEvent, tev);
 }

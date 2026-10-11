@@ -27,16 +27,15 @@
 #include <math.h>
 
 #include <algorithm>
-
 #include <unordered_map>
 #include <unordered_set>
 
-#include "epi_math.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
-#include "epi.h"
 #include "edge_profiling.h"
-#include "epi_doomdefs.h"
+#include "epi.h"
+#include "epi_math.h"
 #include "epi_simd.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
@@ -195,7 +194,7 @@ void SkyDecideLineSide(LineSide *line_side, DrawMirror *mir, bool resident)
         }
         else if (bsector && EDGE_IMAGE_IS_SKY(*b_ceil))
         {
-            float max_f = HMM_MAX(f_fh, b_fh);
+            float max_f = epi::Max(f_fh, b_fh);
 
             if (b_ch <= max_f && max_f < fsector->sky_height)
             {
@@ -220,11 +219,11 @@ static bool PointPairViewAngles(float sx1, float sy1, float sx2, float sy2, bool
 
 static bool LineSideViewAngles(const LineSide *line_side, BAMAngle *out_left, BAMAngle *out_right)
 {
-    float sx1 = line_side->vertex_1->X;
-    float sy1 = line_side->vertex_1->Y;
+    float sx1 = line_side->vertex_1->x;
+    float sy1 = line_side->vertex_1->y;
 
-    float sx2 = line_side->vertex_2->X;
-    float sy2 = line_side->vertex_2->Y;
+    float sx2 = line_side->vertex_2->x;
+    float sy2 = line_side->vertex_2->y;
 
     // when there are active mirror planes, segs not only need to
     // be flipped across them but also clipped across them.
@@ -255,10 +254,10 @@ static bool LineSideViewAngles(const LineSide *line_side, BAMAngle *out_left, BA
 
             DividingLine div;
 
-            div.x       = clipper->vertex_1->X;
-            div.y       = clipper->vertex_1->Y;
-            div.delta_x = clipper->vertex_2->X - div.x;
-            div.delta_y = clipper->vertex_2->Y - div.y;
+            div.x       = clipper->vertex_1->x;
+            div.y       = clipper->vertex_1->y;
+            div.delta_x = clipper->vertex_2->x - div.x;
+            div.delta_y = clipper->vertex_2->y - div.y;
 
             int s1 = PointOnDividingLineSide(sx1, sy1, &div);
             int s2 = PointOnDividingLineSide(sx2, sy2, &div);
@@ -1463,19 +1462,19 @@ static void BuildViewGrid(void)
         {
             const Line *ld = sec->lines[k];
 
-            box[0] = HMM_MIN(box[0], HMM_MIN(ld->vertex_1->X, ld->vertex_2->X));
-            box[1] = HMM_MIN(box[1], HMM_MIN(ld->vertex_1->Y, ld->vertex_2->Y));
-            box[2] = HMM_MAX(box[2], HMM_MAX(ld->vertex_1->X, ld->vertex_2->X));
-            box[3] = HMM_MAX(box[3], HMM_MAX(ld->vertex_1->Y, ld->vertex_2->Y));
+            box[0] = epi::Min(box[0], epi::Min(ld->vertex_1->x, ld->vertex_2->x));
+            box[1] = epi::Min(box[1], epi::Min(ld->vertex_1->y, ld->vertex_2->y));
+            box[2] = epi::Max(box[2], epi::Max(ld->vertex_1->x, ld->vertex_2->x));
+            box[3] = epi::Max(box[3], epi::Max(ld->vertex_1->y, ld->vertex_2->y));
         }
 
         if (box[0] > box[2])
             continue;
 
-        min_x = HMM_MIN(min_x, box[0]);
-        min_y = HMM_MIN(min_y, box[1]);
-        max_x = HMM_MAX(max_x, box[2]);
-        max_y = HMM_MAX(max_y, box[3]);
+        min_x = epi::Min(min_x, box[0]);
+        min_y = epi::Min(min_y, box[1]);
+        max_x = epi::Max(max_x, box[2]);
+        max_y = epi::Max(max_y, box[3]);
     }
 
     if (min_x > max_x || min_y > max_y)
@@ -1515,15 +1514,15 @@ static void BuildViewGrid(void)
         {
             const Line *ld = sec->lines[k];
 
-            float lx1 = ld->vertex_1->X;
-            float ly1 = ld->vertex_1->Y;
-            float lx2 = ld->vertex_2->X;
-            float ly2 = ld->vertex_2->Y;
+            float lx1 = ld->vertex_1->x;
+            float ly1 = ld->vertex_1->y;
+            float lx2 = ld->vertex_2->x;
+            float ly2 = ld->vertex_2->y;
 
-            int x0 = (int)((HMM_MIN(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
-            int y0 = (int)((HMM_MIN(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
-            int x1 = (int)((HMM_MAX(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
-            int y1 = (int)((HMM_MAX(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
+            int x0 = (int)((epi::Min(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
+            int y0 = (int)((epi::Min(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
+            int x1 = (int)((epi::Max(lx1, lx2) - view_grid_origin_x) / view_grid_cell);
+            int y1 = (int)((epi::Max(ly1, ly2) - view_grid_origin_y) / view_grid_cell);
 
             float dx = lx2 - lx1;
             float dy = ly2 - ly1;
@@ -1574,14 +1573,14 @@ static void BuildViewGrid(void)
                 if (ld->front_sector == ld->back_sector)
                     continue;
 
-                float ly1 = ld->vertex_1->Y;
-                float ly2 = ld->vertex_2->Y;
+                float ly1 = ld->vertex_1->y;
+                float ly2 = ld->vertex_2->y;
 
                 if ((ly1 <= center_y) == (ly2 <= center_y))
                     continue;
 
-                float lx1 = ld->vertex_1->X;
-                float lx2 = ld->vertex_2->X;
+                float lx1 = ld->vertex_1->x;
+                float lx2 = ld->vertex_2->x;
 
                 crossings.push_back(lx1 + (center_y - ly1) * (lx2 - lx1) / (ly2 - ly1));
             }
@@ -1596,8 +1595,8 @@ static void BuildViewGrid(void)
 
             for (size_t k = 0; k + 1 < crossings.size(); k += 2)
             {
-                int x0 = HMM_MAX(0, (int)((crossings[k] - view_grid_origin_x) / view_grid_cell));
-                int x1 = HMM_MIN(view_grid_width - 1, (int)((crossings[k + 1] - view_grid_origin_x) / view_grid_cell));
+                int x0 = epi::Max(0, (int)((crossings[k] - view_grid_origin_x) / view_grid_cell));
+                int x1 = epi::Min(view_grid_width - 1, (int)((crossings[k + 1] - view_grid_origin_x) / view_grid_cell));
 
                 for (int x = x0; x <= x1; x++)
                 {
@@ -1726,17 +1725,17 @@ static void GridViewSectors(void)
         double half_scope = epi::RadiansFromBAM(clip_scope) * 0.5;
         double far_reach  = (renderer_far_clip.f_ + 500.0 + 32.0) / cos(half_scope);
 
-        reach = HMM_MIN(reach, far_reach);
+        reach = epi::Min(reach, far_reach);
     }
 
     double wedge_x[3] = {apex_x, apex_x + reach * cos(left), apex_x + reach * cos(right)};
     double wedge_y[3] = {apex_y, apex_y + reach * sin(left), apex_y + reach * sin(right)};
 
-    double low_y  = HMM_MIN(wedge_y[0], HMM_MIN(wedge_y[1], wedge_y[2]));
-    double high_y = HMM_MAX(wedge_y[0], HMM_MAX(wedge_y[1], wedge_y[2]));
+    double low_y  = epi::Min(wedge_y[0], epi::Min(wedge_y[1], wedge_y[2]));
+    double high_y = epi::Max(wedge_y[0], epi::Max(wedge_y[1], wedge_y[2]));
 
-    int row_low  = HMM_MAX(0, (int)floor((low_y - view_grid_origin_y) / view_grid_cell));
-    int row_high = HMM_MIN(view_grid_height - 1, (int)floor((high_y - view_grid_origin_y) / view_grid_cell));
+    int row_low  = epi::Max(0, (int)floor((low_y - view_grid_origin_y) / view_grid_cell));
+    int row_high = epi::Min(view_grid_height - 1, (int)floor((high_y - view_grid_origin_y) / view_grid_cell));
 
     for (int row = row_low; row <= row_high; row++)
     {
@@ -1756,12 +1755,12 @@ static void GridViewSectors(void)
 
         for (int k = 1; k < clipped; k++)
         {
-            span_low  = HMM_MIN(span_low, clip_x[k]);
-            span_high = HMM_MAX(span_high, clip_x[k]);
+            span_low  = epi::Min(span_low, clip_x[k]);
+            span_high = epi::Max(span_high, clip_x[k]);
         }
 
-        int column_low  = HMM_MAX(0, (int)floor((span_low - view_grid_origin_x) / view_grid_cell));
-        int column_high = HMM_MIN(view_grid_width - 1, (int)floor((span_high - view_grid_origin_x) / view_grid_cell));
+        int column_low  = epi::Max(0, (int)floor((span_low - view_grid_origin_x) / view_grid_cell));
+        int column_high = epi::Min(view_grid_width - 1, (int)floor((span_high - view_grid_origin_x) / view_grid_cell));
 
         for (int column = column_low; column <= column_high; column++)
         {
@@ -1811,14 +1810,14 @@ static bool AutomapSightLine(Line *ld, void *data)
     along.delta_x = sight->x2 - sight->x1;
     along.delta_y = sight->y2 - sight->y1;
 
-    if (PointOnDividingLineSide(ld->vertex_1->X, ld->vertex_1->Y, &along) ==
-        PointOnDividingLineSide(ld->vertex_2->X, ld->vertex_2->Y, &along))
+    if (PointOnDividingLineSide(ld->vertex_1->x, ld->vertex_1->y, &along) ==
+        PointOnDividingLineSide(ld->vertex_2->x, ld->vertex_2->y, &along))
         return true;
 
     DividingLine across;
 
-    across.x       = ld->vertex_1->X;
-    across.y       = ld->vertex_1->Y;
+    across.x       = ld->vertex_1->x;
+    across.y       = ld->vertex_1->y;
     across.delta_x = ld->delta_x;
     across.delta_y = ld->delta_y;
 
@@ -1882,18 +1881,18 @@ static void MarkAutomapLines(void)
             if (!LineSideViewAngles(line_side, &angle_L, &angle_R))
                 continue;
 
-            float dx = line_side->vertex_2->X - line_side->vertex_1->X;
-            float dy = line_side->vertex_2->Y - line_side->vertex_1->Y;
+            float dx = line_side->vertex_2->x - line_side->vertex_1->x;
+            float dy = line_side->vertex_2->y - line_side->vertex_1->y;
 
-            float length = HMM_MAX(line_side->length, 1.0f);
+            float length = epi::Max(line_side->length, 1.0f);
 
             AutomapSight sight;
 
             sight.target  = line;
             sight.x1      = view_x;
             sight.y1      = view_y;
-            sight.x2      = (line_side->vertex_1->X + line_side->vertex_2->X) * 0.5f + dy / length * 2.0f;
-            sight.y2      = (line_side->vertex_1->Y + line_side->vertex_2->Y) * 0.5f - dx / length * 2.0f;
+            sight.x2      = (line_side->vertex_1->x + line_side->vertex_2->x) * 0.5f + dy / length * 2.0f;
+            sight.y2      = (line_side->vertex_1->y + line_side->vertex_2->y) * 0.5f - dx / length * 2.0f;
             sight.blocked = false;
 
             BlockmapSegmentLineIterator(sight.x1, sight.y1, sight.x2, sight.y2, AutomapSightLine, &sight);

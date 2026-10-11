@@ -20,8 +20,8 @@
 
 #include <string.h>
 
-#include "HandmadeMath.h"
 #include "epi.h"
+#include "epi_math.h"
 namespace epi
 {
 
@@ -163,7 +163,7 @@ unsigned int SubFile::Read(void *dest, unsigned int size)
     if (pos_ >= length_)
         return 0;
 
-    size = HMM_MIN(size, (unsigned int)(length_ - pos_));
+    size = epi::Min(size, (unsigned int)(length_ - pos_));
 
     // we must always seek before a read, because other things may also be
     // reading the parent file.

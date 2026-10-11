@@ -19,11 +19,11 @@ struct MirrorViewState
     float xy_scale;
     float z_scale;
 
-    HMM_Vec2 sprite_right;
-    HMM_Vec2 sprite_forward;
+    epi::Vec2 sprite_right;
+    epi::Vec2 sprite_forward;
 
-    HMM_Vec3 view_position;
-    HMM_Vec3 view_plane;
+    epi::Vec3 view_position;
+    epi::Vec3 view_plane;
 };
 
 extern MirrorViewState mirror_view;
@@ -37,12 +37,12 @@ void RenderMirror(DrawMirror *mir);
 void MirrorRenderStatsBeginFrame(void);
 void MirrorRenderStatsRead(int *count, int *top_count, uint64_t *top_us);
 
-inline void ClipPlaneHorizontalLine(GLdouble *p, const HMM_Vec2 &s, const HMM_Vec2 &e)
+inline void ClipPlaneHorizontalLine(GLdouble *p, const epi::Vec2 &s, const epi::Vec2 &e)
 {
-    p[0] = e.Y - s.Y;
-    p[1] = s.X - e.X;
+    p[0] = e.y - s.y;
+    p[1] = s.x - e.x;
     p[2] = 0.0f;
-    p[3] = e.X * s.Y - s.X * e.Y;
+    p[3] = e.x * s.y - s.x * e.y;
 }
 
 class MirrorSet
@@ -85,12 +85,12 @@ class MirrorSet
             active_mirrors_[i].Turn(ang);
     }
 
-    HMM_Mat4 Matrix(void)
+    epi::Mat4 Matrix(void)
     {
-        HMM_Mat4 result = HMM_M4D(1.0f);
+        epi::Mat4 result = epi::IdentityMatrix();
 
         for (int i = 0; i < active_; i++)
-            result = HMM_MulM4(result, active_mirrors_[i].Matrix());
+            result = epi::MultiplyMatrices(result, active_mirrors_[i].Matrix());
 
         return result;
     }
@@ -176,7 +176,7 @@ class MirrorSet
 
         active_++;
 
-        HMM_Mat4 view_matrix = Matrix();
+        epi::Mat4 view_matrix = Matrix();
 
         mir->local_matrix = active_mirrors_[active_ - 1].Matrix();
         mir->view_matrix  = view_matrix;
@@ -213,8 +213,8 @@ class MirrorSet
         {
             LineSide *line_side = draw_mirror_->line_side;
 
-            float sdx = line_side->vertex_2->X - line_side->vertex_1->X;
-            float sdy = line_side->vertex_2->Y - line_side->vertex_1->Y;
+            float sdx = line_side->vertex_2->x - line_side->vertex_1->x;
+            float sdy = line_side->vertex_2->y - line_side->vertex_1->y;
 
             float len_p2 = line_side->length * line_side->length;
 
@@ -226,8 +226,8 @@ class MirrorSet
             yx_ = B;
             yy_ = -A;
 
-            xc_ = line_side->vertex_1->X * (1.0 - A) - line_side->vertex_1->Y * B;
-            yc_ = line_side->vertex_1->Y * (1.0 + A) - line_side->vertex_1->X * B;
+            xc_ = line_side->vertex_1->x * (1.0 - A) - line_side->vertex_1->y * B;
+            yc_ = line_side->vertex_1->y * (1.0 + A) - line_side->vertex_1->x * B;
 
             tc_ = line_side->angle << 1;
 
@@ -239,9 +239,9 @@ class MirrorSet
         float GetAlong(const Line *ld, float x, float y)
         {
             if (fabs(ld->delta_x) >= fabs(ld->delta_y))
-                return (x - ld->vertex_1->X) / ld->delta_x;
+                return (x - ld->vertex_1->x) / ld->delta_x;
             else
-                return (y - ld->vertex_1->Y) / ld->delta_y;
+                return (y - ld->vertex_1->y) / ld->delta_y;
         }
 
         void ComputePortal()
@@ -251,21 +251,21 @@ class MirrorSet
 
             EPI_ASSERT(other);
 
-            float ax1 = line_side->vertex_1->X;
-            float ay1 = line_side->vertex_1->Y;
+            float ax1 = line_side->vertex_1->x;
+            float ay1 = line_side->vertex_1->y;
 
-            float ax2 = line_side->vertex_2->X;
-            float ay2 = line_side->vertex_2->Y;
+            float ax2 = line_side->vertex_2->x;
+            float ay2 = line_side->vertex_2->y;
 
             // find corresponding coords on partner line
             float along1 = GetAlong(line_side->linedef, ax1, ay1);
             float along2 = GetAlong(line_side->linedef, ax2, ay2);
 
-            float bx1 = other->vertex_2->X - other->delta_x * along1;
-            float by1 = other->vertex_2->Y - other->delta_y * along1;
+            float bx1 = other->vertex_2->x - other->delta_x * along1;
+            float by1 = other->vertex_2->y - other->delta_y * along1;
 
-            float bx2 = other->vertex_2->X - other->delta_x * along2;
-            float by2 = other->vertex_2->Y - other->delta_y * along2;
+            float bx2 = other->vertex_2->x - other->delta_x * along2;
+            float by2 = other->vertex_2->y - other->delta_y * along2;
 
             // compute rotation angle
             tc_ = kBAMAngle180 + PointToAngle(0, 0, other->delta_x, other->delta_y) - line_side->angle;
@@ -279,7 +279,7 @@ class MirrorSet
             float a_len = line_side->length;
             float b_len = PointToDistance(bx1, by1, bx2, by2);
 
-            xy_scale_ = a_len / HMM_MAX(1, b_len);
+            xy_scale_ = a_len / epi::Max(1.0f, b_len);
 
             xx_ *= xy_scale_;
             xy_ *= xy_scale_;
@@ -296,7 +296,7 @@ class MirrorSet
             float b_h =
                 (other->front_sector->interpolated_ceiling_height - other->front_sector->interpolated_floor_height);
 
-            z_scale_ = a_h / HMM_MAX(1, b_h);
+            z_scale_ = a_h / epi::Max(1.0f, b_h);
             zc_      = line_side->front_sector->interpolated_floor_height -
                   other->front_sector->interpolated_floor_height * z_scale_;
         }
@@ -309,22 +309,22 @@ class MirrorSet
                 ComputeMirror();
         }
 
-        HMM_Mat4 Matrix() const
+        epi::Mat4 Matrix() const
         {
-            HMM_Mat4 m = {};
+            epi::Mat4 m = {};
 
-            m.Elements[0][0] = xx_;
-            m.Elements[1][0] = xy_;
-            m.Elements[3][0] = xc_;
+            m.elements[0][0] = xx_;
+            m.elements[1][0] = xy_;
+            m.elements[3][0] = xc_;
 
-            m.Elements[0][1] = yx_;
-            m.Elements[1][1] = yy_;
-            m.Elements[3][1] = yc_;
+            m.elements[0][1] = yx_;
+            m.elements[1][1] = yy_;
+            m.elements[3][1] = yc_;
 
-            m.Elements[2][2] = z_scale_;
-            m.Elements[3][2] = zc_;
+            m.elements[2][2] = z_scale_;
+            m.elements[3][2] = zc_;
 
-            m.Elements[3][3] = 1.0f;
+            m.elements[3][3] = 1.0f;
 
             return m;
         }
@@ -343,25 +343,25 @@ class MirrorSet
         }
     };
 
-    void ComputeViewSpace(DrawMirror *mir, const HMM_Mat4 &view_matrix)
+    void ComputeViewSpace(DrawMirror *mir, const epi::Mat4 &view_matrix)
     {
-        float xx = view_matrix.Elements[0][0];
-        float xy = view_matrix.Elements[1][0];
-        float yx = view_matrix.Elements[0][1];
-        float yy = view_matrix.Elements[1][1];
+        float xx = view_matrix.elements[0][0];
+        float xy = view_matrix.elements[1][0];
+        float yx = view_matrix.elements[0][1];
+        float yy = view_matrix.elements[1][1];
 
-        float zs = view_matrix.Elements[2][2];
+        float zs = view_matrix.elements[2][2];
 
-        float xc = view_matrix.Elements[3][0];
-        float yc = view_matrix.Elements[3][1];
-        float zc = view_matrix.Elements[3][2];
+        float xc = view_matrix.elements[3][0];
+        float yc = view_matrix.elements[3][1];
+        float zc = view_matrix.elements[3][2];
 
         float determinant = xx * yy - xy * yx;
 
-        HMM_Vec2 right   = {{view_sine, -view_cosine}};
-        HMM_Vec2 forward = {{view_cosine, view_sine}};
+        epi::Vec2 right   = {view_sine, -view_cosine};
+        epi::Vec2 forward = {view_cosine, view_sine};
 
-        mir->view_position = {{view_x, view_y, view_z}};
+        mir->view_position = {view_x, view_y, view_z};
         mir->view_plane    = view_forward;
 
         if (epi::AlmostEquals(determinant, 0.0f) || epi::AlmostEquals(zs, 0.0f))
@@ -376,22 +376,22 @@ class MirrorSet
         float iyx = -yx / determinant;
         float iyy = xx / determinant;
 
-        HMM_Vec2 inverse_right   = {{ixx * right.X + ixy * right.Y, iyx * right.X + iyy * right.Y}};
-        HMM_Vec2 inverse_forward = {{ixx * forward.X + ixy * forward.Y, iyx * forward.X + iyy * forward.Y}};
+        epi::Vec2 inverse_right   = {ixx * right.x + ixy * right.y, iyx * right.x + iyy * right.y};
+        epi::Vec2 inverse_forward = {ixx * forward.x + ixy * forward.y, iyx * forward.x + iyy * forward.y};
 
-        mir->sprite_right   = HMM_NormV2(inverse_right);
-        mir->sprite_forward = HMM_NormV2(inverse_forward);
+        mir->sprite_right   = epi::NormalizeVector(inverse_right);
+        mir->sprite_forward = epi::NormalizeVector(inverse_forward);
 
         float ox = view_x - xc;
         float oy = view_y - yc;
 
-        mir->view_position = {{ixx * ox + ixy * oy, iyx * ox + iyy * oy, (view_z - zc) / zs}};
+        mir->view_position = {ixx * ox + ixy * oy, iyx * ox + iyy * oy, (view_z - zc) / zs};
 
-        mir->view_plane = {{xx * view_forward.X + yx * view_forward.Y, xy * view_forward.X + yy * view_forward.Y,
-                            zs * view_forward.Z}};
+        mir->view_plane = {xx * view_forward.x + yx * view_forward.y, xy * view_forward.x + yy * view_forward.y,
+                           zs * view_forward.z};
     }
 
-    void ComputeNearPlane(DrawMirror *mir, const HMM_Mat4 &view_matrix)
+    void ComputeNearPlane(DrawMirror *mir, const epi::Mat4 &view_matrix)
     {
         mir->near_plane = {};
 
@@ -400,33 +400,35 @@ class MirrorSet
 
         MirrorInfo &inner = active_mirrors_[active_ - 1];
 
-        HMM_Vec2 v1, v2;
+        epi::Vec2 v1, v2;
 
-        v1 = {{inner.draw_mirror_->line_side->vertex_1->X, inner.draw_mirror_->line_side->vertex_1->Y}};
-        v2 = {{inner.draw_mirror_->line_side->vertex_2->X, inner.draw_mirror_->line_side->vertex_2->Y}};
+        v1 = {inner.draw_mirror_->line_side->vertex_1->x, inner.draw_mirror_->line_side->vertex_1->y};
+        v2 = {inner.draw_mirror_->line_side->vertex_2->x, inner.draw_mirror_->line_side->vertex_2->y};
 
         for (int k = active_ - 2; k >= 0; k--)
         {
             if (!active_mirrors_[k].draw_mirror_->is_portal)
             {
-                HMM_Vec2 tmp;
+                epi::Vec2 tmp;
                 tmp = v1;
                 v1  = v2;
                 v2  = tmp;
             }
 
-            active_mirrors_[k].Transform(v1.X, v1.Y);
-            active_mirrors_[k].Transform(v2.X, v2.Y);
+            active_mirrors_[k].Transform(v1.x, v1.y);
+            active_mirrors_[k].Transform(v2.x, v2.y);
         }
 
         GLdouble p[4];
 
         ClipPlaneHorizontalLine(p, v2, v1);
 
-        HMM_Vec4 plane = HMM_V4((float)p[0], (float)p[1], (float)p[2], (float)p[3]);
+        epi::Vec4 plane = epi::Vec4{(float)p[0], (float)p[1], (float)p[2], (float)p[3]};
 
-        for (int32_t e = 0; e < 4; e++)
-            mir->near_plane.Elements[e] = HMM_DotV4(view_matrix.Columns[e], plane);
+        mir->near_plane.x = epi::DotProduct(epi::MatrixColumn(view_matrix, 0), plane);
+        mir->near_plane.y = epi::DotProduct(epi::MatrixColumn(view_matrix, 1), plane);
+        mir->near_plane.z = epi::DotProduct(epi::MatrixColumn(view_matrix, 2), plane);
+        mir->near_plane.w = epi::DotProduct(epi::MatrixColumn(view_matrix, 3), plane);
     }
 
     int32_t active_ = 0;

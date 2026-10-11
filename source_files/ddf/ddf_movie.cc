@@ -77,7 +77,7 @@ static void MovieStartEntry(const char *name, bool extend)
 static void MovieParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("MOVIE_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("MOVIE_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -96,7 +96,7 @@ static void MovieFinishEntry(void)
 
 static void MovieClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in movies.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in movies.ddf\n");
 }
 
 void DDFReadMovies(const std::string &data)

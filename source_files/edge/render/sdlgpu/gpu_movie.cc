@@ -185,14 +185,14 @@ void MovieDrawFrame(float x1, float y1, float x2, float y2, float luma_scale_x, 
 
     EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
 
-    quad[0].position               = {{x1, y1, 0.0f}};
-    quad[0].texture_coordinates[0] = {{0.0f, 0.0f}};
-    quad[1].position               = {{x2, y1, 0.0f}};
-    quad[1].texture_coordinates[0] = {{1.0f, 0.0f}};
-    quad[2].position               = {{x2, y2, 0.0f}};
-    quad[2].texture_coordinates[0] = {{1.0f, 1.0f}};
-    quad[3].position               = {{x1, y2, 0.0f}};
-    quad[3].texture_coordinates[0] = {{0.0f, 1.0f}};
+    quad[0].position               = {x1, y1, 0.0f};
+    quad[0].texture_coordinates[0] = {0.0f, 0.0f};
+    quad[1].position               = {x2, y1, 0.0f};
+    quad[1].texture_coordinates[0] = {1.0f, 0.0f};
+    quad[2].position               = {x2, y2, 0.0f};
+    quad[2].texture_coordinates[0] = {1.0f, 1.0f};
+    quad[3].position               = {x1, y2, 0.0f};
+    quad[3].texture_coordinates[0] = {0.0f, 1.0f};
 
     float plane_scales[4] = {luma_scale_x, luma_scale_y, chroma_scale_x, chroma_scale_y};
 

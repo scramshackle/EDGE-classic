@@ -1,12 +1,12 @@
 
 #pragma once
 
-#include "HandmadeMath.h"
 #include "con_var.h"
 #include "dm_defs.h"
 #include "epi.h"
-#include "epi_math.h"
 #include "epi_color.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 
 extern ConsoleVariable fliplevels;
 extern ConsoleVariable render_scale;
@@ -44,25 +44,24 @@ enum ClipVolumeDepthRange
     kClipVolumeNegativeWToW
 };
 
-inline HMM_Mat4 ObliqueNearPlaneProjection(const HMM_Mat4 &projection, const HMM_Vec4 &eye_plane,
-                                           ClipVolumeDepthRange range)
+inline epi::Mat4 ObliqueNearPlaneProjection(const epi::Mat4 &projection, const epi::Vec4 &eye_plane,
+                                            ClipVolumeDepthRange range)
 {
-    if (epi::AlmostEquals(projection.Elements[0][0], 0.0f) ||
-        epi::AlmostEquals(projection.Elements[1][1], 0.0f) ||
-        epi::AlmostEquals(projection.Elements[3][2], 0.0f))
+    if (epi::AlmostEquals(projection.elements[0][0], 0.0f) || epi::AlmostEquals(projection.elements[1][1], 0.0f) ||
+        epi::AlmostEquals(projection.elements[3][2], 0.0f))
         return projection;
 
-    float sign_x = (eye_plane.X > 0.0f) ? 1.0f : ((eye_plane.X < 0.0f) ? -1.0f : 0.0f);
-    float sign_y = (eye_plane.Y > 0.0f) ? 1.0f : ((eye_plane.Y < 0.0f) ? -1.0f : 0.0f);
+    float sign_x = (eye_plane.x > 0.0f) ? 1.0f : ((eye_plane.x < 0.0f) ? -1.0f : 0.0f);
+    float sign_y = (eye_plane.y > 0.0f) ? 1.0f : ((eye_plane.y < 0.0f) ? -1.0f : 0.0f);
 
-    HMM_Vec4 corner;
+    epi::Vec4 corner;
 
-    corner.X = (sign_x + projection.Elements[2][0]) / projection.Elements[0][0];
-    corner.Y = (sign_y + projection.Elements[2][1]) / projection.Elements[1][1];
-    corner.Z = -1.0f;
-    corner.W = (1.0f + projection.Elements[2][2]) / projection.Elements[3][2];
+    corner.x = (sign_x + projection.elements[2][0]) / projection.elements[0][0];
+    corner.y = (sign_y + projection.elements[2][1]) / projection.elements[1][1];
+    corner.z = -1.0f;
+    corner.w = (1.0f + projection.elements[2][2]) / projection.elements[3][2];
 
-    float denominator = HMM_DotV4(eye_plane, corner);
+    float denominator = epi::DotProduct(eye_plane, corner);
 
     if (epi::AlmostEquals(denominator, 0.0f))
         return projection;
@@ -70,24 +69,26 @@ inline HMM_Mat4 ObliqueNearPlaneProjection(const HMM_Mat4 &projection, const HMM
     float near_bias = (range == kClipVolumeNegativeWToW) ? 1.0f : 0.0f;
     float scale     = (1.0f + near_bias) / denominator;
 
-    HMM_Mat4 result = projection;
+    epi::Mat4 result = projection;
 
-    result.Elements[0][2] = eye_plane.X * scale;
-    result.Elements[1][2] = eye_plane.Y * scale;
-    result.Elements[2][2] = eye_plane.Z * scale + near_bias;
-    result.Elements[3][2] = eye_plane.W * scale;
+    result.elements[0][2] = eye_plane.x * scale;
+    result.elements[1][2] = eye_plane.y * scale;
+    result.elements[2][2] = eye_plane.z * scale + near_bias;
+    result.elements[3][2] = eye_plane.w * scale;
 
     return result;
 }
 
-inline HMM_Vec4 EyeSpacePlane(const HMM_Mat4 &model_view, const HMM_Vec4 &plane)
+inline epi::Vec4 EyeSpacePlane(const epi::Mat4 &model_view, const epi::Vec4 &plane)
 {
-    HMM_Mat4 inverse = HMM_InvGeneralM4(model_view);
+    epi::Mat4 inverse = epi::InverseMatrix(model_view);
 
-    HMM_Vec4 result;
+    epi::Vec4 result;
 
-    for (int32_t i = 0; i < 4; i++)
-        result.Elements[i] = HMM_DotV4(inverse.Columns[i], plane);
+    result.x = epi::DotProduct(epi::MatrixColumn(inverse, 0), plane);
+    result.y = epi::DotProduct(epi::MatrixColumn(inverse, 1), plane);
+    result.z = epi::DotProduct(epi::MatrixColumn(inverse, 2), plane);
+    result.w = epi::DotProduct(epi::MatrixColumn(inverse, 3), plane);
 
     return result;
 }
@@ -139,11 +140,11 @@ class RenderBackend
 
     virtual void SetRenderLayer(RenderLayer layer, bool clear_depth = false) = 0;
 
-    virtual void PushModelMatrix(const HMM_Mat4 &matrix) = 0;
+    virtual void PushModelMatrix(const epi::Mat4 &matrix) = 0;
 
     virtual void PopModelMatrix() = 0;
 
-    virtual void SetObliqueNearPlane(bool enabled, const HMM_Vec4 &plane) = 0;
+    virtual void SetObliqueNearPlane(bool enabled, const epi::Vec4 &plane) = 0;
 
     virtual bool OitSinglePass()
     {
@@ -190,9 +191,9 @@ class RenderBackend
 
     virtual void GetPassInfo(PassInfo &info) = 0;
 
-    virtual HMM_Mat4 WorldViewProjection() = 0;
+    virtual epi::Mat4 WorldViewProjection() = 0;
 
-    virtual HMM_Mat4 WorldModelView() = 0;
+    virtual epi::Mat4 WorldModelView() = 0;
 
     virtual void UploadLightGrid(const LightGrid *grid) = 0;
 

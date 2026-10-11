@@ -384,22 +384,22 @@ void HUDPushScissor(float x1, float y1, float x2, float y2, bool expand)
     {
         render_state->Enable(GL_SCISSOR_TEST);
 
-        sx1 = HMM_MAX(sx1, 0);
-        sy1 = HMM_MAX(sy1, 0);
+        sx1 = epi::Max(sx1, 0);
+        sy1 = epi::Max(sy1, 0);
 
-        sx2 = HMM_MIN(sx2, current_screen_width);
-        sy2 = HMM_MIN(sy2, current_screen_height);
+        sx2 = epi::Min(sx2, current_screen_width);
+        sy2 = epi::Min(sy2, current_screen_height);
     }
     else
     {
         // clip to previous scissor
         int *xy = scissor_stack[scissor_stack_top - 1];
 
-        sx1 = HMM_MAX(sx1, xy[0]);
-        sy1 = HMM_MAX(sy1, xy[1]);
+        sx1 = epi::Max(sx1, xy[0]);
+        sy1 = epi::Max(sy1, xy[1]);
 
-        sx2 = HMM_MIN(sx2, xy[2]);
-        sy2 = HMM_MIN(sy2, xy[3]);
+        sx2 = epi::Min(sx2, xy[2]);
+        sy2 = epi::Min(sy2, xy[3]);
     }
 
     EPI_ASSERT(sx2 >= sx1);
@@ -523,17 +523,17 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         render_unit_filter = -1;
 
         glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty2}};
-        glvert++->position             = {{hx1, hy1, 0}};
+        glvert->texture_coordinates[0] = {tx1, ty2};
+        glvert++->position             = {hx1, hy1, 0};
         glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty2}};
-        glvert++->position             = {{hx2, hy1, 0}};
+        glvert->texture_coordinates[0] = {tx2, ty2};
+        glvert++->position             = {hx2, hy1, 0};
         glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx2, ty1}};
-        glvert++->position             = {{hx2, hy2, 0}};
+        glvert->texture_coordinates[0] = {tx2, ty1};
+        glvert++->position             = {hx2, hy2, 0};
         glvert->rgba                   = unit_col;
-        glvert->texture_coordinates[0] = {{tx1, ty1}};
-        glvert->position               = {{hx1, hy2, 0}};
+        glvert->texture_coordinates[0] = {tx1, ty1};
+        glvert->position               = {hx1, hy2, 0};
 
         EndRenderUnit(4);
 
@@ -546,8 +546,8 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
     AtlasRegion region;
 
     if (!scrolling && current_image_blur <= 0.0f && image->liquid_type_ == kLiquidImageNone &&
-        HMM_MIN(tx1, tx2) >= 0.0f && HMM_MAX(tx1, tx2) <= 1.0f && HMM_MIN(ty1, ty2) >= 0.0f &&
-        HMM_MAX(ty1, ty2) <= 1.0f && AtlasImageRegion(image->animation_.current, &region))
+        epi::Min(tx1, tx2) >= 0.0f && epi::Max(tx1, tx2) <= 1.0f && epi::Min(ty1, ty2) >= 0.0f &&
+        epi::Max(ty1, ty2) <= 1.0f && AtlasImageRegion(image->animation_.current, &region))
     {
         tex_id = region.texture;
 
@@ -589,7 +589,7 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
     render_unit_whiten = do_whiten || current_image_whiten;
 
     if (current_image_blur > 0.0f)
-        render_unit_blur = HMM_V4(current_image_blur, 0.0f, (float)image->width_, (float)image->height_);
+        render_unit_blur = epi::Vec4{current_image_blur, 0.0f, (float)image->width_, (float)image->height_};
 
     render_unit_liquid = LiquidShaderParameters(image, hud_tic / 35.0f);
 
@@ -597,17 +597,17 @@ void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image,
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx1, ty1}};
-    glvert++->position             = {{hx1, hy1, 0}};
+    glvert->texture_coordinates[0] = {tx1, ty1};
+    glvert++->position             = {hx1, hy1, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx2, ty1}};
-    glvert++->position             = {{hx2, hy1, 0}};
+    glvert->texture_coordinates[0] = {tx2, ty1};
+    glvert++->position             = {hx2, hy1, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx2, ty2}};
-    glvert++->position             = {{hx2, hy2, 0}};
+    glvert->texture_coordinates[0] = {tx2, ty2};
+    glvert++->position             = {hx2, hy2, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx1, ty2}};
-    glvert->position               = {{hx1, hy2, 0}};
+    glvert->texture_coordinates[0] = {tx1, ty2};
+    glvert->position               = {hx1, hy2, 0};
 
     EndRenderUnit(4);
 
@@ -650,17 +650,17 @@ void HUDRawFromTexID(float hx1, float hy1, float hx2, float hy2, unsigned int te
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx1, ty1}};
-    glvert++->position             = {{hx1, hy1, 0}};
+    glvert->texture_coordinates[0] = {tx1, ty1};
+    glvert++->position             = {hx1, hy1, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx2, ty1}};
-    glvert++->position             = {{hx2, hy1, 0}};
+    glvert->texture_coordinates[0] = {tx2, ty1};
+    glvert++->position             = {hx2, hy1, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx2, ty2}};
-    glvert++->position             = {{hx2, hy2, 0}};
+    glvert->texture_coordinates[0] = {tx2, ty2};
+    glvert++->position             = {hx2, hy2, 0};
     glvert->rgba                   = unit_col;
-    glvert->texture_coordinates[0] = {{tx1, ty2}};
-    glvert->position               = {{hx1, hy2, 0}};
+    glvert->texture_coordinates[0] = {tx1, ty2};
+    glvert->position               = {hx1, hy2, 0};
 
     EndRenderUnit(4);
 
@@ -868,13 +868,13 @@ void HUDSolidBox(float x1, float y1, float x2, float y2, RGBAColor col)
     epi::SetRGBAAlpha(unit_col, current_alpha);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, 0}};
+    glvert++->position = {x1, y1, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y2, 0}};
+    glvert++->position = {x1, y2, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y2, 0}};
+    glvert++->position = {x2, y2, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y1, 0}};
+    glvert++->position = {x2, y1, 0};
 
     EndRenderUnit(4);
 
@@ -901,9 +901,9 @@ void HUDSolidLine(float x1, float y1, float x2, float y2, RGBAColor col)
         BeginRenderUnit(GL_LINES, 2, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, 0}};
+    glvert++->position = {x1, y1, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x2, y2, 0}};
+    glvert->position   = {x2, y2, 0};
 
     EndRenderUnit(2);
 
@@ -934,52 +934,52 @@ void HUDThinBox(float x1, float y1, float x2, float y2, RGBAColor col, float thi
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, 0}};
+    glvert++->position = {x1, y1, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y2, 0}};
+    glvert++->position = {x1, y2, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1 + 2 + thickness, y2, 0}};
+    glvert++->position = {x1 + 2 + thickness, y2, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x1 + 2 + thickness, y1, 0}};
+    glvert->position   = {x1 + 2 + thickness, y1, 0};
 
     EndRenderUnit(4);
 
     glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2 - 2 - thickness, y1, 0}};
+    glvert++->position = {x2 - 2 - thickness, y1, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2 - 2 - thickness, y2, 0}};
+    glvert++->position = {x2 - 2 - thickness, y2, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y2, 0}};
+    glvert++->position = {x2, y2, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x2, y1, 0}};
+    glvert->position   = {x2, y1, 0};
 
     EndRenderUnit(4);
 
     glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1 + 2 + thickness, y1, 0}};
+    glvert++->position = {x1 + 2 + thickness, y1, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1 + 2 + thickness, y1 + 2 + thickness, 0}};
+    glvert++->position = {x1 + 2 + thickness, y1 + 2 + thickness, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2 - 2 - thickness, y1 + 2 + thickness, 0}};
+    glvert++->position = {x2 - 2 - thickness, y1 + 2 + thickness, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x2 - 2 - thickness, y1, 0}};
+    glvert->position   = {x2 - 2 - thickness, y1, 0};
 
     EndRenderUnit(4);
 
     glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1 + 2 + thickness, y2 - 2 - thickness, 0}};
+    glvert++->position = {x1 + 2 + thickness, y2 - 2 - thickness, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1 + 2 + thickness, y2, 0}};
+    glvert++->position = {x1 + 2 + thickness, y2, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2 - 2 - thickness, y2, 0}};
+    glvert++->position = {x2 - 2 - thickness, y2, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x2 - 2 - thickness, y2 - 2 - thickness, 0}};
+    glvert->position   = {x2 - 2 - thickness, y2 - 2 - thickness, 0};
 
     EndRenderUnit(4);
 
@@ -1008,22 +1008,22 @@ void HUDGradientBox(float x1, float y1, float x2, float y2, RGBAColor *cols)
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, blend);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y1, 0}};
+    glvert++->position = {x1, y1, 0};
 
     unit_col = cols[0];
     epi::SetRGBAAlpha(unit_col, current_alpha);
     glvert->rgba       = unit_col;
-    glvert++->position = {{x1, y2, 0}};
+    glvert++->position = {x1, y2, 0};
 
     unit_col = cols[2];
     epi::SetRGBAAlpha(unit_col, current_alpha);
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y2, 0}};
+    glvert++->position = {x2, y2, 0};
 
     unit_col = cols[3];
     epi::SetRGBAAlpha(unit_col, current_alpha);
     glvert->rgba       = unit_col;
-    glvert++->position = {{x2, y1, 0}};
+    glvert++->position = {x2, y1, 0};
 
     EndRenderUnit(4);
 
@@ -1284,7 +1284,7 @@ void HUDDrawText(float x, float y, const char *str, float size)
                 {
                     xoff            = cur_font->GetCharXOffset(str[i]);
                     float off_check = cur_font->GetCharYOffset(str[i]);
-                    if (HMM_ABS(off_check) > HMM_ABS(yoff))
+                    if (epi::Abs(off_check) > epi::Abs(yoff))
                         yoff = off_check;
                 }
                 total_w += ((size > 0 ? size * cur_font->patch_font_cache_.ratio + cur_font->spacing_
@@ -1294,7 +1294,7 @@ void HUDDrawText(float x, float y, const char *str, float size)
             }
         }
 
-        line_h += HMM_ABS(yoff) * current_scale;
+        line_h += epi::Abs(yoff) * current_scale;
 
         if (current_x_alignment >= 0)
         {
@@ -1376,8 +1376,8 @@ void HUDDrawQuitScreen()
     if (quit_lines[0] && quit_lines[0]->endoom_bytes_.size() == kENDOOMBytesPerLine)
     {
         EPI_ASSERT(endoom_font);
-        float FNX = HMM_MIN((float)current_screen_width / 80.0f,
-                            320.0f / 80.0f * ((float)current_screen_height * 0.90f / 200.0f));
+        float FNX = epi::Min((float)current_screen_width / 80.0f,
+                             320.0f / 80.0f * ((float)current_screen_height * 0.90f / 200.0f));
         float FNY = FNX * 2;
         StartUnitBatch(false);
         RendererVertex *endoom_vert       = BeginRenderUnit(GL_QUADS, kENDOOMTotalVerts, GL_MODULATE, 0,
@@ -1387,20 +1387,20 @@ void HUDDrawQuitScreen()
         for (int i = 0; i < kENDOOMLines; i++)
         {
             float cy = (float)current_screen_height - ((i + 1) * FNY);
-            float cx = HMM_MAX(0, (((float)current_screen_width - (FNX * 80.0f)) / 2.0f));
+            float cx = epi::Max(0.0f, (((float)current_screen_width - (FNX * 80.0f)) / 2.0f));
             for (int j = 1; j < kENDOOMBytesPerLine; j += 2)
             {
                 uint8_t   info     = quit_lines[i]->endoom_bytes_[j];
                 RGBAColor unit_col = kENDOOMColors[(info >> 4) & 7];
 
                 endoom_vert->rgba       = unit_col;
-                endoom_vert++->position = {{cx, cy, 0}};
+                endoom_vert++->position = {cx, cy, 0};
                 endoom_vert->rgba       = unit_col;
-                endoom_vert++->position = {{cx, cy + FNX * 2, 0}};
+                endoom_vert++->position = {cx, cy + FNX * 2, 0};
                 endoom_vert->rgba       = unit_col;
-                endoom_vert++->position = {{cx + FNX, cy + FNX * 2, 0}};
+                endoom_vert++->position = {cx + FNX, cy + FNX * 2, 0};
                 endoom_vert->rgba       = unit_col;
-                endoom_vert++->position = {{cx + FNX, cy, 0}};
+                endoom_vert++->position = {cx + FNX, cy, 0};
 
                 cx += FNX;
                 endoom_vert_count += 4;
@@ -1430,7 +1430,7 @@ void HUDDrawQuitScreen()
         for (int i = 0; i < kENDOOMLines; i++)
         {
             float cy = (float)current_screen_height - ((i + 1) * FNY);
-            float cx = HMM_MAX(0, (((float)current_screen_width - (FNX * 80.0f)) / 2.0f));
+            float cx = epi::Max(0.0f, (((float)current_screen_width - (FNX * 80.0f)) / 2.0f));
             for (int j = 0; j < kENDOOMBytesPerLine; j += 2)
             {
                 uint8_t info = quit_lines[i]->endoom_bytes_[j + 1];
@@ -1455,17 +1455,17 @@ void HUDDrawQuitScreen()
                 float width_adjust = FNX / 2 + .5;
 
                 endoom_vert->rgba                   = unit_col;
-                endoom_vert->texture_coordinates[0] = {{tx1, ty1}};
-                endoom_vert++->position             = {{cx - width_adjust, cy, 0}};
+                endoom_vert->texture_coordinates[0] = {tx1, ty1};
+                endoom_vert++->position             = {cx - width_adjust, cy, 0};
                 endoom_vert->rgba                   = unit_col;
-                endoom_vert->texture_coordinates[0] = {{tx2, ty1}};
-                endoom_vert++->position             = {{cx + FNX + width_adjust, cy, 0}};
+                endoom_vert->texture_coordinates[0] = {tx2, ty1};
+                endoom_vert++->position             = {cx + FNX + width_adjust, cy, 0};
                 endoom_vert->rgba                   = unit_col;
-                endoom_vert->texture_coordinates[0] = {{tx2, ty2}};
-                endoom_vert++->position             = {{cx + FNX + width_adjust, cy + FNX * 2, 0}};
+                endoom_vert->texture_coordinates[0] = {tx2, ty2};
+                endoom_vert++->position             = {cx + FNX + width_adjust, cy + FNX * 2, 0};
                 endoom_vert->rgba                   = unit_col;
-                endoom_vert->texture_coordinates[0] = {{tx1, ty2}};
-                endoom_vert++->position             = {{cx - width_adjust, cy + FNX * 2, 0}};
+                endoom_vert->texture_coordinates[0] = {tx1, ty2};
+                endoom_vert++->position             = {cx - width_adjust, cy + FNX * 2, 0};
 
                 cx += FNX;
                 endoom_vert_count += 4;

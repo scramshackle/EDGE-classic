@@ -198,8 +198,8 @@ static void DoSet(BAMAngle low, BAMAngle high)
         // some subsequent ranges in the list.  When that happens,
         // we must remove them (and adjust the current range).
 
-        AR->low  = HMM_MIN(AR->low, low);
-        AR->high = HMM_MAX(AR->high, high);
+        AR->low  = epi::Min(AR->low, low);
+        AR->high = epi::Max(AR->high, high);
 
 #ifdef EDGE_DEBUG_OCCLUSION
         if (AR->prev)
@@ -209,7 +209,7 @@ static void DoSet(BAMAngle low, BAMAngle high)
 #endif
         while (AR->next && AR->high >= AR->next->low)
         {
-            AR->high = HMM_MAX(AR->high, AR->next->high);
+            AR->high = epi::Max(AR->high, AR->next->high);
 
             RemoveRange(AR->next);
         }

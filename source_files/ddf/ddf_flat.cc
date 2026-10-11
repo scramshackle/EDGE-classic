@@ -83,7 +83,7 @@ static void FlatFinishEntry(void)
 static void FlatParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("FLAT_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("FLAT_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);

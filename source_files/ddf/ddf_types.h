@@ -603,8 +603,8 @@ class WeaponDefinition
   public:
     inline int KeyPri(int idx) const // next/prev order value
     {
-        int key = 1 + HMM_MAX(-1, HMM_MIN(10, bind_key_));
-        int pri = 1 + HMM_MAX(-1, HMM_MIN(900, priority_));
+        int key = 1 + epi::Max(-1, epi::Min(10, bind_key_));
+        int pri = 1 + epi::Max(-1, epi::Min(900, priority_));
 
         return (pri * 20 + key) * 100 + idx;
     }

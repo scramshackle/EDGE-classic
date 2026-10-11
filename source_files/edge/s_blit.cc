@@ -33,6 +33,7 @@
 #include "dm_state.h"
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
 #include "i_sound.h"
 #include "i_system.h"
 #include "m_misc.h"
@@ -139,28 +140,28 @@ void UpdateSounds(MapObject *listener, BAMAngle angle)
     listen_y = listener ? listener->y : 0;
     listen_z = listener ? listener->z : 0;
 
-    spatial_listener.position = {{listen_x, listen_z, -listen_y}};
+    spatial_listener.position = {listen_x, listen_z, -listen_y};
 
     if (listener)
     {
         if (fliplevels.d_)
         {
-            spatial_listener.direction.X = epi::BAMCos(angle - kBAMAngle180);
-            spatial_listener.direction.Y = epi::BAMTan(listener->vertical_angle_);
-            spatial_listener.direction.Z = -epi::BAMSin(angle);
+            spatial_listener.direction.x = epi::BAMCos(angle - kBAMAngle180);
+            spatial_listener.direction.y = epi::BAMTan(listener->vertical_angle_);
+            spatial_listener.direction.z = -epi::BAMSin(angle);
         }
         else
         {
-            spatial_listener.direction.X = epi::BAMCos(angle);
-            spatial_listener.direction.Y = epi::BAMTan(listener->vertical_angle_);
-            spatial_listener.direction.Z = -epi::BAMSin(angle);
+            spatial_listener.direction.x = epi::BAMCos(angle);
+            spatial_listener.direction.y = epi::BAMTan(listener->vertical_angle_);
+            spatial_listener.direction.z = -epi::BAMSin(angle);
         }
     }
     else
     {
-        spatial_listener.direction.X = 0;
-        spatial_listener.direction.Y = 0;
-        spatial_listener.direction.Z = 0;
+        spatial_listener.direction.x = 0;
+        spatial_listener.direction.y = 0;
+        spatial_listener.direction.z = 0;
     }
 
     for (int i = 0; i < total_channels; i++)
@@ -177,7 +178,7 @@ void UpdateSounds(MapObject *listener, BAMAngle angle)
                     chan->minimum_distance_ = kMinimumOccludedSoundClipDistance;
             }
 
-            HMM_Vec3 emitter = {{chan->position_->x, chan->position_->z, -chan->position_->y}};
+            epi::Vec3 emitter = {chan->position_->x, chan->position_->z, -chan->position_->y};
 
             chan->spatializer_.Update(spatial_listener, emitter, chan->minimum_distance_, kMaximumSoundClipDistance,
                                       chan->volume_);

@@ -2,36 +2,37 @@
 
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
 
-HMM_Mat4 ModelBuildTransform(float xy_scale, float z_scale, float bias, const HMM_Vec2 &mouselook_x_matrix,
-                             const HMM_Vec2 &mouselook_z_matrix, const HMM_Vec2 &rotation_x_matrix,
-                             const HMM_Vec2 &rotation_y_matrix, float x, float y, float z)
+epi::Mat4 ModelBuildTransform(float xy_scale, float z_scale, float bias, const epi::Vec2 &mouselook_x_matrix,
+                              const epi::Vec2 &mouselook_z_matrix, const epi::Vec2 &rotation_x_matrix,
+                              const epi::Vec2 &rotation_y_matrix, float x, float y, float z)
 {
     float scale_x = xy_scale;
     float scale_y = xy_scale;
     float scale_z = z_scale;
 
-    HMM_Mat4 result = {};
+    epi::Mat4 result = {};
 
-    result.Elements[0][0] = scale_x * mouselook_x_matrix.X * rotation_x_matrix.X;
-    result.Elements[0][1] = scale_x * mouselook_x_matrix.X * rotation_y_matrix.X;
-    result.Elements[0][2] = scale_x * mouselook_z_matrix.X;
-    result.Elements[0][3] = 0.0f;
+    result.elements[0][0] = scale_x * mouselook_x_matrix.x * rotation_x_matrix.x;
+    result.elements[0][1] = scale_x * mouselook_x_matrix.x * rotation_y_matrix.x;
+    result.elements[0][2] = scale_x * mouselook_z_matrix.x;
+    result.elements[0][3] = 0.0f;
 
-    result.Elements[1][0] = scale_y * rotation_x_matrix.Y;
-    result.Elements[1][1] = scale_y * rotation_y_matrix.Y;
-    result.Elements[1][2] = 0.0f;
-    result.Elements[1][3] = 0.0f;
+    result.elements[1][0] = scale_y * rotation_x_matrix.y;
+    result.elements[1][1] = scale_y * rotation_y_matrix.y;
+    result.elements[1][2] = 0.0f;
+    result.elements[1][3] = 0.0f;
 
-    result.Elements[2][0] = scale_z * mouselook_x_matrix.Y * rotation_x_matrix.X;
-    result.Elements[2][1] = scale_z * mouselook_x_matrix.Y * rotation_y_matrix.X;
-    result.Elements[2][2] = scale_z * mouselook_z_matrix.Y;
-    result.Elements[2][3] = 0.0f;
+    result.elements[2][0] = scale_z * mouselook_x_matrix.y * rotation_x_matrix.x;
+    result.elements[2][1] = scale_z * mouselook_x_matrix.y * rotation_y_matrix.x;
+    result.elements[2][2] = scale_z * mouselook_z_matrix.y;
+    result.elements[2][3] = 0.0f;
 
-    result.Elements[3][0] = x + bias * scale_z * mouselook_x_matrix.Y * rotation_x_matrix.X;
-    result.Elements[3][1] = y + bias * scale_z * mouselook_x_matrix.Y * rotation_y_matrix.X;
-    result.Elements[3][2] = z + bias * scale_z * mouselook_z_matrix.Y;
-    result.Elements[3][3] = 1.0f;
+    result.elements[3][0] = x + bias * scale_z * mouselook_x_matrix.y * rotation_x_matrix.x;
+    result.elements[3][1] = y + bias * scale_z * mouselook_x_matrix.y * rotation_y_matrix.x;
+    result.elements[3][2] = z + bias * scale_z * mouselook_z_matrix.y;
+    result.elements[3][3] = 1.0f;
 
     return result;
 }

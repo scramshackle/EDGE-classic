@@ -20,8 +20,8 @@
 
 #include <math.h>
 
-#include "HandmadeMath.h"
 #include "epi.h"
+#include "epi_math.h"
 
 LowPassEffect::LowPassEffect()
     : b0_(0.0f), b1_(0.0f), b2_(0.0f), a1_(0.0f), a2_(0.0f), channels_(kMaximumEffectChannels), ready_(false)
@@ -47,8 +47,8 @@ bool LowPassEffect::Setup(int frequency, int channels, float cutoff)
 
     channels_ = channels;
 
-    double q = 1.0 / (2.0 * cos(HMM_PI / 4.0));
-    double w = 2.0 * HMM_PI * (double)cutoff / (double)frequency;
+    double q = 1.0 / (2.0 * cos(epi::kPi / 4.0));
+    double w = 2.0 * epi::kPi * (double)cutoff / (double)frequency;
     double s = sin(w);
     double c = cos(w);
     double a = s / (2.0 * q);
@@ -295,7 +295,7 @@ bool ReverbEffect::Setup(int frequency, int channels)
 
     modulation_depth_ = kReverbModulationDepth;
 
-    low_damping_coefficient_ = (float)exp(-2.0 * HMM_PI * (double)kReverbLowDampingCrossover / (double)frequency);
+    low_damping_coefficient_ = (float)exp(-2.0 * epi::kPi * (double)kReverbLowDampingCrossover / (double)frequency);
 
     ready_ = true;
 
@@ -481,7 +481,7 @@ void ReverbEffect::Process(float *frames, int frame_count)
                 modulation_phase_[line] -= 1.0f;
 
             float offset = modulation_depth_ * (float)line_length_[line] *
-                           (0.5f + 0.5f * sinf(modulation_phase_[line] * 2.0f * HMM_PI32));
+                           (0.5f + 0.5f * sinf(modulation_phase_[line] * 2.0f * epi::kPiFloat));
 
             float read_position = (float)line_cursor_[line] + offset;
 

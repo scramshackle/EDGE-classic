@@ -26,13 +26,13 @@
 #include "e_main.h"
 #include "epi.h"
 #include "epi_simd.h"
+#include "epi_str_util.h"
 #include "epi_windows.h"
 #include "g_game.h"
 #include "m_argv.h"
 #include "m_menu.h"
 #include "m_misc.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -61,7 +61,7 @@ void LogWarning(const char *warning, ...)
     va_list argptr;
 
     va_start(argptr, warning);
-    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), warning, argptr);
+    epi::FormatToBufferSizedArgs(message_buffer, sizeof(message_buffer), warning, argptr);
     va_end(argptr);
 
     LogPrint("WARNING: %s", message_buffer);
@@ -72,7 +72,7 @@ void LogWarning(const char *warning, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buffer, sizeof(message_buffer), error, argptr);
     va_end(argptr);
 
     if (log_file)
@@ -107,7 +107,7 @@ void LogPrint(const char *message, ...)
     printbuf[kMessageBufferSize - 1] = 0;
 
     va_start(argptr, message);
-    stbsp_vsnprintf(printbuf, sizeof(printbuf), message, argptr);
+    epi::FormatToBufferSizedArgs(printbuf, sizeof(printbuf), message, argptr);
     va_end(argptr);
 
     EPI_ASSERT(printbuf[kMessageBufferSize - 1] == 0);
@@ -128,6 +128,33 @@ void LogPrint(const char *message, ...)
     // Send to debug console in browser
     printf("%s", printbuf);
 #endif
+}
+
+static void EPIFatalErrorHandler(const char *message)
+{
+    FatalError("%s", message);
+}
+
+static void EPILogHandler(epi::LogLevel level, const char *message)
+{
+    switch (level)
+    {
+    case epi::kLogLevelPrint:
+        LogPrint("%s", message);
+        break;
+    case epi::kLogLevelWarning:
+        LogWarning("%s", message);
+        break;
+    case epi::kLogLevelDebug:
+        LogDebug("%s", message);
+        break;
+    }
+}
+
+void SetupEPIHandlers(void)
+{
+    epi::SetFatalErrorHandler(EPIFatalErrorHandler);
+    epi::SetLogHandler(EPILogHandler);
 }
 
 void ShowMessageBox(const char *message, const char *title)

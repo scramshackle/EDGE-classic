@@ -7,7 +7,7 @@
 
 #include <string>
 #include <string_view>
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
 #include <unordered_map>
 #endif
 
@@ -54,7 +54,7 @@ class StringHash
     /// Construct from a string view.
     StringHash(const std::string_view &str) : value_(Calculate(str.data(), str.length()))
     {
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
         Register(*this, str);
 #endif
     }
@@ -71,9 +71,9 @@ class StringHash
         return StringHash(std::string_view(value));
     }
 
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
     static std::string                                        GetRegistered(StringHash hash);
-    static void                                               RegisterKnownStrings();
+    static void                                               Register(const char *str);
     static const std::unordered_map<StringHash, std::string> &GetHashRegistry();
 #endif
 
@@ -171,10 +171,9 @@ class StringHash
 
     /// Hash value.
     uint32_t value_;
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
     static std::unordered_map<StringHash, std::string> global_hash_registry_;
     static void                                        Register(StringHash hash, const std::string_view &str);
-    static void                                        Register(const char *str);
 #endif
 };
 

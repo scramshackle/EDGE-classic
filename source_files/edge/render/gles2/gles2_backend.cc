@@ -20,7 +20,7 @@
 
 void SetupSkyMatrices(void);
 
-static constexpr float kGles2DegreesToRadians = HMM_DegToRad;
+static constexpr float kGles2DegreesToRadians = epi::kDegreesToRadians;
 
 static inline const char *SafeStr(const void *s)
 {
@@ -90,8 +90,8 @@ class Gles2RenderBackend : public RenderBackend
                                1.0f);
 
         if (!epi::AlmostEquals(view_rotation, 0.0f))
-            gles2_immediate.Rotate(view_rotation * kGles2DegreesToRadians, view_forward.X, view_forward.Y,
-                                   view_forward.Z);
+            gles2_immediate.Rotate(view_rotation * kGles2DegreesToRadians, view_forward.x, view_forward.y,
+                                   view_forward.z);
 
         gles2_immediate.Translate(-view_x, -view_y, -view_z);
 
@@ -100,7 +100,7 @@ class Gles2RenderBackend : public RenderBackend
 
         if (oblique_near_plane_active_)
         {
-            HMM_Vec4 eye_plane = EyeSpacePlane(gles2_immediate.ModelViewMatrix(), oblique_near_plane_);
+            epi::Vec4 eye_plane = EyeSpacePlane(gles2_immediate.ModelViewMatrix(), oblique_near_plane_);
 
             gles2_immediate.MatrixModeProjection();
             gles2_immediate.LoadMatrix(ObliqueNearPlaneProjection(gles2_immediate.ProjectionMatrix(), eye_plane, kClipVolumeNegativeWToW));
@@ -157,12 +157,12 @@ class Gles2RenderBackend : public RenderBackend
         RenderBackend::Init();
     }
 
-    HMM_Mat4 WorldViewProjection()
+    epi::Mat4 WorldViewProjection()
     {
-        return gles2_immediate.ProjectionMatrix() * gles2_immediate.ModelViewMatrix();
+        return epi::MultiplyMatrices(gles2_immediate.ProjectionMatrix(), gles2_immediate.ModelViewMatrix());
     }
 
-    HMM_Mat4 WorldModelView()
+    epi::Mat4 WorldModelView()
     {
         return gles2_immediate.ModelViewMatrix();
     }
@@ -347,13 +347,13 @@ class Gles2RenderBackend : public RenderBackend
         Gles2InvalidateRenderState();
     }
 
-    void PushModelMatrix(const HMM_Mat4 &matrix)
+    void PushModelMatrix(const epi::Mat4 &matrix)
     {
         EPI_ASSERT(world_model_matrix_total_ < kMaximumWorldModelMatrices);
 
         world_model_matrix_stack_[world_model_matrix_total_++] = world_model_matrix_;
 
-        world_model_matrix_ = HMM_MulM4(world_model_matrix_, matrix);
+        world_model_matrix_ = epi::MultiplyMatrices(world_model_matrix_, matrix);
 
         SetupMatrices3D();
     }
@@ -367,7 +367,7 @@ class Gles2RenderBackend : public RenderBackend
         SetupMatrices3D();
     }
 
-    void SetObliqueNearPlane(bool enabled, const HMM_Vec4 &plane)
+    void SetObliqueNearPlane(bool enabled, const epi::Vec4 &plane)
     {
         oblique_near_plane_active_ = enabled;
         oblique_near_plane_        = plane;
@@ -421,11 +421,11 @@ class Gles2RenderBackend : public RenderBackend
   private:
     static constexpr int32_t kMaximumWorldModelMatrices = 8;
 
-    HMM_Mat4 world_model_matrix_                                     = HMM_M4D(1.0f);
+    epi::Mat4 world_model_matrix_ = epi::IdentityMatrix();
 
     bool     oblique_near_plane_active_ = false;
-    HMM_Vec4 oblique_near_plane_        = {};
-    HMM_Mat4 world_model_matrix_stack_[kMaximumWorldModelMatrices]   = {};
+    epi::Vec4 oblique_near_plane_                                     = {};
+    epi::Mat4 world_model_matrix_stack_[kMaximumWorldModelMatrices]   = {};
     int32_t  world_model_matrix_total_                               = 0;
 
     RenderLayer render_layer_ = kRenderLayerInvalid;

@@ -57,9 +57,9 @@ extern int view_window_y;
 extern int view_window_width;
 extern int view_window_height;
 
-extern HMM_Vec3 view_forward;
-extern HMM_Vec3 view_up;
-extern HMM_Vec3 view_right;
+extern epi::Vec3 view_forward;
+extern epi::Vec3 view_up;
+extern epi::Vec3 view_right;
 
 extern int valid_count;
 

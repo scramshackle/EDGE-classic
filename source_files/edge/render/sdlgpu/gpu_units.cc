@@ -8,6 +8,7 @@
 #include "con_var.h"
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
 #include "gpu_images.h"
 #include "gpu_immediate.h"
 #include "gpu_lights.h"
@@ -51,20 +52,20 @@ struct RendererUnit
     int         color_lookup        = 0;
     bool        whiten              = false;
     int         filter              = -1;
-    HMM_Vec4    blur                = {};
+    epi::Vec4   blur                = {};
 
     uint32_t static_buffer = 0;
     int      static_first  = 0;
-    HMM_Vec2 texture_offset = {{0, 0}};
+    epi::Vec2   texture_offset   = {0, 0};
     float    light_row_offset = 0;
-    HMM_Vec4    liquid           = {};
+    epi::Vec4   liquid           = {};
     SkyPassInfo sky_pass;
 
     bool                    sprite             = false;
     const SpriteLightTable *sprite_light_table = nullptr;
     uint8_t                 sprite_alpha       = 255;
     uint32_t                sprite_buffer      = 0;
-    HMM_Vec4                sprite_view[2];
+    epi::Vec4               sprite_view[2];
 
     bool            scissor_enabled = false;
     RendererScissor scissor;
@@ -87,9 +88,9 @@ float    static_batch_light_row_offset = 0;
 
 bool     render_unit_whiten = false;
 int      render_unit_filter = -1;
-HMM_Vec4 render_unit_blur           = {};
-HMM_Vec4 render_unit_liquid         = {};
-HMM_Vec4 render_unit_sprite_view[2] = {};
+epi::Vec4 render_unit_blur           = {};
+epi::Vec4 render_unit_liquid         = {};
+epi::Vec4 render_unit_sprite_view[2] = {};
 
 static uint8_t UnitAlpha(const RendererUnit *unit)
 {
@@ -273,12 +274,12 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
     unit->filter              = -1;
-    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{};
+    unit->blur                = tex1 ? render_unit_blur : epi::Vec4{};
     unit->scissor_enabled     = false;
     unit->static_buffer       = handle;
-    unit->texture_offset      = {{0, 0}};
+    unit->texture_offset      = {0, 0};
     unit->light_row_offset    = static_batch_light_row_offset;
-    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{};
+    unit->liquid              = tex1 ? render_unit_liquid : epi::Vec4{};
     unit->static_first        = first;
     unit->sprite              = false;
 
@@ -353,7 +354,7 @@ void AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_textu
     unit->scissor_enabled     = false;
     unit->static_buffer       = 0;
     unit->static_first        = 0;
-    unit->texture_offset      = {{0, 0}};
+    unit->texture_offset      = {0, 0};
     unit->light_row_offset    = 0;
     unit->liquid              = {};
     unit->sprite              = true;
@@ -414,10 +415,10 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
     unit->color_lookup        = (tex1 || sky_pass) ? render_unit_color_lookup : 0;
     unit->whiten              = tex1 ? render_unit_whiten : false;
     unit->filter              = tex1 ? render_unit_filter : -1;
-    unit->blur                = tex1 ? render_unit_blur : HMM_Vec4{};
-    unit->texture_offset      = {{0, 0}};
+    unit->blur                = tex1 ? render_unit_blur : epi::Vec4{};
+    unit->texture_offset      = {0, 0};
     unit->light_row_offset    = 0;
-    unit->liquid              = tex1 ? render_unit_liquid : HMM_Vec4{};
+    unit->liquid              = tex1 ? render_unit_liquid : epi::Vec4{};
     unit->static_buffer       = 0;
     unit->static_first        = 0;
     unit->sprite              = false;
@@ -541,31 +542,31 @@ static void DrawLineUnit(const RendererUnit *unit)
 
     RendererVertex *destination = gpu_immediate.ReserveVertices(line_total * 4);
 
-    HMM_Vec2 aa_radius = {{2.0f, 2.0f}};
+    epi::Vec2 aa_radius = {2.0f, 2.0f};
 
-    float line_width       = HMM_MAX(1.0f, unit->line_width) + aa_radius.X;
-    float extension_length = aa_radius.Y;
+    float line_width       = epi::Max(1.0f, unit->line_width) + aa_radius.x;
+    float extension_length = aa_radius.y;
 
     for (int32_t i = 0; i < line_total; i++)
     {
         const RendererVertex *source_v0 = source + i * 2;
         const RendererVertex *source_v1 = source_v0 + 1;
 
-        HMM_Vec2 v0 = {{source_v0->position.X, source_v0->position.Y}};
-        HMM_Vec2 v1 = {{source_v1->position.X, source_v1->position.Y}};
+        epi::Vec2 v0 = {source_v0->position.x, source_v0->position.y};
+        epi::Vec2 v1 = {source_v1->position.x, source_v1->position.y};
 
-        HMM_Vec2 line_vector = HMM_SubV2(v1, v0);
-        float    line_length = HMM_LenV2(line_vector) + 2.0f * extension_length;
-        HMM_Vec2 direction   = HMM_NormV2(line_vector);
-        HMM_Vec2 normal      = {{-direction.Y * line_width * 0.5f, direction.X * line_width * 0.5f}};
+        epi::Vec2 line_vector = epi::SubtractVectors(v1, v0);
+        float     line_length = epi::VectorLength(line_vector) + 2.0f * extension_length;
+        epi::Vec2 direction   = epi::NormalizeVector(line_vector);
+        epi::Vec2 normal      = {-direction.y * line_width * 0.5f, direction.x * line_width * 0.5f};
 
-        HMM_Vec2 extension = HMM_MulV2({{extension_length, extension_length}}, direction);
+        epi::Vec2 extension = epi::MultiplyComponents({extension_length, extension_length}, direction);
 
-        HMM_Vec2 a1 = {{v0.X - normal.X - extension.X, v0.Y - normal.Y - extension.Y}};
-        HMM_Vec2 a0 = {{v0.X + normal.X - extension.X, v0.Y + normal.Y - extension.Y}};
+        epi::Vec2 a1 = {v0.x - normal.x - extension.x, v0.y - normal.y - extension.y};
+        epi::Vec2 a0 = {v0.x + normal.x - extension.x, v0.y + normal.y - extension.y};
 
-        HMM_Vec2 b1 = {{v1.X - normal.X + extension.X, v1.Y - normal.Y + extension.Y}};
-        HMM_Vec2 b0 = {{v1.X + normal.X + extension.X, v1.Y + normal.Y + extension.Y}};
+        epi::Vec2 b1 = {v1.x - normal.x + extension.x, v1.y - normal.y + extension.y};
+        epi::Vec2 b0 = {v1.x + normal.x + extension.x, v1.y + normal.y + extension.y};
 
         float factor = 0.5f;
 
@@ -574,21 +575,21 @@ static void DrawLineUnit(const RendererUnit *unit)
         for (int32_t k = 0; k < 4; k++)
         {
             out[k].rgba                     = source_v0->rgba;
-            out[k].texture_coordinates[1].X = line_width;
-            out[k].texture_coordinates[1].Y = factor * line_length;
+            out[k].texture_coordinates[1].x = line_width;
+            out[k].texture_coordinates[1].y = factor * line_length;
         }
 
-        out[0].position                   = {{a1.X, a1.Y, source_v0->position.Z}};
-        out[0].texture_coordinates[0]     = {{line_width, -factor * line_length}};
+        out[0].position               = {a1.x, a1.y, source_v0->position.z};
+        out[0].texture_coordinates[0] = {line_width, -factor * line_length};
 
-        out[1].position                   = {{a0.X, a0.Y, source_v0->position.Z}};
-        out[1].texture_coordinates[0]     = {{-line_width, -factor * line_length}};
+        out[1].position               = {a0.x, a0.y, source_v0->position.z};
+        out[1].texture_coordinates[0] = {-line_width, -factor * line_length};
 
-        out[2].position                   = {{b0.X, b0.Y, source_v1->position.Z}};
-        out[2].texture_coordinates[0]     = {{-line_width, factor * line_length}};
+        out[2].position               = {b0.x, b0.y, source_v1->position.z};
+        out[2].texture_coordinates[0] = {-line_width, factor * line_length};
 
-        out[3].position                   = {{b1.X, b1.Y, source_v1->position.Z}};
-        out[3].texture_coordinates[0]     = {{line_width, factor * line_length}};
+        out[3].position               = {b1.x, b1.y, source_v1->position.z};
+        out[3].texture_coordinates[0] = {line_width, factor * line_length};
     }
 
     gpu_immediate.RecordDraw(GL_QUADS, line_total * 4);
@@ -818,8 +819,8 @@ void RenderCurrentUnits(void)
 
             for (int k = 0; k < unit->count; k++, v++)
             {
-                v->texture_coordinates[0].X = v->texture_coordinates[1].X;
-                v->texture_coordinates[0].Y = v->texture_coordinates[1].Y;
+                v->texture_coordinates[0].x = v->texture_coordinates[1].x;
+                v->texture_coordinates[0].y = v->texture_coordinates[1].y;
             }
         }
 
@@ -871,7 +872,7 @@ void RenderCurrentUnits(void)
     gpu_immediate.SetSkyPass(nullptr);
     gpu_immediate.SetColorLookup(0);
     gpu_immediate.SetWhiten(false);
-    gpu_immediate.SetBlur(HMM_Vec4{});
+    gpu_immediate.SetBlur(epi::Vec4{});
 
     current_render_vert = current_render_unit = 0;
 }

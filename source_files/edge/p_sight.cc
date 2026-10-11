@@ -40,10 +40,11 @@
 #include <algorithm>
 #include <vector>
 
-#include "epi_math.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "m_bbox.h"
 #include "p_local.h"
 #include "r_misc.h"
@@ -59,7 +60,7 @@ struct LineOfSight
     Sector      *source_sector;
 
     // dest position
-    HMM_Vec2 destination;
+    epi::Vec2 destination;
     float    destination_z;
     Sector  *destination_sector;
 
@@ -144,21 +145,21 @@ static bool SightCollectLine(Line *ld, void *data)
         ld->bounding_box[kBoundingBoxTop] < sight_check.bounding_box[kBoundingBoxBottom])
         return true;
 
-    int s1 = PointOnDividingLineSide(ld->vertex_1->X, ld->vertex_1->Y, &sight_check.source);
-    int s2 = PointOnDividingLineSide(ld->vertex_2->X, ld->vertex_2->Y, &sight_check.source);
+    int s1 = PointOnDividingLineSide(ld->vertex_1->x, ld->vertex_1->y, &sight_check.source);
+    int s2 = PointOnDividingLineSide(ld->vertex_2->x, ld->vertex_2->y, &sight_check.source);
 
     if (s1 == s2)
         return true;
 
     DividingLine divl;
 
-    divl.x       = ld->vertex_1->X;
-    divl.y       = ld->vertex_1->Y;
+    divl.x       = ld->vertex_1->x;
+    divl.y       = ld->vertex_1->y;
     divl.delta_x = ld->delta_x;
     divl.delta_y = ld->delta_y;
 
     s1 = PointOnDividingLineSide(sight_check.source.x, sight_check.source.y, &divl);
-    s2 = PointOnDividingLineSide(sight_check.destination.X, sight_check.destination.Y, &divl);
+    s2 = PointOnDividingLineSide(sight_check.destination.x, sight_check.destination.y, &divl);
 
     if (s1 == s2)
         return true;
@@ -199,7 +200,7 @@ static bool SightCollectLine(Line *ld, void *data)
 
     if (!epi::AlmostEquals(front->floor_height, back->floor_height))
     {
-        float openbottom = HMM_MAX(ld->front_sector->floor_height, ld->back_sector->floor_height);
+        float openbottom = epi::Max(ld->front_sector->floor_height, ld->back_sector->floor_height);
         float slope      = (openbottom - sight_check.source_z) / along;
         if (slope > sight_check.bottom_slope)
             sight_check.bottom_slope = slope;
@@ -207,7 +208,7 @@ static bool SightCollectLine(Line *ld, void *data)
 
     if (!epi::AlmostEquals(front->ceiling_height, back->ceiling_height))
     {
-        float opentop = HMM_MIN(ld->front_sector->ceiling_height, ld->back_sector->ceiling_height);
+        float opentop = epi::Min(ld->front_sector->ceiling_height, ld->back_sector->ceiling_height);
         float slope   = (opentop - sight_check.source_z) / along;
         if (slope < sight_check.top_slope)
             sight_check.top_slope = slope;
@@ -228,8 +229,8 @@ static bool CheckSightLines(void)
 
     SightNoteSector(sight_check.source_sector);
 
-    if (!BlockmapSegmentLineIterator(sight_check.source.x, sight_check.source.y, sight_check.destination.X,
-                                     sight_check.destination.Y, SightCollectLine))
+    if (!BlockmapSegmentLineIterator(sight_check.source.x, sight_check.source.y, sight_check.destination.x,
+                                     sight_check.destination.y, SightCollectLine))
         return false;
 
     std::sort(sight_crossings.begin(), sight_crossings.end(), SightCrossingLess);
@@ -374,8 +375,8 @@ bool CheckSight(MapObject *src, MapObject *dest)
     sight_check.source.delta_y = dest->y - src->y;
     sight_check.source_sector  = src->sector_;
 
-    sight_check.destination.X      = dest->x;
-    sight_check.destination.Y      = dest->y;
+    sight_check.destination.x      = dest->x;
+    sight_check.destination.y      = dest->y;
     sight_check.destination_sector = dest->sector_;
 
     sight_check.bottom_slope = dest->z - sight_check.source_z;
@@ -401,12 +402,12 @@ bool CheckSight(MapObject *src, MapObject *dest)
         return false;
 
     sight_check.angle =
-        PointToAngle(sight_check.source.x, sight_check.source.y, sight_check.destination.X, sight_check.destination.Y);
+        PointToAngle(sight_check.source.x, sight_check.source.y, sight_check.destination.x, sight_check.destination.y);
 
-    sight_check.bounding_box[kBoundingBoxLeft]   = HMM_MIN(sight_check.source.x, sight_check.destination.X);
-    sight_check.bounding_box[kBoundingBoxRight]  = HMM_MAX(sight_check.source.x, sight_check.destination.X);
-    sight_check.bounding_box[kBoundingBoxBottom] = HMM_MIN(sight_check.source.y, sight_check.destination.Y);
-    sight_check.bounding_box[kBoundingBoxTop]    = HMM_MAX(sight_check.source.y, sight_check.destination.Y);
+    sight_check.bounding_box[kBoundingBoxLeft]   = epi::Min(sight_check.source.x, sight_check.destination.x);
+    sight_check.bounding_box[kBoundingBoxRight]  = epi::Max(sight_check.source.x, sight_check.destination.x);
+    sight_check.bounding_box[kBoundingBoxBottom] = epi::Min(sight_check.source.y, sight_check.destination.y);
+    sight_check.bounding_box[kBoundingBoxTop]    = epi::Max(sight_check.source.y, sight_check.destination.y);
 
     wall_intercepts.clear(); // FIXME
 
@@ -497,8 +498,8 @@ bool CheckSightToPoint(MapObject *src, float x, float y, float z)
     sight_check.source.delta_y = y - src->y;
     sight_check.source_sector  = src->sector_;
 
-    sight_check.destination.X      = x;
-    sight_check.destination.Y      = y;
+    sight_check.destination.x      = x;
+    sight_check.destination.y      = y;
     sight_check.destination_z      = z;
     sight_check.destination_sector = PointInSector(x, y);
 
@@ -506,12 +507,12 @@ bool CheckSightToPoint(MapObject *src, float x, float y, float z)
     sight_check.top_slope    = z + 1.0f - sight_check.source_z;
 
     sight_check.angle =
-        PointToAngle(sight_check.source.x, sight_check.source.y, sight_check.destination.X, sight_check.destination.Y);
+        PointToAngle(sight_check.source.x, sight_check.source.y, sight_check.destination.x, sight_check.destination.y);
 
-    sight_check.bounding_box[kBoundingBoxLeft]   = HMM_MIN(sight_check.source.x, sight_check.destination.X);
-    sight_check.bounding_box[kBoundingBoxRight]  = HMM_MAX(sight_check.source.x, sight_check.destination.X);
-    sight_check.bounding_box[kBoundingBoxBottom] = HMM_MIN(sight_check.source.y, sight_check.destination.Y);
-    sight_check.bounding_box[kBoundingBoxTop]    = HMM_MAX(sight_check.source.y, sight_check.destination.Y);
+    sight_check.bounding_box[kBoundingBoxLeft]   = epi::Min(sight_check.source.x, sight_check.destination.x);
+    sight_check.bounding_box[kBoundingBoxRight]  = epi::Max(sight_check.source.x, sight_check.destination.x);
+    sight_check.bounding_box[kBoundingBoxBottom] = epi::Min(sight_check.source.y, sight_check.destination.y);
+    sight_check.bounding_box[kBoundingBoxTop]    = epi::Max(sight_check.source.y, sight_check.destination.y);
 
     wall_intercepts.clear();
 

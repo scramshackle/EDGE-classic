@@ -451,7 +451,7 @@ static void WeaponDoTemplate(const char *contents)
 static void WeaponParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("WEAPON_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("WEAPON_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFCompareName(field, "TEMPLATE") == 0)
@@ -783,7 +783,7 @@ static void DDFWStateGetDEHBullet(const char *arg, State *cur_state)
         int vspread = 0;
         if (sscanf(args[1].c_str(), "%d", &vspread) == 1 && vspread != 0)
         {
-            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * HMM_PI / 180.0);
+            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * epi::kPi / 180.0);
 
             if (vspread < 0)
                 atk->accuracy_slope_ = -atk->accuracy_slope_;
@@ -855,7 +855,7 @@ static void DDFWStateGetDEHProjectile(const char *arg, State *cur_state)
     {
         int slope = 0;
         if (sscanf(args[2].c_str(), "%d", &slope) == 1 && slope != 0)
-            atk->slope_offset_ = tan((float)slope / -65536.0f * HMM_PI / 180.0);
+            atk->slope_offset_ = tan((float)slope / -65536.0f * epi::kPi / 180.0);
     }
     if (arg_size > 3)
     {

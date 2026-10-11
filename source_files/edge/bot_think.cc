@@ -27,12 +27,13 @@
 
 #include <string.h>
 
-#include "epi_math.h"
 #include "bot_nav.h"
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "epi_math.h"
+#include "epi_str_util.h"
 #include "g_game.h"
 #include "m_bbox.h"
 #include "m_random.h"
@@ -43,7 +44,6 @@
 #include "r_state.h"
 #include "rad_trig.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 // this ranges from 0 (VERY EASY) to 4 (VERY HARD)
@@ -621,7 +621,7 @@ void DeathBot::RetreatFrom(const MapObject *enemy)
 {
     float dx   = pl_->map_object_->x - enemy->x;
     float dy   = pl_->map_object_->y - enemy->y;
-    float dlen = HMM_MAX(hypotf(dx, dy), 1.0f);
+    float dlen = epi::Max(hypotf(dx, dy), 1.0f);
 
     Position pos{pl_->map_object_->x, pl_->map_object_->y, pl_->map_object_->z};
 
@@ -725,7 +725,7 @@ void DeathBot::ShootTarget()
 
     // the further away we are, the more accurate our shot must be.
     // e.g. at point-blank range, even 45 degrees away can hit.
-    float acc_dist = HMM_MAX(enemy_dist_, 32.0f);
+    float acc_dist = epi::Max(enemy_dist_, 32.0f);
     float adjust   = acc_dist / 32.0f;
 
     if (delta > (BAMAngle)(kBAMAngle90 / adjust / (11 - (2.5 * bot_skill.d_))))
@@ -791,14 +791,14 @@ void DeathBot::ThinkFight()
     // handle slope, equation is: `slope = dz / dist`
     float dz = fabs(pl_->map_object_->z - enemy->z);
 
-    float min_dist = HMM_MIN(dz * 2.0f, 480.0f);
+    float min_dist = epi::Min(dz * 2.0f, 480.0f);
     float max_dist = 640.0f;
 
     // handle dangerous weapons
     const WeaponDefinition *weapon = pl_->weapons_[pl_->ready_weapon_].info;
 
     if (weapon->dangerous_)
-        min_dist = HMM_MAX(min_dist, 224.0f);
+        min_dist = epi::Max(min_dist, 224.0f);
 
     // approach if too far away
     if (enemy_dist_ > max_dist)
@@ -1544,7 +1544,7 @@ void CreateBotPlayer(Player *p, bool recreate)
     p->player_flags_ |= kPlayerFlagBot;
 
     if (!recreate)
-        stbsp_sprintf(p->player_name_, "Bot%d", p->player_number_ + 1);
+        epi::FormatToBufferSized(p->player_name_, sizeof(p->player_name_), "Bot%d", p->player_number_ + 1);
 }
 
 void BotPlayerBuilder(const Player *p, void *data, EventTicCommand *cmd)

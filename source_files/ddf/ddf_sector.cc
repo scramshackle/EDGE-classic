@@ -90,7 +90,7 @@ static const DDFCommandList sect_commands[] = {
 //
 static void SectorStartEntry(const char *name, bool extend)
 {
-    int number = HMM_MAX(0, atoi(name));
+    int number = epi::Max(0, atoi(name));
 
     if (number == 0)
         DDFError("Bad sectortype number in sectors.ddf: %s\n", name);
@@ -120,7 +120,7 @@ static void SectorStartEntry(const char *name, bool extend)
 
 static void SectorDoTemplate(const char *contents)
 {
-    int number = HMM_MAX(0, atoi(contents));
+    int number = epi::Max(0, atoi(contents));
     if (number == 0)
         DDFError("Bad sectortype number for template: %s\n", contents);
 
@@ -138,7 +138,7 @@ static void SectorDoTemplate(const char *contents)
 static void SectorParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("SECTOR_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("SECTOR_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);

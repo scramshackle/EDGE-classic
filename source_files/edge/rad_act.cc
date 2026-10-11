@@ -23,12 +23,12 @@
 
 #include <limits.h>
 
-#include "epi_math.h"
 #include "con_main.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -1340,7 +1340,7 @@ void ScriptTeleportToStart(RADScriptTrigger *R, void *param)
         return;                            // should never happen but who knows...
 
     // 1. Stop the player movement and turn him
-    p->map_object_->momentum_.X = p->map_object_->momentum_.Y = p->map_object_->momentum_.Z = 0;
+    p->map_object_->momentum_.x = p->map_object_->momentum_.y = p->map_object_->momentum_.z = 0;
     p->actual_speed_                                                                        = 0;
     p->map_object_->angle_                                                                  = point->angle;
 

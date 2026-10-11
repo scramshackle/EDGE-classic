@@ -24,6 +24,8 @@
 #include <charconv>
 
 #include "epi.h"
+
+#define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
 namespace epi
@@ -395,6 +397,20 @@ void TextureNameFromFilename(std::string &buf, std::string_view stem)
         else
             buf.push_back((char)ToUpperASCII(ch));
     }
+}
+
+int FormatToBufferSized(char *buffer, int buffer_size, const char *format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    int length = stbsp_vsnprintf(buffer, buffer_size, format, arguments);
+    va_end(arguments);
+    return length;
+}
+
+int FormatToBufferSizedArgs(char *buffer, int buffer_size, const char *format, va_list arguments)
+{
+    return stbsp_vsnprintf(buffer, buffer_size, format, arguments);
 }
 
 std::string StringFormat(const char *fmt, ...)

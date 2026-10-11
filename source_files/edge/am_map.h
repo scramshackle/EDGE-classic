@@ -70,7 +70,7 @@ enum AutomapArrowStyle
 };
 struct AutomapLine
 {
-    HMM_Vec4  points;
+    epi::Vec4 points;
     RGBAColor color;
 };
 

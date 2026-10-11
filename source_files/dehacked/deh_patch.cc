@@ -140,13 +140,13 @@ enum ObjectKind
 
 void DetectMsg(const char *kind)
 {
-    LogPrint("Detected %s patch file from DEHACKED v%d.%d\n", kind, dhe_ver / 10, dhe_ver % 10);
+    epi::LogPrint("Detected %s patch file from DEHACKED v%d.%d\n", kind, dhe_ver / 10, dhe_ver % 10);
 }
 
 void VersionMsg(void)
 {
-    LogPrint("Patch format %d, for DOOM EXE %d.%d%s\n", patch_fmt, doom_ver / 10, doom_ver % 10,
-             (doom_ver == 16) ? "66" : "");
+    epi::LogPrint("Patch format %d, for DOOM EXE %d.%d%s\n", patch_fmt, doom_ver / 10, doom_ver % 10,
+                  (doom_ver == 16) ? "66" : "");
 }
 
 int GetRawInt(void)
@@ -191,10 +191,10 @@ void GetRawString(char *buf, int max_len)
 
         if (len >= max_len)
         {
-            FatalError("Dehacked: Error - Text string exceeds internal buffer "
-                       "length.\n"
-                       "[> %d characters, from binary patch file]\n",
-                       kMaximumTextStringLength);
+            epi::FatalError("Dehacked: Error - Text string exceeds internal buffer "
+                            "length.\n"
+                            "[> %d characters, from binary patch file]\n",
+                            kMaximumTextStringLength);
         }
     }
 
@@ -223,13 +223,13 @@ const char *ObjectName(int o_kind)
         return "sprite";
 
     default:
-        FatalError("Dehacked: Error - Illegal object kind: %d\n", o_kind);
+        epi::FatalError("Dehacked: Error - Illegal object kind: %d\n", o_kind);
     }
 }
 
 void MarkObject(int o_kind, int o_num)
 {
-    LogPrint("[%d] MODIFIED\n", o_num);
+    epi::LogPrint("[%d] MODIFIED\n", o_num);
 
     switch (o_kind)
     {
@@ -253,7 +253,7 @@ void MarkObject(int o_kind, int o_num)
         break;
 
     default:
-        FatalError("Dehacked: Error - Illegal object kind: %d\n", o_kind);
+        epi::FatalError("Dehacked: Error - Illegal object kind: %d\n", o_kind);
     }
 }
 
@@ -261,7 +261,7 @@ void GetInt(int o_kind, int o_num, int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("Int: %d\n", temp);
+    epi::LogPrint("Int: %d\n", temp);
 
     if (*dest == temp)
         return;
@@ -275,7 +275,7 @@ void GetFlags(int o_kind, int o_num, int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("Flags: 0x%08x\n", temp);
+    epi::LogPrint("Flags: 0x%08x\n", temp);
 
     // prevent the BOOM/MBF specific flags from being set
     // from binary patch files.
@@ -293,13 +293,13 @@ void GetFrame(int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("Frame: %d\n", temp);
+    epi::LogPrint("Frame: %d\n", temp);
 
     if (doom_ver == 12)
     {
         if (temp < 0 || temp >= kV12Frames)
         {
-            LogDebug("Dehacked: Warning - Found illegal V1.2 frame number: %d\n", temp);
+            epi::LogDebug("Dehacked: Warning - Found illegal V1.2 frame number: %d\n", temp);
             return;
         }
 
@@ -308,7 +308,7 @@ void GetFrame(int *dest)
 
     if (temp < 0 || temp >= kTotalStates)
     {
-        LogDebug("Dehacked: Warning - Found illegal frame number: %d\n", temp);
+        epi::LogDebug("Dehacked: Warning - Found illegal frame number: %d\n", temp);
         return;
     }
 
@@ -321,13 +321,13 @@ void GetSprite(int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("Sprite: %d\n", temp);
+    epi::LogPrint("Sprite: %d\n", temp);
 
     if (doom_ver == 12)
     {
         if (temp < 0 || temp >= kV12Sprites)
         {
-            LogDebug("Dehacked: Warning - Found illegal V1.2 sprite number: %d\n", temp);
+            epi::LogDebug("Dehacked: Warning - Found illegal V1.2 sprite number: %d\n", temp);
             return;
         }
 
@@ -336,7 +336,7 @@ void GetSprite(int *dest)
 
     if (temp < 0 || temp >= kTotalSprites)
     {
-        LogDebug("Dehacked: Warning - Found illegal sprite number: %d\n", temp);
+        epi::LogDebug("Dehacked: Warning - Found illegal sprite number: %d\n", temp);
         return;
     }
 
@@ -347,13 +347,13 @@ void GetSound(int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("Sound: %d\n", temp);
+    epi::LogPrint("Sound: %d\n", temp);
 
     if (doom_ver == 12)
     {
         if (temp < 0 || temp >= kV12Sounds)
         {
-            LogDebug("Dehacked: Warning - Found illegal V1.2 sound number: %d\n", temp);
+            epi::LogDebug("Dehacked: Warning - Found illegal V1.2 sound number: %d\n", temp);
             return;
         }
 
@@ -362,7 +362,7 @@ void GetSound(int *dest)
 
     if (temp < 0 || temp >= kTotalSoundEffects)
     {
-        LogDebug("Dehacked: Warning - Found illegal sound number: %d\n", temp);
+        epi::LogDebug("Dehacked: Warning - Found illegal sound number: %d\n", temp);
         return;
     }
 
@@ -375,11 +375,11 @@ void GetAmmoType(int *dest)
 {
     int temp = GetRawInt();
 
-    LogPrint("AmmoType: %d\n", temp);
+    epi::LogPrint("AmmoType: %d\n", temp);
 
     if (temp < 0 || temp > 5)
     {
-        LogDebug("Dehacked: Warning - Found illegal ammo type: %d\n", temp);
+        epi::LogDebug("Dehacked: Warning - Found illegal ammo type: %d\n", temp);
         return;
     }
 
@@ -439,10 +439,10 @@ const char *PrettyTextString(const char *t)
 
 void ReadBinaryThing(int mt_num)
 {
-    LogPrint("\n--- ReadBinaryThing %d ---\n", mt_num);
+    epi::LogPrint("\n--- ReadBinaryThing %d ---\n", mt_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary thing table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary thing table.\n");
 
     DehackedMapObjectDefinition *mobj = things::GetModifiedMobj(mt_num);
 
@@ -477,10 +477,10 @@ void ReadBinaryThing(int mt_num)
 
 void ReadBinaryAmmo(void)
 {
-    LogPrint("\n--- ReadBinaryAmmo ---\n");
+    epi::LogPrint("\n--- ReadBinaryAmmo ---\n");
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary ammo table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary ammo table.\n");
 
     GetInt(kObjectKindAmmo, 0, ammo::player_max + 0);
     GetInt(kObjectKindAmmo, 1, ammo::player_max + 1);
@@ -495,10 +495,10 @@ void ReadBinaryAmmo(void)
 
 void ReadBinaryWeapon(int wp_num)
 {
-    LogPrint("\n--- ReadBinaryWeapon %d ---\n", wp_num);
+    epi::LogPrint("\n--- ReadBinaryWeapon %d ---\n", wp_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary weapon table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary weapon table.\n");
 
     WeaponInfo *weap = weapon_info + wp_num;
 
@@ -513,10 +513,10 @@ void ReadBinaryWeapon(int wp_num)
 
 void ReadBinaryFrame(int st_num)
 {
-    LogPrint("\n--- ReadBinaryFrame %d ---\n", st_num);
+    epi::LogPrint("\n--- ReadBinaryFrame %d ---\n", st_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary frame table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary frame table.\n");
 
     State *state = frames::GetModifiedState(st_num);
 
@@ -534,10 +534,10 @@ void ReadBinaryFrame(int st_num)
 
 void ReadBinarySound(int s_num)
 {
-    LogPrint("\n--- ReadBinarySound %d ---\n", s_num);
+    epi::LogPrint("\n--- ReadBinarySound %d ---\n", s_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary sound table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary sound table.\n");
 
     GetRawInt(); // ignore sound name pointer
     GetRawInt(); // ignore singularity
@@ -554,20 +554,20 @@ void ReadBinarySound(int s_num)
 
 void ReadBinarySprite(int spr_num)
 {
-    LogPrint("\n--- ReadBinarySprite %d ---\n", spr_num);
+    epi::LogPrint("\n--- ReadBinarySprite %d ---\n", spr_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary sprite table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary sprite table.\n");
 
     GetRawInt(); // ignore sprite name pointer
 }
 
 void ReadBinaryText(int tx_num)
 {
-    LogPrint("\n--- ReadBinaryText %d ---\n", tx_num);
+    epi::LogPrint("\n--- ReadBinaryText %d ---\n", tx_num);
 
     if (file_error)
-        FatalError("Dehacked: Error - File error reading binary text table.\n");
+        epi::FatalError("Dehacked: Error - File error reading binary text table.\n");
 
     static char text_buf[kMaximumTextStringLength + 8];
 
@@ -785,7 +785,7 @@ void GetNextLine(void)
         if (ch == EOF)
         {
             if (pat_buf->Error())
-                LogDebug("Dehacked: Warning - Read error on input file.\n");
+                epi::LogDebug("Dehacked: Warning - Read error on input file.\n");
 
             break;
         }
@@ -817,7 +817,7 @@ void GetNextLine(void)
         line_buf[len++] = (char)ch;
 
         if (len == kMaximumLineLength)
-            LogDebug("Dehacked: Warning - Truncating very long line (#%d).\n", line_num);
+            epi::LogDebug("Dehacked: Warning - Truncating very long line (#%d).\n", line_num);
     }
 
     line_buf[len] = 0;
@@ -870,7 +870,7 @@ bool ValidateObject(void)
             break;
 
         default:
-            FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
+            epi::FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
         }
     }
     else /* patch_fmt == 6, allow BOOM/MBF stuff */
@@ -900,14 +900,14 @@ bool ValidateObject(void)
             break;
 
         default:
-            FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
+            epi::FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
         }
     }
 
     if (active_obj < min_obj || active_obj > max_obj)
     {
-        LogDebug("Dehacked: Warning - Line %d: Illegal %s number: %d.\n", line_num, section_name[active_section],
-                 active_obj);
+        epi::LogDebug("Dehacked: Warning - Line %d: Illegal %s number: %d.\n", line_num, section_name[active_section],
+                      active_obj);
 
         syncing = true;
         return false;
@@ -939,7 +939,7 @@ bool CheckNewSection(void)
 
             if (active_section == BEX_PARS || active_section == BEX_HELPER)
             {
-                LogDebug("Dehacked: Warning - Ignoring BEX %s section.\n", section_name[i]);
+                epi::LogDebug("Dehacked: Warning - Ignoring BEX %s section.\n", section_name[i]);
             }
 
             return true;
@@ -985,10 +985,10 @@ void ReadTextString(char *dest, int len)
     {
         if ((dest - begin) >= kMaximumTextStringLength)
         {
-            FatalError("Dehacked: Error - Text string exceeds internal buffer "
-                       "length.\n"
-                       "[> %d characters, starting on line %d]\n",
-                       kMaximumTextStringLength, start_line);
+            epi::FatalError("Dehacked: Error - Text string exceeds internal buffer "
+                            "length.\n"
+                            "[> %d characters, starting on line %d]\n",
+                            kMaximumTextStringLength, start_line);
         }
 
         if (*cur_txt_ptr)
@@ -999,8 +999,8 @@ void ReadTextString(char *dest, int len)
         }
 
         if (pat_buf->EndOfFile())
-            FatalError("Dehacked: Error - End of file while reading Text "
-                       "replacement.\n");
+            epi::FatalError("Dehacked: Error - End of file while reading Text "
+                            "replacement.\n");
 
         GetNextLine();
         cur_txt_ptr = line_buf;
@@ -1014,7 +1014,7 @@ void ReadTextString(char *dest, int len)
 
 void ProcessTextSection(int len1, int len2)
 {
-    LogPrint("TEXT REPLACE: %d %d\n", len1, len2);
+    epi::LogPrint("TEXT REPLACE: %d %d\n", len1, len2);
 
     static char text_1[kMaximumTextStringLength + 8];
     static char text_2[kMaximumTextStringLength + 8];
@@ -1026,8 +1026,8 @@ void ProcessTextSection(int len1, int len2)
     ReadTextString(text_1, len1);
     ReadTextString(text_2, len2);
 
-    LogPrint("- Before <%s>\n", text_1);
-    LogPrint("- After  <%s>\n", text_2);
+    epi::LogPrint("- Before <%s>\n", text_1);
+    epi::LogPrint("- After  <%s>\n", text_2);
 
     if (len1 == 4 && len2 == 4)
         if (sprites::ReplaceSprite(text_1, text_2))
@@ -1045,7 +1045,7 @@ void ProcessTextSection(int len1, int len2)
     if (text_strings::ReplaceString(text_1, text_2))
         return;
 
-    LogDebug("Dehacked: Warning - Cannot match text: \"%s\"\n", PrettyTextString(text_1));
+    epi::LogDebug("Dehacked: Warning - Cannot match text: \"%s\"\n", PrettyTextString(text_1));
 }
 
 void ReadBexTextString(char *dest) // upto kMaximumTextStringLength chars
@@ -1060,9 +1060,9 @@ void ReadBexTextString(char *dest) // upto kMaximumTextStringLength chars
     {
         if ((dest - begin) >= kMaximumTextStringLength)
         {
-            FatalError("Dehacked: Error - Bex String exceeds internal buffer length.\n"
-                       "[> %d characters, starting on line %d]\n",
-                       kMaximumTextStringLength, start_line);
+            epi::FatalError("Dehacked: Error - Bex String exceeds internal buffer length.\n"
+                            "[> %d characters, starting on line %d]\n",
+                            kMaximumTextStringLength, start_line);
         }
 
         if (*cur_txt_ptr == 0)
@@ -1081,8 +1081,8 @@ void ReadBexTextString(char *dest) // upto kMaximumTextStringLength chars
             do // need a loop to ignore comment lines
             {
                 if (pat_buf->EndOfFile())
-                    FatalError("Dehacked: Error - End of file while reading Bex "
-                               "String replacement.\n");
+                    epi::FatalError("Dehacked: Error - End of file while reading Bex "
+                                    "String replacement.\n");
 
                 GetNextLine();
                 StripTrailingSpace();
@@ -1105,10 +1105,10 @@ void ReadBexTextString(char *dest) // upto kMaximumTextStringLength chars
 
 void ProcessBexString(void)
 {
-    LogDebug("BEX STRING REPLACE: %s\n", line_buf);
+    epi::LogDebug("BEX STRING REPLACE: %s\n", line_buf);
 
     if (strlen(line_buf) >= 100)
-        FatalError("Dehacked: Error - Bex string name too long !\nLine %d: %s\n", line_num, line_buf);
+        epi::FatalError("Dehacked: Error - Bex string name too long !\nLine %d: %s\n", line_num, line_buf);
 
     char bex_field[104];
 
@@ -1120,24 +1120,24 @@ void ProcessBexString(void)
 
     ReadBexTextString(text_buf);
 
-    LogDebug("- Replacement <%s>\n", text_buf);
+    epi::LogDebug("- Replacement <%s>\n", text_buf);
 
     if (!text_strings::ReplaceBexString(bex_field, text_buf))
-        LogDebug("Dehacked: Warning - Line %d: unknown BEX string name: %s\n", line_num, bex_field);
+        epi::LogDebug("Dehacked: Warning - Line %d: unknown BEX string name: %s\n", line_num, bex_field);
 }
 
 void ProcessLine(void)
 {
     EPI_ASSERT(active_section >= 0);
 
-    LogDebug("Section %d Object %d : <%s>\n", active_section, active_obj, line_buf);
+    epi::LogDebug("Section %d Object %d : <%s>\n", active_section, active_obj, line_buf);
 
     if (active_section == BEX_PARS || active_section == BEX_HELPER)
         return;
 
     if (!equal_pos)
     {
-        LogDebug("Dehacked: Warning - Ignoring line: %s\n", line_buf);
+        epi::LogDebug("Dehacked: Warning - Ignoring line: %s\n", line_buf);
         return;
     }
 
@@ -1163,12 +1163,12 @@ void ProcessLine(void)
 
     if (line_buf[0] == 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: No field name before equal sign.\n", line_num);
+        epi::LogDebug("Dehacked: Warning - Line %d: No field name before equal sign.\n", line_num);
         return;
     }
     else if (equal_pos[0] == 0)
     {
-        LogDebug("Dehacked: Warning - Line %d: No value after equal sign.\n", line_num);
+        epi::LogDebug("Dehacked: Warning - Line %d: No value after equal sign.\n", line_num);
         return;
     }
 
@@ -1190,8 +1190,8 @@ void ProcessLine(void)
     {
         if (sscanf(equal_pos, " %i ", &num_value) != 1)
         {
-            LogDebug("Dehacked: Warning - Line %d: unreadable %s value: %s\n", line_num, section_name[active_section],
-                     equal_pos);
+            epi::LogDebug("Dehacked: Warning - Line %d: unreadable %s value: %s\n", line_num,
+                          section_name[active_section], equal_pos);
             return;
         }
     }
@@ -1244,7 +1244,7 @@ void ProcessLine(void)
         break;
 
     default:
-        FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
+        epi::FatalError("Dehacked: Error - Bad active_section value %d\n", active_section);
     }
 }
 
@@ -1323,7 +1323,7 @@ DehackedResult LoadDiff(bool no_header)
 
         if (epi::StringPrefixCaseCompareASCII(line_buf, "include") == 0)
         {
-            LogPrint("- Warning: BEX INCLUDE directive not supported!\n");
+            epi::LogPrint("- Warning: BEX INCLUDE directive not supported!\n");
             continue;
         }
 
@@ -1422,7 +1422,7 @@ DehackedResult patch::Load(InputBuffer *buf)
     {
         pat_buf->UngetCharacter(tempver);
 
-        LogPrint("Missing header -- assuming text-based BEX patch !\n");
+        epi::LogPrint("Missing header -- assuming text-based BEX patch !\n");
         dhe_ver = 31;
         result  = LoadDiff(true);
     }
@@ -1432,7 +1432,7 @@ DehackedResult patch::Load(InputBuffer *buf)
         result = kDehackedConversionParseError;
     }
 
-    LogPrint("\n");
+    epi::LogPrint("\n");
     pat_buf = nullptr;
 
     return result;

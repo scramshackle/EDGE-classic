@@ -30,8 +30,8 @@
 
 #include "m_menu.h"
 
-#include <math.h>
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include "am_map.h"
 #include "con_main.h"
@@ -66,7 +66,6 @@
 #include "r_texgl.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "w_wad.h"
@@ -1636,7 +1635,7 @@ void QuitEdge(int choice)
     {
         num_quitmessages++;
 
-        stbsp_sprintf(ref, "QUITMSG%d", num_quitmessages);
+        epi::FormatToBufferSized(ref, sizeof(ref), "QUITMSG%d", num_quitmessages);
     } while (language.IsValidRef(ref));
 
     // we stopped at one higher than the last
@@ -1646,7 +1645,7 @@ void QuitEdge(int choice)
     if (num_quitmessages > 0)
     {
         // Pick one at random
-        stbsp_sprintf(ref, "QUITMSG%d", 1 + (RandomByte() % num_quitmessages));
+        epi::FormatToBufferSized(ref, sizeof(ref), "QUITMSG%d", 1 + (RandomByte() % num_quitmessages));
 
         // Construct the quit message in full
         msg = epi::StringFormat("%s\n\n%s", language[ref], language["PressToQuit"]);
@@ -1692,7 +1691,7 @@ void DrawMenuSlider(int x, int y, float slider_position, float increment, int di
     // increment
     std::string actual_val = format_string.empty() ? "" : epi::StringFormat(format_string.c_str(), slider_position);
 
-    slider_position = HMM_Clamp(min, slider_position, max);
+    slider_position = epi::Clamp(slider_position, min, max);
 
     slider_position = slider_position - remainderf(slider_position, increment);
 

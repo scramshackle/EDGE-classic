@@ -1,18 +1,17 @@
 #include "gles2_program.h"
 
-#include "gles2_lights.h"
-
-#include "r_lightgrid.h"
-
 #include <string.h>
 
 #include <vector>
 
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
+#include "gles2_lights.h"
 #include "i_system.h"
 #include "r_backend.h"
 #include "r_colormap.h"
+#include "r_lightgrid.h"
 #include "shaders/model_glsl.h"
 #include "shaders/movie_glsl.h"
 #include "shaders/oit_glsl.h"
@@ -283,9 +282,9 @@ void Gles2Program::SetFloat(GLint location, float &shadow, float value)
     uniform_update_count_++;
 }
 
-void Gles2Program::SetModelViewProjection(const HMM_Mat4 &matrix)
+void Gles2Program::SetModelViewProjection(const epi::Mat4 &matrix)
 {
-    if (memcmp(&shadow_model_view_projection_, &matrix, sizeof(HMM_Mat4)) == 0)
+    if (memcmp(&shadow_model_view_projection_, &matrix, sizeof(epi::Mat4)) == 0)
     {
         return;
     }
@@ -297,9 +296,9 @@ void Gles2Program::SetModelViewProjection(const HMM_Mat4 &matrix)
     uniform_update_count_++;
 }
 
-void Gles2Program::SetModelView(const HMM_Mat4 &matrix)
+void Gles2Program::SetModelView(const epi::Mat4 &matrix)
 {
-    if (memcmp(&shadow_model_view_, &matrix, sizeof(HMM_Mat4)) == 0)
+    if (memcmp(&shadow_model_view_, &matrix, sizeof(epi::Mat4)) == 0)
     {
         return;
     }
@@ -431,14 +430,14 @@ void Gles2Program::SetOit(float mode, float scale)
     SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
 }
 
-void Gles2Program::SetTextureOffset(const HMM_Vec2 &offset)
+void Gles2Program::SetTextureOffset(const epi::Vec2 &offset)
 {
-    if (epi::AlmostEquals(shadow_texture_offset_.X, offset.X) && epi::AlmostEquals(shadow_texture_offset_.Y, offset.Y))
+    if (epi::AlmostEquals(shadow_texture_offset_.x, offset.x) && epi::AlmostEquals(shadow_texture_offset_.y, offset.y))
         return;
 
     shadow_texture_offset_ = offset;
 
-    glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+    glUniform2f(uniform_texture_offset_, offset.x, offset.y);
 }
 
 void Gles2Program::SetLightRowOffset(float offset)
@@ -464,7 +463,7 @@ void Gles2Program::SetSpriteLightTable(const SpriteLightTable *light_table)
     uniform_update_count_++;
 }
 
-void Gles2Program::SetSpriteView(const HMM_Vec4 view[2])
+void Gles2Program::SetSpriteView(const epi::Vec4 view[2])
 {
     if (!memcmp(shadow_sprite_view_, view, sizeof(shadow_sprite_view_)))
         return;
@@ -472,21 +471,21 @@ void Gles2Program::SetSpriteView(const HMM_Vec4 view[2])
     shadow_sprite_view_[0] = view[0];
     shadow_sprite_view_[1] = view[1];
 
-    glUniform4fv(uniform_sprite_view0_, 1, view[0].Elements);
-    glUniform4fv(uniform_sprite_view1_, 1, view[1].Elements);
+    glUniform4f(uniform_sprite_view0_, view[0].x, view[0].y, view[0].z, view[0].w);
+    glUniform4f(uniform_sprite_view1_, view[1].x, view[1].y, view[1].z, view[1].w);
 
     uniform_update_count_++;
 }
 
-void Gles2Program::SetLiquid(const HMM_Vec4 &liquid)
+void Gles2Program::SetLiquid(const epi::Vec4 &liquid)
 {
-    if (epi::AlmostEquals(shadow_liquid_.X, liquid.X) && epi::AlmostEquals(shadow_liquid_.Y, liquid.Y) &&
-        epi::AlmostEquals(shadow_liquid_.Z, liquid.Z) && epi::AlmostEquals(shadow_liquid_.W, liquid.W))
+    if (epi::AlmostEquals(shadow_liquid_.x, liquid.x) && epi::AlmostEquals(shadow_liquid_.y, liquid.y) &&
+        epi::AlmostEquals(shadow_liquid_.z, liquid.z) && epi::AlmostEquals(shadow_liquid_.w, liquid.w))
         return;
 
     shadow_liquid_ = liquid;
 
-    glUniform4f(uniform_liquid_, liquid.X, liquid.Y, liquid.Z, liquid.W);
+    glUniform4f(uniform_liquid_, liquid.x, liquid.y, liquid.z, liquid.w);
 }
 
 void Gles2Program::SetColorLookup(int slot)
@@ -499,15 +498,15 @@ void Gles2Program::SetWhiten(bool enabled)
     SetFloat(uniform_whiten_, shadow_whiten_, enabled ? 1.0f : 0.0f);
 }
 
-void Gles2Program::SetBlur(const HMM_Vec4 &blur)
+void Gles2Program::SetBlur(const epi::Vec4 &blur)
 {
-    if (epi::AlmostEquals(shadow_blur_.X, blur.X) && epi::AlmostEquals(shadow_blur_.Z, blur.Z) &&
-        epi::AlmostEquals(shadow_blur_.W, blur.W))
+    if (epi::AlmostEquals(shadow_blur_.x, blur.x) && epi::AlmostEquals(shadow_blur_.z, blur.z) &&
+        epi::AlmostEquals(shadow_blur_.w, blur.w))
         return;
 
     shadow_blur_ = blur;
 
-    glUniform4f(uniform_blur_, blur.X, blur.Y, blur.Z, blur.W);
+    glUniform4f(uniform_blur_, blur.x, blur.y, blur.z, blur.w);
 }
 
 void Gles2Program::ForceOitReset()
@@ -543,8 +542,8 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
     float scale_x = render_backend->ActiveScaleX();
     float scale_y = render_backend->ActiveScaleY();
 
-    glUniform4f(uniform_sky_viewport_, sky_pass->viewport_origin.X * scale_x, sky_pass->viewport_origin.Y * scale_y,
-                sky_pass->viewport_size.X * scale_x, sky_pass->viewport_size.Y * scale_y);
+    glUniform4f(uniform_sky_viewport_, sky_pass->viewport_origin.x * scale_x, sky_pass->viewport_origin.y * scale_y,
+                sky_pass->viewport_size.x * scale_x, sky_pass->viewport_size.y * scale_y);
 
     glUniform1f(uniform_sky_stretch_mode_, (float)sky_pass->stretch_mode);
     glUniform1f(uniform_sky_u_scale_, sky_pass->u_scale);
@@ -777,13 +776,13 @@ void Gles2ModelProgram::SetFloat(GLint location, float &shadow, float value)
     glUniform1f(location, value);
 }
 
-void Gles2ModelProgram::SetMatrices(const HMM_Mat4 &model_view_projection, const HMM_Mat4 &model_view)
+void Gles2ModelProgram::SetMatrices(const epi::Mat4 &model_view_projection, const epi::Mat4 &model_view)
 {
     glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&model_view_projection);
     glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&model_view);
 }
 
-void Gles2ModelProgram::SetTransform(const HMM_Mat4 &transform)
+void Gles2ModelProgram::SetTransform(const epi::Mat4 &transform)
 {
     glUniformMatrix4fv(uniform_model_transform_, 1, GL_FALSE, (const GLfloat *)&transform);
 }
@@ -793,10 +792,10 @@ void Gles2ModelProgram::SetLerp(float lerp)
     SetFloat(uniform_lerp_, shadow_lerp_, lerp);
 }
 
-void Gles2ModelProgram::SetTextureTransform(const HMM_Vec2 &scale, const HMM_Vec2 &offset)
+void Gles2ModelProgram::SetTextureTransform(const epi::Vec2 &scale, const epi::Vec2 &offset)
 {
-    glUniform2f(uniform_texture_scale_, scale.X, scale.Y);
-    glUniform2f(uniform_texture_offset_, offset.X, offset.Y);
+    glUniform2f(uniform_texture_scale_, scale.x, scale.y);
+    glUniform2f(uniform_texture_offset_, offset.x, offset.y);
 }
 
 void Gles2ModelProgram::SetAlpha(float alpha)
@@ -819,7 +818,7 @@ void Gles2ModelProgram::SetLighting(const ModelDrawInfo &info)
 
     glUniform4f(uniform_model_light_, info.light_level, info.light_fixed_depth, info.light_depth_fixed ? 1.0f : 0.0f,
                 info.fuzzy ? 1.0f : 0.0f);
-    glUniform4f(uniform_model_tint_, info.tint.X, info.tint.Y, info.tint.Z, 1.0f);
+    glUniform4f(uniform_model_tint_, info.tint.x, info.tint.y, info.tint.z, 1.0f);
 }
 
 void Gles2ModelProgram::SetOit(float mode, float scale)
@@ -925,7 +924,7 @@ void Gles2MovieProgram::Use()
     glUseProgram(program_);
 }
 
-void Gles2MovieProgram::SetMatrices(const HMM_Mat4 &model_view, const HMM_Mat4 &projection)
+void Gles2MovieProgram::SetMatrices(const epi::Mat4 &model_view, const epi::Mat4 &projection)
 {
     glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&model_view);
     glUniformMatrix4fv(uniform_projection_, 1, GL_FALSE, (const GLfloat *)&projection);

@@ -97,7 +97,7 @@ static void SoundStartEntry(const char *name, bool extend)
 static void SoundParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("SOUND_PARSE: %s = %s;\n", field, contents);
+    epi::LogDebug("SOUND_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -138,7 +138,7 @@ static void SoundFinishEntry(void)
 
 static void SoundClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in sounds.ddf\n");
+    epi::LogWarning("Ignoring #CLEARALL in sounds.ddf\n");
 }
 
 void DDFReadSFX(const std::string &data)

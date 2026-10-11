@@ -56,63 +56,64 @@
 #include <math.h>
 #endif
 
-void BAMAngleToMatrix(BAMAngle ang, HMM_Vec2 *x, HMM_Vec2 *y)
+void BAMAngleToMatrix(BAMAngle ang, epi::Vec2 *x, epi::Vec2 *y)
 {
-    x->X = epi::BAMCos(ang);
-    x->Y = epi::BAMSin(ang);
+    x->x = epi::BAMCos(ang);
+    x->y = epi::BAMSin(ang);
 
-    y->X = -x->Y;
-    y->Y = x->X;
+    y->x = -x->y;
+    y->y = x->x;
 }
 
-HMM_Vec3 TripleCrossProduct(HMM_Vec3 v1, HMM_Vec3 v2, HMM_Vec3 v3)
+epi::Vec3 TripleCrossProduct(epi::Vec3 v1, epi::Vec3 v2, epi::Vec3 v3)
 {
-    return HMM_Cross(HMM_SubV3(v2, v1), HMM_SubV3(v3, v1));
+    return epi::CrossProduct(epi::SubtractVectors(v2, v1), epi::SubtractVectors(v3, v1));
 }
 
 // If the plane normal is precalculated; otherwise use the other version
-HMM_Vec3 LinePlaneIntersection(HMM_Vec3 line_a, HMM_Vec3 line_b, HMM_Vec3 plane_c, HMM_Vec3 plane_normal)
+epi::Vec3 LinePlaneIntersection(epi::Vec3 line_a, epi::Vec3 line_b, epi::Vec3 plane_c, epi::Vec3 plane_normal)
 {
-    float    n             = HMM_DotV3(plane_normal, HMM_SubV3(plane_c, line_a));
-    HMM_Vec3 line_subtract = HMM_SubV3(line_b, line_a);
-    float    d             = HMM_DotV3(plane_normal, line_subtract);
-    return HMM_AddV3(line_a, HMM_MulV3F(line_subtract, n / d));
+    float     n             = epi::DotProduct(plane_normal, epi::SubtractVectors(plane_c, line_a));
+    epi::Vec3 line_subtract = epi::SubtractVectors(line_b, line_a);
+    float     d             = epi::DotProduct(plane_normal, line_subtract);
+    return epi::AddVectors(line_a, epi::ScaleVector(line_subtract, n / d));
 }
 
-HMM_Vec3 LinePlaneIntersection(HMM_Vec3 line_a, HMM_Vec3 line_b, HMM_Vec3 plane_a, HMM_Vec3 plane_b, HMM_Vec3 plane_c)
+epi::Vec3 LinePlaneIntersection(epi::Vec3 line_a, epi::Vec3 line_b, epi::Vec3 plane_a, epi::Vec3 plane_b,
+                                epi::Vec3 plane_c)
 {
-    HMM_Vec3 plane_normal  = TripleCrossProduct(plane_a, plane_b, plane_c);
-    float    n             = HMM_DotV3(plane_normal, HMM_SubV3(plane_c, line_a));
-    HMM_Vec3 line_subtract = HMM_SubV3(line_b, line_a);
-    float    d             = HMM_DotV3(plane_normal, line_subtract);
-    return HMM_AddV3(line_a, HMM_MulV3F(line_subtract, n / d));
+    epi::Vec3 plane_normal  = TripleCrossProduct(plane_a, plane_b, plane_c);
+    float     n             = epi::DotProduct(plane_normal, epi::SubtractVectors(plane_c, line_a));
+    epi::Vec3 line_subtract = epi::SubtractVectors(line_b, line_a);
+    float     d             = epi::DotProduct(plane_normal, line_subtract);
+    return epi::AddVectors(line_a, epi::ScaleVector(line_subtract, n / d));
 }
 
-float PointToSegDistance(HMM_Vec2 seg_a, HMM_Vec2 seg_b, HMM_Vec2 point)
+float PointToSegDistance(epi::Vec2 seg_a, epi::Vec2 seg_b, epi::Vec2 point)
 {
-    HMM_Vec2 seg_ab = HMM_SubV2(seg_b, seg_a);
-    HMM_Vec2 seg_bp = HMM_SubV2(point, seg_b);
-    HMM_Vec2 seg_ap = HMM_SubV2(point, seg_a);
+    epi::Vec2 seg_ab = epi::SubtractVectors(seg_b, seg_a);
+    epi::Vec2 seg_bp = epi::SubtractVectors(point, seg_b);
+    epi::Vec2 seg_ap = epi::SubtractVectors(point, seg_a);
 
-    if (HMM_DotV2(seg_ab, seg_bp) > 0)
-        return HMM_LenV2(HMM_SubV2(point, seg_b));
-    else if (HMM_DotV2(seg_ab, seg_ap) < 0)
-        return HMM_LenV2(HMM_SubV2(point, seg_a));
+    if (epi::DotProduct(seg_ab, seg_bp) > 0)
+        return epi::VectorLength(epi::SubtractVectors(point, seg_b));
+    else if (epi::DotProduct(seg_ab, seg_ap) < 0)
+        return epi::VectorLength(epi::SubtractVectors(point, seg_a));
     else
-        return abs(seg_ab.X * seg_ap.Y - seg_ab.Y * seg_ap.X) / HMM_LenV2(seg_ab);
+        return abs(seg_ab.x * seg_ap.y - seg_ab.y * seg_ap.x) / epi::VectorLength(seg_ab);
 }
 
-int PointInTriangle(HMM_Vec2 v1, HMM_Vec2 v2, HMM_Vec2 v3, HMM_Vec2 test)
+int PointInTriangle(epi::Vec2 v1, epi::Vec2 v2, epi::Vec2 v3, epi::Vec2 test)
 {
-    std::vector<HMM_Vec2> tri_vec = {v1, v2, v3};
+    std::vector<epi::Vec2> tri_vec = {v1, v2, v3};
     int                   i       = 0;
     int                   j       = 0;
     int                   c       = 0;
     for (i = 0, j = 2; i < 3; j = i++)
     {
-        if (((tri_vec[i].Y > test.Y) != (tri_vec[j].Y > test.Y)) &&
-            (test.X <
-             (tri_vec[j].X - tri_vec[i].X) * (test.Y - tri_vec[i].Y) / (tri_vec[j].Y - tri_vec[i].Y) + tri_vec[i].X))
+        if (((tri_vec[i].y > test.y) != (tri_vec[j].y > test.y)) &&
+            (test.x <
+             (tri_vec[j].x - tri_vec[i].x) * (test.y - tri_vec[i].y) / (tri_vec[j].y - tri_vec[i].y) + tri_vec[i].x))
             c = !c;
     }
     return c;

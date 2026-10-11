@@ -60,7 +60,6 @@
 #include "s_music.h"
 #include "s_sound.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "version.h"
@@ -668,10 +667,10 @@ void ExitToHub(int map_number, int tag)
     // bit hackish: decided whether to use MAP## or E#M#
     if (current_map->name_[0] == 'E')
     {
-        stbsp_sprintf(name_buf, "E%dM%d", 1 + (map_number / 10), map_number % 10);
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "E%dM%d", 1 + (map_number / 10), map_number % 10);
     }
     else
-        stbsp_sprintf(name_buf, "MAP%02d", map_number);
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "MAP%02d", map_number);
 
     ExitToHub(name_buf, tag);
 }
@@ -986,8 +985,9 @@ static bool GameSaveGameToFile(const std::string &filename, const char *descript
     timebuf[0] = 0;
 
     if (local_time)
-        stbsp_snprintf(timebuf, sizeof(timebuf), "%02d:%02d  %d-%02d-%02d", local_time->tm_hour, local_time->tm_min,
-                       local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday);
+        epi::FormatToBufferSized(timebuf, sizeof(timebuf), "%02d:%02d  %d-%02d-%02d", local_time->tm_hour,
+                                 local_time->tm_min, local_time->tm_year + 1900, local_time->tm_mon + 1,
+                                 local_time->tm_mday);
 
     globs->description = SaveChunkCopyString(description);
     globs->desc_date   = SaveChunkCopyString(timebuf);

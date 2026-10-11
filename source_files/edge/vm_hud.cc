@@ -69,9 +69,9 @@ RGBAColor COALVectorToColor(double *v)
     if (v[0] < 0)
         return kRGBANoValue;
 
-    int r = HMM_Clamp(0, (int)v[0], 255);
-    int g = HMM_Clamp(0, (int)v[1], 255);
-    int b = HMM_Clamp(0, (int)v[2], 255);
+    int r = epi::Clamp((int)v[0], 0, 255);
+    int g = epi::Clamp((int)v[1], 0, 255);
+    int b = epi::Clamp((int)v[2], 0, 255);
 
     RGBAColor rgb = epi::MakeRGBA(r, g, b);
 
@@ -721,7 +721,7 @@ static void HD_automap_zoom(coal::VM *vm, int argc)
     float zoom = *vm->AccessParam(0);
 
     // impose a very broad limit
-    ui_hud_automap_zoom = HMM_Clamp(0.2f, zoom, 100.0f);
+    ui_hud_automap_zoom = epi::Clamp(zoom, 0.2f, 100.0f);
 }
 
 // hud.automap_player_arrow(type)

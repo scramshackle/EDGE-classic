@@ -35,7 +35,6 @@
 #include "p_local.h"
 #include "p_spec.h"
 #include "r_state.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "w_wad.h"
 
@@ -122,16 +121,16 @@ bool SaveGameGetBoolean(void *storage, int index)
 
 bool SaveGameGetVec2(void *storage, int index)
 {
-    ((HMM_Vec2 *)storage)[index].X = SaveChunkGetFloat();
-    ((HMM_Vec2 *)storage)[index].Y = SaveChunkGetFloat();
+    ((epi::Vec2 *)storage)[index].x = SaveChunkGetFloat();
+    ((epi::Vec2 *)storage)[index].y = SaveChunkGetFloat();
     return true;
 }
 
 bool SaveGameGetVec3(void *storage, int index)
 {
-    ((HMM_Vec3 *)storage)[index].X = SaveChunkGetFloat();
-    ((HMM_Vec3 *)storage)[index].Y = SaveChunkGetFloat();
-    ((HMM_Vec3 *)storage)[index].Z = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].x = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].y = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].z = SaveChunkGetFloat();
     return true;
 }
 
@@ -173,15 +172,15 @@ void SaveGamePutBoolean(void *storage, int index)
 
 void SaveGamePutVec2(void *storage, int index)
 {
-    SaveChunkPutFloat(((HMM_Vec2 *)storage)[index].X);
-    SaveChunkPutFloat(((HMM_Vec2 *)storage)[index].Y);
+    SaveChunkPutFloat(((epi::Vec2 *)storage)[index].x);
+    SaveChunkPutFloat(((epi::Vec2 *)storage)[index].y);
 }
 
 void SaveGamePutVec3(void *storage, int index)
 {
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].X);
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].Y);
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].Z);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].x);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].y);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].z);
 }
 
 void SaveGamePutAngleToSlope(void *storage, int index)
@@ -294,7 +293,7 @@ const char *SaveSlotName(int slot)
 
     static char buffer[256];
 
-    stbsp_sprintf(buffer, "slot%03d", slot);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "slot%03d", slot);
 
     return buffer;
 }

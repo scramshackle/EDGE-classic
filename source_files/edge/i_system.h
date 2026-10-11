@@ -42,6 +42,7 @@
 // StartupControl, StartupGraphics, StartupMusic and
 // StartupSound).  Does whatever else the platform code needs.
 void SystemStartup(void);
+void SetupEPIHandlers(void);
 
 void              LogPrint(const char *message, ...) EPI_PRINTF_FORMAT(1, 2);
 void              LogWarning(const char *warning, ...) EPI_PRINTF_FORMAT(1, 2);

@@ -841,8 +841,8 @@ void TouchSpecialThing(MapObject *special, MapObject *toucher)
         return;
 
     // Do not pick up the item if completely still
-    if (epi::AlmostEquals(toucher->momentum_.X, 0.0f) && epi::AlmostEquals(toucher->momentum_.Y, 0.0f) &&
-        epi::AlmostEquals(toucher->momentum_.Z, 0.0f))
+    if (epi::AlmostEquals(toucher->momentum_.x, 0.0f) && epi::AlmostEquals(toucher->momentum_.y, 0.0f) &&
+        epi::AlmostEquals(toucher->momentum_.z, 0.0f))
         return;
 
     // -KM- 1998/09/27 Sounds.ddf
@@ -1121,7 +1121,7 @@ void KillMapObject(MapObject *source, MapObject *target, const DamageClass *damt
 
         target->flags_ &= ~kMapObjectFlagSolid;
         target->player_->player_state_         = kPlayerDead;
-        target->player_->standard_view_height_ = HMM_MIN(kDeathViewHeight, target->height_ / 3);
+        target->player_->standard_view_height_ = epi::Min(kDeathViewHeight, target->height_ / 3);
         target->player_->actual_speed_         = 0;
 
         DropWeapon(target->player_);
@@ -1257,8 +1257,8 @@ void ThrustMapObject(MapObject *target, MapObject *inflictor, float thrust)
     if (push > 40.0f)
         push = 40.0f;
 
-    target->momentum_.X += push * epi::BAMCos(angle);
-    target->momentum_.Y += push * epi::BAMSin(angle);
+    target->momentum_.x += push * epi::BAMCos(angle);
+    target->momentum_.y += push * epi::BAMSin(angle);
 
     if (level_flags.true_3d_gameplay)
     {
@@ -1268,7 +1268,7 @@ void ThrustMapObject(MapObject *target, MapObject *inflictor, float thrust)
         // Don't apply downward Z momentum if the target is on the ground
         // (this was screwing up mikoportal/peccaflight levels - Dasho)
         if (z_thrust >= 0.0f || target->z > target->floor_z_)
-            target->momentum_.Z += push * slope / 2;
+            target->momentum_.z += push * slope / 2;
     }
 }
 
@@ -1314,15 +1314,15 @@ void PushMapObject(MapObject *target, MapObject *inflictor, float thrust)
     if (push > 40.0f)
         push = 40.0f;
 
-    target->momentum_.X += push * epi::BAMCos(angle);
-    target->momentum_.Y += push * epi::BAMSin(angle);
+    target->momentum_.x += push * epi::BAMCos(angle);
+    target->momentum_.y += push * epi::BAMSin(angle);
 
     if (level_flags.true_3d_gameplay)
     {
         float dz    = MapObjectMidZ(target) - MapObjectMidZ(inflictor);
         float slope = ApproximateSlope(dx, dy, dz);
 
-        target->momentum_.Z += push * slope / 2;
+        target->momentum_.z += push * slope / 2;
     }
 }
 
@@ -1381,7 +1381,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
     if (!weak_spot && damage >= 0.1f && inflictor && inflictor->current_attack_ &&
         0 == (inflictor->current_attack_->attack_class_ & ~target->info_->resistance_))
     {
-        damage = HMM_MAX(0.05f, damage * target->info_->resist_multiply_);
+        damage = epi::Max(0.05f, damage * target->info_->resist_multiply_);
     }
 
     // -ACB- 1998/07/12 Use Visibility Enum
@@ -1391,7 +1391,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
 
     if (target->flags_ & kMapObjectFlagSkullFly)
     {
-        target->momentum_.X = target->momentum_.Y = target->momentum_.Z = 0;
+        target->momentum_.x = target->momentum_.y = target->momentum_.z = 0;
         target->flags_ &= ~kMapObjectFlagSkullFly;
     }
 
@@ -1475,7 +1475,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
 
             if (damage > 0.05f && 0 == (inflictor->current_attack_->attack_class_ & ~arm_info->resistance_))
             {
-                damage = HMM_MAX(0.05f, damage * arm_info->resist_multiply_);
+                damage = epi::Max(0.05f, damage * arm_info->resist_multiply_);
             }
         }
 
@@ -1490,7 +1490,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
             else if (player_deathmatch_damage_resistance.d_ > 9)
             {
                 float mul = 0.10f + ((18 - player_deathmatch_damage_resistance.d_) * 0.10f);
-                damage    = HMM_MAX(0.1f, damage * mul);
+                damage    = epi::Max(0.1f, damage * mul);
             }
         }
 
@@ -1584,7 +1584,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
                     player->last_damage_colour_ = current_map->episode_->default_damage_flash_;
             }
 
-            player->damage_count_ += (int)HMM_MAX(damage, kDamageAddMinimum);
+            player->damage_count_ += (int)epi::Max<float>(damage, kDamageAddMinimum);
             player->damage_pain_ += damage;
         }
 
@@ -1611,7 +1611,7 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
         // multiple voodoo dolls were present in a level (i.e., heavily damaging
         // one and then lightly damaging another one that was previously at full
         // health would "heal" the player)
-        player->health_ = HMM_MAX(0, player->health_ - damage);
+        player->health_ = epi::Max(0.0f, player->health_ - damage);
     }
 
     // Lobo 2023: Handle attack flagged with the "PLAYER_ATTACK" special.
@@ -1636,10 +1636,10 @@ void DamageMapObject(MapObject *target, MapObject *inflictor, MapObject *source,
     {
         float qty = (target->player_ ? 0.5 : 0.25) * damage;
 
-        source->health_ = HMM_MIN(source->health_ + qty, source->spawn_health_);
+        source->health_ = epi::Min(source->health_ + qty, source->spawn_health_);
 
         if (source->player_)
-            source->player_->health_ = HMM_MIN(source->player_->health_ + qty, source->spawn_health_);
+            source->player_->health_ = epi::Min(source->player_->health_ + qty, source->spawn_health_);
     }
 
     if (target->health_ <= 0)
@@ -1730,7 +1730,7 @@ void TelefragMapObject(MapObject *target, MapObject *inflictor, const DamageClas
 
     if (target->flags_ & kMapObjectFlagSkullFly)
     {
-        target->momentum_.X = target->momentum_.Y = target->momentum_.Z = 0;
+        target->momentum_.x = target->momentum_.y = target->momentum_.z = 0;
         target->flags_ &= ~kMapObjectFlagSkullFly;
     }
 

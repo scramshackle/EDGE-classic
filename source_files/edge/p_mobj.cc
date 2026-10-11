@@ -53,11 +53,12 @@
 
 #include <list>
 
-#include "epi_math.h"
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "f_interm.h"
 #include "g_game.h"
 #include "hu_stuff.h"
@@ -173,9 +174,9 @@ bool MapObject::IsSpawning()
 
 void MapObject::AddMomentum(float xm, float ym, float zm)
 {
-    momentum_.X += xm;
-    momentum_.Y += ym;
-    momentum_.Z += zm;
+    momentum_.x += xm;
+    momentum_.y += ym;
+    momentum_.z += zm;
 
     if (IsSpawning())
     {
@@ -211,8 +212,8 @@ static inline int PointOnLineSide(float x, float y, Line *ld)
 {
     DividingLine div;
 
-    div.x       = ld->vertex_1->X;
-    div.y       = ld->vertex_1->Y;
+    div.x       = ld->vertex_1->x;
+    div.y       = ld->vertex_1->y;
     div.delta_x = ld->delta_x;
     div.delta_y = ld->delta_y;
 
@@ -255,7 +256,7 @@ static void BounceOffWall(MapObject *mo, Line *wall)
     BAMAngle wall_angle;
     BAMAngle diff;
 
-    angle      = PointToAngle(0, 0, mo->momentum_.X, mo->momentum_.Y);
+    angle      = PointToAngle(0, 0, mo->momentum_.x, mo->momentum_.y);
     wall_angle = PointToAngle(0, 0, wall->delta_x, wall->delta_y) - kBAMAngle90;
 
     diff = wall_angle - angle;
@@ -268,8 +269,8 @@ static void BounceOffWall(MapObject *mo, Line *wall)
     // calculate new momentum
     mo->speed_ *= mo->info_->bounce_speed_;
     mo->angle_      = angle;
-    mo->momentum_.X = epi::BAMCos(angle) * mo->speed_;
-    mo->momentum_.Y = epi::BAMSin(angle) * mo->speed_;
+    mo->momentum_.x = epi::BAMCos(angle) * mo->speed_;
+    mo->momentum_.y = epi::BAMSin(angle) * mo->speed_;
 
     EnterBounceStates(mo);
 }
@@ -298,14 +299,14 @@ static void BounceOffPlane(MapObject *mo, float dir)
             else
                 bounce_factor = 0.5f;
         }
-        mo->momentum_.Z *= (dir * bounce_factor);
+        mo->momentum_.z *= (dir * bounce_factor);
     }
     else
     {
         mo->speed_ *= mo->info_->bounce_speed_;
-        mo->momentum_.X = (float)(epi::BAMCos(mo->angle_) * mo->speed_);
-        mo->momentum_.Y = (float)(epi::BAMSin(mo->angle_) * mo->speed_);
-        mo->momentum_.Z = (float)(dir * mo->speed_ * mo->info_->bounce_up_);
+        mo->momentum_.x = (float)(epi::BAMCos(mo->angle_) * mo->speed_);
+        mo->momentum_.y = (float)(epi::BAMSin(mo->angle_) * mo->speed_);
+        mo->momentum_.z = (float)(dir * mo->speed_ * mo->info_->bounce_up_);
     }
 
     EnterBounceStates(mo);
@@ -320,7 +321,7 @@ static bool CorpseShouldSlide(MapObject *mo)
 {
     float floor, ceil;
 
-    if (-0.25f < mo->momentum_.X && mo->momentum_.X < 0.25f && -0.25f < mo->momentum_.Y && mo->momentum_.Y < 0.25f)
+    if (-0.25f < mo->momentum_.x && mo->momentum_.x < 0.25f && -0.25f < mo->momentum_.y && mo->momentum_.y < 0.25f)
     {
         return false;
     }
@@ -331,22 +332,22 @@ static bool CorpseShouldSlide(MapObject *mo)
     // Vertex slope check here?
     if (mo->sector_->floor_vertex_slope)
     {
-        HMM_Vec3 line_a{{mo->x, mo->y, -40000}};
-        HMM_Vec3 line_b{{mo->x, mo->y, 40000}};
-        float    z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->floor_z_vertices[2],
-                                                mo->sector_->floor_vertex_slope_normal)
-                           .Z;
+        epi::Vec3 line_a{mo->x, mo->y, -40000};
+        epi::Vec3 line_b{mo->x, mo->y, 40000};
+        float     z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->floor_z_vertices[2],
+                                                 mo->sector_->floor_vertex_slope_normal)
+                           .z;
         if (isfinite(z_test))
             floor_slope_z = z_test - mo->sector_->floor_height;
     }
 
     if (mo->sector_->ceiling_vertex_slope)
     {
-        HMM_Vec3 line_a{{mo->x, mo->y, -40000}};
-        HMM_Vec3 line_b{{mo->x, mo->y, 40000}};
-        float    z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->ceiling_z_vertices[2],
-                                                mo->sector_->ceiling_vertex_slope_normal)
-                           .Z;
+        epi::Vec3 line_a{mo->x, mo->y, -40000};
+        epi::Vec3 line_b{mo->x, mo->y, 40000};
+        float     z_test = LinePlaneIntersection(line_a, line_b, mo->sector_->ceiling_z_vertices[2],
+                                                 mo->sector_->ceiling_vertex_slope_normal)
+                           .z;
         if (isfinite(z_test))
             ceiling_slope_z = mo->sector_->ceiling_height - z_test;
     }
@@ -634,18 +635,18 @@ void MapObjectSetDirectionAndSpeed(MapObject *mo, BAMAngle angle, float slope, f
     // Dasho - After reducing the value of kMaximumMove to match other ports, discovered
     // that projectiles had vertical drift if their speed was greater than kMaxiumumMove. This
     // seems like the best compromise without imposing a cap on the speed of things in DDF
-    float capped_speed = HMM_Clamp(-kMaximumMove, speed, kMaximumMove);
+    float capped_speed = epi::Clamp(speed, -kMaximumMove, kMaximumMove);
 
     mo->angle_          = angle;
     mo->vertical_angle_ = epi::BAMFromATan(slope);
 
-    mo->momentum_.Z = epi::BAMSin(mo->vertical_angle_) * capped_speed;
+    mo->momentum_.z = epi::BAMSin(mo->vertical_angle_) * capped_speed;
 
     capped_speed *= epi::BAMCos(mo->vertical_angle_);
-    capped_speed = HMM_Clamp(-kMaximumMove, capped_speed, kMaximumMove);
+    capped_speed = epi::Clamp(capped_speed, -kMaximumMove, kMaximumMove);
 
-    mo->momentum_.X = epi::BAMCos(angle) * capped_speed;
-    mo->momentum_.Y = epi::BAMSin(angle) * capped_speed;
+    mo->momentum_.x = epi::BAMCos(angle) * capped_speed;
+    mo->momentum_.y = epi::BAMSin(angle) * capped_speed;
 }
 
 //
@@ -656,7 +657,7 @@ void MapObjectSetDirectionAndSpeed(MapObject *mo, BAMAngle angle, float slope, f
 //
 void ExplodeMissile(MapObject *mo)
 {
-    mo->momentum_.X = mo->momentum_.Y = mo->momentum_.Z = 0;
+    mo->momentum_.x = mo->momentum_.y = mo->momentum_.z = 0;
 
     mo->flags_ &= ~(kMapObjectFlagMissile | kMapObjectFlagTouchy);
     mo->extended_flags_ &= ~(kExtendedFlagBounce | kExtendedFlagUsable);
@@ -708,7 +709,7 @@ static inline void AddRegionProperties(const MapObject *mo, float bz, float tz, 
                     if (new_p->friction < 0.0f || tn_props.friction < new_p->friction)
                         new_p->friction = tn_props.friction;
                 }
-                if (tn_props.push.X || tn_props.push.Y || tn_props.push.Z)
+                if (tn_props.push.x || tn_props.push.y || tn_props.push.z)
                 {
                     SectorFlag tn_flags = tn_props.special ? tn_props.special->special_flags_ : kSectorFlagNone;
 
@@ -726,19 +727,19 @@ static inline void AddRegionProperties(const MapObject *mo, float bz, float tz, 
                     if (tn_flags & kSectorFlagProportional)
                         push_mul *= factor;
 
-                    if (tn_props.push.X)
-                        new_p->push.X += push_mul * tn_props.push.X;
-                    if (tn_props.push.Y)
-                        new_p->push.Y += push_mul * tn_props.push.Y;
-                    if (tn_props.push.Z)
-                        new_p->push.Z += push_mul * tn_props.push.Z;
+                    if (tn_props.push.x)
+                        new_p->push.x += push_mul * tn_props.push.x;
+                    if (tn_props.push.y)
+                        new_p->push.y += push_mul * tn_props.push.y;
+                    if (tn_props.push.z)
+                        new_p->push.z += push_mul * tn_props.push.z;
                 }
             }
         }
     }
     else
     {
-        if (p->push.X || p->push.Y || p->push.Z)
+        if (p->push.x || p->push.y || p->push.z)
         {
             if (!(flags & kSectorFlagWholeRegion) && bz > floor_height)
                 return;
@@ -754,12 +755,12 @@ static inline void AddRegionProperties(const MapObject *mo, float bz, float tz, 
             if (flags & kSectorFlagProportional)
                 push_mul *= factor;
 
-            if (p->push.X)
-                new_p->push.X += push_mul * p->push.X;
-            if (p->push.Y)
-                new_p->push.Y += push_mul * p->push.Y;
-            if (p->push.Z)
-                new_p->push.Z += push_mul * p->push.Z;
+            if (p->push.x)
+                new_p->push.x += push_mul * p->push.x;
+            if (p->push.y)
+                new_p->push.y += push_mul * p->push.y;
+            if (p->push.z)
+                new_p->push.z += push_mul * p->push.z;
         }
     }
 }
@@ -788,7 +789,7 @@ void CalculateFullRegionProperties(const MapObject *mo, RegionProperties *new_p)
     new_p->viscosity = 0;
     new_p->drag      = 0;
 
-    new_p->push.X = new_p->push.Y = new_p->push.Z = 0;
+    new_p->push.x = new_p->push.y = new_p->push.z = 0;
 
     new_p->type    = 0; // these shouldn't be used
     new_p->special = nullptr;
@@ -855,22 +856,22 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
     float absx, absy;
     float maxstep;
 
-    if (fabs(mo->momentum_.X) > kMaximumMove)
+    if (fabs(mo->momentum_.x) > kMaximumMove)
     {
-        float factor = kMaximumMove / fabs(mo->momentum_.X);
-        mo->momentum_.X *= factor;
-        mo->momentum_.Y *= factor;
+        float factor = kMaximumMove / fabs(mo->momentum_.x);
+        mo->momentum_.x *= factor;
+        mo->momentum_.y *= factor;
     }
 
-    if (fabs(mo->momentum_.Y) > kMaximumMove)
+    if (fabs(mo->momentum_.y) > kMaximumMove)
     {
-        float factor = kMaximumMove / fabs(mo->momentum_.Y);
-        mo->momentum_.X *= factor;
-        mo->momentum_.Y *= factor;
+        float factor = kMaximumMove / fabs(mo->momentum_.y);
+        mo->momentum_.x *= factor;
+        mo->momentum_.y *= factor;
     }
 
-    float xmove = mo->momentum_.X;
-    float ymove = mo->momentum_.Y;
+    float xmove = mo->momentum_.x;
+    float ymove = mo->momentum_.y;
 
     // -AJA- 1999/10/09: Reworked viscosity.
     // Dasho - Reduce impact of viscosity now that
@@ -1008,7 +1009,7 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
             // -AJA- 2008/01/20: Jumping out of Water
             if (block_line && block_line->back_sector && mo->player_ && mo->player_->map_object_ == mo &&
                 mo->player_->wet_feet_ && !mo->player_->swimming_ && mo->player_->jump_wait_ == 0 &&
-                mo->z > mo->floor_z_ + 0.5f && mo->momentum_.Z >= 0.0f)
+                mo->z > mo->floor_z_ + 0.5f && mo->momentum_.z >= 0.0f)
             {
                 float ground_h;
 
@@ -1020,7 +1021,7 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
                 }
                 else
                 {
-                    ground_h = HMM_MAX(block_line->front_sector->floor_height, block_line->back_sector->floor_height);
+                    ground_h = epi::Max(block_line->front_sector->floor_height, block_line->back_sector->floor_height);
                 }
 
                 // LogDebug("ground_h: %1.0f  mo_Z: %1.0f\n", ground_h, mo->z);
@@ -1068,8 +1069,8 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
                     {
                         BounceOffWall(mo, block_line);
                         // recalculate remaining xmove/ymove
-                        xmove = mo->momentum_.X;
-                        ymove = mo->momentum_.Y;
+                        xmove = mo->momentum_.x;
+                        ymove = mo->momentum_.y;
 
                         // Use half radius as max step, if not exceptionally small.
                         if (mo->radius_ > kStepMove)
@@ -1117,8 +1118,8 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
                 {
                     BounceOffWall(mo, block_line);
                     // Recalculate remaining xmove/ymove
-                    xmove = mo->momentum_.X;
-                    ymove = mo->momentum_.Y;
+                    xmove = mo->momentum_.x;
+                    ymove = mo->momentum_.y;
 
                     // Use half radius as max step, if not exceptionally small.
                     if (mo->radius_ > kStepMove)
@@ -1174,7 +1175,7 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
             else
             {
                 xmove = ymove   = 0;
-                mo->momentum_.X = mo->momentum_.Y = 0;
+                mo->momentum_.x = mo->momentum_.y = 0;
             }
         }
     } while (!epi::AlmostEquals(xmove, 0.0f) || !epi::AlmostEquals(ymove, 0.0f)); //while (xmove || ymove);
@@ -1215,18 +1216,18 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
 
     // when we are confident that a mikoportal is being used, do not apply
     // friction or drag
-    if (!epi::AlmostEquals(mo->floor_z_, -32768.0f) || epi::AlmostEquals(mo->momentum_.Z, 0.0f))
+    if (!epi::AlmostEquals(mo->floor_z_, -32768.0f) || epi::AlmostEquals(mo->momentum_.z, 0.0f))
     {
-        mo->momentum_.X *= friction;
-        mo->momentum_.Y *= friction;
+        mo->momentum_.x *= friction;
+        mo->momentum_.y *= friction;
 
         // Test: Do not allow X/Y momentum to exceed the distance an object actually moved
         // to prevent building momentum against a door/wall
         // Not sure if we need an equivalent for P_ZMovement - Dasho
-        if (x_diff < fabs(mo->momentum_.X))
-            mo->momentum_.X = mo->x - orig_x;
-        if (y_diff < fabs(mo->momentum_.Y))
-            mo->momentum_.Y = mo->y - orig_y;
+        if (x_diff < fabs(mo->momentum_.x))
+            mo->momentum_.x = mo->x - orig_x;
+        if (y_diff < fabs(mo->momentum_.y))
+            mo->momentum_.y = mo->y - orig_y;
     }
 
     if (mo->player_)
@@ -1237,10 +1238,10 @@ static void P_XYMovement(MapObject *mo, const RegionProperties *props)
 
         // LogDebug("Actual speed = %1.4f\n", mo->player_->actual_speed_);
 
-        if (fabs(mo->momentum_.X) < kStopSpeed && fabs(mo->momentum_.Y) < kStopSpeed)
+        if (fabs(mo->momentum_.x) < kStopSpeed && fabs(mo->momentum_.y) < kStopSpeed)
         {
             if (!(mo->player_->command_.forward_move | mo->player_->command_.side_move) || mo->is_voodoo_)
-                mo->momentum_.X = mo->momentum_.Y = 0;
+                mo->momentum_.x = mo->momentum_.y = 0;
         }
     }
 }
@@ -1276,9 +1277,9 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
         mo->player_->delta_view_height_ = (mo->player_->standard_view_height_ - mo->player_->view_height_) / 8.0f;
     }
 
-    zmove = mo->momentum_.Z * (1.0f - props->viscosity);
+    zmove = mo->momentum_.z * (1.0f - props->viscosity);
 
-    if (mo->on_slope_ && mo->z > mo->floor_z_ && HMM_ABS(mo->z - mo->floor_z_) < 6.0f) // 1/4 of default step size
+    if (mo->on_slope_ && mo->z > mo->floor_z_ && epi::Abs(mo->z - mo->floor_z_) < 6.0f) // 1/4 of default step size
         zmove_vs = mo->floor_z_ - mo->z;
 
     // adjust height
@@ -1310,16 +1311,16 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
         {
             mo->z = mo->ceiling_z_ - mo->height_;
             if (TryMove(mo, mo->x, mo->y))
-                mo->momentum_.Z -= gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
-            if (mo->momentum_.Z < -65.535f)
+                mo->momentum_.z -= gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
+            if (mo->momentum_.z < -65.535f)
                 mo->pecca_flight_ = true;
             return;
         }
 
         if (mo->flags_ & kMapObjectFlagSkullFly)
-            mo->momentum_.Z = -mo->momentum_.Z;
+            mo->momentum_.z = -mo->momentum_.z;
 
-        if (mo->momentum_.Z < 0)
+        if (mo->momentum_.z < 0)
         {
             float hurt_momz   = gravity * mo->info_->maxfall_;
             bool  fly_or_swim = mo->player_ && (mo->player_->swimming_ || mo->player_->powers_[kPowerTypeJetpack] > 0 ||
@@ -1332,7 +1333,7 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
                 mo->player_->delta_view_height_ = zmove / 8.0f;
                 if (mo->player_->health_ > 0)
                 {
-                    if (mo->info_->maxfall_ > 0 && -mo->momentum_.Z > hurt_momz)
+                    if (mo->info_->maxfall_ > 0 && -mo->momentum_.z > hurt_momz)
                     {
                         if (!(mo->player_->cheats_ & kCheatingGodMode) &&
                             mo->player_->powers_[kPowerTypeInvulnerable] < 1)
@@ -1347,10 +1348,10 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
                 HitLiquidFloor(mo);
             }
             // -KM- 1998/12/16 If bigger than max fall, take damage.
-            if (mo->info_->maxfall_ > 0 && gravity > 0 && -mo->momentum_.Z > hurt_momz &&
+            if (mo->info_->maxfall_ > 0 && gravity > 0 && -mo->momentum_.z > hurt_momz &&
                 (!mo->player_ || !fly_or_swim))
             {
-                DamageMapObject(mo, nullptr, nullptr, (-mo->momentum_.Z - hurt_momz), nullptr);
+                DamageMapObject(mo, nullptr, nullptr, (-mo->momentum_.z - hurt_momz), nullptr);
             }
 
             // -KM- 1999/01/31 Bouncy bouncy...
@@ -1360,20 +1361,20 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
 
                 // don't bounce forever on the floor
                 if (!(mo->flags_ & kMapObjectFlagNoGravity) &&
-                    fabs(mo->momentum_.Z) <
+                    fabs(mo->momentum_.z) <
                         kStopSpeed + fabs(gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1)))
                 {
                     if (mo->hyper_flags_ & kHyperFlagDehackedCompatibility)
-                        mo->momentum_.Z = 0;
+                        mo->momentum_.z = 0;
                     else
-                        mo->momentum_.X = mo->momentum_.Y = mo->momentum_.Z = 0;
+                        mo->momentum_.x = mo->momentum_.y = mo->momentum_.z = 0;
                 }
             }
             else
-                mo->momentum_.Z = 0;
+                mo->momentum_.z = 0;
         }
 
-        if (mo->z - mo->momentum_.Z > mo->floor_z_)
+        if (mo->z - mo->momentum_.z > mo->floor_z_)
         { // Spawn splashes, etc.
             HitLiquidFloor(mo);
         }
@@ -1418,7 +1419,7 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
         if (!(mo->flags_ & kMapObjectFlagNoGravity) && !(mo->player_ && mo->player_->powers_[kPowerTypeJetpack] > 0) &&
             !(mo->on_ladder_ >= 0))
         {
-            mo->momentum_.Z -= gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
+            mo->momentum_.z -= gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
         }
     }
 
@@ -1429,10 +1430,10 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
     if (mo->z + mo->height_ > mo->ceiling_z_)
     {
         if (mo->flags_ & kMapObjectFlagSkullFly)
-            mo->momentum_.Z = -mo->momentum_.Z; // the skull slammed into something
+            mo->momentum_.z = -mo->momentum_.z; // the skull slammed into something
 
         // hit the ceiling
-        if (mo->momentum_.Z > 0)
+        if (mo->momentum_.z > 0)
         {
             float hurt_momz   = gravity * mo->info_->maxfall_;
             bool  fly_or_swim = mo->player_ && (mo->player_->swimming_ || mo->player_->powers_[kPowerTypeJetpack] > 0 ||
@@ -1444,9 +1445,9 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
                 if (mo->player_->health_ > 0)
                     StartSoundEffect(mo->info_->oof_sound_, GetSoundEffectCategory(mo), mo);
             }
-            if (mo->info_->maxfall_ > 0 && gravity < 0 && mo->momentum_.Z > hurt_momz && (!mo->player_ || !fly_or_swim))
+            if (mo->info_->maxfall_ > 0 && gravity < 0 && mo->momentum_.z > hurt_momz && (!mo->player_ || !fly_or_swim))
             {
-                DamageMapObject(mo, nullptr, nullptr, (mo->momentum_.Z - hurt_momz), nullptr);
+                DamageMapObject(mo, nullptr, nullptr, (mo->momentum_.z - hurt_momz), nullptr);
             }
 
             // -KM- 1999/01/31 More bouncing.
@@ -1456,17 +1457,17 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
 
                 // don't bounce forever on the ceiling
                 if (!(mo->flags_ & kMapObjectFlagNoGravity) &&
-                    fabs(mo->momentum_.Z) <
+                    fabs(mo->momentum_.z) <
                         kStopSpeed + fabs(gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1)))
                 {
                     if (mo->hyper_flags_ & kHyperFlagDehackedCompatibility)
-                        mo->momentum_.Z = 0;
+                        mo->momentum_.z = 0;
                     else
-                        mo->momentum_.X = mo->momentum_.Y = mo->momentum_.Z = 0;
+                        mo->momentum_.x = mo->momentum_.y = mo->momentum_.z = 0;
                 }
             }
             else
-                mo->momentum_.Z = 0;
+                mo->momentum_.z = 0;
         }
 
         mo->z = mo->ceiling_z_ - mo->height_;
@@ -1504,7 +1505,7 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
         if (!(mo->flags_ & kMapObjectFlagNoGravity) && !(mo->player_ && mo->player_->powers_[kPowerTypeJetpack] > 0) &&
             !(mo->on_ladder_ >= 0))
         {
-            mo->momentum_.Z += -gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
+            mo->momentum_.z += -gravity / (mo->mbf21_flags_ & kMBF21FlagLowGravity ? 8 : 1);
         }
     }
 
@@ -1528,17 +1529,17 @@ static void P_ZMovement(MapObject *mo, const RegionProperties *props)
 
     // ladders have friction
     if (mo->on_ladder_ >= 0)
-        mo->momentum_.Z *= kLadderFriction;
+        mo->momentum_.z *= kLadderFriction;
     else if (mo->player_ && mo->player_->powers_[kPowerTypeJetpack] > 0)
-        mo->momentum_.Z *= props->friction;
+        mo->momentum_.z *= props->friction;
     else
-        mo->momentum_.Z *= props->drag;
+        mo->momentum_.z *= props->drag;
 
     if (mo->player_)
     {
-        if (fabs(mo->momentum_.Z) < kStopSpeed && mo->player_->command_.upward_move == 0)
+        if (fabs(mo->momentum_.z) < kStopSpeed && mo->player_->command_.upward_move == 0)
         {
-            mo->momentum_.Z = 0;
+            mo->momentum_.z = 0;
         }
     }
 }
@@ -1592,12 +1593,12 @@ static void P_MobjThinker(MapObject *mobj)
     }
 
     // handle SKULLFLY attacks
-    if ((mobj->flags_ & kMapObjectFlagSkullFly) && epi::AlmostEquals(mobj->momentum_.X, 0.0f) &&
-        epi::AlmostEquals(mobj->momentum_.Y, 0.0f))
+    if ((mobj->flags_ & kMapObjectFlagSkullFly) && epi::AlmostEquals(mobj->momentum_.x, 0.0f) &&
+        epi::AlmostEquals(mobj->momentum_.y, 0.0f))
     {
         // the skull slammed into something
         mobj->flags_ &= ~kMapObjectFlagSkullFly;
-        mobj->momentum_.X = mobj->momentum_.Y = mobj->momentum_.Z = 0;
+        mobj->momentum_.x = mobj->momentum_.y = mobj->momentum_.z = 0;
 
         MapObjectSetState(mobj, mobj->info_->idle_state_);
 
@@ -1615,9 +1616,9 @@ static void P_MobjThinker(MapObject *mobj)
 
         if (!(mobj->flags_ & kMapObjectFlagNoClip))
         {
-            mobj->momentum_.X += mobj_props.push.X;
-            mobj->momentum_.Y += mobj_props.push.Y;
-            mobj->momentum_.Z += mobj_props.push.Z;
+            mobj->momentum_.x += mobj_props.push.x;
+            mobj->momentum_.y += mobj_props.push.y;
+            mobj->momentum_.z += mobj_props.push.z;
         }
     }
     else
@@ -1647,7 +1648,7 @@ static void P_MobjThinker(MapObject *mobj)
                 }
                 if (!(mobj->flags_ & kMapObjectFlagNoClip))
                 {
-                    if (tn_props.push.X || tn_props.push.Y || tn_props.push.Z)
+                    if (tn_props.push.x || tn_props.push.y || tn_props.push.z)
                     {
                         SectorFlag flags = tn_props.special ? tn_props.special->special_flags_ : kSectorFlagNone;
 
@@ -1662,12 +1663,12 @@ static void P_MobjThinker(MapObject *mobj)
                                 push_mul = 100.0f / mobj->info_->mass_;
                             }
 
-                            if (tn_props.push.X)
-                                mobj->momentum_.X += push_mul * tn_props.push.X;
-                            if (tn_props.push.Y)
-                                mobj->momentum_.Y += push_mul * tn_props.push.Y;
-                            if (tn_props.push.Z)
-                                mobj->momentum_.Z += push_mul * tn_props.push.Z;
+                            if (tn_props.push.x)
+                                mobj->momentum_.x += push_mul * tn_props.push.x;
+                            if (tn_props.push.y)
+                                mobj->momentum_.y += push_mul * tn_props.push.y;
+                            if (tn_props.push.z)
+                                mobj->momentum_.z += push_mul * tn_props.push.z;
                         }
                     }
                 }
@@ -1700,7 +1701,7 @@ static void P_MobjThinker(MapObject *mobj)
             mobj->on_slope_ = true;
     }
 
-    if (!epi::AlmostEquals(mobj->momentum_.X, 0.0f) || !epi::AlmostEquals(mobj->momentum_.Y, 0.0f) || mobj->player_)
+    if (!epi::AlmostEquals(mobj->momentum_.x, 0.0f) || !epi::AlmostEquals(mobj->momentum_.y, 0.0f) || mobj->player_)
     {
         P_XYMovement(mobj, props);
 
@@ -1708,7 +1709,8 @@ static void P_MobjThinker(MapObject *mobj)
             return;
     }
 
-    if ((!epi::AlmostEquals(mobj->z, mobj->floor_z_)) || !epi::AlmostEquals(mobj->momentum_.Z, 0.0f)) //  || mobj->ride_em)
+    if ((!epi::AlmostEquals(mobj->z, mobj->floor_z_)) ||
+        !epi::AlmostEquals(mobj->momentum_.z, 0.0f)) //  || mobj->ride_em)
     {
         P_ZMovement(mobj, props);
 
@@ -2295,7 +2297,7 @@ void SpawnPuff(float x, float y, float z, const MapObjectDefinition *puff, BAMAn
     th = CreateMapObject(x, y, z, puff);
 
     // -AJA- 1999/07/14: DDF-itised.
-    th->momentum_.Z = puff->float_speed_;
+    th->momentum_.z = puff->float_speed_;
 
     // -AJA- 2011/03/14: set the angle
     th->angle_ = angle;
@@ -2322,7 +2324,7 @@ void SpawnBlood(float x, float y, float z, float damage, BAMAngle angle, const M
 
     angle += kBAMAngle180;
 
-    num = (int)(!level_flags.more_blood ? 1.0f : (RandomByte() % 7) + (float)((HMM_MAX(damage / 4.0f, 7.0f))));
+    num = (int)(!level_flags.more_blood ? 1.0f : (RandomByte() % 7) + (float)((epi::Max(damage / 4.0f, 7.0f))));
 
     while (num--)
     {
@@ -2525,7 +2527,7 @@ void RemoveMissile(MapObject *missile)
 {
     RemoveMapObject(missile);
 
-    missile->momentum_.X = missile->momentum_.Y = missile->momentum_.Z = 0;
+    missile->momentum_.x = missile->momentum_.y = missile->momentum_.z = 0;
 
     missile->flags_ &= ~(kMapObjectFlagMissile | kMapObjectFlagTouchy);
     missile->extended_flags_ &= ~(kExtendedFlagBounce);
@@ -2643,17 +2645,17 @@ MapObject *CreateMapObject(float x, float y, float z, const MapObjectDefinition 
 
     if (sec->floor_vertex_slope)
     {
-        float sz = LinePlaneIntersection({{x, y, -40000}}, {{x, y, 40000}}, sec->floor_z_vertices[2],
+        float sz = LinePlaneIntersection({x, y, -40000}, {x, y, 40000}, sec->floor_z_vertices[2],
                                          sec->floor_vertex_slope_normal)
-                       .Z;
+                       .z;
         if (isfinite(sz))
             floor_slope_z = sz - sec->floor_height;
     }
     if (sec->ceiling_vertex_slope)
     {
-        float sz = LinePlaneIntersection({{x, y, -40000}}, {{x, y, 40000}}, sec->ceiling_z_vertices[2],
+        float sz = LinePlaneIntersection({x, y, -40000}, {x, y, 40000}, sec->ceiling_z_vertices[2],
                                          sec->ceiling_vertex_slope_normal)
-                       .Z;
+                       .z;
         if (isfinite(sz))
             ceiling_slope_z = sec->ceiling_height - sz;
     }

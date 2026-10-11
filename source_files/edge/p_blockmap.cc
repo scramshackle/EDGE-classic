@@ -31,11 +31,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "epi_math.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "i_defs_gl.h" // needed for r_shader.h
 #include "i_system.h"
 #include "m_bbox.h"
@@ -89,7 +89,7 @@ static void UpdateDLightRadius(ConsoleVariable *self)
     for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {
         if (mo->dynamic_light_.shader)
-            mo->dynamic_light_.shader->SetRadius(HMM_MIN(exp2(5 + self->d_), mo->dynamic_light_.r));
+            mo->dynamic_light_.shader->SetRadius(epi::Min<double>(exp2(5 + self->d_), mo->dynamic_light_.r));
     }
 }
 
@@ -688,10 +688,10 @@ bool BlockmapLineIterator(float x1, float y1, float x2, float y2, bool (*func)(L
     int hx = BlockmapGetX(x2);
     int hy = BlockmapGetY(y2);
 
-    lx = HMM_MAX(0, lx);
-    hx = HMM_MIN(blockmap_width - 1, hx);
-    ly = HMM_MAX(0, ly);
-    hy = HMM_MIN(blockmap_height - 1, hy);
+    lx = epi::Max(0, lx);
+    hx = epi::Min(blockmap_width - 1, hx);
+    ly = epi::Max(0, ly);
+    hy = epi::Min(blockmap_height - 1, hy);
 
     for (int by = ly; by <= hy; by++)
         for (int bx = lx; bx <= hx; bx++)
@@ -817,10 +817,10 @@ Line *BlockmapNearestLine(float x, float y)
     if (!blockmap_lines || blockmap_width <= 0 || blockmap_height <= 0)
         return nullptr;
 
-    int center_x = HMM_MIN(HMM_MAX(BlockmapGetX(x), 0), blockmap_width - 1);
-    int center_y = HMM_MIN(HMM_MAX(BlockmapGetY(y), 0), blockmap_height - 1);
+    int center_x = epi::Min(epi::Max(BlockmapGetX(x), 0), blockmap_width - 1);
+    int center_y = epi::Min(epi::Max(BlockmapGetY(y), 0), blockmap_height - 1);
 
-    int max_ring = HMM_MAX(blockmap_width, blockmap_height);
+    int max_ring = epi::Max(blockmap_width, blockmap_height);
 
     Line *best      = nullptr;
     float best_dist = FLT_MAX;
@@ -851,8 +851,8 @@ Line *BlockmapNearestLine(float x, float y)
                 {
                     Line *ld = *LI;
 
-                    float dist = PointToSegDistance({{ld->vertex_1->X, ld->vertex_1->Y}},
-                                                    {{ld->vertex_2->X, ld->vertex_2->Y}}, {{x, y}});
+                    float dist = PointToSegDistance({ld->vertex_1->x, ld->vertex_1->y},
+                                                    {ld->vertex_2->x, ld->vertex_2->y}, {x, y});
 
                     if (dist < best_dist)
                     {
@@ -878,10 +878,10 @@ bool BlockmapThingIterator(float x1, float y1, float x2, float y2, bool (*func)(
     int hx = BlockmapGetX(x2) + 1;
     int hy = BlockmapGetY(y2) + 1;
 
-    lx = HMM_MAX(0, lx);
-    hx = HMM_MIN(blockmap_width - 1, hx);
-    ly = HMM_MAX(0, ly);
-    hy = HMM_MIN(blockmap_height - 1, hy);
+    lx = epi::Max(0, lx);
+    hx = epi::Min(blockmap_width - 1, hx);
+    ly = epi::Max(0, ly);
+    hy = epi::Min(blockmap_height - 1, hy);
 
     for (int by = ly; by <= hy; by++)
         for (int bx = lx; bx <= hx; bx++)
@@ -910,10 +910,10 @@ void DynamicLightIterator(float x1, float y1, float z1, float x2, float y2, floa
     int hx = LightmapGetX(x2) + 1;
     int hy = LightmapGetY(y2) + 1;
 
-    lx = HMM_MAX(0, lx);
-    hx = HMM_MIN(dynamic_light_blockmap_width - 1, hx);
-    ly = HMM_MAX(0, ly);
-    hy = HMM_MIN(dynamic_light_blockmap_height - 1, hy);
+    lx = epi::Max(0, lx);
+    hx = epi::Min(dynamic_light_blockmap_width - 1, hx);
+    ly = epi::Max(0, ly);
+    hy = epi::Min(dynamic_light_blockmap_height - 1, hy);
 
     for (int by = ly; by <= hy; by++)
         for (int bx = lx; bx <= hx; bx++)
@@ -931,7 +931,7 @@ void DynamicLightIterator(float x1, float y1, float z1, float x2, float y2, floa
                     continue;
 
                 // check whether radius touches the given bbox
-                float r = HMM_MIN(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
+                float r = epi::Min<double>(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
 
                 if (mo->x + r <= x1 || mo->x - r >= x2 || mo->y + r <= y1 || mo->y - r >= y2 || mo->z + r <= z1 ||
                     mo->z - r >= z2)
@@ -969,7 +969,7 @@ void SectorGlowIterator(Sector *sec, float x1, float y1, float z1, float x2, flo
             continue;
 
         // check whether radius touches the given bbox
-        float r = HMM_MIN(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
+        float r = epi::Min<double>(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
 
         if (mo->info_->glow_type_ == kSectorGlowTypeFloor && sec->floor_height + r <= z1)
             continue;
@@ -1064,16 +1064,16 @@ static inline void PIT_AddLineIntercept(Line *ld)
     float        along;
     DividingLine div;
 
-    div.x       = ld->vertex_1->X;
-    div.y       = ld->vertex_1->Y;
+    div.x       = ld->vertex_1->x;
+    div.y       = ld->vertex_1->y;
     div.delta_x = ld->delta_x;
     div.delta_y = ld->delta_y;
 
     // avoid precision problems with two routines
     if (trace.delta_x > 16 || trace.delta_y > 16 || trace.delta_x < -16 || trace.delta_y < -16)
     {
-        s1 = PointOnDividingLineSide(ld->vertex_1->X, ld->vertex_1->Y, &trace);
-        s2 = PointOnDividingLineSide(ld->vertex_2->X, ld->vertex_2->Y, &trace);
+        s1 = PointOnDividingLineSide(ld->vertex_1->x, ld->vertex_1->y, &trace);
+        s2 = PointOnDividingLineSide(ld->vertex_2->x, ld->vertex_2->y, &trace);
     }
     else
     {
@@ -1367,10 +1367,10 @@ void BlockmapAddLine(Line *ld)
 
     float slope;
 
-    x0 = (int)(ld->vertex_1->X - blockmap_origin_x);
-    y0 = (int)(ld->vertex_1->Y - blockmap_origin_y);
-    x1 = (int)(ld->vertex_2->X - blockmap_origin_x);
-    y1 = (int)(ld->vertex_2->Y - blockmap_origin_y);
+    x0 = (int)(ld->vertex_1->x - blockmap_origin_x);
+    y0 = (int)(ld->vertex_1->y - blockmap_origin_y);
+    x1 = (int)(ld->vertex_2->x - blockmap_origin_x);
+    y1 = (int)(ld->vertex_2->y - blockmap_origin_y);
 
     // swap endpoints if horizontally backward
     if (x1 < x0)
@@ -1392,8 +1392,8 @@ void BlockmapAddLine(Line *ld)
 
     // check if this line spans multiple blocks.
 
-    x_dist = HMM_ABS((x1 / kBlockmapUnitSize) - (x0 / kBlockmapUnitSize));
-    y_dist = HMM_ABS((y1 / kBlockmapUnitSize) - (y0 / kBlockmapUnitSize));
+    x_dist = epi::Abs((x1 / kBlockmapUnitSize) - (x0 / kBlockmapUnitSize));
+    y_dist = epi::Abs((y1 / kBlockmapUnitSize) - (y0 / kBlockmapUnitSize));
 
     y_sign = (y1 >= y0) ? 1 : -1;
 
@@ -1435,7 +1435,7 @@ void BlockmapAddLine(Line *ld)
 
         EPI_ASSERT(sx <= ex);
 
-        y_dist = HMM_ABS((ey / 128) - (sy / 128));
+        y_dist = epi::Abs((ey / 128) - (sy / 128));
 
         for (j = 0; j <= y_dist; j++)
         {

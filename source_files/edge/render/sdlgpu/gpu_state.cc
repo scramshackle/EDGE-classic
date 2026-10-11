@@ -654,28 +654,28 @@ class GpuRenderState : public RenderState
         GpuModelVertexParameters vertex_parameters;
         EPI_CLEAR_MEMORY(&vertex_parameters, GpuModelVertexParameters, 1);
 
-        const HMM_Mat4 &model_view = gpu_immediate.ModelViewMatrix();
-        const HMM_Mat4 &projection = gpu_immediate.ProjectionMatrix();
+        const epi::Mat4 &model_view = gpu_immediate.ModelViewMatrix();
+        const epi::Mat4 &projection = gpu_immediate.ProjectionMatrix();
 
-        vertex_parameters.mvp             = HMM_MulM4(projection, model_view);
+        vertex_parameters.mvp             = epi::MultiplyMatrices(projection, model_view);
         vertex_parameters.mv              = model_view;
         vertex_parameters.model_transform = info.transform;
         vertex_parameters.lerp            = info.lerp;
 
-        vertex_parameters.texture_scale[0] = info.texture_scale.X;
-        vertex_parameters.texture_scale[1] = info.texture_scale.Y;
+        vertex_parameters.texture_scale[0] = info.texture_scale.x;
+        vertex_parameters.texture_scale[1] = info.texture_scale.y;
 
-        vertex_parameters.texture_offset[0] = info.texture_offset.X;
-        vertex_parameters.texture_offset[1] = info.texture_offset.Y;
+        vertex_parameters.texture_offset[0] = info.texture_offset.x;
+        vertex_parameters.texture_offset[1] = info.texture_offset.y;
 
         vertex_parameters.light[0] = info.light_level;
         vertex_parameters.light[1] = info.light_fixed_depth;
         vertex_parameters.light[2] = info.light_depth_fixed ? 1.0f : 0.0f;
         vertex_parameters.light[3] = info.fuzzy ? 1.0f : 0.0f;
 
-        vertex_parameters.tint[0] = info.tint.X;
-        vertex_parameters.tint[1] = info.tint.Y;
-        vertex_parameters.tint[2] = info.tint.Z;
+        vertex_parameters.tint[0] = info.tint.x;
+        vertex_parameters.tint[1] = info.tint.y;
+        vertex_parameters.tint[2] = info.tint.z;
         vertex_parameters.tint[3] = 1.0f;
 
         GpuModelFragmentParameters fragment_parameters;
