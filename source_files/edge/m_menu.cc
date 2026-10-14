@@ -30,13 +30,14 @@
 
 #include "m_menu.h"
 
-#include <math.h>
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include "am_map.h"
 #include "con_main.h"
 #include "ddf_font.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "dstrings.h"
@@ -66,7 +67,6 @@
 #include "r_texgl.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "w_wad.h"
@@ -558,7 +558,8 @@ void MenuReadSaveStrings(void)
                 }
                 else
                 {
-                    LogWarning("Error reading MainMenuSaveGame screenshot %s!\n", fn.c_str());
+                    epi::LogMessage(epi::kLogLevelWarning, "Error reading MainMenuSaveGame screenshot %s!\n",
+                                    fn.c_str());
                     save_extended_information_slots[i].save_image_data = nullptr;
                     save_extended_information_slots[i].save_texture_id = 0; // just in case
                     save_extended_information_slots[i].save_image_page = save_page;
@@ -680,7 +681,7 @@ static void MenuDrawSaveLoadCommon(Style *style, float LineHeight)
     LineHeight = style->fonts_[text_type]->NominalHeight() * txtscale;
 
     const Colormap *colmap = style->definition_->text_[text_type].colmap_;
-    RGBAColor       col    = GetFontColor(colmap);
+    epi::RGBAColor  col    = GetFontColor(colmap);
     HUDThinBox(x - 5, y - 5, x + 95, y + 115, col);
 
     if (entering_save_string || info->empty || info->corrupt)
@@ -829,7 +830,7 @@ void MenuDrawLoad(void)
     TempY += style->definition_->text_[fontType].y_offset_;
     TempY += style->definition_->entry_spacing_;
 
-    RGBAColor col = GetFontColor(style->definition_->text_[fontType].colmap_);
+    epi::RGBAColor col = GetFontColor(style->definition_->text_[fontType].colmap_);
     HUDThinBox(TempX - 5, TempY - 5, TempX + 175, TempY + 115, col);
 
     // 2. draw the save games
@@ -937,7 +938,7 @@ void MenuDrawSave(void)
     TempY += style->definition_->text_[fontType].y_offset_;
     TempY += style->definition_->entry_spacing_;
 
-    RGBAColor col = GetFontColor(style->definition_->text_[fontType].colmap_);
+    epi::RGBAColor col = GetFontColor(style->definition_->text_[fontType].colmap_);
     HUDThinBox(TempX - 5, TempY - 5, TempX + 175, TempY + 115, col);
 
     // 2. draw the save games
@@ -1491,7 +1492,7 @@ static void DoStartLevel(SkillLevel skill)
     // Sanity checking...
     if (!g)
     {
-        LogWarning("Internal Error: no episode for '%s'.\n", chosen_episodesode.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Internal Error: no episode for '%s'.\n", chosen_episodesode.c_str());
         MenuClear();
         return;
     }
@@ -1499,7 +1500,8 @@ static void DoStartLevel(SkillLevel skill)
     const MapDefinition *map = LookupMap(g->firstmap_.c_str());
     if (!map)
     {
-        LogWarning("Cannot find map for '%s' (episode %s)\n", g->firstmap_.c_str(), chosen_episodesode.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Cannot find map for '%s' (episode %s)\n", g->firstmap_.c_str(),
+                        chosen_episodesode.c_str());
         MenuClear();
         return;
     }
@@ -1597,10 +1599,10 @@ static void QuitResponse(int ch)
 
     // -ACB- 1999/09/20 New exit code order
     // Write the default config file first
-    LogPrint("Saving system defaults...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Saving system defaults...\n");
     SaveDefaults();
 
-    LogPrint("Exiting...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Exiting...\n");
 
     app_state = kApplicationPendingQuit;
 }
@@ -1636,7 +1638,7 @@ void QuitEdge(int choice)
     {
         num_quitmessages++;
 
-        stbsp_sprintf(ref, "QUITMSG%d", num_quitmessages);
+        epi::FormatToBufferSized(ref, sizeof(ref), "QUITMSG%d", num_quitmessages);
     } while (language.IsValidRef(ref));
 
     // we stopped at one higher than the last
@@ -1646,7 +1648,7 @@ void QuitEdge(int choice)
     if (num_quitmessages > 0)
     {
         // Pick one at random
-        stbsp_sprintf(ref, "QUITMSG%d", 1 + (RandomByte() % num_quitmessages));
+        epi::FormatToBufferSized(ref, sizeof(ref), "QUITMSG%d", 1 + (RandomByte() % num_quitmessages));
 
         // Construct the quit message in full
         msg = epi::StringFormat("%s\n\n%s", language[ref], language["PressToQuit"]);
@@ -1665,13 +1667,13 @@ void QuitEdge(int choice)
 void ImmediateQuit()
 {
 #if EDGE_WEB
-    LogPrint("Quit ignored on web platform\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Quit ignored on web platform\n");
     return;
 #else
-    LogPrint("Saving system defaults...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Saving system defaults...\n");
     SaveDefaults();
 
-    LogPrint("Exiting...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Exiting...\n");
 
     app_state = kApplicationPendingQuit;
 #endif
@@ -1692,7 +1694,7 @@ void DrawMenuSlider(int x, int y, float slider_position, float increment, int di
     // increment
     std::string actual_val = format_string.empty() ? "" : epi::StringFormat(format_string.c_str(), slider_position);
 
-    slider_position = HMM_Clamp(min, slider_position, max);
+    slider_position = epi::Clamp(slider_position, min, max);
 
     slider_position = slider_position - remainderf(slider_position, increment);
 
@@ -1703,7 +1705,7 @@ void DrawMenuSlider(int x, int y, float slider_position, float increment, int di
     if (opt_style->fonts_[StyleDefinition::kTextSectionAlternate]->definition_->type_ == kFontTypeImage ||
         opt_style->fonts_[StyleDefinition::kTextSectionAlternate]->definition_->type_ == kFontTypeTrueType)
     {
-        RGBAColor slider_color = kRGBAWhite;
+        epi::RGBAColor slider_color = kRGBAWhite;
 
         const Colormap *colmap = opt_style->definition_->text_[StyleDefinition::kTextSectionAlternate].colmap_;
 
@@ -2996,7 +2998,7 @@ void MenuTicker(void)
     // update language if it changed
     if (m_language.CheckModified())
         if (!language.Select(m_language.c_str()))
-            LogPrint("Unknown language: %s\n", m_language.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Unknown language: %s\n", m_language.c_str());
 
     if (option_menu_on)
     {
@@ -3117,9 +3119,9 @@ void MenuInitialize(void)
             custom_MenuDifficulty = true;
     }
 
-    LogDebug("custom_MenuMain =%d \n", custom_MenuMain);
-    LogDebug("custom_MenuEpisode =%d \n", custom_MenuEpisode);
-    LogDebug("custom_MenuDifficulty =%d \n", custom_MenuDifficulty);
+    epi::LogMessage(epi::kLogLevelDebug, "custom_MenuMain =%d \n", custom_MenuMain);
+    epi::LogMessage(epi::kLogLevelDebug, "custom_MenuEpisode =%d \n", custom_MenuEpisode);
+    epi::LogMessage(epi::kLogLevelDebug, "custom_MenuDifficulty =%d \n", custom_MenuDifficulty);
 
     menu_doom = ImageLookup("M_DOOM");
 

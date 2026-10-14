@@ -31,10 +31,12 @@
 #include "con_var.h"
 #include "ddf_font.h"
 #include "ddf_language.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "e_input.h"
 #include "e_player.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "g_game.h"
@@ -52,7 +54,6 @@
 #include "r_modes.h"
 #include "r_units.h"
 #include "r_wipe.h"
-#include "stb_sprintf.h"
 #include "w_files.h"
 #include "w_wad.h"
 
@@ -73,7 +74,7 @@ const Font        *endoom_font;
 // the console's background
 static const Style *console_style;
 
-static RGBAColor current_color;
+static epi::RGBAColor current_color;
 
 extern void StartupProgressMessage(const char *message);
 
@@ -146,7 +147,7 @@ static void ConsoleAddLine(const char *s, bool partial)
     for (int i = kMaximumConsoleLines - 1; i > 0; i--)
         console_lines[i] = console_lines[i - 1];
 
-    RGBAColor col = current_color;
+    epi::RGBAColor col = current_color;
 
     if (col == kRGBAGray && (epi::StringPrefixCaseCompareASCII(s, "WARNING") == 0))
         col = kRGBADarkOrange;
@@ -287,7 +288,7 @@ void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...)
     char    buffer[1024];
 
     va_start(argptr, message);
-    stbsp_vsnprintf(buffer, sizeof(buffer), message, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), message, argptr);
     va_end(argptr);
 
     bool append_newline = false;
@@ -321,7 +322,7 @@ void ConsoleMessage(ConsoleMessageTarget target, const char *message, ...)
     SplitIntoLines(buffer);
 }
 
-void ConsoleMessageColor(RGBAColor col)
+void ConsoleMessageColor(epi::RGBAColor col)
 {
     current_color = col;
 }
@@ -341,27 +342,27 @@ static void CalcSizes()
     if (console_font->definition_->type_ == kFontTypeImage)
     {
         const ImageFont *confont = (const ImageFont *)console_font;
-        XMUL                     = RoundToInteger((confont->image_monospace_width_ + confont->spacing_) *
-                                                  (FNSZ / confont->image_character_height_));
+        XMUL                     = epi::RoundToInteger((confont->image_monospace_width_ + confont->spacing_) *
+                                                       (FNSZ / confont->image_character_height_));
     }
 }
 
-static void SolidBox(float x, float y, float w, float h, RGBAColor col, float alpha)
+static void SolidBox(float x, float y, float w, float h, epi::RGBAColor col, float alpha)
 {
     RendererVertex *glvert = BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0,
                                              alpha < 0.99f ? kBlendingAlpha : kBlendingNone);
 
-    RGBAColor unit_col = col;
+    epi::RGBAColor unit_col = col;
     epi::SetRGBAAlpha(unit_col, alpha);
 
     glvert->rgba       = unit_col;
-    glvert++->position = {{x, y, 0}};
+    glvert++->position = {x, y, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x, y + h, 0}};
+    glvert++->position = {x, y + h, 0};
     glvert->rgba       = unit_col;
-    glvert++->position = {{x + w, y + h, 0}};
+    glvert++->position = {x + w, y + h, 0};
     glvert->rgba       = unit_col;
-    glvert->position   = {{x + w, y, 0}};
+    glvert->position   = {x + w, y, 0};
 
     EndRenderUnit(4);
 }
@@ -404,30 +405,30 @@ static RendererVertex *StartText()
     return glvert;
 }
 
-static void AddChar(float x, float y, char ch, RendererVertex *&glvert, RGBAColor col)
+static void AddChar(float x, float y, char ch, RendererVertex *&glvert, epi::RGBAColor col)
 {
     if (console_font->definition_->type_ == kFontTypeTrueType)
     {
         TTFFont *con_font     = (TTFFont *)console_font;
         float    chwidth      = con_font->CharWidth(ch);
-        XMUL                  = RoundToInteger(chwidth * FNSZ_ratio / pixel_aspect_ratio.f_);
+        XMUL                  = epi::RoundToInteger(chwidth * FNSZ_ratio / pixel_aspect_ratio.f_);
         float width           = (chwidth - con_font->spacing_) * FNSZ_ratio / pixel_aspect_ratio.f_;
         float x_adjust        = (XMUL - width) / 2;
         float y_adjust        = con_font->truetype_glyph_map_.at((uint8_t)ch).y_shift[current_font_size] * FNSZ_ratio;
         float height          = con_font->truetype_glyph_map_.at((uint8_t)ch).height[current_font_size] * FNSZ_ratio;
         stbtt_aligned_quad *q = &con_font->truetype_glyph_map_.at((uint8_t)ch).character_quad[current_font_size];
         glvert->rgba          = col;
-        glvert->position      = {{x + x_adjust, y - y_adjust, 0}};
-        glvert++->texture_coordinates[0] = {{q->s0, q->t0}};
+        glvert->position      = {x + x_adjust, y - y_adjust, 0};
+        glvert++->texture_coordinates[0] = {q->s0, q->t0};
         glvert->rgba                     = col;
-        glvert->position                 = {{x + x_adjust + width, y - y_adjust, 0}};
-        glvert++->texture_coordinates[0] = {{q->s1, q->t0}};
+        glvert->position                 = {x + x_adjust + width, y - y_adjust, 0};
+        glvert++->texture_coordinates[0] = {q->s1, q->t0};
         glvert->rgba                     = col;
-        glvert->position                 = {{x + x_adjust + width, y - y_adjust - height, 0}};
-        glvert++->texture_coordinates[0] = {{q->s1, q->t1}};
+        glvert->position                 = {x + x_adjust + width, y - y_adjust - height, 0};
+        glvert++->texture_coordinates[0] = {q->s1, q->t1};
         glvert->rgba                     = col;
-        glvert->position                 = {{x + x_adjust, y - y_adjust - height, 0}};
-        glvert++->texture_coordinates[0] = {{q->s0, q->t1}};
+        glvert->position                 = {x + x_adjust, y - y_adjust - height, 0};
+        glvert++->texture_coordinates[0] = {q->s0, q->t1};
     }
     else // spritesheet font
     {
@@ -440,22 +441,22 @@ static void AddChar(float x, float y, char ch, RendererVertex *&glvert, RGBAColo
         float ty2 = (float)(py + 1) * 0.0625f;
 
         glvert->rgba                     = col;
-        glvert->position                 = {{x, y, 0}};
-        glvert++->texture_coordinates[0] = {{tx1, ty1}};
+        glvert->position                 = {x, y, 0};
+        glvert++->texture_coordinates[0] = {tx1, ty1};
         glvert->rgba                     = col;
-        glvert->position                 = {{x, y + FNSZ, 0}};
-        glvert++->texture_coordinates[0] = {{tx1, ty2}};
+        glvert->position                 = {x, y + FNSZ, 0};
+        glvert++->texture_coordinates[0] = {tx1, ty2};
         glvert->rgba                     = col;
-        glvert->position                 = {{x + FNSZ, y + FNSZ, 0}};
-        glvert++->texture_coordinates[0] = {{tx2, ty2}};
+        glvert->position                 = {x + FNSZ, y + FNSZ, 0};
+        glvert++->texture_coordinates[0] = {tx2, ty2};
         glvert->rgba                     = col;
-        glvert->position                 = {{x + FNSZ, y, 0}};
-        glvert++->texture_coordinates[0] = {{tx2, ty1}};
+        glvert->position                 = {x + FNSZ, y, 0};
+        glvert++->texture_coordinates[0] = {tx2, ty1};
     }
 }
 
 // Add characters to current render unit; return total number of verts added
-static uint16_t AddText(float x, float y, const char *s, RGBAColor col, RendererVertex *&runit)
+static uint16_t AddText(float x, float y, const char *s, epi::RGBAColor col, RendererVertex *&runit)
 {
     bool     draw_cursor = (s == input_line && console_cursor < 16);
     uint16_t verts_added = 0;
@@ -548,7 +549,7 @@ void ConsoleDrawer(void)
 
     if (console_wipe_active)
     {
-        y = (int)((float)y - CON_GFX_HT * HMM_Lerp(old_console_wipe_position, fractional_tic, console_wipe_position) /
+        y = (int)((float)y - CON_GFX_HT * epi::Lerp(old_console_wipe_position, console_wipe_position, fractional_tic) /
                                  kConsoleWipeTics);
     }
     else
@@ -582,7 +583,7 @@ void ConsoleDrawer(void)
 
     y = bottom_y + ((FNSZ / 2) + (bottom_row == -1 ? FNSZ : 0));
     // First pass, draw ENDOOM background colors if needed
-    for (int i = HMM_MAX(0, bottom_row); i < kMaximumConsoleLines; i++)
+    for (int i = epi::Max(0, bottom_row); i < kMaximumConsoleLines; i++)
     {
         ConsoleLine *CL = console_lines[i];
 
@@ -600,21 +601,21 @@ void ConsoleDrawer(void)
 
             const ImageFont *en_font = (const ImageFont *)endoom_font;
             int              x       = 0;
-            int              enwidth = RoundToInteger((float)en_font->image_monospace_width_ *
-                                                      ((float)FNSZ / en_font->image_monospace_width_) / 2) /
+            int              enwidth = epi::RoundToInteger((float)en_font->image_monospace_width_ *
+                                                           ((float)FNSZ / en_font->image_monospace_width_) / 2) /
                           2;
             for (int j = 1; j < kENDOOMBytesPerLine; j += 2)
             {
-                RGBAColor col = kENDOOMColors[(CL->endoom_bytes_[j] >> 4) & 7];
+                epi::RGBAColor col = kENDOOMColors[(CL->endoom_bytes_[j] >> 4) & 7];
 
                 console_glvert->rgba       = col;
-                console_glvert++->position = {{(float)(x - enwidth), (float)y, 0}};
+                console_glvert++->position = {(float)(x - enwidth), (float)y, 0};
                 console_glvert->rgba       = col;
-                console_glvert++->position = {{(float)(x - enwidth), (float)(y + FNSZ), 0}};
+                console_glvert++->position = {(float)(x - enwidth), (float)(y + FNSZ), 0};
                 console_glvert->rgba       = col;
-                console_glvert++->position = {{(float)(x + enwidth), (float)(y + FNSZ), 0}};
+                console_glvert++->position = {(float)(x + enwidth), (float)(y + FNSZ), 0};
                 console_glvert->rgba       = col;
-                console_glvert++->position = {{(float)(x + enwidth), (float)y, 0}};
+                console_glvert++->position = {(float)(x + enwidth), (float)y, 0};
 
                 x += enwidth * 2;
                 console_verts += 4;
@@ -643,10 +644,10 @@ void ConsoleDrawer(void)
                                                    ImageCache(en_font->font_image_, true),
                                                    (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingMasked);
         render_unit_whiten       = false;
-        int enwidth              = RoundToInteger((float)en_font->image_monospace_width_ *
-                                                  ((float)FNSZ / en_font->image_monospace_width_) / 2);
+        int enwidth              = epi::RoundToInteger((float)en_font->image_monospace_width_ *
+                                                       ((float)FNSZ / en_font->image_monospace_width_) / 2);
 
-        for (int i = HMM_MAX(0, bottom_row); i < kMaximumConsoleLines; i++)
+        for (int i = epi::Max(0, bottom_row); i < kMaximumConsoleLines; i++)
         {
             ConsoleLine *CL = console_lines[i];
 
@@ -660,7 +661,7 @@ void ConsoleDrawer(void)
                 {
                     uint8_t   ch   = CL->endoom_bytes_[j];
                     uint8_t   info = CL->endoom_bytes_[j + 1];
-                    RGBAColor col  = kENDOOMColors[info & 15];
+                    epi::RGBAColor col  = kENDOOMColors[info & 15];
 
                     // blink
                     if ((info & 128) && console_cursor >= 16)
@@ -679,17 +680,17 @@ void ConsoleDrawer(void)
                     float ty2 = (float)(py + 1) * 0.0625f;
 
                     console_glvert->rgba                   = col;
-                    console_glvert->texture_coordinates[0] = {{tx1, ty1}};
-                    console_glvert++->position             = {{(float)(x - enwidth), (float)y, 0}};
+                    console_glvert->texture_coordinates[0] = {tx1, ty1};
+                    console_glvert++->position             = {(float)(x - enwidth), (float)y, 0};
                     console_glvert->rgba                   = col;
-                    console_glvert->texture_coordinates[0] = {{tx1, ty2}};
-                    console_glvert++->position             = {{(float)(x - enwidth), (float)(y + FNSZ), 0}};
+                    console_glvert->texture_coordinates[0] = {tx1, ty2};
+                    console_glvert++->position             = {(float)(x - enwidth), (float)(y + FNSZ), 0};
                     console_glvert->rgba                   = col;
-                    console_glvert->texture_coordinates[0] = {{tx2, ty2}};
-                    console_glvert++->position             = {{(float)(x + enwidth), (float)(y + FNSZ), 0}};
+                    console_glvert->texture_coordinates[0] = {tx2, ty2};
+                    console_glvert++->position             = {(float)(x + enwidth), (float)(y + FNSZ), 0};
                     console_glvert->rgba                   = col;
-                    console_glvert->texture_coordinates[0] = {{tx2, ty1}};
-                    console_glvert++->position             = {{(float)(x + enwidth), (float)y, 0}};
+                    console_glvert->texture_coordinates[0] = {tx2, ty1};
+                    console_glvert++->position             = {(float)(x + enwidth), (float)y, 0};
 
                     x += enwidth;
                     console_verts += 4;
@@ -732,7 +733,7 @@ void ConsoleDrawer(void)
     }
 
     y = bottom_y + ((FNSZ / 2) + (bottom_row == -1 ? FNSZ : 0));
-    for (int i = HMM_MAX(0, bottom_row); i < kMaximumConsoleLines; i++)
+    for (int i = epi::Max(0, bottom_row); i < kMaximumConsoleLines; i++)
     {
         ConsoleLine *CL = console_lines[i];
 
@@ -852,10 +853,10 @@ static char KeyToCharacter(int key, bool shift, bool ctrl)
     return epi::ToUpperASCII(key);
 }
 
-static void ListCompletions(std::vector<const char *> &list, int word_len, int max_row, RGBAColor color)
+static void ListCompletions(std::vector<const char *> &list, int word_len, int max_row, epi::RGBAColor color)
 {
     int max_col = current_screen_width / XMUL - 4;
-    max_col     = HMM_Clamp(24, max_col, 78);
+    max_col     = epi::Clamp(max_col, 24, 78);
 
     char buffer[200];
     int  buf_len = 0;
@@ -1063,7 +1064,7 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
     case kPageUp:
         if (shift)
             // Move to top of console buffer
-            bottom_row = HMM_MAX(-1, console_used_lines - 10);
+            bottom_row = epi::Max(-1, console_used_lines - 10);
         else
             // Start scrolling console buffer up
             scroll_direction = +1;
@@ -1080,8 +1081,8 @@ void ConsoleHandleKey(int key, bool shift, bool ctrl)
 
     case kMouseWheelUp:
         bottom_row += 4;
-        if (bottom_row > HMM_MAX(-1, console_used_lines - 10))
-            bottom_row = HMM_MAX(-1, console_used_lines - 10);
+        if (bottom_row > epi::Max(-1, console_used_lines - 10))
+            bottom_row = epi::Max(-1, console_used_lines - 10);
         break;
 
     case kMouseWheelDown:
@@ -1485,7 +1486,7 @@ void ConsoleShowFPS(void)
     {
         frames += 1;
         total += diff;
-        worst = HMM_MAX(worst, diff);
+        worst = epi::Max<uint64_t>(worst, diff);
 
         // update every second
         if (total > 999999)
@@ -1529,9 +1530,9 @@ void ConsoleShowFPS(void)
     char textbuf[128];
 
     if (debug_fps.d_ < 0)
-        stbsp_sprintf(textbuf, " %6.2f ms", avg_shown);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), " %6.2f ms", avg_shown);
     else
-        stbsp_sprintf(textbuf, " %6.2f fps", 1000 / avg_shown);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), " %6.2f fps", 1000 / avg_shown);
 
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
@@ -1542,9 +1543,9 @@ void ConsoleShowFPS(void)
         y -= FNSZ;
 
         if (debug_fps.d_ < 0)
-            stbsp_sprintf(textbuf, " %6.2f max", worst_shown);
+            epi::FormatToBufferSized(textbuf, sizeof(textbuf), " %6.2f max", worst_shown);
         else if (worst_shown > 0)
-            stbsp_sprintf(textbuf, " %6.2f min", 1000 / worst_shown);
+            epi::FormatToBufferSized(textbuf, sizeof(textbuf), " %6.2f min", 1000 / worst_shown);
 
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
     }
@@ -1554,16 +1555,16 @@ void ConsoleShowFPS(void)
     if (abs(debug_fps.d_) >= 3)
     {
         y -= FNSZ;
-        stbsp_sprintf(textbuf, "%i runit", ec_frame_stats.draw_render_units);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i runit", ec_frame_stats.draw_render_units);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
-        stbsp_sprintf(textbuf, "%i wall", ec_frame_stats.draw_wall_parts);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i wall", ec_frame_stats.draw_wall_parts);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
-        stbsp_sprintf(textbuf, "%i plane", ec_frame_stats.draw_planes);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i plane", ec_frame_stats.draw_planes);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
-        stbsp_sprintf(textbuf, "%i thing", ec_frame_stats.draw_things);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i thing", ec_frame_stats.draw_things);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
@@ -1572,34 +1573,34 @@ void ConsoleShowFPS(void)
         FrameStats stats;
         render_backend->GetFrameStats(stats);
 
-        stbsp_sprintf(textbuf, "%i draw", stats.num_draw_);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i draw", stats.num_draw_);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
-        stbsp_sprintf(textbuf, "%i pipelines", stats.num_apply_pipeline_);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i pipelines", stats.num_apply_pipeline_);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
-        stbsp_sprintf(textbuf, "%i bindings", stats.num_apply_bindings_);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i bindings", stats.num_apply_bindings_);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
-        stbsp_sprintf(textbuf, "%i uniforms", stats.num_apply_uniforms_);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i uniforms", stats.num_apply_uniforms_);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
-        stbsp_sprintf(textbuf, "%i buffers", stats.num_update_buffer_);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%i buffers", stats.num_update_buffer_);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
         char hrbytes[128];
 
         GetHumanSize(stats.size_apply_uniforms_, hrbytes);
-        stbsp_sprintf(textbuf, "%s uniform size", hrbytes);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%s uniform size", hrbytes);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
         GetHumanSize(stats.size_update_buffer_, hrbytes);
-        stbsp_sprintf(textbuf, "%s buffer size", hrbytes);
+        epi::FormatToBufferSized(textbuf, sizeof(textbuf), "%s buffer size", hrbytes);
         console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
         y -= FNSZ;
 
@@ -1643,39 +1644,39 @@ void ConsoleShowPosition(void)
 
     x += XMUL;
     y -= FNSZ * (console_font->definition_->type_ == kFontTypeTrueType ? 0.25 : 1.25);
-    stbsp_sprintf(textbuf, "    x: %d", (int)p->map_object_->x);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "    x: %d", (int)p->map_object_->x);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "    y: %d", (int)p->map_object_->y);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "    y: %d", (int)p->map_object_->y);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "    z: %d", (int)p->map_object_->z);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "    z: %d", (int)p->map_object_->z);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "angle: %d", (int)epi::DegreesFromBAM(p->map_object_->angle_));
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "angle: %d", (int)epi::DegreesFromBAM(p->map_object_->angle_));
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "x mom: %.4f", p->map_object_->momentum_.X);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "x mom: %.4f", p->map_object_->momentum_.x);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "y mom: %.4f", p->map_object_->momentum_.Y);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "y mom: %.4f", p->map_object_->momentum_.y);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "z mom: %.4f", p->map_object_->momentum_.Z);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "z mom: %.4f", p->map_object_->momentum_.z);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "speed: %.4f", p->actual_speed_);
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "speed: %.4f", p->actual_speed_);
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     y -= FNSZ;
-    stbsp_sprintf(textbuf, "  sec: %d", (int)(p->map_object_->sector_ - level_sectors));
+    epi::FormatToBufferSized(textbuf, sizeof(textbuf), "  sec: %d", (int)(p->map_object_->sector_ - level_sectors));
     console_verts += AddText(x, y, textbuf, kRGBAWebGray, console_glvert);
 
     EndRenderUnit(console_verts);

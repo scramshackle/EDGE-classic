@@ -63,10 +63,10 @@ bool EquivalentDisplayDepth(int depth1, int depth2)
     if (depth1 == depth2)
         return true;
 
-    if (HMM_MIN(depth1, depth2) == 15 && HMM_MAX(depth1, depth2) == 16)
+    if (epi::Min(depth1, depth2) == 15 && epi::Max(depth1, depth2) == 16)
         return true;
 
-    if (HMM_MIN(depth1, depth2) == 24 && HMM_MAX(depth1, depth2) == 32)
+    if (epi::Min(depth1, depth2) == 24 && epi::Max(depth1, depth2) == 32)
         return true;
 
     return false;
@@ -120,20 +120,20 @@ void AddDisplayResolution(DisplayMode *mode)
 
 void DumpResolutionList(void)
 {
-    LogPrint("Available Resolutions:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Available Resolutions:\n");
 
     for (int i = 0; i < (int)screen_modes.size(); i++)
     {
         DisplayMode *cur = screen_modes[i];
 
         if (i > 0 && (i % 3) == 0)
-            LogPrint("\n");
+            epi::LogMessage(epi::kLogLevelPrint, "\n");
 
-        LogPrint("  %4dx%4d @ %02d %s", cur->width, cur->height, cur->depth,
-                 cur->window_mode == kWindowModeBorderless ? "BL" : "win");
+        epi::LogMessage(epi::kLogLevelPrint, "  %4dx%4d @ %02d %s", cur->width, cur->height, cur->depth,
+                        cur->window_mode == kWindowModeBorderless ? "BL" : "win");
     }
 
-    LogPrint("\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
 }
 
 bool IncrementResolution(DisplayMode *mode, int what, int dir)
@@ -196,7 +196,7 @@ bool IncrementResolution(DisplayMode *mode, int what, int dir)
                 continue;
         }
 
-        diff = HMM_ABS(diff);
+        diff = epi::Abs(diff);
 
         if (diff < best_diff)
         {
@@ -247,7 +247,7 @@ void ToggleFullscreen(void)
 
 void SoftInitializeResolution(void)
 {
-    LogDebug("SoftInitializeResolution...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SoftInitializeResolution...\n");
 
     NewScreenSize();
 
@@ -264,7 +264,7 @@ void SoftInitializeResolution(void)
     // re-initialise various bits of GL state
     render_backend->SoftInit();
 
-    LogDebug("-  returning true.\n");
+    epi::LogMessage(epi::kLogLevelDebug, "-  returning true.\n");
 
     return;
 }
@@ -316,15 +316,15 @@ struct CompareResolutionPredicate
 
         if (A->width != B->width)
         {
-            int a_diff_w = HMM_ABS(current_screen_width - A->width);
-            int b_diff_w = HMM_ABS(current_screen_width - B->width);
+            int a_diff_w = epi::Abs(current_screen_width - A->width);
+            int b_diff_w = epi::Abs(current_screen_width - B->width);
 
             return (a_diff_w < b_diff_w);
         }
         else
         {
-            int a_diffloor_height = HMM_ABS(current_screen_height - A->height);
-            int b_diffloor_height = HMM_ABS(current_screen_height - B->height);
+            int a_diffloor_height = epi::Abs(current_screen_height - A->height);
+            int b_diffloor_height = epi::Abs(current_screen_height - B->height);
 
             return (a_diffloor_height < b_diffloor_height);
         }
@@ -333,7 +333,7 @@ struct CompareResolutionPredicate
 
 void SetInitialResolution(void)
 {
-    LogDebug("SetInitialResolution...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SetInitialResolution...\n");
 
     if (current_window_mode == kWindowModeBorderless)
     {
@@ -355,7 +355,7 @@ void SetInitialResolution(void)
         return;
     }
 
-    LogDebug("- Looking for another mode to try...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "- Looking for another mode to try...\n");
 
     // sort modes into a good order, choosing sizes near the
     // request size first, and different depths/fullness last.
@@ -374,12 +374,12 @@ void SetInitialResolution(void)
 
 bool ChangeResolution(DisplayMode *mode)
 {
-    LogDebug("ChangeResolution...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "ChangeResolution...\n");
 
     if (DoExecuteChangeResolution(mode->window_mode == kWindowModeBorderless ? &borderless_mode : mode))
         return true;
 
-    LogDebug("- Failed : switching back...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "- Failed : switching back...\n");
 
     DisplayMode old_mode;
 

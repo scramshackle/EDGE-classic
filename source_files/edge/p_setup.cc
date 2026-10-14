@@ -25,27 +25,30 @@
 
 #include "p_setup.h"
 
-#include "epi_filesystem.h"
+#include <math.h>
 
 #include <map>
 #include <unordered_map>
 #include <vector>
 
-#include "epi_math.h"
 #include "am_map.h"
 #include "ddf_colormap.h"
 #include "ddf_main.h"
 #include "ddf_reverb.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "epi_crc.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
+#include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_scanner.h"
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
+#include "epi_vector.h"
 #include "g_game.h"
 #include "i_system.h"
 #include "m_argv.h"
@@ -239,7 +242,7 @@ static void CheckEvilutionBug(uint8_t *data, int length)
     if (memcmp(data, Y_key_data, 10) != 0)
         return;
 
-    LogPrint("Detected TNT MAP31 bug, adding fix.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Detected TNT MAP31 bug, adding fix.\n");
 
     data[8] &= ~kThingNotSinglePlayer;
 }
@@ -282,7 +285,7 @@ static void CheckDoom2Map05Bug(uint8_t *data, int length)
     if (data[24] == 9) // check just in case
         data[24] = 0;  // set tag to 0 instead of 9
 
-    LogPrint("Detected Doom2 MAP05 bug, adding fix.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Detected Doom2 MAP05 bug, adding fix.\n");
 }
 
 static void LoadVertexes(int lump)
@@ -320,14 +323,14 @@ static void LoadVertexes(int lump)
     // internal representation as fixed.
     for (i = 0; i < total_level_vertexes; i++, li++, ml++)
     {
-        li->X = AlignedLittleEndianS16(ml->x);
-        li->Y = AlignedLittleEndianS16(ml->y);
-        li->Z = -40000.0f;
-        li->W = 40000.0f;
-        min_x = HMM_MIN((int)li->X, min_x);
-        min_y = HMM_MIN((int)li->Y, min_y);
-        max_x = HMM_MAX((int)li->X, max_x);
-        max_y = HMM_MAX((int)li->Y, max_y);
+        li->x = epi::AlignedLittleEndianS16(ml->x);
+        li->y = epi::AlignedLittleEndianS16(ml->y);
+        li->z = -40000.0f;
+        li->w = 40000.0f;
+        min_x = epi::Min((int)li->x, min_x);
+        min_y = epi::Min((int)li->y, min_y);
+        max_x = epi::Max((int)li->x, max_x);
+        max_y = epi::Max((int)li->y, max_y);
     }
 
     GenerateBlockmap(min_x, min_y, max_x, max_y);
@@ -373,16 +376,16 @@ static void LoadSectors(int lump)
     {
         char buffer[10];
 
-        ss->floor_height   = AlignedLittleEndianS16(ms->floor_height);
-        ss->ceiling_height = AlignedLittleEndianS16(ms->ceiling_height);
+        ss->floor_height   = epi::AlignedLittleEndianS16(ms->floor_height);
+        ss->ceiling_height = epi::AlignedLittleEndianS16(ms->ceiling_height);
 
         ss->original_height = (ss->floor_height + ss->ceiling_height);
 
         ss->floor.translucency = 1.0f;
-        ss->floor.x_matrix.X   = 1;
-        ss->floor.x_matrix.Y   = 0;
-        ss->floor.y_matrix.X   = 0;
-        ss->floor.y_matrix.Y   = 1;
+        ss->floor.x_matrix.x   = 1;
+        ss->floor.x_matrix.y   = 0;
+        ss->floor.y_matrix.x   = 0;
+        ss->floor.y_matrix.y   = 1;
 
         ss->ceiling = ss->floor;
 
@@ -404,23 +407,23 @@ static void LoadSectors(int lump)
 
         if (!ss->floor.image)
         {
-            LogWarning("Bad Level: sector #%d has missing floor texture.\n", i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad Level: sector #%d has missing floor texture.\n", i);
             ss->floor.image = ImageLookup("FLAT1", kImageNamespaceFlat);
         }
         if (!ss->ceiling.image)
         {
-            LogWarning("Bad Level: sector #%d has missing ceiling texture.\n", i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad Level: sector #%d has missing ceiling texture.\n", i);
             ss->ceiling.image = ss->floor.image;
         }
 
         // convert negative tags to zero
-        ss->tag = HMM_MAX(0, AlignedLittleEndianS16(ms->tag));
+        ss->tag = epi::Max<int>(0, epi::AlignedLittleEndianS16(ms->tag));
 
-        ss->properties.light_level = AlignedLittleEndianS16(ms->light);
+        ss->properties.light_level = epi::AlignedLittleEndianS16(ms->light);
 
-        int type = AlignedLittleEndianS16(ms->type);
+        int type = epi::AlignedLittleEndianS16(ms->type);
 
-        ss->properties.type    = HMM_MAX(0, type);
+        ss->properties.type    = epi::Max(0, type);
         ss->properties.special = LookupSectorType(ss->properties.type);
 
         ss->extrafloor_maximum = 0;
@@ -480,15 +483,15 @@ static void UnknownThingWarning(int type, float x, float y)
         count = unknown_thing_map[type];
 
     if (count < 2)
-        LogWarning("Unknown thing type %i at (%1.0f, %1.0f)\n", type, x, y);
+        epi::LogMessage(epi::kLogLevelWarning, "Unknown thing type %i at (%1.0f, %1.0f)\n", type, x, y);
     else if (count == 2)
-        LogWarning("More unknown things of type %i found...\n", type);
+        epi::LogMessage(epi::kLogLevelWarning, "More unknown things of type %i found...\n", type);
 
     unknown_thing_map[type] = count + 1;
 }
 
-static MapObject *SpawnMapThing(const MapObjectDefinition *info, float x, float y, float z, Sector *sec, BAMAngle angle,
-                                int options, int tag)
+static MapObject *SpawnMapThing(const MapObjectDefinition *info, float x, float y, float z, Sector *sec,
+                                epi::BAMAngle angle, int options, int tag)
 {
     SpawnPoint point;
 
@@ -516,7 +519,7 @@ static MapObject *SpawnMapThing(const MapObjectDefinition *info, float x, float 
         if (sec->properties.special && sec->properties.special->hub_)
         {
             if (sec->tag <= 0)
-                LogWarning("HUB_START in sector without tag @ (%1.0f %1.0f)\n", x, y);
+                epi::LogMessage(epi::kLogLevelWarning, "HUB_START in sector without tag @ (%1.0f %1.0f)\n", x, y);
 
             point.tag = sec->tag;
 
@@ -626,7 +629,7 @@ static MapObject *SpawnMapThing(const MapObjectDefinition *info, float x, float 
 static void LoadThings(int lump)
 {
     float    x, y, z;
-    BAMAngle angle;
+    epi::BAMAngle angle;
     int      options, typenum;
     int      i;
 
@@ -656,7 +659,7 @@ static void LoadThings(int lump)
 
     for (i = 0; i < total_map_things; i++)
     {
-        options = AlignedLittleEndianU16(mt[i].options);
+        options = epi::AlignedLittleEndianU16(mt[i].options);
 
         if (options & kThingReserved)
             limit_options = true;
@@ -664,11 +667,11 @@ static void LoadThings(int lump)
 
     for (i = 0; i < total_map_things; i++, mt++)
     {
-        x       = (float)AlignedLittleEndianS16(mt->x);
-        y       = (float)AlignedLittleEndianS16(mt->y);
-        angle   = epi::BAMFromDegrees((float)AlignedLittleEndianS16(mt->angle));
-        typenum = AlignedLittleEndianU16(mt->type);
-        options = AlignedLittleEndianU16(mt->options);
+        x       = (float)epi::AlignedLittleEndianS16(mt->x);
+        y       = (float)epi::AlignedLittleEndianS16(mt->y);
+        angle   = epi::BAMFromDegrees((float)epi::AlignedLittleEndianS16(mt->angle));
+        typenum = epi::AlignedLittleEndianU16(mt->type);
+        options = epi::AlignedLittleEndianU16(mt->options);
 
         if (limit_options)
             options &= 0x001F;
@@ -749,8 +752,8 @@ static inline void ComputeLinedefData(Line *ld, int side0, int side1)
     Vertex *v1 = ld->vertex_1;
     Vertex *v2 = ld->vertex_2;
 
-    ld->delta_x = v2->X - v1->X;
-    ld->delta_y = v2->Y - v1->Y;
+    ld->delta_x = v2->x - v1->x;
+    ld->delta_y = v2->y - v1->y;
 
     if (epi::AlmostEquals(ld->delta_x, 0.0f))
         ld->slope_type = kLineClipVertical;
@@ -763,26 +766,26 @@ static inline void ComputeLinedefData(Line *ld, int side0, int side1)
 
     ld->length = PointToDistance(0, 0, ld->delta_x, ld->delta_y);
 
-    if (v1->X < v2->X)
+    if (v1->x < v2->x)
     {
-        ld->bounding_box[kBoundingBoxLeft]  = v1->X;
-        ld->bounding_box[kBoundingBoxRight] = v2->X;
+        ld->bounding_box[kBoundingBoxLeft]  = v1->x;
+        ld->bounding_box[kBoundingBoxRight] = v2->x;
     }
     else
     {
-        ld->bounding_box[kBoundingBoxLeft]  = v2->X;
-        ld->bounding_box[kBoundingBoxRight] = v1->X;
+        ld->bounding_box[kBoundingBoxLeft]  = v2->x;
+        ld->bounding_box[kBoundingBoxRight] = v1->x;
     }
 
-    if (v1->Y < v2->Y)
+    if (v1->y < v2->y)
     {
-        ld->bounding_box[kBoundingBoxBottom] = v1->Y;
-        ld->bounding_box[kBoundingBoxTop]    = v2->Y;
+        ld->bounding_box[kBoundingBoxBottom] = v1->y;
+        ld->bounding_box[kBoundingBoxTop]    = v2->y;
     }
     else
     {
-        ld->bounding_box[kBoundingBoxBottom] = v2->Y;
-        ld->bounding_box[kBoundingBoxTop]    = v1->Y;
+        ld->bounding_box[kBoundingBoxBottom] = v2->y;
+        ld->bounding_box[kBoundingBoxTop]    = v1->y;
     }
 
     if (!udmf_level && side0 == 0xFFFF)
@@ -793,16 +796,17 @@ static inline void ComputeLinedefData(Line *ld, int side0, int side1)
     // handle missing RIGHT sidedef (idea taken from MBF)
     if (side0 == -1)
     {
-        LogWarning("Bad WAD: level %s linedef #%d is missing RIGHT side\n", current_map->lump_.c_str(),
-                   (int)(ld - level_lines));
+        epi::LogMessage(epi::kLogLevelWarning, "Bad WAD: level %s linedef #%d is missing RIGHT side\n",
+                        current_map->lump_.c_str(), (int)(ld - level_lines));
         side0 = 0;
     }
 
     if ((ld->flags & kLineFlagTwoSided) && ((side0 == -1) || (side1 == -1)))
     {
-        LogWarning("Bad WAD: level %s has linedef #%d marked TWOSIDED, "
-                   "but it has only one side.\n",
-                   current_map->lump_.c_str(), (int)(ld - level_lines));
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Bad WAD: level %s has linedef #%d marked TWOSIDED, "
+                        "but it has only one side.\n",
+                        current_map->lump_.c_str(), (int)(ld - level_lines));
 
         ld->flags &= ~kLineFlagTwoSided;
     }
@@ -851,18 +855,18 @@ static void LoadLineDefs(int lump)
 
     for (int i = 0; i < total_level_lines; i++, mld++, ld++)
     {
-        ld->flags    = AlignedLittleEndianU16(mld->flags);
-        ld->tag      = HMM_MAX(0, AlignedLittleEndianS16(mld->tag));
+        ld->flags    = epi::AlignedLittleEndianU16(mld->flags);
+        ld->tag      = epi::Max<int>(0, epi::AlignedLittleEndianS16(mld->tag));
         ld->arg0     = ld->tag; // this is always true for binary format
-        ld->vertex_1 = &level_vertexes[AlignedLittleEndianU16(mld->start)];
-        ld->vertex_2 = &level_vertexes[AlignedLittleEndianU16(mld->end)];
+        ld->vertex_1 = &level_vertexes[epi::AlignedLittleEndianU16(mld->start)];
+        ld->vertex_2 = &level_vertexes[epi::AlignedLittleEndianU16(mld->end)];
 
         // Check for BoomClear flag bit and clear applicable specials
         // (PassThru may still be intentionally added further down)
         if (ld->flags & kLineFlagClearBoomFlags)
             ld->flags &= ~(kLineFlagBoomPassThrough | kLineFlagBlockGroundedMonsters | kLineFlagBlockPlayers);
 
-        ld->special = LookupLineType(HMM_MAX(0, AlignedLittleEndianS16(mld->type)));
+        ld->special = LookupLineType(epi::Max<int>(0, epi::AlignedLittleEndianS16(mld->type)));
 
         if (ld->special && ld->special->type_ == kLineTriggerWalkable)
             ld->flags |= kLineFlagBoomPassThrough;
@@ -883,8 +887,8 @@ static void LoadLineDefs(int lump)
         if (ld->special && ld->special == linetypes.Lookup(0)) // Add passthru to unknown/templated
             ld->flags |= kLineFlagBoomPassThrough;
 
-        int side0 = AlignedLittleEndianU16(mld->right);
-        int side1 = AlignedLittleEndianU16(mld->left);
+        int side0 = epi::AlignedLittleEndianU16(mld->right);
+        int side1 = epi::AlignedLittleEndianU16(mld->left);
 
         ComputeLinedefData(ld, side0, side1);
 
@@ -911,7 +915,7 @@ static void LoadUDMFVertexes()
 {
     epi::Scanner lex(udmf_lump);
 
-    LogDebug("LoadUDMFVertexes: parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFVertexes: parsing TEXTMAP\n");
     int cur_vertex = 0;
     int min_x      = 0;
     int min_y      = 0;
@@ -979,13 +983,13 @@ static void LoadUDMFVertexes()
                 {
                 case udmf::kX:
                     x     = lex.state_.decimal;
-                    min_x = HMM_MIN((int)x, min_x);
-                    max_x = HMM_MAX((int)x, max_x);
+                    min_x = epi::Min((int)x, min_x);
+                    max_x = epi::Max((int)x, max_x);
                     break;
                 case udmf::kY:
                     y     = lex.state_.decimal;
-                    min_y = HMM_MIN((int)y, min_y);
-                    max_y = HMM_MAX((int)y, max_y);
+                    min_y = epi::Min((int)y, min_y);
+                    max_y = epi::Max((int)y, max_y);
                     break;
                 case udmf::kZFloor:
                     zf = lex.state_.decimal;
@@ -997,7 +1001,7 @@ static void LoadUDMFVertexes()
                     break;
                 }
             }
-            level_vertexes[cur_vertex] = {{{{{x, y, zf}}}, zc}};
+            level_vertexes[cur_vertex] = {x, y, zf, zc};
             cur_vertex++;
         }
         else // consume other blocks
@@ -1015,14 +1019,14 @@ static void LoadUDMFVertexes()
 
     CreateThingBlockmap();
 
-    LogDebug("LoadUDMFVertexes: finished parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFVertexes: finished parsing TEXTMAP\n");
 }
 
 static void LoadUDMFSectors()
 {
     epi::Scanner lex(udmf_lump);
 
-    LogDebug("LoadUDMFSectors: parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSectors: parsing TEXTMAP\n");
     int cur_sector = 0;
     std::unordered_map<int, Sector *> tag_map;
 
@@ -1059,8 +1063,8 @@ static void LoadUDMFSectors()
             float                  rf = 0.0f, rc = 0.0f;
             float                  gravfactor = 1.0f;
             int                    light = 160, type = 0, tag = 0;
-            RGBAColor              fog_color   = kRGBABlack;
-            RGBAColor              light_color = kRGBAWhite;
+            epi::RGBAColor         fog_color   = kRGBABlack;
+            epi::RGBAColor         light_color = kRGBAWhite;
             int                    fog_density = 0;
             char                   floor_tex[10];
             char                   ceil_tex[10];
@@ -1126,7 +1130,7 @@ static void LoadUDMFSectors()
                     fog_color = ((uint32_t)lex.state_.number << 8 | 0xFF);
                     break;
                 case udmf::kFogDensity:
-                    fog_density = HMM_Clamp(0, lex.state_.number, 1020);
+                    fog_density = epi::Clamp(lex.state_.number, 0, 1020);
                     break;
                 case udmf::kXPanningFloor:
                     fx = lex.state_.decimal;
@@ -1181,10 +1185,10 @@ static void LoadUDMFSectors()
             ss->original_height = (ss->floor_height + ss->ceiling_height);
 
             ss->floor.translucency = falph;
-            ss->floor.x_matrix.X   = 1;
-            ss->floor.x_matrix.Y   = 0;
-            ss->floor.y_matrix.X   = 0;
-            ss->floor.y_matrix.Y   = 1;
+            ss->floor.x_matrix.x   = 1;
+            ss->floor.x_matrix.y   = 0;
+            ss->floor.y_matrix.x   = 0;
+            ss->floor.y_matrix.y   = 1;
 
             ss->ceiling              = ss->floor;
             ss->ceiling.translucency = calph;
@@ -1197,17 +1201,17 @@ static void LoadUDMFSectors()
                 ss->ceiling.rotation = epi::BAMFromDegrees(rc);
 
             // granular scaling
-            ss->floor.x_matrix.X   = fx_sc;
-            ss->floor.y_matrix.Y   = fy_sc;
-            ss->ceiling.x_matrix.X = cx_sc;
-            ss->ceiling.y_matrix.Y = cy_sc;
+            ss->floor.x_matrix.x   = fx_sc;
+            ss->floor.y_matrix.y   = fy_sc;
+            ss->ceiling.x_matrix.x = cx_sc;
+            ss->ceiling.y_matrix.y = cy_sc;
 
             // granular offsets
-            ss->floor.offset.X += (fx / fx_sc);
-            ss->floor.offset.Y -= (fy / fy_sc);
+            ss->floor.offset.x += (fx / fx_sc);
+            ss->floor.offset.y -= (fy / fy_sc);
             ss->floor.old_offset = ss->floor.offset;
-            ss->ceiling.offset.X += (cx / cx_sc);
-            ss->ceiling.offset.Y -= (cy / cy_sc);
+            ss->ceiling.offset.x += (cx / cx_sc);
+            ss->ceiling.offset.y -= (cy / cy_sc);
             ss->ceiling.old_offset = ss->ceiling.offset;
 
             ss->floor.image = ImageLookup(floor_tex, kImageNamespaceFlat);
@@ -1226,22 +1230,24 @@ static void LoadUDMFSectors()
 
             if (!ss->floor.image)
             {
-                LogWarning("Bad Level: sector #%d has missing floor texture.\n", cur_sector);
+                epi::LogMessage(epi::kLogLevelWarning, "Bad Level: sector #%d has missing floor texture.\n",
+                                cur_sector);
                 ss->floor.image = ImageLookup("FLAT1", kImageNamespaceFlat);
             }
             if (!ss->ceiling.image)
             {
-                LogWarning("Bad Level: sector #%d has missing ceiling texture.\n", cur_sector);
+                epi::LogMessage(epi::kLogLevelWarning, "Bad Level: sector #%d has missing ceiling texture.\n",
+                                cur_sector);
                 ss->ceiling.image = ss->floor.image;
             }
 
             // convert negative tags to zero
-            ss->tag = HMM_MAX(0, tag);
+            ss->tag = epi::Max(0, tag);
 
             ss->properties.light_level = light;
 
             // convert negative types to zero
-            ss->properties.type    = HMM_MAX(0, type);
+            ss->properties.type    = epi::Max(0, type);
             ss->properties.special = LookupSectorType(ss->properties.type);
 
             ss->extrafloor_maximum = 0;
@@ -1341,14 +1347,14 @@ static void LoadUDMFSectors()
     }
     EPI_ASSERT(cur_sector == total_level_sectors);
 
-    LogDebug("LoadUDMFSectors: finished parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSectors: finished parsing TEXTMAP\n");
 }
 
 static void LoadUDMFSideDefs()
 {
     epi::Scanner lex(udmf_lump);
 
-    LogDebug("LoadUDMFSectors: parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSectors: parsing TEXTMAP\n");
 
     level_sides = new Side[total_level_sides];
     EPI_CLEAR_MEMORY(level_sides, Side, total_level_sides);
@@ -1488,12 +1494,12 @@ static void LoadUDMFSideDefs()
             Side *sd = level_sides + nummapsides - 1;
 
             sd->top.translucency = 1.0f;
-            sd->top.offset.X     = x;
-            sd->top.offset.Y     = y;
-            sd->top.x_matrix.X   = 1;
-            sd->top.x_matrix.Y   = 0;
-            sd->top.y_matrix.X   = 0;
-            sd->top.y_matrix.Y   = 1;
+            sd->top.offset.x     = x;
+            sd->top.offset.y     = y;
+            sd->top.x_matrix.x   = 1;
+            sd->top.x_matrix.y   = 0;
+            sd->top.y_matrix.x   = 0;
+            sd->top.y_matrix.y   = 1;
 
             sd->middle = sd->top;
             sd->bottom = sd->top;
@@ -1509,20 +1515,20 @@ static void LoadUDMFSideDefs()
             sd->bottom.image = ImageLookup(bottom_tex, kImageNamespaceTexture);
 
             // granular scaling
-            sd->bottom.x_matrix.X = low_scx;
-            sd->middle.x_matrix.X = mid_scx;
-            sd->top.x_matrix.X    = high_scx;
-            sd->bottom.y_matrix.Y = low_scy;
-            sd->middle.y_matrix.Y = mid_scy;
-            sd->top.y_matrix.Y    = high_scy;
+            sd->bottom.x_matrix.x = low_scx;
+            sd->middle.x_matrix.x = mid_scx;
+            sd->top.x_matrix.x    = high_scx;
+            sd->bottom.y_matrix.y = low_scy;
+            sd->middle.y_matrix.y = mid_scy;
+            sd->top.y_matrix.y    = high_scy;
 
             // granular offsets
-            sd->bottom.offset.X += lowx / low_scx;
-            sd->middle.offset.X += midx / mid_scx;
-            sd->top.offset.X += highx / high_scx;
-            sd->bottom.offset.Y += lowy / low_scy;
-            sd->middle.offset.Y += midy / mid_scy;
-            sd->top.offset.Y += highy / high_scy;
+            sd->bottom.offset.x += lowx / low_scx;
+            sd->middle.offset.x += midx / mid_scx;
+            sd->top.offset.x += highx / high_scx;
+            sd->bottom.offset.y += lowy / low_scy;
+            sd->middle.offset.y += midy / mid_scy;
+            sd->top.offset.y += highy / high_scy;
             sd->top.old_offset    = sd->top.offset;
             sd->middle.old_offset = sd->middle.offset;
             sd->bottom.old_offset = sd->bottom.offset;
@@ -1542,7 +1548,7 @@ static void LoadUDMFSideDefs()
         }
     }
 
-    LogDebug("LoadUDMFSideDefs: post-processing linedefs & sidedefs\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSideDefs: post-processing linedefs & sidedefs\n");
 
     // post-process linedefs & sidedefs
 
@@ -1561,22 +1567,24 @@ static void LoadUDMFSideDefs()
 
         if (side0 >= nummapsides)
         {
-            LogWarning("Bad WAD: level %s linedef #%d has bad RIGHT side.\n", current_map->lump_.c_str(), i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad WAD: level %s linedef #%d has bad RIGHT side.\n",
+                            current_map->lump_.c_str(), i);
             side0 = nummapsides - 1;
         }
 
         if (side1 != -1 && side1 >= nummapsides)
         {
-            LogWarning("Bad WAD: level %s linedef #%d has bad LEFT side.\n", current_map->lump_.c_str(), i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad WAD: level %s linedef #%d has bad LEFT side.\n",
+                            current_map->lump_.c_str(), i);
             side1 = nummapsides - 1;
         }
 
         ld->side[0] = sd;
         if (sd->middle.image && (side1 != -1))
         {
-            sd->middle_mask_offset  = sd->middle.offset.Y;
-            sd->middle.offset.Y     = 0;
-            sd->middle.old_offset.Y = 0;
+            sd->middle_mask_offset  = sd->middle.offset.y;
+            sd->middle.offset.y     = 0;
+            sd->middle.old_offset.y = 0;
         }
         ld->front_sector        = sd->sector;
         sd->top.translucency    = level_line_alphas[i];
@@ -1589,9 +1597,9 @@ static void LoadUDMFSideDefs()
             ld->side[1] = sd;
             if (sd->middle.image)
             {
-                sd->middle_mask_offset  = sd->middle.offset.Y;
-                sd->middle.offset.Y     = 0;
-                sd->middle.old_offset.Y = 0;
+                sd->middle_mask_offset  = sd->middle.offset.y;
+                sd->middle.offset.y     = 0;
+                sd->middle.old_offset.y = 0;
             }
             ld->back_sector         = sd->sector;
             sd->top.translucency    = level_line_alphas[i];
@@ -1608,14 +1616,14 @@ static void LoadUDMFSideDefs()
     delete[] level_line_alphas;
     level_line_alphas = nullptr;
 
-    LogDebug("LoadUDMFSideDefs: finished parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSideDefs: finished parsing TEXTMAP\n");
 }
 
 static void LoadUDMFLineDefs()
 {
     epi::Scanner lex(udmf_lump);
 
-    LogDebug("LoadUDMFLineDefs: parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFLineDefs: parsing TEXTMAP\n");
 
     int cur_line = 0;
 
@@ -1755,15 +1763,15 @@ static void LoadUDMFLineDefs()
             Line *ld = level_lines + cur_line;
 
             ld->flags = flags;
-            ld->tag   = HMM_MAX(0, tag);
+            ld->tag   = epi::Max(0, tag);
             if (id_arg0_split)
-                ld->arg0 = HMM_MAX(0, arg0);
+                ld->arg0 = epi::Max(0, arg0);
             else
                 ld->arg0 = ld->tag;
             ld->vertex_1 = &level_vertexes[v1];
             ld->vertex_2 = &level_vertexes[v2];
 
-            ld->special = LookupLineType(HMM_MAX(0, special));
+            ld->special = LookupLineType(epi::Max(0, special));
 
             if (ld->special && ld->special->type_ == kLineTriggerWalkable)
                 ld->flags |= kLineFlagBoomPassThrough;
@@ -1816,14 +1824,14 @@ static void LoadUDMFLineDefs()
     }
     EPI_ASSERT(cur_line == total_level_lines);
 
-    LogDebug("LoadUDMFLineDefs: finished parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFLineDefs: finished parsing TEXTMAP\n");
 }
 
 static void LoadUDMFThings()
 {
     epi::Scanner lex(udmf_lump);
 
-    LogDebug("LoadUDMFThings: parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFThings: parsing TEXTMAP\n");
     while (lex.TokensLeft())
     {
         std::string section;
@@ -1851,7 +1859,7 @@ static void LoadUDMFThings()
         if (section == "thing")
         {
             float                      x = 0.0f, y = 0.0f, z = 0.0f;
-            BAMAngle                   angle     = kBAMAngle0;
+            epi::BAMAngle              angle     = epi::kBAMAngle0;
             int                        options   = kThingNotSinglePlayer | kThingNotDeathmatch | kThingNotCooperative;
             int                        typenum   = -1;
             int                        tag       = 0;
@@ -2061,7 +2069,7 @@ static void LoadUDMFThings()
     // so we can avoid re-checks
     musinfo_tracks[current_map->name_].processed = true;
 
-    LogDebug("LoadUDMFThings: finished parsing TEXTMAP\n");
+    epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFThings: finished parsing TEXTMAP\n");
 }
 
 static void LoadUDMFCounts()
@@ -2092,11 +2100,12 @@ static void LoadUDMFCounts()
                 if (section != "doom" && section != "heretic" && section != "edge-classic" &&
                     section != "zdoomtranslated" && section != "woof")
                 {
-                    LogWarning("UDMF: %s uses unsupported namespace "
-                               "\"%s\"!\nSupported namespaces are \"doom\", "
-                               "\"heretic\", \"edge-classic\", \"woof\" or "
-                               "\"zdoomtranslated\"!\n",
-                               current_map->lump_.c_str(), section.c_str());
+                    epi::LogMessage(epi::kLogLevelWarning,
+                                    "UDMF: %s uses unsupported namespace "
+                                    "\"%s\"!\nSupported namespaces are \"doom\", "
+                                    "\"heretic\", \"edge-classic\", \"woof\" or "
+                                    "\"zdoomtranslated\"!\n",
+                                    current_map->lump_.c_str(), section.c_str());
                 }
             }
 
@@ -2155,23 +2164,24 @@ static void TransferMapSideDef(const RawSidedef *msd, Side *sd, bool two_sided)
     char middle_tex[10];
     char lower_tex[10];
 
-    int sec_num = AlignedLittleEndianS16(msd->sector);
+    int sec_num = epi::AlignedLittleEndianS16(msd->sector);
 
     sd->top.translucency = 1.0f;
-    sd->top.offset.X     = AlignedLittleEndianS16(msd->x_offset);
-    sd->top.offset.Y     = AlignedLittleEndianS16(msd->y_offset);
+    sd->top.offset.x     = epi::AlignedLittleEndianS16(msd->x_offset);
+    sd->top.offset.y     = epi::AlignedLittleEndianS16(msd->y_offset);
     sd->top.old_offset   = sd->top.offset;
-    sd->top.x_matrix.X   = 1;
-    sd->top.x_matrix.Y   = 0;
-    sd->top.y_matrix.X   = 0;
-    sd->top.y_matrix.Y   = 1;
+    sd->top.x_matrix.x   = 1;
+    sd->top.x_matrix.y   = 0;
+    sd->top.y_matrix.x   = 0;
+    sd->top.y_matrix.y   = 1;
 
     sd->middle = sd->top;
     sd->bottom = sd->top;
 
     if (sec_num < 0)
     {
-        LogWarning("Level %s has sidedef with bad sector ref (%d)\n", current_map->lump_.c_str(), sec_num);
+        epi::LogMessage(epi::kLogLevelWarning, "Level %s has sidedef with bad sector ref (%d)\n",
+                        current_map->lump_.c_str(), sec_num);
         sec_num = 0;
     }
     sd->sector = &level_sectors[sec_num];
@@ -2195,9 +2205,9 @@ static void TransferMapSideDef(const RawSidedef *msd, Side *sd, bool two_sided)
 
     if (sd->middle.image && two_sided)
     {
-        sd->middle_mask_offset  = sd->middle.offset.Y;
-        sd->middle.offset.Y     = 0;
-        sd->middle.old_offset.Y = 0;
+        sd->middle_mask_offset  = sd->middle.offset.y;
+        sd->middle.offset.y     = 0;
+        sd->middle.old_offset.y = 0;
     }
 }
 
@@ -2242,13 +2252,15 @@ static void LoadSideDefs(int lump)
 
         if (side0 >= nummapsides)
         {
-            LogWarning("Bad WAD: level %s linedef #%d has bad RIGHT side.\n", current_map->lump_.c_str(), i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad WAD: level %s linedef #%d has bad RIGHT side.\n",
+                            current_map->lump_.c_str(), i);
             side0 = nummapsides - 1;
         }
 
         if (side1 != -1 && side1 >= nummapsides)
         {
-            LogWarning("Bad WAD: level %s linedef #%d has bad LEFT side.\n", current_map->lump_.c_str(), i);
+            epi::LogMessage(epi::kLogLevelWarning, "Bad WAD: level %s linedef #%d has bad LEFT side.\n",
+                            current_map->lump_.c_str(), i);
             side1 = nummapsides - 1;
         }
 
@@ -2465,15 +2477,15 @@ void GroupLines(void)
         li     = level_lines + i;
         int fi = li->front_sector - level_sectors;
         li->front_sector->lines[sector_offsets[fi]++] = li;
-        BoundingBoxAddPoint(sector_bboxes + fi * 4, li->vertex_1->X, li->vertex_1->Y);
-        BoundingBoxAddPoint(sector_bboxes + fi * 4, li->vertex_2->X, li->vertex_2->Y);
+        BoundingBoxAddPoint(sector_bboxes + fi * 4, li->vertex_1->x, li->vertex_1->y);
+        BoundingBoxAddPoint(sector_bboxes + fi * 4, li->vertex_2->x, li->vertex_2->y);
 
         if (li->back_sector && li->back_sector != li->front_sector)
         {
             int bi = li->back_sector - level_sectors;
             li->back_sector->lines[sector_offsets[bi]++] = li;
-            BoundingBoxAddPoint(sector_bboxes + bi * 4, li->vertex_1->X, li->vertex_1->Y);
-            BoundingBoxAddPoint(sector_bboxes + bi * 4, li->vertex_2->X, li->vertex_2->Y);
+            BoundingBoxAddPoint(sector_bboxes + bi * 4, li->vertex_1->x, li->vertex_1->y);
+            BoundingBoxAddPoint(sector_bboxes + bi * 4, li->vertex_2->x, li->vertex_2->y);
         }
     }
 
@@ -2496,167 +2508,167 @@ void GroupLines(void)
         // and the other two have it unset
         if (sector->line_count == 3 && udmf_level)
         {
-            sector->floor_vertex_slope_high_low   = {{-40000, 40000}};
-            sector->ceiling_vertex_slope_high_low = {{-40000, 40000}};
-            std::vector<HMM_Vec3> f_zverts;
-            std::vector<HMM_Vec3> c_zverts;
+            sector->floor_vertex_slope_high_low   = {-40000, 40000};
+            sector->ceiling_vertex_slope_high_low = {-40000, 40000};
+            std::vector<epi::Vec3> f_zverts;
+            std::vector<epi::Vec3> c_zverts;
             for (j = 0; j < 3; j++)
             {
                 Vertex *vert   = sector->lines[j]->vertex_1;
                 bool    add_it = true;
-                for (HMM_Vec3 v : f_zverts)
-                    if (epi::AlmostEquals(v.X, vert->X) && epi::AlmostEquals(v.Y, vert->Y))
+                for (epi::Vec3 v : f_zverts)
+                    if (epi::AlmostEquals(v.x, vert->x) && epi::AlmostEquals(v.y, vert->y))
                         add_it = false;
                 if (add_it)
                 {
-                    if (vert->Z < 32767.0f && vert->Z > -32768.0f)
+                    if (vert->z < 32767.0f && vert->z > -32768.0f)
                     {
                         sector->floor_vertex_slope = true;
-                        f_zverts.push_back({{vert->X, vert->Y, vert->Z}});
-                        if (vert->Z > sector->floor_vertex_slope_high_low.X)
-                            sector->floor_vertex_slope_high_low.X = vert->Z;
-                        if (vert->Z < sector->floor_vertex_slope_high_low.Y)
-                            sector->floor_vertex_slope_high_low.Y = vert->Z;
+                        f_zverts.push_back({vert->x, vert->y, vert->z});
+                        if (vert->z > sector->floor_vertex_slope_high_low.x)
+                            sector->floor_vertex_slope_high_low.x = vert->z;
+                        if (vert->z < sector->floor_vertex_slope_high_low.y)
+                            sector->floor_vertex_slope_high_low.y = vert->z;
                     }
                     else
-                        f_zverts.push_back({{vert->X, vert->Y, sector->floor_height}});
-                    if (vert->W < 32767.0f && vert->W > -32768.0f)
+                        f_zverts.push_back({vert->x, vert->y, sector->floor_height});
+                    if (vert->w < 32767.0f && vert->w > -32768.0f)
                     {
                         sector->ceiling_vertex_slope = true;
-                        c_zverts.push_back({{vert->X, vert->Y, vert->W}});
-                        if (vert->W > sector->ceiling_vertex_slope_high_low.X)
-                            sector->ceiling_vertex_slope_high_low.X = vert->W;
-                        if (vert->W < sector->ceiling_vertex_slope_high_low.Y)
-                            sector->ceiling_vertex_slope_high_low.Y = vert->W;
+                        c_zverts.push_back({vert->x, vert->y, vert->w});
+                        if (vert->w > sector->ceiling_vertex_slope_high_low.x)
+                            sector->ceiling_vertex_slope_high_low.x = vert->w;
+                        if (vert->w < sector->ceiling_vertex_slope_high_low.y)
+                            sector->ceiling_vertex_slope_high_low.y = vert->w;
                     }
                     else
-                        c_zverts.push_back({{vert->X, vert->Y, sector->ceiling_height}});
+                        c_zverts.push_back({vert->x, vert->y, sector->ceiling_height});
                 }
                 vert   = sector->lines[j]->vertex_2;
                 add_it = true;
-                for (HMM_Vec3 v : f_zverts)
-                    if (epi::AlmostEquals(v.X, vert->X) && epi::AlmostEquals(v.Y, vert->Y))
+                for (epi::Vec3 v : f_zverts)
+                    if (epi::AlmostEquals(v.x, vert->x) && epi::AlmostEquals(v.y, vert->y))
                         add_it = false;
                 if (add_it)
                 {
-                    if (vert->Z < 32767.0f && vert->Z > -32768.0f)
+                    if (vert->z < 32767.0f && vert->z > -32768.0f)
                     {
                         sector->floor_vertex_slope = true;
-                        f_zverts.push_back({{vert->X, vert->Y, vert->Z}});
-                        if (vert->Z > sector->floor_vertex_slope_high_low.X)
-                            sector->floor_vertex_slope_high_low.X = vert->Z;
-                        if (vert->Z < sector->floor_vertex_slope_high_low.Y)
-                            sector->floor_vertex_slope_high_low.Y = vert->Z;
+                        f_zverts.push_back({vert->x, vert->y, vert->z});
+                        if (vert->z > sector->floor_vertex_slope_high_low.x)
+                            sector->floor_vertex_slope_high_low.x = vert->z;
+                        if (vert->z < sector->floor_vertex_slope_high_low.y)
+                            sector->floor_vertex_slope_high_low.y = vert->z;
                     }
                     else
-                        f_zverts.push_back({{vert->X, vert->Y, sector->floor_height}});
-                    if (vert->W < 32767.0f && vert->W > -32768.0f)
+                        f_zverts.push_back({vert->x, vert->y, sector->floor_height});
+                    if (vert->w < 32767.0f && vert->w > -32768.0f)
                     {
                         sector->ceiling_vertex_slope = true;
-                        c_zverts.push_back({{vert->X, vert->Y, vert->W}});
-                        if (vert->W > sector->ceiling_vertex_slope_high_low.X)
-                            sector->ceiling_vertex_slope_high_low.X = vert->W;
-                        if (vert->W < sector->ceiling_vertex_slope_high_low.Y)
-                            sector->ceiling_vertex_slope_high_low.Y = vert->W;
+                        c_zverts.push_back({vert->x, vert->y, vert->w});
+                        if (vert->w > sector->ceiling_vertex_slope_high_low.x)
+                            sector->ceiling_vertex_slope_high_low.x = vert->w;
+                        if (vert->w < sector->ceiling_vertex_slope_high_low.y)
+                            sector->ceiling_vertex_slope_high_low.y = vert->w;
                     }
                     else
-                        c_zverts.push_back({{vert->X, vert->Y, sector->ceiling_height}});
+                        c_zverts.push_back({vert->x, vert->y, sector->ceiling_height});
                 }
             }
             if (sector->floor_vertex_slope)
             {
-                memcpy(sector->floor_z_vertices, f_zverts.data(), 3 * sizeof(HMM_Vec3));
+                memcpy(sector->floor_z_vertices, f_zverts.data(), 3 * sizeof(epi::Vec3));
                 sector->floor_vertex_slope_normal = TripleCrossProduct(
                     sector->floor_z_vertices[0], sector->floor_z_vertices[1], sector->floor_z_vertices[2]);
-                if (sector->floor_height > sector->floor_vertex_slope_high_low.X)
-                    sector->floor_vertex_slope_high_low.X = sector->floor_height;
-                if (sector->floor_height < sector->floor_vertex_slope_high_low.Y)
-                    sector->floor_vertex_slope_high_low.Y = sector->floor_height;
+                if (sector->floor_height > sector->floor_vertex_slope_high_low.x)
+                    sector->floor_vertex_slope_high_low.x = sector->floor_height;
+                if (sector->floor_height < sector->floor_vertex_slope_high_low.y)
+                    sector->floor_vertex_slope_high_low.y = sector->floor_height;
             }
             if (sector->ceiling_vertex_slope)
             {
-                memcpy(sector->ceiling_z_vertices, c_zverts.data(), 3 * sizeof(HMM_Vec3));
+                memcpy(sector->ceiling_z_vertices, c_zverts.data(), 3 * sizeof(epi::Vec3));
                 sector->ceiling_vertex_slope_normal = TripleCrossProduct(
                     sector->ceiling_z_vertices[0], sector->ceiling_z_vertices[1], sector->ceiling_z_vertices[2]);
-                if (sector->ceiling_height < sector->ceiling_vertex_slope_high_low.Y)
-                    sector->ceiling_vertex_slope_high_low.Y = sector->ceiling_height;
-                if (sector->ceiling_height > sector->ceiling_vertex_slope_high_low.X)
-                    sector->ceiling_vertex_slope_high_low.X = sector->ceiling_height;
+                if (sector->ceiling_height < sector->ceiling_vertex_slope_high_low.y)
+                    sector->ceiling_vertex_slope_high_low.y = sector->ceiling_height;
+                if (sector->ceiling_height > sector->ceiling_vertex_slope_high_low.x)
+                    sector->ceiling_vertex_slope_high_low.x = sector->ceiling_height;
             }
         }
         if (sector->line_count == 4 && udmf_level)
         {
             int floor_z_lines                     = 0;
             int ceil_z_lines                      = 0;
-            sector->floor_vertex_slope_high_low   = {{-40000, 40000}};
-            sector->ceiling_vertex_slope_high_low = {{-40000, 40000}};
-            std::vector<HMM_Vec3> f_zverts;
-            std::vector<HMM_Vec3> c_zverts;
+            sector->floor_vertex_slope_high_low   = {-40000, 40000};
+            sector->ceiling_vertex_slope_high_low = {-40000, 40000};
+            std::vector<epi::Vec3> f_zverts;
+            std::vector<epi::Vec3> c_zverts;
             for (j = 0; j < 4; j++)
             {
                 Vertex *vert      = sector->lines[j]->vertex_1;
                 Vertex *vert2     = sector->lines[j]->vertex_2;
                 bool    add_it_v1 = true;
                 bool    add_it_v2 = true;
-                for (HMM_Vec3 v : f_zverts)
-                    if (epi::AlmostEquals(v.X, vert->X) && epi::AlmostEquals(v.Y, vert->Y))
+                for (epi::Vec3 v : f_zverts)
+                    if (epi::AlmostEquals(v.x, vert->x) && epi::AlmostEquals(v.y, vert->y))
                         add_it_v1 = false;
-                for (HMM_Vec3 v : f_zverts)
-                    if (epi::AlmostEquals(v.X, vert2->X) && epi::AlmostEquals(v.Y, vert2->Y))
+                for (epi::Vec3 v : f_zverts)
+                    if (epi::AlmostEquals(v.x, vert2->x) && epi::AlmostEquals(v.y, vert2->y))
                         add_it_v2 = false;
                 if (add_it_v1)
                 {
-                    if (vert->Z < 32767.0f && vert->Z > -32768.0f)
+                    if (vert->z < 32767.0f && vert->z > -32768.0f)
                     {
-                        f_zverts.push_back({{vert->X, vert->Y, vert->Z}});
-                        if (vert->Z > sector->floor_vertex_slope_high_low.X)
-                            sector->floor_vertex_slope_high_low.X = vert->Z;
-                        if (vert->Z < sector->floor_vertex_slope_high_low.Y)
-                            sector->floor_vertex_slope_high_low.Y = vert->Z;
+                        f_zverts.push_back({vert->x, vert->y, vert->z});
+                        if (vert->z > sector->floor_vertex_slope_high_low.x)
+                            sector->floor_vertex_slope_high_low.x = vert->z;
+                        if (vert->z < sector->floor_vertex_slope_high_low.y)
+                            sector->floor_vertex_slope_high_low.y = vert->z;
                     }
                     else
-                        f_zverts.push_back({{vert->X, vert->Y, sector->floor_height}});
-                    if (vert->W < 32767.0f && vert->W > -32768.0f)
+                        f_zverts.push_back({vert->x, vert->y, sector->floor_height});
+                    if (vert->w < 32767.0f && vert->w > -32768.0f)
                     {
-                        c_zverts.push_back({{vert->X, vert->Y, vert->W}});
-                        if (vert->W > sector->ceiling_vertex_slope_high_low.X)
-                            sector->ceiling_vertex_slope_high_low.X = vert->W;
-                        if (vert->W < sector->ceiling_vertex_slope_high_low.Y)
-                            sector->ceiling_vertex_slope_high_low.Y = vert->W;
+                        c_zverts.push_back({vert->x, vert->y, vert->w});
+                        if (vert->w > sector->ceiling_vertex_slope_high_low.x)
+                            sector->ceiling_vertex_slope_high_low.x = vert->w;
+                        if (vert->w < sector->ceiling_vertex_slope_high_low.y)
+                            sector->ceiling_vertex_slope_high_low.y = vert->w;
                     }
                     else
-                        c_zverts.push_back({{vert->X, vert->Y, sector->ceiling_height}});
+                        c_zverts.push_back({vert->x, vert->y, sector->ceiling_height});
                 }
                 if (add_it_v2)
                 {
-                    if (vert2->Z < 32767.0f && vert2->Z > -32768.0f)
+                    if (vert2->z < 32767.0f && vert2->z > -32768.0f)
                     {
-                        f_zverts.push_back({{vert2->X, vert2->Y, vert2->Z}});
-                        if (vert2->Z > sector->floor_vertex_slope_high_low.X)
-                            sector->floor_vertex_slope_high_low.X = vert2->Z;
-                        if (vert2->Z < sector->floor_vertex_slope_high_low.Y)
-                            sector->floor_vertex_slope_high_low.Y = vert2->Z;
+                        f_zverts.push_back({vert2->x, vert2->y, vert2->z});
+                        if (vert2->z > sector->floor_vertex_slope_high_low.x)
+                            sector->floor_vertex_slope_high_low.x = vert2->z;
+                        if (vert2->z < sector->floor_vertex_slope_high_low.y)
+                            sector->floor_vertex_slope_high_low.y = vert2->z;
                     }
                     else
-                        f_zverts.push_back({{vert2->X, vert2->Y, sector->floor_height}});
-                    if (vert2->W < 32767.0f && vert2->W > -32768.0f)
+                        f_zverts.push_back({vert2->x, vert2->y, sector->floor_height});
+                    if (vert2->w < 32767.0f && vert2->w > -32768.0f)
                     {
-                        c_zverts.push_back({{vert2->X, vert2->Y, vert2->W}});
-                        if (vert2->W > sector->ceiling_vertex_slope_high_low.X)
-                            sector->ceiling_vertex_slope_high_low.X = vert2->W;
-                        if (vert2->W < sector->ceiling_vertex_slope_high_low.Y)
-                            sector->ceiling_vertex_slope_high_low.Y = vert2->W;
+                        c_zverts.push_back({vert2->x, vert2->y, vert2->w});
+                        if (vert2->w > sector->ceiling_vertex_slope_high_low.x)
+                            sector->ceiling_vertex_slope_high_low.x = vert2->w;
+                        if (vert2->w < sector->ceiling_vertex_slope_high_low.y)
+                            sector->ceiling_vertex_slope_high_low.y = vert2->w;
                     }
                     else
-                        c_zverts.push_back({{vert2->X, vert2->Y, sector->ceiling_height}});
+                        c_zverts.push_back({vert2->x, vert2->y, sector->ceiling_height});
                 }
-                if ((vert->Z < 32767.0f && vert->Z > -32768.0f) && (vert2->Z < 32767.0f && vert2->Z > -32768.0f) &&
-                    epi::AlmostEquals(vert->Z, vert2->Z))
+                if ((vert->z < 32767.0f && vert->z > -32768.0f) && (vert2->z < 32767.0f && vert2->z > -32768.0f) &&
+                    epi::AlmostEquals(vert->z, vert2->z))
                 {
                     floor_z_lines++;
                 }
-                if ((vert->W < 32767.0f && vert->W > -32768.0f) && (vert2->W < 32767.0f && vert2->W > -32768.0f) &&
-                    epi::AlmostEquals(vert->W, vert2->W))
+                if ((vert->w < 32767.0f && vert->w > -32768.0f) && (vert2->w < 32767.0f && vert2->w > -32768.0f) &&
+                    epi::AlmostEquals(vert->w, vert2->w))
                 {
                     ceil_z_lines++;
                 }
@@ -2667,13 +2679,13 @@ void GroupLines(void)
                 // Only need three of the verts, as with the way we regulate rectangular
                 // vert slopes, any 3 of the 4 vertices that comprise the sector
                 // will result in the same plane calculation
-                memcpy(sector->floor_z_vertices, f_zverts.data(), 3 * sizeof(HMM_Vec3));
+                memcpy(sector->floor_z_vertices, f_zverts.data(), 3 * sizeof(epi::Vec3));
                 sector->floor_vertex_slope_normal = TripleCrossProduct(
                     sector->floor_z_vertices[0], sector->floor_z_vertices[1], sector->floor_z_vertices[2]);
-                if (sector->floor_height > sector->floor_vertex_slope_high_low.X)
-                    sector->floor_vertex_slope_high_low.X = sector->floor_height;
-                if (sector->floor_height < sector->floor_vertex_slope_high_low.Y)
-                    sector->floor_vertex_slope_high_low.Y = sector->floor_height;
+                if (sector->floor_height > sector->floor_vertex_slope_high_low.x)
+                    sector->floor_vertex_slope_high_low.x = sector->floor_height;
+                if (sector->floor_height < sector->floor_vertex_slope_high_low.y)
+                    sector->floor_vertex_slope_high_low.y = sector->floor_height;
             }
             if (ceil_z_lines == 1 && c_zverts.size() == 4)
             {
@@ -2681,13 +2693,13 @@ void GroupLines(void)
                 // Only need three of the verts, as with the way we regulate rectangular
                 // vert slopes, any 3 of the 4 vertices that comprise the sector
                 // will result in the same plane calculation
-                memcpy(sector->ceiling_z_vertices, c_zverts.data(), 3 * sizeof(HMM_Vec3));
+                memcpy(sector->ceiling_z_vertices, c_zverts.data(), 3 * sizeof(epi::Vec3));
                 sector->ceiling_vertex_slope_normal = TripleCrossProduct(
                     sector->ceiling_z_vertices[0], sector->ceiling_z_vertices[1], sector->ceiling_z_vertices[2]);
-                if (sector->ceiling_height < sector->ceiling_vertex_slope_high_low.Y)
-                    sector->ceiling_vertex_slope_high_low.Y = sector->ceiling_height;
-                if (sector->ceiling_height > sector->ceiling_vertex_slope_high_low.X)
-                    sector->ceiling_vertex_slope_high_low.X = sector->ceiling_height;
+                if (sector->ceiling_height < sector->ceiling_vertex_slope_high_low.y)
+                    sector->ceiling_vertex_slope_high_low.y = sector->ceiling_height;
+                if (sector->ceiling_height > sector->ceiling_vertex_slope_high_low.x)
+                    sector->ceiling_vertex_slope_high_low.x = sector->ceiling_height;
             }
         }
 
@@ -2720,7 +2732,7 @@ static void CreateLineSides(void)
             ls->vertex_1 = side ? ld->vertex_2 : ld->vertex_1;
             ls->vertex_2 = side ? ld->vertex_1 : ld->vertex_2;
             ls->length   = ld->length;
-            ls->angle    = PointToAngle(ls->vertex_1->X, ls->vertex_1->Y, ls->vertex_2->X, ls->vertex_2->Y);
+            ls->angle    = PointToAngle(ls->vertex_1->x, ls->vertex_1->y, ls->vertex_2->x, ls->vertex_2->y);
 
             ls->front_sector = side ? ld->back_sector : ld->front_sector;
             ls->back_sector  = side ? ld->front_sector : ld->back_sector;
@@ -2811,8 +2823,8 @@ static void CreateVertexSeclists(void)
 
     EPI_CLEAR_MEMORY(level_vertex_sector_lists, VertexSectorList, num_triples);
 
-    LogDebug("Created %d seclists from %d vertices (%1.1f%%)\n", num_triples, total_level_vertexes,
-             num_triples * 100 / (float)total_level_vertexes);
+    epi::LogMessage(epi::kLogLevelDebug, "Created %d seclists from %d vertices (%1.1f%%)\n", num_triples,
+                    total_level_vertexes, num_triples * 100 / (float)total_level_vertexes);
 
     // multiple passes for each linedef:
     //   pass #1 takes care of normal sectors
@@ -3079,7 +3091,8 @@ void LevelSetup(void)
 
         // OK, CRC values have now been computed
 #ifdef DEVELOPERS
-    LogDebug("MAP CRCS: S=%08x L=%08x T=%08x\n", map_sectors_crc.crc, map_lines_crc.crc, map_things_crc.crc);
+    epi::LogMessage(epi::kLogLevelDebug, "MAP CRCS: S=%08x L=%08x T=%08x\n", map_sectors_crc.crc, map_lines_crc.crc,
+                    map_things_crc.crc);
 #endif
 
     CreateLineSides();
@@ -3135,7 +3148,7 @@ LineType *LookupLineType(int num)
     if (DDFIsBoomLineType(num))
         return DDFBoomGetGeneralizedLine(num);
 
-    LogWarning("P_LookupLineType(): Unknown linedef type %d\n", num);
+    epi::LogMessage(epi::kLogLevelWarning, "P_LookupLineType(): Unknown linedef type %d\n", num);
 
     return linetypes.Lookup(0); // template line
 }
@@ -3154,7 +3167,7 @@ SectorType *LookupSectorType(int num)
     if (DDFIsBoomSectorType(num))
         return DDFBoomGetGeneralizedSector(num);
 
-    LogWarning("P_LookupSectorType(): Unknown sector type %d\n", num);
+    epi::LogMessage(epi::kLogLevelWarning, "P_LookupSectorType(): Unknown sector type %d\n", num);
 
     return sectortypes.Lookup(0); // template sector
 }

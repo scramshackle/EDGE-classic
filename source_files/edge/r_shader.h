@@ -57,15 +57,15 @@ class ColorMixer
 
     int mod_MAX() const
     {
-        return HMM_MAX(modulate_red_, HMM_MAX(modulate_green_, modulate_blue_));
+        return epi::Max(modulate_red_, epi::Max(modulate_green_, modulate_blue_));
     }
 
     int add_MAX() const
     {
-        return HMM_MAX(add_red_, HMM_MAX(add_green_, add_blue_));
+        return epi::Max(add_red_, epi::Max(add_green_, add_blue_));
     }
 
-    void modulate_GIVE(RGBAColor rgb, float qty)
+    void modulate_GIVE(epi::RGBAColor rgb, float qty)
     {
         if (qty > 1.0f)
             qty = 1.0f;
@@ -75,7 +75,7 @@ class ColorMixer
         modulate_blue_ += (int)(epi::GetRGBABlue(rgb) * qty);
     }
 
-    void add_GIVE(RGBAColor rgb, float qty)
+    void add_GIVE(epi::RGBAColor rgb, float qty)
     {
         if (qty > 1.0f)
             qty = 1.0f;
@@ -86,15 +86,15 @@ class ColorMixer
     }
 };
 
-typedef void (*ShaderCoordinateFunction)(void *data, int v_idx, HMM_Vec3 *pos, RGBAColor *rgb, HMM_Vec2 *texc,
-                                         HMM_Vec3 *lit_pos);
+typedef void (*ShaderCoordinateFunction)(void *data, int v_idx, epi::Vec3 *pos, epi::RGBAColor *rgb, epi::Vec2 *texc,
+                                         epi::Vec3 *lit_pos);
 
 struct DynamicLightParameters
 {
-    HMM_Vec3 position;
+    epi::Vec3 position;
     float    radius;
 
-    HMM_Vec3 color;
+    epi::Vec3 color;
 
     bool additive;
 };

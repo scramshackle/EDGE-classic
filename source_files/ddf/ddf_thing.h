@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <math.h>
+
 #include "ddf_colormap.h"
 #include "ddf_states.h"
 #include "ddf_types.h"
@@ -26,7 +28,7 @@
 
 inline float DynamicLightCompatibilityRadius(float x)
 {
-    return 10.0f * HMM_SQRTF(x);
+    return 10.0f * sqrtf(x);
 }
 
 //
@@ -674,7 +676,7 @@ class DynamicLightDefinition
     DynamicLightType type_;
     std::string      shape_; // IMAGES.DDF reference
     float            radius_;
-    RGBAColor        colour_;
+    epi::RGBAColor   colour_;
     float            height_;
     bool             leaky_;
     std::string      autocolour_reference_; // IMAGES.DDF reference
@@ -698,8 +700,8 @@ class WeaknessDefinition
     WeaknessDefinition &operator=(const WeaknessDefinition &rhs);
 
     float    height_[2];
-    BAMAngle angle_[2];
-    BitSet   classes_;
+    epi::BAMAngle angle_[2];
+    epi::BitSet   classes_;
     float    multiply_;
     float    painchance_;
 };
@@ -788,7 +790,7 @@ class MapObjectDefinition
     float    bounce_speed_;
     float    bounce_up_;
     float    sight_slope_;
-    BAMAngle sight_angle_;
+    epi::BAMAngle sight_angle_;
     float    ride_friction_;
     float    shadow_trans_;
 
@@ -818,9 +820,9 @@ class MapObjectDefinition
     // armour held: 100% is normal, at 0% you never lose it.
     float  armour_protect_;
     float  armour_deplete_;
-    BitSet armour_class_;
+    epi::BitSet armour_class_;
 
-    BitSet side_;
+    epi::BitSet side_;
     int    playernum_;
     int    yalign_;    // -AJA- 2007/08/08: sprite Y alignment in bbox
 
@@ -841,9 +843,9 @@ class MapObjectDefinition
     float bobbing_;
 
     // what attack classes we are immune/resistant to (usually none).
-    BitSet immunity_;
-    BitSet resistance_;
-    BitSet ghost_; // pass through us
+    epi::BitSet immunity_;
+    epi::BitSet resistance_;
+    epi::BitSet ghost_; // pass through us
 
     float resist_multiply_;
     float resist_painchance_;
@@ -925,7 +927,7 @@ class MapObjectDefinition
 struct DEHSpawnParameters
 {
     const char *spawn_name = nullptr;
-    BAMAngle    angle      = kBAMAngle0;
+    epi::BAMAngle angle      = epi::kBAMAngle0;
     float       x_offset   = 0.0f;
     float       y_offset   = 0.0f;
     float       z_offset   = 0.0f;

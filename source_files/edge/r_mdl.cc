@@ -23,6 +23,8 @@
 //
 //----------------------------------------------------------------------------
 
+#include "r_mdl.h"
+
 #include <stddef.h>
 #include <string.h>
 
@@ -30,6 +32,7 @@
 #include <vector>
 
 #include "ddf_types.h"
+#include "dm_colors.h"
 #include "dm_state.h" // EDGE_IMAGE_IS_SKY
 #include "epi.h"
 #include "epi_endian.h"
@@ -44,10 +47,8 @@
 #include "r_effects.h"
 #include "r_gldefs.h"
 #include "r_image.h"
-#include "r_mdcommon.h"
-#include "r_mdl.h"
-
 #include "r_lightgrid.h"
+#include "r_mdcommon.h"
 #include "r_mdmesh.h"
 #include "r_mirror.h"
 #include "r_misc.h"
@@ -206,8 +207,8 @@ class MDLModel
     }
 };
 
-static HMM_Vec3 render_position;
-static HMM_Vec2 render_texture_coordinates;
+static epi::Vec3 render_position;
+static epi::Vec2 render_texture_coordinates;
 
 static std::vector<RendererVertex> model_vertices;
 
@@ -217,7 +218,7 @@ static void ReserveModelVertices(int count)
         model_vertices.resize(count);
 }
 
-static inline void StoreModelVertex(int index, RGBAColor rgba)
+static inline void StoreModelVertex(int index, epi::RGBAColor rgba)
 {
     RendererVertex *dest = &model_vertices[index];
 
@@ -246,8 +247,8 @@ static void MDLBuildMesh(MDLModel *md)
     ModelMeshBuild(md->mesh_, points.data(), md->total_points_, triangle_points.data(), md->total_triangles_,
                    md->vertices_per_frame_);
 
-    LogDebug("  mesh: %d vertices, %d indices, %d submeshes\n", md->mesh_.TotalVertices(), md->mesh_.TotalIndices(),
-             (int)md->mesh_.submeshes_.size());
+    epi::LogMessage(epi::kLogLevelDebug, "  mesh: %d vertices, %d indices, %d submeshes\n", md->mesh_.TotalVertices(),
+                    md->mesh_.TotalIndices(), (int)md->mesh_.submeshes_.size());
 }
 
 static void MDLUploadMesh(MDLModel *md)
@@ -282,11 +283,11 @@ static void MDLUploadMesh(MDLModel *md)
             destination[v * 3 + 1] = vert->y;
             destination[v * 3 + 2] = vert->z;
 
-            const HMM_Vec3 &normal = md_normals[vert->normal_idx];
+            const epi::Vec3 &normal = md_normals[vert->normal_idx];
 
-            normal_destination[v * 3 + 0] = normal.X;
-            normal_destination[v * 3 + 1] = normal.Y;
-            normal_destination[v * 3 + 2] = normal.Z;
+            normal_destination[v * 3 + 0] = normal.x;
+            normal_destination[v * 3 + 1] = normal.y;
+            normal_destination[v * 3 + 2] = normal.z;
         }
     }
 
@@ -306,7 +307,7 @@ static void MDLUploadMesh(MDLModel *md)
 
     mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_.data(), mesh.TotalIndices());
 
-    LogDebug("  mesh gpu handle: %u\n", mesh.gpu_handle_);
+    epi::LogMessage(epi::kLogLevelDebug, "  mesh gpu handle: %u\n", mesh.gpu_handle_);
 }
 
 /*============== LOADING CODE ====================*/
@@ -331,10 +332,10 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
     /* read header */
     f->Read(&header, sizeof(RawMDLHeader));
 
-    int version = AlignedLittleEndianS32(header.version);
+    int version = epi::AlignedLittleEndianS32(header.version);
 
-    LogDebug("MODEL IDENT: [%c%c%c%c] VERSION: %d", header.ident[0], header.ident[1], header.ident[2], header.ident[3],
-             version);
+    epi::LogMessage(epi::kLogLevelDebug, "MODEL IDENT: [%c%c%c%c] VERSION: %d", header.ident[0], header.ident[1],
+                    header.ident[2], header.ident[3], version);
 
     if (strncmp(header.ident, kMDLIdentifier, 4) != 0)
     {
@@ -346,25 +347,25 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
         FatalError("MDL_LoadModel: strange version!");
     }
 
-    int num_frames = AlignedLittleEndianS32(header.num_frames);
-    int num_tris   = AlignedLittleEndianS32(header.num_tris);
-    int num_verts  = AlignedLittleEndianS32(header.num_verts);
-    int swidth     = AlignedLittleEndianS32(header.skin_width);
-    int sheight    = AlignedLittleEndianS32(header.skin_height);
+    int num_frames = epi::AlignedLittleEndianS32(header.num_frames);
+    int num_tris   = epi::AlignedLittleEndianS32(header.num_tris);
+    int num_verts  = epi::AlignedLittleEndianS32(header.num_verts);
+    int swidth     = epi::AlignedLittleEndianS32(header.skin_width);
+    int sheight    = epi::AlignedLittleEndianS32(header.skin_height);
     int num_points = num_tris * 3;
 
     MDLModel *md = new MDLModel(num_frames, num_points, num_tris, swidth, sheight);
 
     /* PARSE SKINS */
 
-    for (int i = 0; i < AlignedLittleEndianS32(header.num_skins); i++)
+    for (int i = 0; i < epi::AlignedLittleEndianS32(header.num_skins); i++)
     {
         int      group  = 0;
         uint8_t *pixels = new uint8_t[sheight * swidth];
 
         // Check for single vs. group skins; error if group skin found
         f->Read(&group, sizeof(int));
-        if (AlignedLittleEndianS32(group))
+        if (epi::AlignedLittleEndianS32(group))
         {
             FatalError("MDL_LoadModel: Group skins unsupported!\n");
         }
@@ -407,11 +408,11 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
         f->Read(frames[fr].frame.verts, num_verts * sizeof(RawMDLVertex));
     }
 
-    LogDebug("  frames:%d  points:%d  tris: %d\n", num_frames, num_points, num_tris);
+    epi::LogMessage(epi::kLogLevelDebug, "  frames:%d  points:%d  tris: %d\n", num_frames, num_points, num_tris);
 
     md->vertices_per_frame_ = num_verts;
 
-    LogDebug("  vertices_per_frame_:%d\n", md->vertices_per_frame_);
+    epi::LogMessage(epi::kLogLevelDebug, "  vertices_per_frame_:%d\n", md->vertices_per_frame_);
 
     // convert glcmds into tris and points
     int      *tri   = md->triangle_indices_;
@@ -429,11 +430,11 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
         for (int j = 0; j < 3; j++, point++)
         {
             RawMDLTriangle raw_tri = tris[i];
-            point->vert_idx        = AlignedLittleEndianS32(raw_tri.vertex[j]);
-            float s                = (float)AlignedLittleEndianS16(texcoords[point->vert_idx].s);
-            float t                = (float)AlignedLittleEndianS16(texcoords[point->vert_idx].t);
-            if (!AlignedLittleEndianS32(raw_tri.facesfront) &&
-                AlignedLittleEndianS32(texcoords[point->vert_idx].onseam))
+            point->vert_idx        = epi::AlignedLittleEndianS32(raw_tri.vertex[j]);
+            float s                = (float)epi::AlignedLittleEndianS16(texcoords[point->vert_idx].s);
+            float t                = (float)epi::AlignedLittleEndianS16(texcoords[point->vert_idx].t);
+            if (!epi::AlignedLittleEndianS32(raw_tri.facesfront) &&
+                epi::AlignedLittleEndianS32(texcoords[point->vert_idx].onseam))
                 s += (float)swidth * 0.5f;
             point->skin_s = (s + 0.5f) / (float)swidth;
             point->skin_t = (t + 0.5f) / (float)sheight;
@@ -452,12 +453,12 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
     uint32_t raw_scale[3];
     uint32_t raw_translate[3];
 
-    raw_scale[0]     = AlignedLittleEndianU32(header.scale_x);
-    raw_scale[1]     = AlignedLittleEndianU32(header.scale_y);
-    raw_scale[2]     = AlignedLittleEndianU32(header.scale_z);
-    raw_translate[0] = AlignedLittleEndianU32(header.trans_x);
-    raw_translate[1] = AlignedLittleEndianU32(header.trans_y);
-    raw_translate[2] = AlignedLittleEndianU32(header.trans_z);
+    raw_scale[0]     = epi::AlignedLittleEndianU32(header.scale_x);
+    raw_scale[1]     = epi::AlignedLittleEndianU32(header.scale_y);
+    raw_scale[2]     = epi::AlignedLittleEndianU32(header.scale_z);
+    raw_translate[0] = epi::AlignedLittleEndianU32(header.trans_x);
+    raw_translate[1] = epi::AlignedLittleEndianU32(header.trans_y);
+    raw_translate[2] = epi::AlignedLittleEndianU32(header.trans_z);
 
     float *f_ptr = (float *)raw_scale;
     float  scale[3];
@@ -498,12 +499,13 @@ MDLModel *MDLLoad(epi::File *f, float &radius)
             //  Dasho: Maybe try to salvage bad MDL models?
             if (good_V->normal_idx >= kTotalMDFormatNormals)
             {
-                LogDebug("Vert %d of Frame %d has an invalid normal index: %d\n", v, i, good_V->normal_idx);
+                epi::LogMessage(epi::kLogLevelDebug, "Vert %d of Frame %d has an invalid normal index: %d\n", v, i,
+                                good_V->normal_idx);
                 good_V->normal_idx = (good_V->normal_idx % kTotalMDFormatNormals);
             }
 
-            HMM_Vec3 vr = {{good_V->x, good_V->y, good_V->z}};
-            float    r  = HMM_Len(vr);
+            epi::Vec3 vr = {good_V->x, good_V->y, good_V->z};
+            float     r  = epi::VectorLength(vr);
 
             if (r > radius)
             {
@@ -561,30 +563,30 @@ class MDLCoordinateData
 
     // fuzzy info
     float    fuzz_multiplier_;
-    HMM_Vec2 fuzz_add_;
+    epi::Vec2 fuzz_add_;
 
     // mlook vectors
-    HMM_Vec2 mouselook_x_vector_;
-    HMM_Vec2 mouselook_z_vector_;
+    epi::Vec2 mouselook_x_vector_;
+    epi::Vec2 mouselook_z_vector_;
 
     // rotation vectors
-    HMM_Vec2 rotation_vector_x_;
-    HMM_Vec2 rotation_vector_y_;
+    epi::Vec2 rotation_vector_x_;
+    epi::Vec2 rotation_vector_y_;
 
   public:
-    void CalculatePosition(HMM_Vec3 &pos, float x1, float y1, float z1) const
+    void CalculatePosition(epi::Vec3 &pos, float x1, float y1, float z1) const
     {
         x1 *= xy_scale_;
         y1 *= xy_scale_;
         z1 *= z_scale_;
 
-        float x2 = x1 * mouselook_x_vector_.X + z1 * mouselook_x_vector_.Y;
-        float z2 = x1 * mouselook_z_vector_.X + z1 * mouselook_z_vector_.Y;
+        float x2 = x1 * mouselook_x_vector_.x + z1 * mouselook_x_vector_.y;
+        float z2 = x1 * mouselook_z_vector_.x + z1 * mouselook_z_vector_.y;
         float y2 = y1;
 
-        pos.X = x_ + x2 * rotation_vector_x_.X + y2 * rotation_vector_x_.Y;
-        pos.Y = y_ + x2 * rotation_vector_y_.X + y2 * rotation_vector_y_.Y;
-        pos.Z = z_ + z2;
+        pos.x = x_ + x2 * rotation_vector_x_.x + y2 * rotation_vector_x_.y;
+        pos.y = y_ + x2 * rotation_vector_y_.x + y2 * rotation_vector_y_.y;
+        pos.z = z_ + z2;
     }
 };
 
@@ -597,12 +599,12 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     // check if frames are valid
     if (frame1 < 0 || frame1 >= md->total_frames_)
     {
-        LogDebug("Render model: bad frame %d\n", frame1);
+        epi::LogMessage(epi::kLogLevelDebug, "Render model: bad frame %d\n", frame1);
         return;
     }
     if (frame2 < 0 || frame2 >= md->total_frames_)
     {
-        LogDebug("Render model: bad frame %d\n", frame1);
+        epi::LogMessage(epi::kLogLevelDebug, "Render model: bad frame %d\n", frame1);
         return;
     }
 
@@ -664,7 +666,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     if (!console_active && !paused && !menu_active && !rts_menu_active &&
         (is_weapon || (!time_stop_active && !erraticism_active)))
     {
-        BAMAngle ang;
+        epi::BAMAngle ang;
         if (is_weapon)
         {
             BAMAngleToMatrix(tilt ? ~epi::BAMInterpolate(mo->old_vertical_angle_, mo->vertical_angle_, fractional_tic)
@@ -682,7 +684,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     else
     {
         BAMAngleToMatrix(tilt ? ~mo->vertical_angle_ : 0, &data.mouselook_x_vector_, &data.mouselook_z_vector_);
-        BAMAngle ang = mo->angle_ + rotation;
+        epi::BAMAngle ang = mo->angle_ + rotation;
         BAMAngleToMatrix(~ang, &data.rotation_vector_x_, &data.rotation_vector_y_);
     }
 
@@ -698,13 +700,13 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
         skin_tex = ImageCache(fuzz_image, false);
 
         data.fuzz_multiplier_ = 0.8;
-        data.fuzz_add_        = {{0, 0}};
+        data.fuzz_add_        = {0, 0};
 
         if (!data.is_weapon && !view_is_zoomed)
         {
             float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
 
-            data.fuzz_multiplier_ = 70.0 / HMM_Clamp(35, dist, 700);
+            data.fuzz_multiplier_ = 70.0 / epi::Clamp(dist, 35.0f, 700.0f);
         }
 
         FuzzAdjust(&data.fuzz_add_, mo);
@@ -738,7 +740,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
     ModelMesh &mesh = md->mesh_;
 
-    RGBAColor fc_to_use = mo->sector_->properties.fog_color;
+    epi::RGBAColor fc_to_use = mo->sector_->properties.fog_color;
     float     fd_to_use = mo->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
@@ -764,7 +766,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     }
     else if (draw_culling.d_)
     {
-        RGBAColor fogColor;
+        epi::RGBAColor fogColor;
         if (need_to_draw_sky)
         {
             switch (cull_fog_color.d_)
@@ -777,7 +779,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
                 fogColor = kRGBASilver;
                 break;
             case 2:
-                fogColor = MakeRGBAConstant(0x404040FF); // Find a constant to call this
+                fogColor = epi::MakeRGBAConstant(0x404040FF); // Find a constant to call this
                 break;
             case 3:
                 fogColor = kRGBABlack;
@@ -892,7 +894,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     info.light_depth_fixed = is_weapon;
     info.light_fixed_depth = is_weapon ? WeaponModelLightDepth(mo) : 0.0f;
     info.fuzzy             = data.is_fuzzy_;
-    info.tint = {{render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier}};
+    info.tint              = {render_view_red_multiplier, render_view_green_multiplier, render_view_blue_multiplier};
 
     if (blending & kBlendingLess)
         info.alpha_test = trans * 0.66f;
@@ -903,7 +905,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
 
     if (data.is_fuzzy_)
     {
-        info.texture_scale  = {{data.fuzz_multiplier_, data.fuzz_multiplier_}};
+        info.texture_scale  = {data.fuzz_multiplier_, data.fuzz_multiplier_};
         info.texture_offset = data.fuzz_add_;
     }
 
@@ -950,7 +952,7 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
     render_state->Enable(GL_BLEND);
     render_state->Enable(GL_CULL_FACE);
 
-    RGBAColor model_rgba = (info->flags_ & kMapObjectFlagFuzzy) ? epi::MakeRGBA(0, 0, 0, 128) : kRGBAWhite;
+    epi::RGBAColor model_rgba = (info->flags_ & kMapObjectFlagFuzzy) ? epi::MakeRGBA(0, 0, 0, 128) : kRGBAWhite;
 
     const ModelMesh &mesh = md->mesh_;
 
@@ -965,13 +967,13 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
         const ModelMeshVertex *point = &mesh.vertices_[(size_t)v];
         const MDLVertex       *vert  = &frame_ptr->vertices[point->vert_idx];
 
-        render_texture_coordinates = {{point->skin_s, point->skin_t}};
+        render_texture_coordinates = {point->skin_s, point->skin_t};
 
         float dx = vert->x * xscale;
         float dy = vert->y * xscale;
         float dz = (vert->z + info->model_bias_) * yscale;
 
-        render_position = {{x + dy, y + dz, dx / 256.0f}};
+        render_position = {x + dy, y + dz, dx / 256.0f};
 
         StoreModelVertex(v, model_rgba);
     }

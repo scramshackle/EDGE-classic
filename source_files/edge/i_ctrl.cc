@@ -24,6 +24,7 @@
 #include "e_input.h"
 #include "e_main.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "i_sound.h"
 #include "i_system.h"
@@ -372,7 +373,7 @@ static void HandleGamepadTriggerEvent(SDL_Event *ev)
 
     InputEvent event;
 
-    int thresh = RoundToInteger(*joystick_deadzones[current_axis] * 32767.0f);
+    int thresh = epi::RoundToInteger(*joystick_deadzones[current_axis] * 32767.0f);
     int input  = ev->gaxis.value;
 
     if (current_axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER)
@@ -449,7 +450,7 @@ static void I_OpenJoystick(SDL_JoystickID id)
     joystick_info = SDL_OpenJoystick(id);
     if (!joystick_info)
     {
-        LogPrint("Unable to open joystick %d (SDL error)\n", id);
+        epi::LogMessage(epi::kLogLevelPrint, "Unable to open joystick %d (SDL error)\n", id);
         return;
     }
 
@@ -457,7 +458,8 @@ static void I_OpenJoystick(SDL_JoystickID id)
 
     if (!gamepad_info)
     {
-        LogPrint("Unable to open joystick %s as a gamepad!\n", SDL_GetJoystickName(joystick_info));
+        epi::LogMessage(epi::kLogLevelPrint, "Unable to open joystick %s as a gamepad!\n",
+                        SDL_GetJoystickName(joystick_info));
         SDL_CloseJoystick(joystick_info);
         joystick_info = nullptr;
         return;
@@ -489,9 +491,9 @@ static void I_OpenJoystick(SDL_JoystickID id)
             gp_num_buttons++;
     }
 
-    LogPrint("Opened gamepad %d : %s\n", id, name);
-    LogPrint("Sticks:%d Triggers: %d Buttons: %d Touchpads: %d\n", gp_total_joysticksticks, gp_num_triggers,
-             gp_num_buttons, SDL_GetNumGamepadTouchpads(gamepad_info));
+    epi::LogMessage(epi::kLogLevelPrint, "Opened gamepad %d : %s\n", id, name);
+    epi::LogMessage(epi::kLogLevelPrint, "Sticks:%d Triggers: %d Buttons: %d Touchpads: %d\n", gp_total_joysticksticks,
+                    gp_num_triggers, gp_num_buttons, SDL_GetNumGamepadTouchpads(gamepad_info));
 }
 
 void CheckJoystickChanged(void)
@@ -728,17 +730,17 @@ void ShowGamepads(void)
 {
     if (no_joystick)
     {
-        LogPrint("Gamepad system is disabled.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Gamepad system is disabled.\n");
         return;
     }
 
     if (attached_joysticks.empty())
     {
-        LogPrint("No gamepads found.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "No gamepads found.\n");
         return;
     }
 
-    LogPrint("Gamepads:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Gamepads:\n");
 
     for (std::set<SDL_JoystickID>::iterator iter = attached_joysticks.begin(), iter_end = attached_joysticks.end(); iter != iter_end;
         ++iter)
@@ -747,7 +749,7 @@ void ShowGamepads(void)
         if (!name)
             name = "(UNKNOWN)";
 
-        LogPrint("  %2d : %s\n", *iter, name);
+        epi::LogMessage(epi::kLogLevelPrint, "  %2d : %s\n", *iter, name);
     }
 }
 
@@ -759,14 +761,14 @@ void StartupJoystick(void)
 
     if (FindArgument("no_joystick") > 0)
     {
-        LogPrint("StartupControl: Gamepad system disabled.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "StartupControl: Gamepad system disabled.\n");
         no_joystick = true;
         return;
     }
 
     if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
     {
-        LogPrint("StartupControl: Couldn't init SDL GAMEPAD!\n");
+        epi::LogMessage(epi::kLogLevelPrint, "StartupControl: Couldn't init SDL GAMEPAD!\n");
         no_joystick = true;
         return;
     }
@@ -776,7 +778,7 @@ void StartupJoystick(void)
     int total_joysticks = 0;
     SDL_JoystickID *joystick_ids = SDL_GetJoysticks(&total_joysticks);
 
-    LogPrint("StartupControl: %d gamepads found.\n", total_joysticks);
+    epi::LogMessage(epi::kLogLevelPrint, "StartupControl: %d gamepads found.\n", total_joysticks);
 
     if (total_joysticks == 0)
     {

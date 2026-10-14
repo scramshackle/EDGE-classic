@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 #include "gpu_pipeline.h"
 #include "gpu_shaders.h"
 #include "i_defs_gl.h"
@@ -161,7 +161,7 @@ struct GpuMovieArguments
     SDL_GPUTexture *texture[3];
     SDL_GPUSampler *sampler;
 
-    HMM_Mat4 mvp;
+    epi::Mat4 mvp;
 
     int32_t base_vertex;
 
@@ -223,9 +223,9 @@ class GpuImmediate
 
     void PopMatrix();
 
-    void LoadMatrix(const HMM_Mat4 &matrix);
+    void LoadMatrix(const epi::Mat4 &matrix);
 
-    void MultiplyMatrix(const HMM_Mat4 &matrix);
+    void MultiplyMatrix(const epi::Mat4 &matrix);
 
     void Translate(float x, float y, float z);
 
@@ -237,12 +237,12 @@ class GpuImmediate
 
     void Frustum(float left, float right, float bottom, float top, float z_near, float z_far);
 
-    const HMM_Mat4 &ModelViewMatrix() const
+    const epi::Mat4 &ModelViewMatrix() const
     {
         return matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]];
     }
 
-    const HMM_Mat4 &ProjectionMatrix() const
+    const epi::Mat4 &ProjectionMatrix() const
     {
         return matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]];
     }
@@ -284,19 +284,19 @@ class GpuImmediate
 
     void SetViewTint(float r, float g, float b);
 
-    void SetTextureOffset(const HMM_Vec2 &offset);
+    void SetTextureOffset(const epi::Vec2 &offset);
 
     void SetLightRowOffset(float offset);
 
-    void SetSpriteView(const HMM_Vec4 view[2]);
+    void SetSpriteView(const epi::Vec4 view[2]);
 
-    void SetLiquid(const HMM_Vec4 &liquid);
+    void SetLiquid(const epi::Vec4 &liquid);
 
     bool SetColorLookup(int slot);
 
     void SetWhiten(bool enabled);
 
-    void SetBlur(const HMM_Vec4 &blur);
+    void SetBlur(const epi::Vec4 &blur);
 
     void UploadColorLookup(int slot, const uint8_t *pixels);
 
@@ -472,7 +472,7 @@ class GpuImmediate
     std::vector<GpuVertexParameters>   vertex_parameters_;
     std::vector<GpuFragmentParameters> fragment_parameters_;
 
-    HMM_Mat4 matrix_stack_[kGpuMatrixModeTotal][kGpuMatrixStackDepth];
+    epi::Mat4 matrix_stack_[kGpuMatrixModeTotal][kGpuMatrixStackDepth];
     int32_t  matrix_top_[kGpuMatrixModeTotal];
 
     GpuMatrixMode current_matrix_mode_ = kGpuMatrixModeModelView;
@@ -507,7 +507,7 @@ class GpuImmediate
     bool        light_depth_enabled_ = false;
     float       texture_offset_[2]  = {0.0f, 0.0f};
     float       light_row_offset_   = 0.0f;
-    HMM_Vec4    sprite_view_[2]      = {};
+    epi::Vec4   sprite_view_[2]      = {};
     float       view_tint_[3]        = {1.0f, 1.0f, 1.0f};
 
     std::vector<SDL_GPUBuffer *> static_buffers_;

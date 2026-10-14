@@ -17,6 +17,7 @@
 //----------------------------------------------------------------------------
 
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -29,12 +30,12 @@
 #include "ddf_local.h"
 #include "ddf_style.h"
 #include "ddf_switch.h"
+#include "dm_colors.h"
 #include "epi.h"
 #include "epi_filesystem.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
 #include "p_action.h"
-#include "stb_sprintf.h"
 
 void ReadRADScript(const std::string &_data, const std::string &source);
 
@@ -97,40 +98,40 @@ std::string cur_ddf_linedata;
 
     // put actual error message on first line
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
     if (cur_ddf_filename != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)),
-                       "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)),
+                                 "Error occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_entryname != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred in entry: %s\n",
-                       cur_ddf_entryname.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred in entry: %s\n",
+                                 cur_ddf_entryname.c_str());
         pos += strlen(pos);
     }
 
     if (cur_ddf_linedata != "")
     {
-        stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
-                       cur_ddf_linedata.c_str());
+        epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                                 cur_ddf_linedata.c_str());
         pos += strlen(pos);
     }
 
     // check for buffer overflow
     if (buffer[2047] != 0)
-        FatalError("Buffer overflow in DDFError\n");
+        epi::FatalError("Buffer overflow in DDFError\n");
 
     // add a blank line for readability under DOS/Linux.
-    LogPrint("\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
 
-    FatalError("%s", buffer);
+    epi::FatalError("%s", buffer);
 }
 
 void DDFWarning(const char *err, ...)
@@ -142,24 +143,25 @@ void DDFWarning(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
-    LogWarning("%s", buffer);
+    epi::LogMessage(epi::kLogLevelWarning, "%s", buffer);
 
     if (!cur_ddf_filename.empty())
     {
-        LogPrint("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "  problem occurred near line %d of %s\n", cur_ddf_line_num,
+                        cur_ddf_filename.c_str());
     }
 
     if (!cur_ddf_entryname.empty())
     {
-        LogPrint("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
     }
 
     if (!cur_ddf_linedata.empty())
     {
-        LogPrint("  with line contents: %s\n", cur_ddf_linedata.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "  with line contents: %s\n", cur_ddf_linedata.c_str());
     }
 }
 
@@ -172,24 +174,25 @@ void DDFDebug(const char *err, ...)
         return;
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
-    LogDebug("%s", buffer);
+    epi::LogMessage(epi::kLogLevelDebug, "%s", buffer);
 
     if (!cur_ddf_filename.empty())
     {
-        LogDebug("  problem occurred near line %d of %s\n", cur_ddf_line_num, cur_ddf_filename.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "  problem occurred near line %d of %s\n", cur_ddf_line_num,
+                        cur_ddf_filename.c_str());
     }
 
     if (!cur_ddf_entryname.empty())
     {
-        LogDebug("  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "  problem occurred in entry: %s\n", cur_ddf_entryname.c_str());
     }
 
     if (!cur_ddf_linedata.empty())
     {
-        LogDebug("  with line contents: %s\n", cur_ddf_linedata.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "  with line contents: %s\n", cur_ddf_linedata.c_str());
     }
 }
 
@@ -199,7 +202,7 @@ void DDFWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)
@@ -329,7 +332,7 @@ void DDFGetLumpNameForFile(const char *filename, char *lumpname)
     FILE *fp = fopen(filename, "r");
 
     if (!fp)
-        FatalError("Couldn't open DDF file: %s\n", filename);
+        epi::FatalError("Couldn't open DDF file: %s\n", filename);
 
     bool in_comment = false;
 
@@ -393,13 +396,13 @@ void DDFGetLumpNameForFile(const char *filename, char *lumpname)
             }
 
             fclose(fp);
-            FatalError("Unknown marker <%s> in DDF file: %s\n", tag_buf, filename);
+            epi::FatalError("Unknown marker <%s> in DDF file: %s\n", tag_buf, filename);
         }
         break;
     }
 
     fclose(fp);
-    FatalError("Missing <..> marker in DDF file: %s\n", filename);
+    epi::FatalError("Missing <..> marker in DDF file: %s\n", filename);
 }
 
 //
@@ -684,9 +687,9 @@ static DDFReadCharReturn DDFMainProcessChar(char character, std::string &token, 
         }
 
     default: // doh!
-        FatalError("DDFMainProcessChar: INTERNAL ERROR: "
-                   "Bad status value %d !\n",
-                   status);
+        epi::FatalError("DDFMainProcessChar: INTERNAL ERROR: "
+                        "Bad status value %d !\n",
+                        status);
     }
 
     return kDDFReadCharReturnNothing;
@@ -997,11 +1000,11 @@ void DDFMainReadFile(DDFReadInfo *readinfo, const std::string &data)
         case kDDFReadCharReturnOK:
 #if (DDF_DEBUG_READ)
             charcount++;
-            LogDebug("%c", character);
+            epi::LogMessage(epi::kLogLevelDebug, "%c", character);
             if (charcount == 75)
             {
                 charcount = 0;
-                LogDebug("\n");
+                epi::LogMessage(epi::kLogLevelDebug, "\n");
             }
 #endif
             break;
@@ -1190,7 +1193,7 @@ int DDFMainLookupDirector(const MapObjectDefinition *info, const char *ref)
     int state = DDFStateFindLabel(info->state_grp_, director.c_str(), true);
     if (state == 0)
         return state;
-    int offset = p ? HMM_MAX(0, atoi(p + 1) - 1) : 0;
+    int offset = p ? epi::Max(0, atoi(p + 1) - 1) : 0;
 
     // FIXME: check for overflow
     return state + offset;
@@ -1218,7 +1221,7 @@ void DDFMainGetAngle(const char *info, void *storage)
 {
     EPI_ASSERT(info && storage);
 
-    BAMAngle *dest = (BAMAngle *)storage;
+    epi::BAMAngle *dest = (epi::BAMAngle *)storage;
 
     float val;
 
@@ -1243,7 +1246,7 @@ void DDFMainGetSlope(const char *info, void *storage)
     if (val < -89.5f)
         val = -89.5f;
 
-    *dest = tan(val * HMM_PI / 180.0);
+    *dest = tan(val * epi::kPi / 180.0);
 }
 
 static void DoGetFloat(const char *info, void *storage)
@@ -1280,7 +1283,7 @@ void DDFMainGetPercent(const char *info, void *storage)
         DDFWarnError("Bad percent value '%s': Should be a number followed by %%\n", info);
         // -AJA- 2001/01/27: backwards compatibility
         DoGetFloat(s, &f);
-        *dest = HMM_MAX(0, HMM_MIN(1, f));
+        *dest = epi::Max(0.0f, epi::Min(1.0f, f));
         return;
     }
 
@@ -1384,7 +1387,7 @@ void DDFMainGetColourmap(const char *info, void *storage)
 //
 void DDFMainGetRGB(const char *info, void *storage)
 {
-    RGBAColor *result = (RGBAColor *)storage;
+    epi::RGBAColor *result = (epi::RGBAColor *)storage;
     int        r      = 0;
     int        g      = 0;
     int        b      = 0;
@@ -1486,7 +1489,7 @@ void DDFMainGetWhenAppear(const char *info, void *storage)
 //
 void DDFMainGetBitSet(const char *info, void *storage)
 {
-    BitSet *result = (BitSet *)storage;
+    epi::BitSet *result = (epi::BitSet *)storage;
     int     start, end;
 
     EPI_ASSERT(info && storage);
@@ -1527,7 +1530,7 @@ static int FindSpecialFlag(const char *prefix, const char *name, const DDFSpecia
         if (current[0] == '!')
             current++;
 
-        stbsp_sprintf(try_name, "%s%s", prefix, current);
+        epi::FormatToBufferSized(try_name, sizeof(try_name), "%s%s", prefix, current);
 
         if (DDFCompareName(name, try_name) == 0)
             return i;
@@ -2050,8 +2053,8 @@ void WeaknessDefinition::Default()
     height_[0] = 0.0f;
     height_[1] = 1.0f;
 
-    angle_[0] = kBAMAngle0;
-    angle_[1] = kBAMAngle360;
+    angle_[0] = epi::kBAMAngle0;
+    angle_[1] = epi::kBAMAngle360;
 
     classes_    = 0;
     multiply_   = 2.5;
@@ -2156,7 +2159,7 @@ void DDFAddCollection(std::vector<DDFFile> &col, const std::string &source)
 
 void DDFDumpFile(const std::string &data)
 {
-    LogDebug("\n");
+    epi::LogMessage(epi::kLogLevelDebug, "\n");
 
     // we need to break it into lines
     std::string line;
@@ -2170,13 +2173,13 @@ void DDFDumpFile(const std::string &data)
 
         if (data[pos] == '\n')
         {
-            LogDebug("%s", line.c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "%s", line.c_str());
             line.clear();
         }
     }
 
     if (line.size() > 0)
-        LogDebug("%s", line.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s", line.c_str());
 }
 
 void DDFDumpCollection(const std::vector<DDFFile> &col)
@@ -2191,7 +2194,7 @@ static void DDFParseUnreadFile(size_t d)
     {
         if (it.type == ddf_readers[d].type)
         {
-            LogPrint("Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Parsing %s from: %s\n", ddf_readers[d].lump_name, it.source.c_str());
 
             bool old_strict = strict_errors;
             bool converted_ddf = it.from_dehacked;

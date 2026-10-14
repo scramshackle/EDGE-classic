@@ -45,7 +45,7 @@ enum ViewHeightZone
 
 extern float    view_cosine;
 extern float    view_sine;
-extern BAMAngle view_vertical_angle;
+extern epi::BAMAngle view_vertical_angle;
 extern float    view_rotation;
 
 extern Sector           *view_sector;
@@ -57,16 +57,16 @@ extern int view_window_y;
 extern int view_window_width;
 extern int view_window_height;
 
-extern HMM_Vec3 view_forward;
-extern HMM_Vec3 view_up;
-extern HMM_Vec3 view_right;
+extern epi::Vec3 view_forward;
+extern epi::Vec3 view_up;
+extern epi::Vec3 view_right;
 
 extern int valid_count;
 
 extern int line_count;
 
 // -ES- 1999/03/29 Added these
-extern BAMAngle normal_field_of_view, zoomed_field_of_view;
+extern epi::BAMAngle normal_field_of_view, zoomed_field_of_view;
 extern bool     view_is_zoomed;
 
 extern ConsoleVariable field_of_view;
@@ -86,7 +86,7 @@ extern float sine_table[kSineTableSize];
 
 //
 // Utility functions.
-BAMAngle          PointToAngle(float x1, float y1, float x2, float y2, bool precise = false);
+epi::BAMAngle     PointToAngle(float x1, float y1, float x2, float y2, bool precise = false);
 float             PointToDistance(float x1, float y1, float x2, float y2);
 Sector           *PointInSector(float x, float y);
 RegionProperties *GetPointProperties(Sector *sector, float z);

@@ -20,6 +20,7 @@
 
 #include "ddf_font.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
@@ -80,7 +81,7 @@ ImageFont::ImageFont(FontDefinition *definition)
     ImageData *char_data    = ReadAsEpiBlock((Image *)font_image_);
     uint16_t   real_left    = 0;
     uint16_t   real_right   = 0;
-    RGBAColor  background   = kRGBATransparent;
+    epi::RGBAColor background   = kRGBATransparent;
     // Assumes that first pixel is part of the background; for a spritesheet font this is almost certainly
     // the case
     if (char_data->depth_ == 3)
@@ -247,7 +248,7 @@ PatchFont::PatchFont(FontDefinition *definition)
 
     if (patch_font_cache_.atlas_rectangles.empty())
     {
-        LogWarning("Font [%s] has no loaded patches !\n", definition_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Font [%s] has no loaded patches !\n", definition_->name_.c_str());
         patch_font_cache_.width = patch_font_cache_.height = 7;
         return;
     }

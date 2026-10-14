@@ -20,7 +20,6 @@
 
 #include <string.h>
 
-#include "HandmadeMath.h"
 #include "epi.h"
 
 SoundData::SoundData() : length_(0), frequency_(0), data_(nullptr), definition_data_(nullptr)

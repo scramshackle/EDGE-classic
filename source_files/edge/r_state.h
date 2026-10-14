@@ -68,7 +68,7 @@ extern float view_x;
 extern float view_y;
 extern float view_z;
 
-extern BAMAngle view_angle;
+extern epi::BAMAngle view_angle;
 
 // -ES- 1999/03/20 Added these.
 // Angles that are used for linedef clipping.
@@ -76,11 +76,11 @@ extern BAMAngle view_angle;
 // view_angletox lookups, and converted to BAM format.
 
 // angles used for clipping
-extern BAMAngle clip_left, clip_right;
+extern epi::BAMAngle clip_left, clip_right;
 
 // the scope of the clipped area (clip_left-clip_right).
 // kBAMAngle180 disables polar clipping
-extern BAMAngle clip_scope;
+extern epi::BAMAngle clip_scope;
 
 // the most extreme angles of the view
 extern float view_x_slope, view_y_slope;
@@ -153,11 +153,11 @@ class RenderState
 
     virtual void Clear(GLbitfield mask) = 0;
 
-    virtual void ClearColor(RGBAColor color) = 0;
+    virtual void ClearColor(epi::RGBAColor color) = 0;
 
     virtual void FogMode(GLint fogMode) = 0;
 
-    virtual void FogColor(RGBAColor color) = 0;
+    virtual void FogColor(epi::RGBAColor color) = 0;
 
     virtual void FogStart(GLfloat start) = 0;
 

@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 
 constexpr int   kSpatialChannels             = 2;
 constexpr int   kSpatialGainSmoothMilliseconds = 8;
@@ -30,8 +30,8 @@ void SetSpatialGainSmoothTime(int frequency);
 
 struct SpatialListener
 {
-    HMM_Vec3 position;
-    HMM_Vec3 direction;
+    epi::Vec3 position;
+    epi::Vec3 direction;
 };
 
 class SoundSpatializer
@@ -43,7 +43,7 @@ class SoundSpatializer
 
     void SetUniformGain(float gain);
 
-    void Update(const SpatialListener &listener, const HMM_Vec3 &emitter, float minimum_distance,
+    void Update(const SpatialListener &listener, const epi::Vec3 &emitter, float minimum_distance,
                 float maximum_distance, float volume);
 
     void Process(float *frames, int frame_count);

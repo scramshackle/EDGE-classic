@@ -24,7 +24,7 @@
 extern ConsoleVariable fliplevels;
 extern SkyStretch      current_sky_stretch;
 
-static constexpr float kGpuDegreesToRadians = HMM_DegToRad;
+static constexpr float kGpuDegreesToRadians = epi::kDegreesToRadians;
 
 void SetupSkyMatrices(void)
 {
@@ -79,7 +79,7 @@ void SetupSkyMatrices(void)
         gpu_immediate.Rotate(270.0f * kGpuDegreesToRadians - (float)epi::RadiansFromBAM(view_vertical_angle), 1.0f,
                              0.0f, 0.0f);
 
-        BAMAngle rot = view_angle;
+        epi::BAMAngle rot = view_angle;
 
         gpu_immediate.Rotate(-(float)epi::RadiansFromBAM(rot), 0.0f, 0.0f, 1.0f);
 
@@ -99,10 +99,10 @@ void RendererRevertSkyMatrices(void)
     gpu_immediate.PopMatrix();
 }
 
-void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view)
+void GetSkyInverseMatrices(epi::Mat4 &inverse_projection, epi::Mat4 &inverse_view)
 {
-    inverse_projection = HMM_InvGeneralM4(gpu_immediate.ProjectionMatrix());
-    inverse_view       = HMM_InvGeneralM4(gpu_immediate.ModelViewMatrix());
+    inverse_projection = epi::InverseMatrix(gpu_immediate.ProjectionMatrix());
+    inverse_view       = epi::InverseMatrix(gpu_immediate.ModelViewMatrix());
 }
 
 GLuint CreateSkyCubemap(ImageData *faces[6], int face_size)

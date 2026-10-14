@@ -43,7 +43,7 @@ static SDL_GPUSampler *GetGpuSampler(SDL_GPUDevice *device, const SDL_GPUSampler
 
     if (!sampler)
     {
-        LogPrint("GpuImages: SDL_CreateGPUSampler failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUSampler failed: %s\n", SDL_GetError());
         return nullptr;
     }
 
@@ -91,7 +91,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
 
     if (!texture)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTexture failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTexture failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -115,7 +115,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
 
         if (!transfer)
         {
-            LogPrint("GpuImages: SDL_CreateGPUTransferBuffer failed: %s\n", SDL_GetError());
+            epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTransferBuffer failed: %s\n", SDL_GetError());
             SDL_ReleaseGPUTexture(device, texture);
             return false;
         }
@@ -124,7 +124,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
 
         if (!mapped)
         {
-            LogPrint("GpuImages: SDL_MapGPUTransferBuffer failed: %s\n", SDL_GetError());
+            epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_MapGPUTransferBuffer failed: %s\n", SDL_GetError());
             SDL_ReleaseGPUTransferBuffer(device, transfer);
             SDL_ReleaseGPUTexture(device, texture);
             return false;
@@ -289,7 +289,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
 
     if (!texture)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTexture (cube) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTexture (cube) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -305,7 +305,8 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
 
     if (!transfer)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (cube) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTransferBuffer (cube) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTexture(device, texture);
         return false;
     }
@@ -314,7 +315,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
 
     if (!mapped)
     {
-        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (cube) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_MapGPUTransferBuffer (cube) failed: %s\n", SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         SDL_ReleaseGPUTexture(device, texture);
         return false;
@@ -446,7 +447,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
 
     if (!texture)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTexture (volume) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTexture (volume) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -462,7 +463,8 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
 
     if (!transfer)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (volume) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTransferBuffer (volume) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTexture(device, texture);
         return false;
     }
@@ -471,7 +473,8 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
 
     if (!mapped)
     {
-        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (volume) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_MapGPUTransferBuffer (volume) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         SDL_ReleaseGPUTexture(device, texture);
         return false;
@@ -568,7 +571,8 @@ bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t hei
 
         if (!image->update_buffer)
         {
-            LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (update) failed: %s\n", SDL_GetError());
+            epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTransferBuffer (update) failed: %s\n",
+                            SDL_GetError());
             return false;
         }
     }
@@ -577,7 +581,8 @@ bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t hei
 
     if (!mapped)
     {
-        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (update) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_MapGPUTransferBuffer (update) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -647,7 +652,8 @@ bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y
 
     if (!transfer)
     {
-        LogPrint("GpuImages: SDL_CreateGPUTransferBuffer (region) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_CreateGPUTransferBuffer (region) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -655,7 +661,8 @@ bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y
 
     if (!mapped)
     {
-        LogPrint("GpuImages: SDL_MapGPUTransferBuffer (region) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImages: SDL_MapGPUTransferBuffer (region) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         return false;
     }

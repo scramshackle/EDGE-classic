@@ -30,6 +30,7 @@
 #include "e_input.h"
 
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include "con_var.h"
 #include "dm_defs.h"
@@ -38,13 +39,14 @@
 #include "e_main.h"
 #include "e_player.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "hu_stuff.h"
 #include "i_movie.h"
+#include "i_system.h"
 #include "m_math.h"
 #include "m_misc.h"
 #include "r_misc.h"
-#include "stb_sprintf.h"
 
 extern bool ConsoleResponder(InputEvent *ev);
 extern bool MenuResponder(InputEvent *ev);
@@ -214,7 +216,7 @@ static void UpdateJoystickAxis(int n)
         force = -force;
 
     if (debug_joyaxis.d_ == n + 1)
-        LogPrint("Axis%d : raw %+05d --> %+7.3f\n", n + 1, raw, force);
+        epi::LogMessage(epi::kLogLevelPrint, "Axis%d : raw %+05d --> %+7.3f\n", n + 1, raw, force);
 
     int axis = (joystick_axis[n] + 1) >> 1;
 
@@ -343,9 +345,9 @@ void BuildEventTicCommand(EventTicCommand *cmd)
         turn += angle_turn[t_speed] * ball_deltas[kAxisTurn] / 64.0;
 
         if (fliplevels.d_)
-            cmd->angle_turn = -RoundToInteger(turn);
+            cmd->angle_turn = -epi::RoundToInteger(turn);
         else
-            cmd->angle_turn = RoundToInteger(turn);
+            cmd->angle_turn = epi::RoundToInteger(turn);
     }
 
     // MLook
@@ -357,7 +359,7 @@ void BuildEventTicCommand(EventTicCommand *cmd)
 
         mlook += mouselook_turn[m_speed] * ball_deltas[kAxisMouselook] / 64.0;
 
-        cmd->mouselook_turn = RoundToInteger(mlook);
+        cmd->mouselook_turn = epi::RoundToInteger(mlook);
     }
 
     // Forward [ no change for 70Hz ]
@@ -369,9 +371,9 @@ void BuildEventTicCommand(EventTicCommand *cmd)
         // -ACB- 1998/09/06 Forward Move Speed Control
         forward += forward_move[speed] * ball_deltas[kAxisForward] / 64.0;
 
-        forward = HMM_Clamp(-forward_move[1], forward, forward_move[1]);
+        forward = epi::Clamp<float>(forward, -forward_move[1], forward_move[1]);
 
-        cmd->forward_move = RoundToInteger(forward);
+        cmd->forward_move = epi::RoundToInteger(forward);
     }
 
     // Sideways [ no change for 70Hz ]
@@ -389,12 +391,12 @@ void BuildEventTicCommand(EventTicCommand *cmd)
         if (strafe)
             side += side_move[speed] * ball_deltas[kAxisTurn] / 64.0;
 
-        side = HMM_Clamp(-forward_move[1], side, forward_move[1]);
+        side = epi::Clamp<float>(side, -forward_move[1], forward_move[1]);
 
         if (fliplevels.d_)
-            cmd->side_move = -RoundToInteger(side);
+            cmd->side_move = -epi::RoundToInteger(side);
         else
-            cmd->side_move = RoundToInteger(side);
+            cmd->side_move = epi::RoundToInteger(side);
     }
 
     // Upwards  -MH- 1998/08/18 Fly Up/Down movement
@@ -405,9 +407,9 @@ void BuildEventTicCommand(EventTicCommand *cmd)
 
         upward += upward_move[speed] * ball_deltas[kAxisFly] / 64.0;
 
-        upward = HMM_Clamp(-forward_move[1], upward, forward_move[1]);
+        upward = epi::Clamp<float>(upward, -forward_move[1], forward_move[1]);
 
-        cmd->upward_move = RoundToInteger(upward);
+        cmd->upward_move = epi::RoundToInteger(upward);
     }
 
     // ---Buttons---
@@ -600,7 +602,8 @@ bool InputResponder(InputEvent *ev)
         dy *= mouse_y_sensitivity.f_;
 
         if (debug_mouse.d_)
-            LogPrint("Mouse %+04d %+04d --> %+7.2f %+7.2f\n", ev->value.mouse.dx, ev->value.mouse.dy, dx, dy);
+            epi::LogMessage(epi::kLogLevelPrint, "Mouse %+04d %+04d --> %+7.2f %+7.2f\n", ev->value.mouse.dx,
+                            ev->value.mouse.dy, dx, dy);
 
         // -AJA- 1999/07/27: Mlook key like quake's.
         if (IsKeyPressed(key_mouselook))
@@ -690,8 +693,8 @@ void PostEvent(InputEvent *ev)
 #ifdef EDGE_DEBUG_KEY_EV //!!!!
     if (ev->type == kInputEventKeyDown || ev->type == kInputEventKeyUp)
     {
-        LogDebug("EVENT @ %08x %d %s\n", GetMilliseconds(), ev->value.key,
-                 (ev->type == kInputEventKeyUp) ? "DOWN" : "up");
+        epi::LogMessage(epi::kLogLevelDebug, "EVENT @ %08x %d %s\n", GetMilliseconds(), ev->value.key,
+                        (ev->type == kInputEventKeyUp) ? "DOWN" : "up");
     }
 #endif
 }
@@ -848,7 +851,7 @@ const char *GetKeyName(int key)
             return special_keys[i].name;
     }
 
-    stbsp_sprintf(buffer, "Key%03d", key);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "Key%03d", key);
 
     return buffer;
 }

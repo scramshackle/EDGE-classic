@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "dm_colors.h"
 #include "epi_color.h"
 
 enum GpuLoadOperation
@@ -89,7 +90,7 @@ class GpuDevice
 
     void EndUpload(SDL_GPUCommandBuffer *upload_buffer);
 
-    void SetClearColor(RGBAColor color)
+    void SetClearColor(epi::RGBAColor color)
     {
         clear_color_ = color;
     }
@@ -190,7 +191,7 @@ class GpuDevice
 
     SDL_GPUTexture *clear_pair_texture_ = nullptr;
 
-    RGBAColor clear_color_ = kRGBABlack;
+    epi::RGBAColor clear_color_ = kRGBABlack;
 
     bool color_written_ = false;
 

@@ -221,7 +221,8 @@ int TryRunTicCommands()
     last_try_run_tic = now_time;
 
 #ifdef EDGE_DEBUG_TICS
-    LogDebug("TryRunTicCommands: now %d last_try_run %d --> real %d\n", now_time, now_time - real_tics, real_tics);
+    epi::LogMessage(epi::kLogLevelDebug, "TryRunTicCommands: now %d last_try_run %d --> real %d\n", now_time,
+                    now_time - real_tics, real_tics);
 #endif
 
     // simpler handling when no game in progress
@@ -258,7 +259,8 @@ int TryRunTicCommands()
         tics = 1;
 
 #ifdef EDGE_DEBUG_TICS
-    LogDebug("=== make_tic %d game_tic %d | real %d using %d\n", make_tic, game_tic, real_tics, tics);
+    epi::LogMessage(epi::kLogLevelDebug, "=== make_tic %d game_tic %d | real %d using %d\n", make_tic, game_tic,
+                    real_tics, tics);
 #endif
 
     // wait for new tics if needed

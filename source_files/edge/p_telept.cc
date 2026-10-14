@@ -23,6 +23,8 @@
 //
 //----------------------------------------------------------------------------
 
+#include <math.h>
+
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
@@ -119,10 +121,10 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
     float new_y;
     float new_z;
 
-    BAMAngle new_ang;
+    epi::BAMAngle new_ang;
 
-    BAMAngle dest_ang;
-    BAMAngle source_ang = kBAMAngle90 + (line ? PointToAngle(0, 0, line->delta_x, line->delta_y) : 0);
+    epi::BAMAngle dest_ang;
+    epi::BAMAngle source_ang = epi::kBAMAngle90 + (line ? PointToAngle(0, 0, line->delta_x, line->delta_y) : 0);
 
     MapObject *currmobj = nullptr;
     Line      *currline = nullptr;
@@ -143,15 +145,15 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
         if (!currline)
             return false;
 
-        new_x = currline->vertex_1->X + currline->delta_x / 2.0f;
-        new_y = currline->vertex_1->Y + currline->delta_y / 2.0f;
+        new_x = currline->vertex_1->x + currline->delta_x / 2.0f;
+        new_y = currline->vertex_1->y + currline->delta_y / 2.0f;
 
         new_z = currline->front_sector ? currline->front_sector->floor_height : -32000;
 
         if (currline->back_sector)
-            new_z = HMM_MAX(new_z, currline->back_sector->floor_height);
+            new_z = epi::Max(new_z, currline->back_sector->floor_height);
 
-        dest_ang = PointToAngle(0, 0, currline->delta_x, currline->delta_y) + kBAMAngle90;
+        dest_ang = PointToAngle(0, 0, currline->delta_x, currline->delta_y) + epi::kBAMAngle90;
 
         flipped = !flipped; // match Boom's logic
     }
@@ -175,7 +177,7 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
     /* --- Angle handling --- */
 
     if (flipped)
-        dest_ang += kBAMAngle180;
+        dest_ang += epi::kBAMAngle180;
 
     if (def->special_ & kTeleportSpecialRelative && currline)
         new_ang = thing->angle_ + (dest_ang - source_ang);
@@ -196,9 +198,9 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
         float pos = 0;
 
         if (fabs(line->delta_x) > fabs(line->delta_y))
-            pos = (oldx - line->vertex_1->X) / line->delta_x;
+            pos = (oldx - line->vertex_1->x) / line->delta_x;
         else
-            pos = (oldy - line->vertex_1->Y) / line->delta_y;
+            pos = (oldy - line->vertex_1->y) / line->delta_y;
 
         if (currline)
         {
@@ -227,7 +229,7 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
             dy = line->delta_y * (pos - 0.5f);
 
             // we need to rotate the offset vector
-            BAMAngle offset_ang = dest_ang - source_ang;
+            epi::BAMAngle offset_ang = dest_ang - source_ang;
 
             float s = epi::BAMSin(offset_ang);
             float c = epi::BAMCos(offset_ang);
@@ -266,29 +268,29 @@ bool TeleportMapObject(Line *line, int tag, MapObject *thing, const TeleportDefi
 
     if (thing->flags_ & kMapObjectFlagMissile)
     {
-        thing->momentum_.X = thing->speed_ * epi::BAMCos(new_ang);
-        thing->momentum_.Y = thing->speed_ * epi::BAMSin(new_ang);
+        thing->momentum_.x = thing->speed_ * epi::BAMCos(new_ang);
+        thing->momentum_.y = thing->speed_ * epi::BAMSin(new_ang);
     }
     else if (def->special_ & kTeleportSpecialSameSpeed)
     {
         // we need to rotate the momentum vector
-        BAMAngle mom_ang = new_ang - thing->angle_;
+        epi::BAMAngle mom_ang = new_ang - thing->angle_;
 
         float s = epi::BAMSin(mom_ang);
         float c = epi::BAMCos(mom_ang);
 
-        float mx = thing->momentum_.X;
-        float my = thing->momentum_.Y;
+        float mx = thing->momentum_.x;
+        float my = thing->momentum_.y;
 
-        thing->momentum_.X = mx * c - my * s;
-        thing->momentum_.Y = my * c + mx * s;
+        thing->momentum_.x = mx * c - my * s;
+        thing->momentum_.y = my * c + mx * s;
     }
     else if (player)
     {
         // don't move for a bit
         thing->reaction_time_ = def->delay_;
 
-        thing->momentum_.X = thing->momentum_.Y = thing->momentum_.Z = 0;
+        thing->momentum_.x = thing->momentum_.y = thing->momentum_.z = 0;
 
         player->actual_speed_ = 0;
     }

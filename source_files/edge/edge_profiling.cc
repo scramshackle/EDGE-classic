@@ -4,6 +4,7 @@
 
 #include "epi.h"
 #include "epi_filesystem.h"
+#include "i_system.h"
 #include "m_argv.h"
 
 #ifdef EDGE_PROFILING
@@ -32,7 +33,8 @@ void ProfilerStartup(void)
     {
         if (!epi::IsDirectory(profiler_log_path) && !epi::MakeDirectory(profiler_log_path))
         {
-            LogWarning("Profiler: cannot create trace directory %s\n", profiler_log_path.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "Profiler: cannot create trace directory %s\n",
+                            profiler_log_path.c_str());
             profiler_log_path.clear();
         }
         else
@@ -43,17 +45,17 @@ void ProfilerStartup(void)
 
     if (error != RMT_ERROR_NONE)
     {
-        LogWarning("Profiler: Remotery failed to start (%s)\n", rmt_GetLastErrorMessage());
+        epi::LogMessage(epi::kLogLevelWarning, "Profiler: Remotery failed to start (%s)\n", rmt_GetLastErrorMessage());
         profiler_instance = nullptr;
         return;
     }
 
     rmt_SetCurrentThreadName("Main");
 
-    LogPrint("Profiler: Remotery listening on localhost:%d\n", (int)settings->port);
+    epi::LogMessage(epi::kLogLevelPrint, "Profiler: Remotery listening on localhost:%d\n", (int)settings->port);
 
     if (!profiler_log_path.empty())
-        LogPrint("Profiler: writing trace files to %s\n", profiler_log_path.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Profiler: writing trace files to %s\n", profiler_log_path.c_str());
 }
 
 void ProfilerFrameMark(void)
@@ -90,7 +92,7 @@ void ProfilerShutdown(void)
 void ProfilerStartup(void)
 {
     if (FindArgument("profile_log") > 0)
-        LogWarning("Profiler: -profile_log ignored, built without EDGE_PROFILING\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Profiler: -profile_log ignored, built without EDGE_PROFILING\n");
 }
 
 void ProfilerShutdown(void)

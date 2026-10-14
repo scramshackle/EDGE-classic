@@ -181,7 +181,7 @@ struct ScriptThingParameter : public RADScriptParameter
     float y = 0;
     float z = 0;
 
-    BAMAngle angle = 0;
+    epi::BAMAngle angle = 0;
     float    slope = 0;
     int      tag   = 0;
 
@@ -792,7 +792,7 @@ struct ScriptDrawTip
     float scale;
 
     // current colour
-    RGBAColor color;
+    epi::RGBAColor color;
 
     // fading fields
     int   fade_time;

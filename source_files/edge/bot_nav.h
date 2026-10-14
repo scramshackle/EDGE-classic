@@ -56,7 +56,7 @@ class BotPath
     Position CurrentFrom() const;
 
     float    CurrentLength() const;
-    BAMAngle CurrentAngle() const;
+    epi::BAMAngle CurrentAngle() const;
 
     bool ReachedDestination(const Position *pos) const;
 };

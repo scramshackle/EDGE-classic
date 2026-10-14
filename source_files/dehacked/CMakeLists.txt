@@ -24,7 +24,7 @@ add_library(
   deh_weapons.cc
 )
 
-target_link_libraries(dehacked PRIVATE ddf epi stb)
+target_link_libraries(dehacked PRIVATE ddf epi)
 
 target_include_directories(dehacked PUBLIC ./)
 

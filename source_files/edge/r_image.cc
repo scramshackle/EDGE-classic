@@ -41,12 +41,13 @@
 
 #include "ddf_flat.h"
 #include "ddf_font.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -97,7 +98,7 @@ void NormalizeLiquidSwirl(void)
     }
 }
 
-HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
+epi::Vec4 LiquidShaderParameters(const Image *image, float seconds)
 {
     if (!image || image->liquid_type_ == kLiquidImageNone || swirling_flats == kLiquidSwirlVanilla)
         return {};
@@ -114,7 +115,7 @@ HMM_Vec4 LiquidShaderParameters(const Image *image, float seconds)
     if (image->liquid_type_ == kLiquidImageThick)
         time *= 0.5f;
 
-    return HMM_V4(mode, time, (float)image->width_, (float)image->height_);
+    return epi::Vec4{mode, time, (float)image->width_, (float)image->height_};
 }
 
 extern ImageData *ReadAsEpiBlock(Image *rim);
@@ -141,7 +142,7 @@ struct CachedImage
     Image *parent;
 
     // general hue of image (skewed towards pure colors)
-    RGBAColor hue;
+    epi::RGBAColor hue;
 
     // texture identifier within GL
     GLuint texture_id;
@@ -296,7 +297,7 @@ static Image *NewImage(int width, int height, int opacity = kOpacityUnknown)
     return rim;
 }
 
-static Image *CreateDummyImage(const char *name, RGBAColor fg, RGBAColor bg)
+static Image *CreateDummyImage(const char *name, epi::RGBAColor fg, epi::RGBAColor bg)
 {
     Image *rim;
 
@@ -334,7 +335,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
     bool is_patch = false;
     bool solid    = false;
 
-    int  header_len = HMM_MIN((int)sizeof(header), packfile_len);
+    int         header_len = epi::Min((int)sizeof(header), packfile_len);
     ImageFormat fmt        = DetectImageFormat(header, header_len, packfile_len);
 
     if (fmt == kImageOther)
@@ -342,7 +343,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
         // close it
         delete f;
 
-        LogWarning("Unsupported image format in '%s'\n", packfile_name);
+        epi::LogMessage(epi::kLogLevelWarning, "Unsupported image format in '%s'\n", packfile_name);
         return nullptr;
     }
     else if (fmt == kImageUnknown)
@@ -376,7 +377,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
         }
         else
         {
-            LogWarning("Graphic '%s' does not seem to be a graphic.\n", name);
+            epi::LogMessage(epi::kLogLevelWarning, "Graphic '%s' does not seem to be a graphic.\n", name);
             return nullptr;
         }
     }
@@ -387,10 +388,10 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
 
         const Patch *pat = (Patch *)header;
 
-        width    = AlignedLittleEndianS16(pat->width);
-        height   = AlignedLittleEndianS16(pat->height);
-        offset_x = AlignedLittleEndianS16(pat->left_offset);
-        offset_y = AlignedLittleEndianS16(pat->top_offset);
+        width    = epi::AlignedLittleEndianS16(pat->width);
+        height   = epi::AlignedLittleEndianS16(pat->height);
+        offset_x = epi::AlignedLittleEndianS16(pat->left_offset);
+        offset_y = epi::AlignedLittleEndianS16(pat->top_offset);
 
         is_patch = true;
     }
@@ -398,7 +399,7 @@ static Image *AddPackImageSmartInternal(const char *name, ImageSource type, cons
     {
         if (!GetImageInfo(f, &width, &height, &bpp) || width <= 0 || height <= 0)
         {
-            LogWarning("Error scanning image in '%s'\n", packfile_name);
+            epi::LogMessage(epi::kLogLevelWarning, "Error scanning image in '%s'\n", packfile_name);
             return nullptr;
         }
 
@@ -475,7 +476,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
     bool is_patch = false;
     bool solid    = false;
 
-    int  header_len = HMM_MIN((int)sizeof(header), lump_len);
+    int         header_len = epi::Min((int)sizeof(header), lump_len);
     ImageFormat fmt        = DetectImageFormat(header, header_len, lump_len);
 
     if (fmt == kImageOther)
@@ -483,7 +484,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
         // close it
         delete f;
 
-        LogWarning("Unsupported image format in '%s' lump\n", GetLumpNameFromIndex(lump));
+        epi::LogMessage(epi::kLogLevelWarning, "Unsupported image format in '%s' lump\n", GetLumpNameFromIndex(lump));
         return nullptr;
     }
     else if (fmt == kImageUnknown)
@@ -517,7 +518,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
         }
         else
         {
-            LogWarning("Graphic '%s' does not seem to be a graphic.\n", name);
+            epi::LogMessage(epi::kLogLevelWarning, "Graphic '%s' does not seem to be a graphic.\n", name);
             return nullptr;
         }
     }
@@ -528,10 +529,10 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
 
         const Patch *pat = (Patch *)header;
 
-        width    = AlignedLittleEndianS16(pat->width);
-        height   = AlignedLittleEndianS16(pat->height);
-        offset_x = AlignedLittleEndianS16(pat->left_offset);
-        offset_y = AlignedLittleEndianS16(pat->top_offset);
+        width    = epi::AlignedLittleEndianS16(pat->width);
+        height   = epi::AlignedLittleEndianS16(pat->height);
+        offset_x = epi::AlignedLittleEndianS16(pat->left_offset);
+        offset_y = epi::AlignedLittleEndianS16(pat->top_offset);
 
         is_patch = true;
     }
@@ -539,7 +540,7 @@ static Image *AddImage_SmartInternal(const char *name, ImageSource type, int lum
     {
         if (!GetImageInfo(f, &width, &height, &bpp) || width <= 0 || height <= 0)
         {
-            LogWarning("Error scanning image in '%s' lump\n", GetLumpNameFromIndex(lump));
+            epi::LogMessage(epi::kLogLevelWarning, "Error scanning image in '%s' lump\n", GetLumpNameFromIndex(lump));
             return nullptr;
         }
 
@@ -724,7 +725,7 @@ static Image *AddImage_DOOM(ImageDefinition *def, bool user_defined = false)
 
     if (rim == nullptr)
     {
-        LogWarning("Unable to add image lump: %s\n", lump_name);
+        epi::LogMessage(epi::kLogLevelWarning, "Unable to add image lump: %s\n", lump_name);
         return nullptr;
     }
 
@@ -785,7 +786,8 @@ static Image *AddImageUser(ImageDefinition *def)
         epi::File *f = OpenUserFileOrLump(def);
         if (f == nullptr)
         {
-            LogWarning("Unable to open image %s: %s\n", (def->type_ == kImageDataLump) ? "lump" : "file", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "Unable to open image %s: %s\n",
+                            (def->type_ == kImageDataLump) ? "lump" : "file", filename);
             return nullptr;
         }
 
@@ -804,7 +806,7 @@ static Image *AddImageUser(ImageDefinition *def)
             f->Read(header, sizeof(header));
             f->Seek(0, epi::File::kSeekpointStart);
 
-            int header_len = HMM_MIN((int)sizeof(header), file_size);
+            int header_len = epi::Min((int)sizeof(header), file_size);
             fmt            = DetectImageFormat(header, header_len, file_size);
         }
         else
@@ -820,21 +822,21 @@ static Image *AddImageUser(ImageDefinition *def)
             if (fmt == kImageDoom)
                 return AddImage_DOOM(def, true);
 
-            LogWarning("Unknown image format in: %s\n", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "Unknown image format in: %s\n", filename);
             return nullptr;
         }
 
         if (fmt == kImageOther)
         {
             delete f;
-            LogWarning("Unsupported image format in: %s\n", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "Unsupported image format in: %s\n", filename);
             return nullptr;
         }
 
         if (!GetImageInfo(f, &width, &height, &bpp))
         {
             delete f;
-            LogWarning("Error occurred scanning image: %s\n", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "Error occurred scanning image: %s\n", filename);
             return nullptr;
         }
 
@@ -1007,7 +1009,7 @@ const Image *CreatePackSprite(const std::string &packname, const PackFile *pack,
 //
 void CreateUserImages(void)
 {
-    LogPrint("Adding DDFIMAGE definitions...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Adding DDFIMAGE definitions...\n");
 
     for (ImageDefinition *def : imagedefs)
     {
@@ -1055,7 +1057,7 @@ void ImageAddTxHx(int lump, const char *name, bool hires)
         }
 
         if (name) // shouldn't need the 'if' here, but gcc currently flags it as a format overflow if I don't :/ - Dasho
-            LogDebug("HIRES replacement %s has no counterpart.\n", name);
+            epi::LogMessage(epi::kLogLevelDebug, "HIRES replacement %s has no counterpart.\n", name);
     }
 
     TX_names.push_back(name);
@@ -1087,7 +1089,7 @@ const Image **GetUserSprites(int *count)
 
     if (*count == 0)
     {
-        LogDebug("GetUserSprites(count = %d)\n", *count);
+        epi::LogMessage(epi::kLogLevelDebug, "GetUserSprites(count = %d)\n", *count);
         return nullptr;
     }
 
@@ -1322,7 +1324,7 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 
     if (tmp_img->depth_ == 4 || (tmp_img->depth_ == 3 && rim->is_font_))
     {
-        RGBAColor background = kRGBATransparent;
+        epi::RGBAColor background = kRGBATransparent;
 
         if (tmp_img->depth_ == 3)
             background = epi::MakeRGBA(tmp_img->pixels_[0], tmp_img->pixels_[1], tmp_img->pixels_[2]);
@@ -1349,7 +1351,7 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
     if (rim->opacity_ == kOpacityMasked && mip)
     {
         if (mip_requested)
-            LogWarning("Image [%s] is masked: ignoring MIP\n", rim->name_.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "Image [%s] is masked: ignoring MIP\n", rim->name_.c_str());
 
         mip = false;
     }
@@ -1680,7 +1682,7 @@ const Image *ImageParseSaveString(char type, const char *name)
         return ImageLookup(name, kImageNamespaceSprite);
 
     default:
-        LogWarning("ImageParseSaveString: unknown type '%c'\n", type);
+        epi::LogMessage(epi::kLogLevelWarning, "ImageParseSaveString: unknown type '%c'\n", type);
         /* FALL THROUGH */
 
     case 'd': /* dummy */

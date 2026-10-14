@@ -308,7 +308,7 @@ static void ProcessSubDirectory(PackFile *pack, const std::string &fullpath)
 
     if (!epi::WalkDirectory(fsd, fullpath))
     {
-        LogWarning("Failed to read dir: %s\n", fullpath.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to read dir: %s\n", fullpath.c_str());
         return;
     }
 
@@ -353,9 +353,10 @@ static PackFile *ProcessFolder(DataFile *df)
         {
             if (epi::GetExtension(fsd[i].name).empty())
             {
-                LogWarning("%s has no extension. Bare filenames are not supported for "
-                           "mounted directories.\n",
-                           fsd[i].name.c_str());
+                epi::LogMessage(epi::kLogLevelWarning,
+                                "%s has no extension. Bare filenames are not supported for "
+                                "mounted directories.\n",
+                                fsd[i].name.c_str());
                 continue;
             }
             std::string filename = fsd[i].name;
@@ -434,7 +435,8 @@ static PackFile *ProcessZip(DataFile *df)
 
         if (epi::GetExtension(filename).empty())
         {
-            LogWarning("%s has no extension. Bare EPK filenames are not supported.\n", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "%s has no extension. Bare EPK filenames are not supported.\n",
+                            filename);
             continue;
         }
 
@@ -595,7 +597,7 @@ class ZIPFile : public epi::File
 
         while (count > 0)
         {
-            size_t want = HMM_MIN((size_t)count, sizeof(buffer));
+            size_t want = epi::Min((size_t)count, sizeof(buffer));
             size_t got  = mz_zip_reader_extract_iter_read(iter, buffer, want);
 
             // reached end of file?
@@ -663,7 +665,8 @@ static void ProcessDDFInPack(PackFile *pack)
             }
             if (ent.HasExtension(".deh") || ent.HasExtension(".bex"))
             {
-                LogPrint("Converting DEH file%s: %s\n", pack->is_folder_ ? "" : " in EPK", ent.name_.c_str());
+                epi::LogMessage(epi::kLogLevelPrint, "Converting DEH file%s: %s\n", pack->is_folder_ ? "" : " in EPK",
+                                ent.name_.c_str());
 
                 int            length = -1;
                 const uint8_t *data   = pack->LoadEntry(dir, entry, length);
@@ -856,7 +859,7 @@ void ProcessPackSubstitutions(PackFile *pack, int pack_index)
                 if (!add_it)
                     continue;
 
-                LogDebug("- Adding image file in EPK: %s\n", entry.pack_path_.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "- Adding image file in EPK: %s\n", entry.pack_path_.c_str());
 
                 if (dir_name == "textures")
                     AddPackImageSmart(texname.c_str(), kImageSourceTXHI, entry.pack_path_.c_str(), kImageTypeTexture);
@@ -870,7 +873,7 @@ void ProcessPackSubstitutions(PackFile *pack, int pack_index)
             }
             else
             {
-                LogWarning("Unknown image type in EPK: %s\n", entry.name_.c_str());
+                epi::LogMessage(epi::kLogLevelWarning, "Unknown image type in EPK: %s\n", entry.name_.c_str());
             }
         }
     }
@@ -977,7 +980,7 @@ void ProcessHiresPackSubstitutions(PackFile *pack, int pack_index)
             if (CheckDataFileIndexForName(texname.c_str()) > pack_index)
                 continue;
 
-            LogDebug("- Adding Hires substitute from EPK: %s\n", entry.pack_path_.c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "- Adding Hires substitute from EPK: %s\n", entry.pack_path_.c_str());
 
             const Image *rim = ImageContainerLookup(kImageTypeTexture, texname.c_str(), -2);
             if (rim && rim->source_type_ != kImageSourceUser)
@@ -1009,13 +1012,13 @@ void ProcessHiresPackSubstitutions(PackFile *pack, int pack_index)
                 continue;
             }
 
-            LogDebug("HIRES replacement '%s' has no counterpart.\n", texname.c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "HIRES replacement '%s' has no counterpart.\n", texname.c_str());
 
             AddPackImageSmart(texname.c_str(), kImageSourceTXHI, entry.pack_path_.c_str(), kImageTypeTexture);
         }
         else
         {
-            LogWarning("Unknown image type in EPK: %s\n", entry.name_.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "Unknown image type in EPK: %s\n", entry.name_.c_str());
         }
     }
 }
@@ -1332,7 +1335,7 @@ void ProcessAllInPack(DataFile *df, size_t file_index)
     // immediately
     if ((df->kind_ == kFileKindEFolder || df->kind_ == kFileKindEEPK) && file_index == 0)
     {
-        LogPrint("Loading WADFIXES\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Loading WADFIXES\n");
         epi::File *wadfixes = OpenPackFile(df->pack_, "wadfixes.ddf");
         if (wadfixes)
             DDFReadFixes(wadfixes->ReadText());

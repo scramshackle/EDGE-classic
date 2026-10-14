@@ -25,14 +25,16 @@
 
 #include "bot_think.h"
 
+#include <math.h>
 #include <string.h>
 
-#include "epi_math.h"
 #include "bot_nav.h"
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "epi_math.h"
+#include "epi_str_util.h"
 #include "g_game.h"
 #include "m_bbox.h"
 #include "m_random.h"
@@ -43,7 +45,6 @@
 #include "r_state.h"
 #include "rad_trig.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 // this ranges from 0 (VERY EASY) to 4 (VERY HARD)
@@ -536,15 +537,15 @@ void DeathBot::WalkToward(const Position &pos)
     cmd_.direction = PointToAngle(pl_->map_object_->x, pl_->map_object_->y, pos.x, pos.y);
 }
 
-void DeathBot::TurnToward(BAMAngle want_angle, float want_slope, bool fast)
+void DeathBot::TurnToward(epi::BAMAngle want_angle, float want_slope, bool fast)
 {
     // horizontal (yaw) angle
-    BAMAngle delta = want_angle - pl_->map_object_->angle_;
+    epi::BAMAngle delta = want_angle - pl_->map_object_->angle_;
 
-    if (delta < kBAMAngle180)
+    if (delta < epi::kBAMAngle180)
         delta = delta / (fast ? 3 : 8);
     else
-        delta = kBAMAngle360 - (kBAMAngle360 - delta) / (fast ? 3 : 8);
+        delta = epi::kBAMAngle360 - (epi::kBAMAngle360 - delta) / (fast ? 3 : 8);
 
     look_angle_ = pl_->map_object_->angle_ + delta;
 
@@ -570,7 +571,7 @@ void DeathBot::TurnToward(const MapObject *mo, bool fast)
     float dy = mo->y - pl_->map_object_->y;
     float dz = mo->z - pl_->map_object_->z;
 
-    BAMAngle want_angle = PointToAngle(0, 0, dx, dy);
+    epi::BAMAngle want_angle = PointToAngle(0, 0, dx, dy);
     float    want_slope = ApproximateSlope(dx, dy, dz);
 
     TurnToward(want_angle, want_slope, fast);
@@ -601,13 +602,13 @@ void DeathBot::WeaveToward(const Position &pos)
     MoveToward(pos);
 
     if (weave_ == -2)
-        cmd_.direction -= kBAMAngle5 * 12;
+        cmd_.direction -= epi::kBAMAngle5 * 12;
     if (weave_ == -1)
-        cmd_.direction -= kBAMAngle5 * 3;
+        cmd_.direction -= epi::kBAMAngle5 * 3;
     if (weave_ == +1)
-        cmd_.direction += kBAMAngle5 * 3;
+        cmd_.direction += epi::kBAMAngle5 * 3;
     if (weave_ == +2)
-        cmd_.direction += kBAMAngle5 * 12;
+        cmd_.direction += epi::kBAMAngle5 * 12;
 }
 
 void DeathBot::WeaveToward(const MapObject *mo)
@@ -621,7 +622,7 @@ void DeathBot::RetreatFrom(const MapObject *enemy)
 {
     float dx   = pl_->map_object_->x - enemy->x;
     float dy   = pl_->map_object_->y - enemy->y;
-    float dlen = HMM_MAX(hypotf(dx, dy), 1.0f);
+    float dlen = epi::Max(hypotf(dx, dy), 1.0f);
 
     Position pos{pl_->map_object_->x, pl_->map_object_->y, pl_->map_object_->z};
 
@@ -634,7 +635,7 @@ void DeathBot::RetreatFrom(const MapObject *enemy)
 void DeathBot::Strafe(bool right)
 {
     cmd_.speed     = kBotMoveSpeed + (6.25 * bot_skill.d_);
-    cmd_.direction = pl_->map_object_->angle_ + (right ? kBAMAngle270 : kBAMAngle90);
+    cmd_.direction = pl_->map_object_->angle_ + (right ? epi::kBAMAngle270 : epi::kBAMAngle90);
 }
 
 void DeathBot::DetectObstacle()
@@ -717,18 +718,18 @@ void DeathBot::ShootTarget()
         return;
 
     // check that we are facing the enemy
-    BAMAngle delta   = enemy_angle_ - pl_->map_object_->angle_;
+    epi::BAMAngle delta   = enemy_angle_ - pl_->map_object_->angle_;
     float    sl_diff = fabs(enemy_slope_ - epi::BAMTan(pl_->map_object_->vertical_angle_));
 
-    if (delta > kBAMAngle180)
-        delta = kBAMAngle360 - delta;
+    if (delta > epi::kBAMAngle180)
+        delta = epi::kBAMAngle360 - delta;
 
     // the further away we are, the more accurate our shot must be.
     // e.g. at point-blank range, even 45 degrees away can hit.
-    float acc_dist = HMM_MAX(enemy_dist_, 32.0f);
+    float acc_dist = epi::Max(enemy_dist_, 32.0f);
     float adjust   = acc_dist / 32.0f;
 
-    if (delta > (BAMAngle)(kBAMAngle90 / adjust / (11 - (2.5 * bot_skill.d_))))
+    if (delta > (epi::BAMAngle)(epi::kBAMAngle90 / adjust / (11 - (2.5 * bot_skill.d_))))
         return;
 
     if (sl_diff > (8.0f / adjust))
@@ -791,14 +792,14 @@ void DeathBot::ThinkFight()
     // handle slope, equation is: `slope = dz / dist`
     float dz = fabs(pl_->map_object_->z - enemy->z);
 
-    float min_dist = HMM_MIN(dz * 2.0f, 480.0f);
+    float min_dist = epi::Min(dz * 2.0f, 480.0f);
     float max_dist = 640.0f;
 
     // handle dangerous weapons
     const WeaponDefinition *weapon = pl_->weapons_[pl_->ready_weapon_].info;
 
     if (weapon->dangerous_)
-        min_dist = HMM_MAX(min_dist, 224.0f);
+        min_dist = epi::Max(min_dist, 224.0f);
 
     // approach if too far away
     if (enemy_dist_ > max_dist)
@@ -989,7 +990,7 @@ BotFollowPathResult DeathBot::FollowPath(bool do_look)
         float dy = dest.y - pl_->map_object_->y;
         float dz = dest.z - pl_->map_object_->z;
 
-        BAMAngle want_angle = PointToAngle(0, 0, dx, dy);
+        epi::BAMAngle want_angle = PointToAngle(0, 0, dx, dy);
         float    want_slope = ApproximateSlope(dx, dy, dz);
 
         TurnToward(want_angle, want_slope, false);
@@ -1172,13 +1173,13 @@ void DeathBot::ThinkOpenDoor()
         }
 
         float    dist = DistTo(path_->CurrentDestination());
-        BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + kBAMAngle90;
-        BAMAngle diff = ang - pl_->map_object_->angle_;
+        epi::BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + epi::kBAMAngle90;
+        epi::BAMAngle diff = ang - pl_->map_object_->angle_;
 
-        if (diff > kBAMAngle180)
-            diff = kBAMAngle360 - diff;
+        if (diff > epi::kBAMAngle180)
+            diff = epi::kBAMAngle360 - diff;
 
-        if (diff < kBAMAngle5 && dist < (kUseRange - 16))
+        if (diff < epi::kBAMAngle5 && dist < (kUseRange - 16))
         {
             door_stage_ = kBotOpenDoorTaskUse;
             door_time_  = kTicRate * 5;
@@ -1239,13 +1240,13 @@ void DeathBot::ThinkUseLift()
         }
 
         float    dist = DistTo(path_->CurrentDestination());
-        BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + kBAMAngle90;
-        BAMAngle diff = ang - pl_->map_object_->angle_;
+        epi::BAMAngle ang  = path_->nodes_[path_->along_].line_side->angle + epi::kBAMAngle90;
+        epi::BAMAngle diff = ang - pl_->map_object_->angle_;
 
-        if (diff > kBAMAngle180)
-            diff = kBAMAngle360 - diff;
+        if (diff > epi::kBAMAngle180)
+            diff = epi::kBAMAngle360 - diff;
 
-        if (diff < kBAMAngle5 && dist < (kUseRange - 16))
+        if (diff < epi::kBAMAngle5 && dist < (kUseRange - 16))
         {
             lift_stage_ = kBotUseLiftTaskUse;
             lift_time_  = kTicRate * 5;
@@ -1496,7 +1497,7 @@ void DeathBot::ConvertTiccmd(EventTicCommand *dest)
     if (cmd_.speed != 0)
     {
         // get angle relative the player.
-        BAMAngle a = cmd_.direction - look_angle_;
+        epi::BAMAngle a = cmd_.direction - look_angle_;
 
         float fwd  = epi::BAMCos(a) * cmd_.speed;
         float side = epi::BAMSin(a) * cmd_.speed;
@@ -1544,7 +1545,7 @@ void CreateBotPlayer(Player *p, bool recreate)
     p->player_flags_ |= kPlayerFlagBot;
 
     if (!recreate)
-        stbsp_sprintf(p->player_name_, "Bot%d", p->player_number_ + 1);
+        epi::FormatToBufferSized(p->player_name_, sizeof(p->player_name_), "Bot%d", p->player_number_ + 1);
 }
 
 void BotPlayerBuilder(const Player *p, void *data, EventTicCommand *cmd)

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "epi_math.h"
+#include "epi_vector.h"
 #include "gles2_loader.h"
 #include "r_lightgrid.h"
 
@@ -126,8 +127,7 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     if (light_total > kGles2LightDataWidth)
         light_total = kGles2LightDataWidth;
 
-    float minimum[3] = {grid->lights[0].eye_position.Elements[0], grid->lights[0].eye_position.Elements[1],
-                        grid->lights[0].eye_position.Elements[2]};
+    float minimum[3] = {grid->lights[0].eye_position.x, grid->lights[0].eye_position.y, grid->lights[0].eye_position.z};
     float maximum[3] = {minimum[0], minimum[1], minimum[2]};
 
     float radius_scale = 1.0f;
@@ -138,11 +138,11 @@ void Gles2UploadLightGrid(const LightGrid *grid)
 
         for (int axis = 0; axis < 3; axis++)
         {
-            if (light.eye_position.Elements[axis] < minimum[axis])
-                minimum[axis] = light.eye_position.Elements[axis];
+            if (epi::VectorComponent(light.eye_position, axis) < minimum[axis])
+                minimum[axis] = epi::VectorComponent(light.eye_position, axis);
 
-            if (light.eye_position.Elements[axis] > maximum[axis])
-                maximum[axis] = light.eye_position.Elements[axis];
+            if (epi::VectorComponent(light.eye_position, axis) > maximum[axis])
+                maximum[axis] = epi::VectorComponent(light.eye_position, axis);
         }
 
         if (light.radius > radius_scale)
@@ -171,20 +171,20 @@ void Gles2UploadLightGrid(const LightGrid *grid)
         uint8_t *row2 = light_data_pixels.data() + (size_t)(2 * kGles2LightDataWidth + i) * 4;
 
         EncodeUnitPair(row0 + 0,
-                       (light.eye_position.X - light_grid_state.bounds_minimum[0]) / light_grid_state.bounds_range[0]);
+                       (light.eye_position.x - light_grid_state.bounds_minimum[0]) / light_grid_state.bounds_range[0]);
         EncodeUnitPair(row0 + 2,
-                       (light.eye_position.Y - light_grid_state.bounds_minimum[1]) / light_grid_state.bounds_range[1]);
+                       (light.eye_position.y - light_grid_state.bounds_minimum[1]) / light_grid_state.bounds_range[1]);
         EncodeUnitPair(row1 + 0,
-                       (light.eye_position.Z - light_grid_state.bounds_minimum[2]) / light_grid_state.bounds_range[2]);
+                       (light.eye_position.z - light_grid_state.bounds_minimum[2]) / light_grid_state.bounds_range[2]);
         EncodeUnitPair(row1 + 2, light.radius / light_grid_state.radius_scale);
 
-        float red   = light.color.X;
-        float green = light.color.Y;
-        float blue  = light.color.Z;
+        float red   = light.color.x;
+        float green = light.color.y;
+        float blue  = light.color.z;
 
-        row2[0] = (uint8_t)HMM_Clamp(0.0f, red, 255.0f);
-        row2[1] = (uint8_t)HMM_Clamp(0.0f, green, 255.0f);
-        row2[2] = (uint8_t)HMM_Clamp(0.0f, blue, 255.0f);
+        row2[0] = (uint8_t)epi::Clamp(red, 0.0f, 255.0f);
+        row2[1] = (uint8_t)epi::Clamp(green, 0.0f, 255.0f);
+        row2[2] = (uint8_t)epi::Clamp(blue, 0.0f, 255.0f);
         row2[3] = (light.additive > 0.5f) ? 255 : 0;
     }
 

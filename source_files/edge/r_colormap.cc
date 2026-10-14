@@ -26,17 +26,19 @@
 #include "r_colormap.h"
 
 #include <limits.h>
+#include <math.h>
 
 #include <vector>
 
 #include "ddf_colormap.h"
 #include "ddf_game.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "e_main.h"
-#include "edge_profiling.h"
 #include "e_player.h"
+#include "edge_profiling.h"
 #include "epi.h"
 #include "epi_str_util.h"
 #include "g_game.h" // current_map
@@ -46,10 +48,10 @@
 #include "r_backend.h"
 #include "r_gldefs.h"
 #include "r_image.h"
+#include "r_lightgrid.h"
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
-#include "r_lightgrid.h"
 #include "r_shader.h"
 #include "r_static.h"
 #include "r_texgl.h"
@@ -92,9 +94,9 @@ static int FindBestRGBMatch(int r, int g, int b)
 
     for (i = 0; i < 256; i++)
     {
-        int d_r = HMM_ABS(r - playpal_data[0][i][0]);
-        int d_g = HMM_ABS(g - playpal_data[0][i][1]);
-        int d_b = HMM_ABS(b - playpal_data[0][i][2]);
+        int d_r = epi::Abs(r - playpal_data[0][i][0]);
+        int d_g = epi::Abs(g - playpal_data[0][i][1]);
+        int d_b = epi::Abs(b - playpal_data[0][i][2]);
 
         int dist = d_r * d_r + d_g * d_g + d_b * d_b;
 
@@ -146,9 +148,9 @@ void InitializePalette(void)
     playpal_white = FindBestRGBMatch(255, 255, 255);
     playpal_gray  = FindBestRGBMatch(239, 239, 239);
 
-    LogPrint("Loaded global palette.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Loaded global palette.\n");
 
-    LogDebug("Black:%d White:%d Gray:%d\n", playpal_black, playpal_white, playpal_gray);
+    epi::LogMessage(epi::kLogLevelDebug, "Black:%d White:%d Gray:%d\n", playpal_black, playpal_white, playpal_gray);
 
     ResetColorLookups();
 }
@@ -429,13 +431,13 @@ static int AnalyseColourmap(const uint8_t *table, int alpha, int *r, int *g, int
         int g1 = playpal_data[0][table[j]][1];
         int b1 = playpal_data[0][table[j]][2];
 
-        int r_div = 255 * HMM_MAX(4, r1) / HMM_MAX(4, r0);
-        int g_div = 255 * HMM_MAX(4, g1) / HMM_MAX(4, g0);
-        int b_div = 255 * HMM_MAX(4, b1) / HMM_MAX(4, b0);
+        int r_div = 255 * epi::Max(4, r1) / epi::Max(4, r0);
+        int g_div = 255 * epi::Max(4, g1) / epi::Max(4, g0);
+        int b_div = 255 * epi::Max(4, b1) / epi::Max(4, b0);
 
-        r_div = HMM_MAX(4, HMM_MIN(4096, r_div));
-        g_div = HMM_MAX(4, HMM_MIN(4096, g_div));
-        b_div = HMM_MAX(4, HMM_MIN(4096, b_div));
+        r_div = epi::Max(4, epi::Min(4096, r_div));
+        g_div = epi::Max(4, epi::Min(4096, g_div));
+        b_div = epi::Max(4, epi::Min(4096, b_div));
 
         r_tot += r_div * weight;
         g_tot += g_div * weight;
@@ -448,7 +450,7 @@ static int AnalyseColourmap(const uint8_t *table, int alpha, int *r, int *g, int
     (*b) = b_tot / total;
 
     // scale down when too large to fit
-    int ity = HMM_MAX(*r, HMM_MAX(*g, *b));
+    int ity = epi::Max(*r, epi::Max(*g, *b));
 
     if (ity > 255)
     {
@@ -508,9 +510,9 @@ void TransformColourmap(Colormap *colmap)
             int g = playpal_data[0][table[playpal_gray]][1] * 255 / 239;
             int b = playpal_data[0][table[playpal_gray]][2] * 255 / 239;
 
-            r = HMM_MIN(255, HMM_MAX(0, r));
-            g = HMM_MIN(255, HMM_MAX(0, g));
-            b = HMM_MIN(255, HMM_MAX(0, b));
+            r = epi::Min(255, epi::Max(0, r));
+            g = epi::Min(255, epi::Max(0, g));
+            b = epi::Min(255, epi::Max(0, b));
 
             colmap->font_colour_ = epi::MakeRGBA(r, g, b);
         }
@@ -525,15 +527,15 @@ void TransformColourmap(Colormap *colmap)
         // int score =
         AnalyseColourmap(table, 0, &r, &g, &b);
 
-        r = HMM_MIN(255, HMM_MAX(0, r));
-        g = HMM_MIN(255, HMM_MAX(0, g));
-        b = HMM_MIN(255, HMM_MAX(0, b));
+        r = epi::Min(255, epi::Max(0, r));
+        g = epi::Min(255, epi::Max(0, g));
+        b = epi::Min(255, epi::Max(0, b));
 
         colmap->gl_color_ = epi::MakeRGBA(r, g, b);
     }
 
-    LogDebug("TransformColourmap [%s]\n", colmap->name_.c_str());
-    LogDebug("- gl_color_   = #%06x\n", colmap->gl_color_);
+    epi::LogMessage(epi::kLogLevelDebug, "TransformColourmap [%s]\n", colmap->name_.c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "- gl_color_   = #%06x\n", colmap->gl_color_);
 }
 
 void GetColormapRGB(const Colormap *colmap, float *r, float *g, float *b)
@@ -544,14 +546,14 @@ void GetColormapRGB(const Colormap *colmap, float *r, float *g, float *b)
         TransformColourmap((Colormap *)colmap);
     }
 
-    RGBAColor col = colmap->gl_color_;
+    epi::RGBAColor col = colmap->gl_color_;
 
     (*r) = ((col >> 24) & 0xFF) / 255.0f;
     (*g) = ((col >> 16) & 0xFF) / 255.0f;
     (*b) = ((col >> 8) & 0xFF) / 255.0f;
 }
 
-RGBAColor GetFontColor(const Colormap *colmap)
+epi::RGBAColor GetFontColor(const Colormap *colmap)
 {
     if (!colmap)
         return kRGBANoValue;
@@ -565,12 +567,12 @@ RGBAColor GetFontColor(const Colormap *colmap)
     return colmap->font_colour_;
 }
 
-RGBAColor ParseFontColor(const char *name, bool strict)
+epi::RGBAColor ParseFontColor(const char *name, bool strict)
 {
     if (!name || !name[0])
         return kRGBANoValue;
 
-    RGBAColor rgb;
+    epi::RGBAColor rgb;
 
     if (name[0] == '#')
     {
@@ -590,7 +592,7 @@ RGBAColor ParseFontColor(const char *name, bool strict)
             if (strict)
                 FatalError("Unknown colormap: '%s'\n", name);
             else
-                LogDebug("Unknown colormap: '%s'\n", name);
+                epi::LogMessage(epi::kLogLevelDebug, "Unknown colormap: '%s'\n", name);
 
             return kRGBAMagenta;
         }
@@ -608,7 +610,7 @@ RGBAColor ParseFontColor(const char *name, bool strict)
 // Returns an RGB value from an index value - used the current
 // palette.  The byte pointer is assumed to point a 3-byte array.
 //
-void PalettedColourToRGB(int indexcol, uint8_t *returncol, RGBAColor last_damage_colour, float damageAmount)
+void PalettedColourToRGB(int indexcol, uint8_t *returncol, epi::RGBAColor last_damage_colour, float damageAmount)
 {
     if ((cur_palette == kPaletteNormal) || (cur_palette == kPalettePain))
     {
@@ -616,9 +618,9 @@ void PalettedColourToRGB(int indexcol, uint8_t *returncol, RGBAColor last_damage
         float g = (float)epi::GetRGBAGreen(last_damage_colour) / 255.0;
         float b = (float)epi::GetRGBABlue(last_damage_colour) / 255.0;
 
-        returncol[0] = (uint8_t)HMM_MAX(0, HMM_MIN(255, r * damageAmount * 2.5));
-        returncol[1] = (uint8_t)HMM_MAX(0, HMM_MIN(255, g * damageAmount * 2.5));
-        returncol[2] = (uint8_t)HMM_MAX(0, HMM_MIN(255, b * damageAmount * 2.5));
+        returncol[0] = (uint8_t)epi::Max(0.0, epi::Min(255.0, r * damageAmount * 2.5));
+        returncol[1] = (uint8_t)epi::Max(0.0, epi::Min(255.0, g * damageAmount * 2.5));
+        returncol[2] = (uint8_t)epi::Max(0.0, epi::Min(255.0, b * damageAmount * 2.5));
     }
     else
     {
@@ -671,9 +673,9 @@ void PaletteTicker(void)
 
 static float ViewPlaneDistance(float x, float y, float z)
 {
-    float dx = (x - mirror_view.view_position.X) * mirror_view.view_plane.X;
-    float dy = (y - mirror_view.view_position.Y) * mirror_view.view_plane.Y;
-    float dz = (z - mirror_view.view_position.Z) * mirror_view.view_plane.Z;
+    float dx = (x - mirror_view.view_position.x) * mirror_view.view_plane.x;
+    float dy = (y - mirror_view.view_position.y) * mirror_view.view_plane.y;
+    float dz = (z - mirror_view.view_position.z) * mirror_view.view_plane.z;
 
     return dx + dy + dz;
 }
@@ -682,12 +684,12 @@ static int DoomLightingEquation(int L, float dist)
 {
     /* L in the range 0 to 63 */
 
-    int min_L = HMM_Clamp(0, 36 - L, 31);
+    int min_L = epi::Clamp(36 - L, 0, 31);
 
-    int index = (59 - L) - int(1280 / HMM_MAX(1, dist));
+    int index = (59 - L) - int(1280 / epi::Max(1.0f, dist));
 
     /* result is colormap index (0 bright .. 31 dark) */
-    return HMM_Clamp(min_L, index, 31);
+    return epi::Clamp(index, min_L, 31);
 }
 
 class ColormapShader : public AbstractShader
@@ -701,11 +703,11 @@ class ColormapShader : public AbstractShader
 
     LightingModel lighting_model_;
 
-    RGBAColor whites_[32];
+    epi::RGBAColor whites_[32];
 
     SpriteLightTable light_table_;
 
-    RGBAColor fog_color_;
+    epi::RGBAColor fog_color_;
     float     fog_density_;
 
     // for DDFLEVL fog checks
@@ -732,14 +734,14 @@ class ColormapShader : public AbstractShader
         return ViewPlaneDistance(x, y, z);
     }
 
-    inline void TextureCoordinates(RendererVertex *v, int t, const HMM_Vec3 *lit_pos)
+    inline void TextureCoordinates(RendererVertex *v, int t, const epi::Vec3 *lit_pos)
     {
-        float dist = DistanceFromViewPlane(lit_pos->X, lit_pos->Y, lit_pos->Z);
+        float dist = DistanceFromViewPlane(lit_pos->x, lit_pos->y, lit_pos->z);
 
         int L = light_level_ / 4; // need integer range 0-63
 
-        v->texture_coordinates[t].X = dist / 1600.0;
-        v->texture_coordinates[t].Y = (L + 0.5) / 64.0;
+        v->texture_coordinates[t].x = dist / 1600.0;
+        v->texture_coordinates[t].y = (L + 0.5) / 64.0;
     }
 
   public:
@@ -752,11 +754,11 @@ class ColormapShader : public AbstractShader
         int cmap_idx;
 
         if (lighting_model_ == kLightingModelFlat)
-            cmap_idx = HMM_Clamp(0, 42 - light_level_ / 6, 31);
+            cmap_idx = epi::Clamp(42 - light_level_ / 6, 0, 31);
         else
             cmap_idx = DoomLightingEquation(light_level_ / 4, dist);
 
-        RGBAColor WH = whites_[cmap_idx];
+        epi::RGBAColor WH = whites_[cmap_idx];
 
         col->modulate_red_ += epi::GetRGBARed(WH);
         col->modulate_green_ += epi::GetRGBAGreen(WH);
@@ -767,7 +769,7 @@ class ColormapShader : public AbstractShader
                           bool masked, void *data, ShaderCoordinateFunction func)
     {
         EPI_UNUSED(masked);
-        RGBAColor fc_to_use = fog_color_;
+        epi::RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
         // check for DDFLEVL fog
         if (fc_to_use == kRGBANoValue)
@@ -794,7 +796,7 @@ class ColormapShader : public AbstractShader
 
                 epi::SetRGBAAlpha(dest->rgba, alpha);
 
-                HMM_Vec3 lit_pos;
+                epi::Vec3 lit_pos;
 
                 (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
 
@@ -819,7 +821,7 @@ class ColormapShader : public AbstractShader
 
             epi::SetRGBAAlpha(dest->rgba, alpha);
 
-            HMM_Vec3 lit_pos;
+            epi::Vec3 lit_pos;
 
             (*func)(data, v_idx, &dest->position, &dest->rgba, &dest->texture_coordinates[0], &lit_pos);
 
@@ -836,7 +838,7 @@ class ColormapShader : public AbstractShader
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
                                     BlendingMode blending, int glow_set)
     {
-        RGBAColor fc_to_use = fog_color_;
+        epi::RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
 
         if (fc_to_use == kRGBANoValue)
@@ -862,7 +864,7 @@ class ColormapShader : public AbstractShader
     virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
                             int *pass_var, BlendingMode blending, int glow_set)
     {
-        RGBAColor fc_to_use = fog_color_;
+        epi::RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
 
         if (fc_to_use == kRGBANoValue)
@@ -888,7 +890,7 @@ class ColormapShader : public AbstractShader
                                      fc_to_use, fd_to_use, nullptr, nullptr, true, true, glow_set);
         }
 
-        RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));
+        epi::RGBAColor tint = epi::MakeRGBA(255, 255, 255, (uint8_t)(alpha * 255.0f));
 
         {
             EDGE_ZoneScopedN("WorldBaked vertex loop");
@@ -901,7 +903,7 @@ class ColormapShader : public AbstractShader
 
                 dest->rgba = tint;
 
-                dest->texture_coordinates[1].Y += static_batch_light_row_offset;
+                dest->texture_coordinates[1].y += static_batch_light_row_offset;
             }
         }
 
@@ -971,7 +973,7 @@ class ColormapShader : public AbstractShader
                 if (lighting_model_ == kLightingModelFlat)
                 {
                     // FLAT lighting
-                    index = HMM_Clamp(0, 42 - (L * 2 / 3), 31);
+                    index = epi::Clamp(42 - (L * 2 / 3), 0, 31);
                 }
                 else
                 {
@@ -1059,7 +1061,7 @@ class ColormapShader : public AbstractShader
         light_level_ = level;
     }
 
-    void SetFog(RGBAColor fog_color, float fog_density)
+    void SetFog(epi::RGBAColor fog_color, float fog_density)
     {
         fog_color_   = fog_color;
         fog_density_ = fog_density;
@@ -1110,7 +1112,7 @@ static ColormapShader *PrepareColormapShader(const struct RegionProperties *prop
         lit_Nom += render_view_extra_light;
     }
 
-    lit_Nom = HMM_Clamp(0, lit_Nom, 255);
+    lit_Nom = epi::Clamp(lit_Nom, 0, 255);
 
     shader->SetLight(lit_Nom);
 

@@ -16,17 +16,21 @@
 //
 //----------------------------------------------------------------------------
 
+#include <math.h>
+
+#include "dm_colors.h"
 #include "e_event.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "hu_draw.h"
 #include "i_defs_gl.h"
-#include "r_movie.h"
 #include "i_sound.h"
 #include "i_system.h"
 #include "pl_mpeg.h"
 #include "r_backend.h"
 #include "r_gldefs.h"
 #include "r_modes.h"
+#include "r_movie.h"
 #include "r_state.h"
 #include "r_units.h"
 #include "r_wipe.h"
@@ -72,7 +76,7 @@ static bool MovieSetupAudioStream(int rate)
 
     if (!movie_stream)
     {
-        LogWarning("MovieSetupAudioStream: Failed to create the audio stream.");
+        epi::LogMessage(epi::kLogLevelWarning, "MovieSetupAudioStream: Failed to create the audio stream.");
         return false;
     }
 
@@ -80,7 +84,7 @@ static bool MovieSetupAudioStream(int rate)
     {
         SDL_DestroyAudioStream(movie_stream);
         movie_stream = nullptr;
-        LogWarning("MovieSetupAudioStream: Failed to bind the audio stream.");
+        epi::LogMessage(epi::kLogLevelWarning, "MovieSetupAudioStream: Failed to bind the audio stream.");
         return false;
     }
 
@@ -125,7 +129,7 @@ void PlayMovie(const std::string &name)
 
     if (!movie)
     {
-        LogWarning("PlayMovie: Movie definition %s not found!\n", name.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "PlayMovie: Movie definition %s not found!\n", name.c_str());
         return;
     }
 
@@ -150,7 +154,7 @@ void PlayMovie(const std::string &name)
 
     if (!movie_bytes)
     {
-        LogWarning("PlayMovie: Could not open %s!\n", movie->info_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "PlayMovie: Could not open %s!\n", movie->info_.c_str());
         return;
     }
 
@@ -164,7 +168,7 @@ void PlayMovie(const std::string &name)
 
     if (!decoder)
     {
-        LogWarning("PlayMovie: Could not open %s!\n", name.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "PlayMovie: Could not open %s!\n", name.c_str());
         delete[] movie_bytes;
         movie_bytes = nullptr;
         return;
@@ -202,7 +206,7 @@ void PlayMovie(const std::string &name)
         else // Zoom
         {
             frame_height = current_screen_height;
-            frame_width  = RoundToInteger((float)current_screen_height * movie_ratio);
+            frame_width  = epi::RoundToInteger((float)current_screen_height * movie_ratio);
         }
     }
     else if (movie->scaling_ == kMovieScalingNoScale)
@@ -213,7 +217,7 @@ void PlayMovie(const std::string &name)
     else if (movie->scaling_ == kMovieScalingZoom)
     {
         frame_height = current_screen_height;
-        frame_width  = RoundToInteger((float)current_screen_height * movie_ratio);
+        frame_width  = epi::RoundToInteger((float)current_screen_height * movie_ratio);
     }
     else // Stretch, aspect ratio gets BTFO potentially
     {
@@ -225,7 +229,7 @@ void PlayMovie(const std::string &name)
 
     if (!first_frame)
     {
-        LogWarning("PlayMovie: could not decode a frame from %s!\n", name.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "PlayMovie: could not decode a frame from %s!\n", name.c_str());
         plm_destroy(decoder);
         decoder = nullptr;
         delete[] movie_bytes;
@@ -303,7 +307,7 @@ void MovieDrawer()
 
         StartUnitBatch(false);
 
-        RGBAColor       unit_col = kRGBAWhite;
+        epi::RGBAColor  unit_col = kRGBAWhite;
         RendererVertex *glvert   = nullptr;
 
         // Fade-in
@@ -316,13 +320,13 @@ void MovieDrawer()
                 BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, 0, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAlpha);
 
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx1, vy2, 0}};
+            glvert++->position = {vx1, vy2, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx2, vy2, 0}};
+            glvert++->position = {vx2, vy2, 0};
             glvert->rgba       = unit_col;
-            glvert++->position = {{vx2, vy1, 0}};
+            glvert++->position = {vx2, vy1, 0};
             glvert->rgba       = unit_col;
-            glvert->position   = {{vx1, vy1, 0}};
+            glvert->position   = {vx1, vy1, 0};
 
             EndRenderUnit(4);
         }
@@ -348,7 +352,7 @@ void MovieDrawer()
 
         StartUnitBatch(false);
 
-        RGBAColor unit_col;
+        epi::RGBAColor unit_col;
 
         if (fadeout > 0.25f)
             unit_col = kRGBABlack;
@@ -360,13 +364,13 @@ void MovieDrawer()
                             fadeout > 0.25f ? kBlendingNone : kBlendingAlpha);
 
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx1, vy2, 0}};
+        glvert++->position = {vx1, vy2, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx2, vy2, 0}};
+        glvert++->position = {vx2, vy2, 0};
         glvert->rgba       = unit_col;
-        glvert++->position = {{vx2, vy1, 0}};
+        glvert++->position = {vx2, vy1, 0};
         glvert->rgba       = unit_col;
-        glvert->position   = {{vx1, vy1, 0}};
+        glvert->position   = {vx1, vy1, 0};
 
         EndRenderUnit(4);
 

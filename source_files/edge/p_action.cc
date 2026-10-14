@@ -42,11 +42,14 @@
 
 #include "p_action.h"
 
-#include "epi_math.h"
+#include <math.h>
+
 #include "con_main.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "f_interm.h" // intermission_stats
 #include "g_game.h"
 #include "i_system.h"
@@ -189,16 +192,16 @@ bool A_LookForTargets(MapObject *we)
 
     int we_bx = BlockmapGetX(we_x);
     int we_by = BlockmapGetY(we_y);
-    we_bx     = HMM_Clamp(0, we_bx, blockmap_width - 1);
-    we_by     = HMM_Clamp(0, we_by, blockmap_height - 1);
+    we_bx     = epi::Clamp(we_bx, 0, blockmap_width - 1);
+    we_by     = epi::Clamp(we_by, 0, blockmap_height - 1);
     int lx    = we_bx - 5;
     int ly    = we_by - 5;
     int hx    = we_bx + 5;
     int hy    = we_by + 5;
-    lx        = HMM_MAX(0, lx);
-    hx        = HMM_MIN(blockmap_width - 1, hx);
-    ly        = HMM_MAX(0, ly);
-    hy        = HMM_MIN(blockmap_height - 1, hy);
+    lx        = epi::Max(0, lx);
+    hx        = epi::Min(blockmap_width - 1, hx);
+    ly        = epi::Max(0, ly);
+    hy        = epi::Min(blockmap_height - 1, hy);
 
     // first check the blockmap in our immediate vicinity
     for (MapObject *mo = blockmap_things[we_by * blockmap_width + we_bx]; mo; mo = mo->blockmap_next_)
@@ -266,8 +269,8 @@ bool A_LookForTargets(MapObject *we)
 
     for (count = 1; count <= 4; count++)
     {
-        blockX = HMM_Clamp(we_bx - count, 0, blockmap_width - 1);
-        blockY = HMM_Clamp(we_by - count, 0, blockmap_height - 1);
+        blockX = epi::Clamp(we_bx - (int)count, 0, blockmap_width - 1);
+        blockY = epi::Clamp(we_by - (int)count, 0, blockmap_height - 1);
 
         blockIndex = blockY * blockmap_width + blockX;
         firstStop  = we_bx + count;
@@ -517,7 +520,7 @@ bool A_LookForTargets(MapObject *we)
 // Same as above, but iterate through the blockmap within a
 // given radius and return the first valid target (or nullptr if none)
 // Also, does not actually set the target unlike A_LookForTargets
-MapObject *A_LookForBlockmapTarget(MapObject *we, uint32_t rangeblocks, BAMAngle fov)
+MapObject *A_LookForBlockmapTarget(MapObject *we, uint32_t rangeblocks, epi::BAMAngle fov)
 {
     MapObject *them = nullptr;
 
@@ -533,16 +536,16 @@ MapObject *A_LookForBlockmapTarget(MapObject *we, uint32_t rangeblocks, BAMAngle
 
     int we_bx = BlockmapGetX(we_x);
     int we_by = BlockmapGetY(we_y);
-    we_bx     = HMM_Clamp(0, we_bx, blockmap_width - 1);
-    we_by     = HMM_Clamp(0, we_by, blockmap_height - 1);
+    we_bx     = epi::Clamp(we_bx, 0, blockmap_width - 1);
+    we_by     = epi::Clamp(we_by, 0, blockmap_height - 1);
     int lx    = we_bx - rangeblocks - 1;
     int ly    = we_by - rangeblocks - 1;
     int hx    = we_bx + rangeblocks + 1;
     int hy    = we_by + rangeblocks + 1;
-    lx        = HMM_MAX(0, lx);
-    hx        = HMM_MIN(blockmap_width - 1, hx);
-    ly        = HMM_MAX(0, ly);
-    hy        = HMM_MIN(blockmap_height - 1, hy);
+    lx        = epi::Max(0, lx);
+    hx        = epi::Min(blockmap_width - 1, hx);
+    ly        = epi::Max(0, ly);
+    hy        = epi::Min(blockmap_height - 1, hy);
 
     // first check the blockmap in our immediate vicinity
     for (MapObject *mo = blockmap_things[we_by * blockmap_width + we_bx]; mo; mo = mo->blockmap_next_)
@@ -597,8 +600,8 @@ MapObject *A_LookForBlockmapTarget(MapObject *we, uint32_t rangeblocks, BAMAngle
 
     for (count = 1; count <= rangeblocks; count++)
     {
-        blockX = HMM_Clamp(we_bx - count, 0, blockmap_width - 1);
-        blockY = HMM_Clamp(we_by - count, 0, blockmap_height - 1);
+        blockX = epi::Clamp(we_bx - (int)count, 0, blockmap_width - 1);
+        blockY = epi::Clamp(we_by - (int)count, 0, blockmap_height - 1);
 
         blockIndex = blockY * blockmap_width + blockX;
         firstStop  = we_bx + count;
@@ -923,15 +926,15 @@ static bool DecideRangeAttack(MapObject *object)
         distance /= 2;
 
     if (object->mbf21_flags_ & kMBF21FlagHigherMissileProb)
-        distance = HMM_MIN(distance, 160.0f);
+        distance = epi::Min(distance, 160.0f);
     else
-        distance = HMM_MIN(distance, 200.0f);
+        distance = epi::Min(distance, 200.0f);
 
     // The chance in the object is one given that the attack will happen, so
     // we inverse the result (since its one in 255) to get the chance that
     // the attack will not happen.
     chance = 1.0f - object->info_->minatkchance_;
-    chance = HMM_MIN(distance / 255.0f, chance);
+    chance = epi::Min(distance / 255.0f, chance);
 
     // now after modifing distance where applicable, we get the random number
     // and check if it is less than distance, if so no attack is made.
@@ -971,7 +974,7 @@ void A_FaceTarget(MapObject *object)
 
     if (target->flags_ & kMapObjectFlagFuzzy)
     {
-        object->angle_ += RandomByteSkewToZeroDeterministic() << (kBAMAngleBits - 11);
+        object->angle_ += RandomByteSkewToZeroDeterministic() << (epi::kBAMAngleBits - 11);
         object->vertical_angle_ += epi::BAMFromATan(RandomByteSkewToZeroDeterministic() / 1024.0f);
     }
 
@@ -979,16 +982,16 @@ void A_FaceTarget(MapObject *object)
     {
         float amount = (1.0f - target->visibility_);
 
-        object->angle_ += (BAMAngle)(RandomByteSkewToZeroDeterministic() * (kBAMAngleBits - 12) * amount);
+        object->angle_ += (epi::BAMAngle)(RandomByteSkewToZeroDeterministic() * (epi::kBAMAngleBits - 12) * amount);
         object->vertical_angle_ += epi::BAMFromATan(RandomByteSkewToZeroDeterministic() * amount / 2048.0f);
     }
 
     // don't look up/down too far...
-    if (object->vertical_angle_ < kBAMAngle180 && object->vertical_angle_ > kBAMAngle45)
-        object->vertical_angle_ = kBAMAngle45;
+    if (object->vertical_angle_ < epi::kBAMAngle180 && object->vertical_angle_ > epi::kBAMAngle45)
+        object->vertical_angle_ = epi::kBAMAngle45;
 
-    if (object->vertical_angle_ >= kBAMAngle180 && object->vertical_angle_ < kBAMAngle315)
-        object->vertical_angle_ = kBAMAngle315;
+    if (object->vertical_angle_ >= epi::kBAMAngle180 && object->vertical_angle_ < epi::kBAMAngle315)
+        object->vertical_angle_ = epi::kBAMAngle315;
 }
 
 //
@@ -1020,11 +1023,11 @@ void P_ForceFaceTarget(MapObject *object)
     }
 
     // don't look up/down too far...
-    if (object->vertical_angle_ < kBAMAngle180 && object->vertical_angle_ > kBAMAngle45)
-        object->vertical_angle_ = kBAMAngle45;
+    if (object->vertical_angle_ < epi::kBAMAngle180 && object->vertical_angle_ > epi::kBAMAngle45)
+        object->vertical_angle_ = epi::kBAMAngle45;
 
-    if (object->vertical_angle_ >= kBAMAngle180 && object->vertical_angle_ < kBAMAngle315)
-        object->vertical_angle_ = kBAMAngle315;
+    if (object->vertical_angle_ >= epi::kBAMAngle180 && object->vertical_angle_ < epi::kBAMAngle315)
+        object->vertical_angle_ = epi::kBAMAngle315;
 }
 
 void A_MakeIntoCorpse(MapObject *mo)
@@ -1133,7 +1136,7 @@ void A_TransSet(MapObject *mo)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     mo->visibility_ = mo->target_visibility_ = value;
@@ -1148,7 +1151,7 @@ void A_TransFade(MapObject *mo)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     mo->target_visibility_ = value;
@@ -1163,7 +1166,7 @@ void A_TransLess(MapObject *mo)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     mo->target_visibility_ -= value;
@@ -1181,7 +1184,7 @@ void A_TransMore(MapObject *mo)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     mo->target_visibility_ += value;
@@ -1210,7 +1213,7 @@ void A_TransAlternate(MapObject *object)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     if (object->extended_flags_ & kExtendedFlagLessVisible)
@@ -1239,7 +1242,7 @@ void A_DLightSet(MapObject *mo)
 
     if (st && st->action_par)
     {
-        mo->dynamic_light_.r = HMM_MAX(0.0f, ((int *)st->action_par)[0]);
+        mo->dynamic_light_.r = epi::Max<float>(0.0f, ((int *)st->action_par)[0]);
 
         if (mo->info_->hyper_flags_ & kHyperFlagQuadraticDynamicLight)
             mo->dynamic_light_.r = DynamicLightCompatibilityRadius(mo->dynamic_light_.r);
@@ -1254,7 +1257,7 @@ void A_DLightFade(MapObject *mo)
 
     if (st && st->action_par)
     {
-        mo->dynamic_light_.target = HMM_MAX(0.0f, ((int *)st->action_par)[0]);
+        mo->dynamic_light_.target = epi::Max<float>(0.0f, ((int *)st->action_par)[0]);
 
         if (mo->info_->hyper_flags_ & kHyperFlagQuadraticDynamicLight)
             mo->dynamic_light_.target = DynamicLightCompatibilityRadius(mo->dynamic_light_.target);
@@ -1276,7 +1279,7 @@ void A_DLightRandom(MapObject *mo)
         if (mo->info_->hyper_flags_ & kHyperFlagQuadraticDynamicLight)
             qty = DynamicLightCompatibilityRadius(qty);
 
-        mo->dynamic_light_.r      = HMM_MAX(0.0f, qty);
+        mo->dynamic_light_.r      = epi::Max(0.0f, qty);
         mo->dynamic_light_.target = mo->dynamic_light_.r;
     }
 }
@@ -1287,7 +1290,7 @@ void A_DLightColour(MapObject *mo)
 
     if (st && st->action_par)
     {
-        mo->dynamic_light_.color = ((RGBAColor *)st->action_par)[0];
+        mo->dynamic_light_.color = ((epi::RGBAColor *)st->action_par)[0];
     }
 }
 
@@ -1333,7 +1336,7 @@ void A_MlookTurn(MapObject *mo)
     const State *st = mo->state_;
 
     if (st && st->action_par)
-        mo->angle_ = *(BAMAngle *)st->action_par;
+        mo->angle_ = *(epi::BAMAngle *)st->action_par;
     else
         mo->angle_ = 0;
 }
@@ -1342,10 +1345,10 @@ void A_TurnDir(MapObject *mo)
 {
     const State *st = mo->state_;
 
-    BAMAngle turn = kBAMAngle180;
+    epi::BAMAngle turn = epi::kBAMAngle180;
 
     if (st && st->action_par)
-        turn = *(BAMAngle *)st->action_par;
+        turn = *(epi::BAMAngle *)st->action_par;
 
     mo->angle_ += turn;
 }
@@ -1357,15 +1360,15 @@ void A_TurnRandom(MapObject *mo)
 
     if (st && st->action_par)
     {
-        turn = (int)epi::DegreesFromBAM(*(BAMAngle *)st->action_par);
+        turn = (int)epi::DegreesFromBAM(*(epi::BAMAngle *)st->action_par);
     }
 
     turn = turn * RandomByteDeterministic() / 90; // 10 bits of angle
 
     if (turn < 0)
-        mo->angle_ -= (BAMAngle)((-turn) << (kBAMAngleBits - 10));
+        mo->angle_ -= (epi::BAMAngle)((-turn) << (epi::kBAMAngleBits - 10));
     else
-        mo->angle_ += (BAMAngle)(turn << (kBAMAngleBits - 10));
+        mo->angle_ += (epi::BAMAngle)(turn << (epi::kBAMAngleBits - 10));
 }
 
 void A_MoveFwd(MapObject *mo)
@@ -1391,8 +1394,8 @@ void A_MoveRight(MapObject *mo)
     {
         float amount = *(float *)st->action_par;
 
-        float dx = epi::BAMCos(mo->angle_ - kBAMAngle90);
-        float dy = epi::BAMSin(mo->angle_ - kBAMAngle90);
+        float dx = epi::BAMCos(mo->angle_ - epi::kBAMAngle90);
+        float dy = epi::BAMSin(mo->angle_ - epi::kBAMAngle90);
 
         mo->AddMomentum(dx * amount, dy * amount, 0);
     }
@@ -1410,7 +1413,7 @@ void A_MoveUp(MapObject *mo)
 
 void A_StopMoving(MapObject *mo)
 {
-    mo->momentum_.X = mo->momentum_.Y = mo->momentum_.Z = 0;
+    mo->momentum_.x = mo->momentum_.y = mo->momentum_.z = 0;
 }
 
 //-------------------------------------------------------------------
@@ -1474,7 +1477,7 @@ void A_MakeAmbientSound(MapObject *mo)
     if (mo->info_->seesound_)
         StartSoundEffect(mo->info_->seesound_, GetSoundEffectCategory(mo), mo);
     else
-        LogDebug("%s has no ambient sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no ambient sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeAmbientSoundRandom(MapObject *mo)
@@ -1490,7 +1493,7 @@ void A_MakeAmbientSoundRandom(MapObject *mo)
             StartSoundEffect(mo->info_->seesound_, GetSoundEffectCategory(mo), mo);
     }
     else
-        LogDebug("%s has no ambient sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no ambient sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeActiveSound(MapObject *mo)
@@ -1503,7 +1506,7 @@ void A_MakeActiveSound(MapObject *mo)
     if (mo->info_->activesound_)
         StartSoundEffect(mo->info_->activesound_, GetSoundEffectCategory(mo), mo);
     else
-        LogDebug("%s has no ambient sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no ambient sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeDyingSound(MapObject *mo)
@@ -1518,7 +1521,7 @@ void A_MakeDyingSound(MapObject *mo)
     if (sound)
         StartSoundEffect(sound, GetSoundEffectCategory(mo), mo, SfxFlags(mo->info_));
     else
-        LogDebug("%s has no death sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no death sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakePainSound(MapObject *mo)
@@ -1528,7 +1531,7 @@ void A_MakePainSound(MapObject *mo)
     if (mo->info_->painsound_)
         StartSoundEffect(mo->info_->painsound_, GetSoundEffectCategory(mo), mo, SfxFlags(mo->info_));
     else
-        LogDebug("%s has no pain sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no pain sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeOverKillSound(MapObject *mo)
@@ -1536,7 +1539,7 @@ void A_MakeOverKillSound(MapObject *mo)
     if (mo->info_->overkill_sound_)
         StartSoundEffect(mo->info_->overkill_sound_, GetSoundEffectCategory(mo), mo, SfxFlags(mo->info_));
     else
-        LogDebug("%s has no overkill sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no overkill sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeCloseAttemptSound(MapObject *mo)
@@ -1553,7 +1556,7 @@ void A_MakeCloseAttemptSound(MapObject *mo)
     if (sound)
         StartSoundEffect(sound, GetSoundEffectCategory(mo), mo);
     else
-        LogDebug("%s has no close combat attempt sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no close combat attempt sound\n", mo->info_->name_.c_str());
 }
 
 void A_MakeRangeAttemptSound(MapObject *mo)
@@ -1570,7 +1573,7 @@ void A_MakeRangeAttemptSound(MapObject *mo)
     if (sound)
         StartSoundEffect(sound, GetSoundEffectCategory(mo), mo);
     else
-        LogDebug("%s has no range attack attempt sound\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s has no range attack attempt sound\n", mo->info_->name_.c_str());
 }
 
 //-------------------------------------------------------------------
@@ -1591,7 +1594,7 @@ void A_DamageExplosion(MapObject *object)
 #ifdef DEVELOPERS
     if (!damage)
     {
-        LogDebug("%s caused no explosion damage\n", object->info_->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s caused no explosion damage\n", object->info_->name.c_str());
         return;
     }
 #endif
@@ -1618,7 +1621,7 @@ void A_Thrust(MapObject *object)
 #ifdef DEVELOPERS
     if (!damage)
     {
-        LogDebug("%s caused no thrust\n", object->info_->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s caused no thrust\n", object->info_->name.c_str());
         return;
     }
 #endif
@@ -1672,18 +1675,18 @@ static void CheckMissileSpawn(MapObject *projectile)
     if (projectile->tics_ < 1)
         projectile->tics_ = 1;
 
-    HMM_Vec3 check_pos = {
-        {projectile->momentum_.X * 0.5f, projectile->momentum_.Y * 0.5f, projectile->momentum_.Z * 0.5f}};
+    epi::Vec3 check_pos = {projectile->momentum_.x * 0.5f, projectile->momentum_.y * 0.5f,
+                           projectile->momentum_.z * 0.5f};
 
-    while (PointToDistance(projectile->x, projectile->y, projectile->x + check_pos.X, projectile->y + check_pos.Y) >
+    while (PointToDistance(projectile->x, projectile->y, projectile->x + check_pos.x, projectile->y + check_pos.y) >
            projectile->radius_)
     {
-        check_pos *= 0.5f;
+        check_pos = epi::ScaleVector(check_pos, 0.5f);
     }
 
-    projectile->z += check_pos.Z;
+    projectile->z += check_pos.z;
 
-    if (!TryMove(projectile, projectile->x + check_pos.X, projectile->y + check_pos.Y))
+    if (!TryMove(projectile, projectile->x + check_pos.x, projectile->y + check_pos.y))
     {
         ExplodeMissile(projectile);
     }
@@ -1736,7 +1739,7 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
                                                                     ? source->height_ / source->info_->height_
                                                                     : 1.0f));
     Sector    *cur_source_sec = source->sector_;
-    BAMAngle   angle          = 0;
+    epi::BAMAngle angle          = 0;
     float      slope          = 0.0f;
     MapObject *projectile     = nullptr;
 
@@ -1751,8 +1754,8 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
 
     if (!(attack->flags_ & kAttackFlagOffsetsLast))
     {
-        projx += attack->xoffset_ * epi::BAMCos(angle + kBAMAngle90);
-        projy += attack->xoffset_ * epi::BAMSin(angle + kBAMAngle90);
+        projx += attack->xoffset_ * epi::BAMCos(angle + epi::kBAMAngle90);
+        projy += attack->xoffset_ * epi::BAMSin(angle + epi::kBAMAngle90);
 
         float yoffset;
 
@@ -1780,10 +1783,10 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
             if (!(attack->flags_ & kAttackFlagPlayer))
             {
                 if (target->flags_ & kMapObjectFlagFuzzy)
-                    angle += RandomByteSkewToZeroDeterministic() << (kBAMAngleBits - 12);
+                    angle += RandomByteSkewToZeroDeterministic() << (epi::kBAMAngleBits - 12);
 
                 if (target->visibility_ < 1.0f)
-                    angle += (BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
+                    angle += (epi::BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
             }
 
             Sector *cur_target_sec = target->sector_;
@@ -1810,10 +1813,10 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
             if (!(attack->flags_ & kAttackFlagPlayer))
             {
                 if (target->flags_ & kMapObjectFlagFuzzy)
-                    angle += RandomByteSkewToZeroDeterministic() << (kBAMAngleBits - 12);
+                    angle += RandomByteSkewToZeroDeterministic() << (epi::kBAMAngleBits - 12);
 
                 if (target->visibility_ < 1.0f)
-                    angle += (BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
+                    angle += (epi::BAMAngle)(RandomByteSkewToZeroDeterministic() * 64 * (1.0f - target->visibility_));
             }
 
             Sector *cur_target_sec = target->sector_;
@@ -1824,8 +1827,8 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
         }
 
         slope = ApproximateSlope(tx - projx, ty - projy, tz - projz);
-        projx += attack->xoffset_ * epi::BAMCos(angle + kBAMAngle90);
-        projy += attack->xoffset_ * epi::BAMSin(angle + kBAMAngle90);
+        projx += attack->xoffset_ * epi::BAMCos(angle + epi::kBAMAngle90);
+        projy += attack->xoffset_ * epi::BAMSin(angle + epi::kBAMAngle90);
 
         float yoffset;
 
@@ -1897,9 +1900,9 @@ static MapObject *DoLaunchProjectile(MapObject *source, float tx, float ty, floa
 
     if (projectile->flags_ & kMapObjectFlagPreserveMomentum)
     {
-        projectile->momentum_.X += source->momentum_.X;
-        projectile->momentum_.Y += source->momentum_.Y;
-        projectile->momentum_.Z += source->momentum_.Z;
+        projectile->momentum_.x += source->momentum_.x;
+        projectile->momentum_.y += source->momentum_.y;
+        projectile->momentum_.z += source->momentum_.z;
     }
     CheckMissileSpawn(projectile);
 
@@ -1937,8 +1940,8 @@ static void LaunchSmartProjectile(MapObject *source, MapObject *target, const Ma
 
     if (target)
     {
-        mx = target->momentum_.X;
-        my = target->momentum_.Y;
+        mx = target->momentum_.x;
+        my = target->momentum_.y;
 
         float dx = source->x - target->x;
         float dy = source->y - target->y;
@@ -2019,7 +2022,7 @@ static inline bool Weakness_CheckHit(MapObject *target, const AttackDefinition *
     // which hits the target on the head (coming sharply down) will
     // still register as a head-shot.
     z = (z - target->z) / target->height_;
-    z = HMM_Clamp(0.01f, z, 0.99f);
+    z = epi::Clamp(z, 0.01f, 0.99f);
 
     // LogDebug("HEIGHT CHECK: %1.2f < %1.2f < %1.2f\n",
     //		  weak->height[0], z, weak->height[1]);
@@ -2027,7 +2030,7 @@ static inline bool Weakness_CheckHit(MapObject *target, const AttackDefinition *
     if (z < weak->height_[0] || z > weak->height_[1])
         return false;
 
-    BAMAngle ang = PointToAngle(target->x, target->y, x, y);
+    epi::BAMAngle ang = PointToAngle(target->x, target->y, x, y);
 
     ang -= target->angle_;
 
@@ -2176,7 +2179,7 @@ int MissileContact(MapObject *object, MapObject *target)
     if (!damage)
     {
 #ifdef DEVELOPERS
-        LogDebug("%s missile did zero damage.\n", object->info_->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s missile did zero damage.\n", object->info_->name.c_str());
 #endif
         return 0;
     }
@@ -2269,7 +2272,8 @@ int BulletContact(MapObject *source, MapObject *target, float damage, const Dama
     if (!damage)
     {
 #ifdef DEVELOPERS
-        LogDebug("%s's shoot/combat attack did zero damage.\n", source->info_->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s's shoot/combat attack did zero damage.\n",
+                        source->info_->name.c_str());
 #endif
         return 0;
     }
@@ -2305,10 +2309,10 @@ void A_CreateSmokeTrail(MapObject *projectile)
     }
 
     // spawn a puff of smoke behind the rocket
-    MapObject *smoke = CreateMapObject(projectile->x - projectile->momentum_.X / 2.0f,
-                                       projectile->y - projectile->momentum_.Y / 2.0f, projectile->z, attack->puff_);
+    MapObject *smoke = CreateMapObject(projectile->x - projectile->momentum_.x / 2.0f,
+                                       projectile->y - projectile->momentum_.y / 2.0f, projectile->z, attack->puff_);
 
-    smoke->momentum_.Z = smoke->info_->float_speed_;
+    smoke->momentum_.z = smoke->info_->float_speed_;
     smoke->tics_ -= RandomByte() & 3;
     if (smoke->tics_ < 1)
         smoke->tics_ = 1;
@@ -2368,28 +2372,28 @@ void A_HomingProjectile(MapObject *projectile)
         return;
 
     // change angle
-    BAMAngle exact = PointToAngle(projectile->x, projectile->y, destination->x, destination->y);
+    epi::BAMAngle exact = PointToAngle(projectile->x, projectile->y, destination->x, destination->y);
 
     if (exact != projectile->angle_)
     {
-        if (exact - projectile->angle_ > kBAMAngle180)
+        if (exact - projectile->angle_ > epi::kBAMAngle180)
         {
             projectile->angle_ -= attack->trace_angle_;
 
-            if (exact - projectile->angle_ < kBAMAngle180)
+            if (exact - projectile->angle_ < epi::kBAMAngle180)
                 projectile->angle_ = exact;
         }
         else
         {
             projectile->angle_ += attack->trace_angle_;
 
-            if (exact - projectile->angle_ > kBAMAngle180)
+            if (exact - projectile->angle_ > epi::kBAMAngle180)
                 projectile->angle_ = exact;
         }
     }
 
-    projectile->momentum_.X = projectile->speed_ * epi::BAMCos(projectile->angle_);
-    projectile->momentum_.Y = projectile->speed_ * epi::BAMSin(projectile->angle_);
+    projectile->momentum_.x = projectile->speed_ * epi::BAMCos(projectile->angle_);
+    projectile->momentum_.y = projectile->speed_ * epi::BAMSin(projectile->angle_);
 
     // change slope
     float slope = ApproximateSlope(destination->x - projectile->x, destination->y - projectile->y,
@@ -2397,10 +2401,10 @@ void A_HomingProjectile(MapObject *projectile)
 
     slope *= projectile->speed_;
 
-    if (slope < projectile->momentum_.Z)
-        projectile->momentum_.Z -= 0.125f;
+    if (slope < projectile->momentum_.z)
+        projectile->momentum_.z -= 0.125f;
     else
-        projectile->momentum_.Z += 0.125f;
+        projectile->momentum_.z += 0.125f;
 }
 
 //
@@ -2434,7 +2438,7 @@ void A_HomeToSpot(MapObject *projectile)
     }
 
     // calculate new angles
-    BAMAngle angle = PointToAngle(0, 0, dx, dy);
+    epi::BAMAngle angle = PointToAngle(0, 0, dx, dy);
     float    slope = ApproximateSlope(dx, dy, dz);
 
     MapObjectSetDirectionAndSpeed(projectile, angle, slope, projectile->speed_);
@@ -2458,9 +2462,9 @@ static void LaunchOrderedSpread(MapObject *mo)
 {
     // left side = angle modifier
     // right side = object or projectile (true for object).
-    static int spreadorder[] = {(int)(kBAMAngle90 / 8),   true,  (int)(kBAMAngle90 / 8),  false,
-                                -(int)(kBAMAngle90 / 8),  true,  -(int)(kBAMAngle90 / 4), false,
-                                -(int)(kBAMAngle90 / 16), false, (int)(kBAMAngle90 / 16), false};
+    static int spreadorder[] = {(int)(epi::kBAMAngle90 / 8),   true,  (int)(epi::kBAMAngle90 / 8),  false,
+                                -(int)(epi::kBAMAngle90 / 8),  true,  -(int)(epi::kBAMAngle90 / 4), false,
+                                -(int)(epi::kBAMAngle90 / 16), false, (int)(epi::kBAMAngle90 / 16), false};
 
     const AttackDefinition *attack = mo->current_attack_;
 
@@ -2488,8 +2492,8 @@ static void LaunchOrderedSpread(MapObject *mo)
 
         projectile->angle_ += spreadorder[count];
 
-        projectile->momentum_.X = projectile->speed_ * epi::BAMCos(projectile->angle_);
-        projectile->momentum_.Y = projectile->speed_ * epi::BAMSin(projectile->angle_);
+        projectile->momentum_.x = projectile->speed_ * epi::BAMCos(projectile->angle_);
+        projectile->momentum_.y = projectile->speed_ * epi::BAMSin(projectile->angle_);
     }
 
     mo->spread_count_ += 2;
@@ -2520,7 +2524,7 @@ static void LaunchRandomSpread(MapObject *mo)
 
     if (i >> 1)
     {
-        BAMAngle spreadangle = (kBAMAngle90 / (i >> 1));
+        epi::BAMAngle spreadangle = (epi::kBAMAngle90 / (i >> 1));
 
         if (i & 1)
             spreadangle -= spreadangle << 1;
@@ -2528,8 +2532,8 @@ static void LaunchRandomSpread(MapObject *mo)
         projectile->angle_ += spreadangle;
     }
 
-    projectile->momentum_.X = projectile->speed_ * epi::BAMCos(projectile->angle_);
-    projectile->momentum_.Y = projectile->speed_ * epi::BAMSin(projectile->angle_);
+    projectile->momentum_.x = projectile->speed_ * epi::BAMCos(projectile->angle_);
+    projectile->momentum_.y = projectile->speed_ * epi::BAMSin(projectile->angle_);
 }
 
 //-------------------------------------------------------------------
@@ -2547,7 +2551,7 @@ static void ShotAttack(MapObject *mo)
     float range = (attack->range_ > 0) ? attack->range_ : kMissileRange;
 
     // -ACB- 1998/09/05 Remember to use the object angle, fool!
-    BAMAngle objangle = mo->angle_;
+    epi::BAMAngle objangle = mo->angle_;
     float    objslope;
 
     if ((mo->player_ && !mo->target_) || (attack->flags_ & kAttackFlagNoTarget))
@@ -2564,7 +2568,7 @@ static void ShotAttack(MapObject *mo)
 
     for (int i = 0; i < attack->count_; i++)
     {
-        BAMAngle angle = objangle;
+        epi::BAMAngle angle = objangle;
         float    slope = objslope;
 
         // is the attack not accurate?
@@ -2601,7 +2605,7 @@ static void SprayAttack(MapObject *mo)
     // offset angles from its attack angle
     for (int i = 0; i < 40; i++)
     {
-        BAMAngle an = mo->angle_ - kBAMAngle90 / 2 + (kBAMAngle90 / 40) * i;
+        epi::BAMAngle an = mo->angle_ - epi::kBAMAngle90 / 2 + (epi::kBAMAngle90 / 40) * i;
 
         // mo->source is the originator (player) of the missile
         MapObject *target = AimLineAttack(mo->source_ ? mo->source_ : mo, an, range, nullptr);
@@ -2700,7 +2704,7 @@ void A_TrackerFollow(MapObject *tracker)
     if (!CheckSight(tracker->source_, destination))
         return;
 
-    BAMAngle angle = destination->angle_;
+    epi::BAMAngle angle = destination->angle_;
 
     ChangeThingPosition(tracker, destination->x + 24 * epi::BAMCos(angle), destination->y + 24 * epi::BAMSin(angle),
                         destination->z);
@@ -2781,7 +2785,7 @@ void A_EffectTracker(MapObject *object)
     MapObject              *tracker = nullptr;
     MapObject              *target  = nullptr;
     const AttackDefinition *attack  = nullptr;
-    BAMAngle                angle;
+    epi::BAMAngle           angle;
     float                   damage;
 
     if (!object->target_)
@@ -2822,14 +2826,15 @@ void A_EffectTracker(MapObject *object)
         DamageMapObject(target, object, object, damage, &attack->damage_);
 #ifdef DEVELOPERS
     else
-        LogDebug("%s + %s attack has zero damage\n", object->info_->name.c_str(), tracker->info->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s + %s attack has zero damage\n", object->info_->name.c_str(),
+                        tracker->info->name.c_str());
 #endif
 
     // -ACB- 2000/03/11 Check for zero mass
     if (target->info_->mass_)
-        target->momentum_.Z = 1000 / target->info_->mass_;
+        target->momentum_.z = 1000 / target->info_->mass_;
     else
-        target->momentum_.Z = 2000;
+        target->momentum_.z = 2000;
 
     if (!tracker)
         return;
@@ -2840,7 +2845,8 @@ void A_EffectTracker(MapObject *object)
 
 #ifdef DEVELOPERS
     if (!tracker->info->explode_damage_.nominal)
-        LogDebug("%s + %s explosion has zero damage\n", object->info_->name.c_str(), tracker->info->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s + %s explosion has zero damage\n", object->info_->name.c_str(),
+                        tracker->info->name.c_str());
 #endif
 
     EDGE_DAMAGE_COMPUTE(damage, &tracker->info_->explode_damage_);
@@ -2888,7 +2894,8 @@ void A_PsychicEffect(MapObject *object)
         DamageMapObject(target, object, object, damage, &attack->damage_);
 #ifdef DEVELOPERS
     else
-        LogDebug("%s + %s attack has zero damage\n", object->info_->name.c_str(), tracker->info->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s + %s attack has zero damage\n", object->info_->name.c_str(),
+                        tracker->info->name.c_str());
 #endif
 }
 
@@ -2913,7 +2920,8 @@ static void ShootToSpot(MapObject *object)
 
     if (spot == nullptr)
     {
-        LogWarning("No [%s] objects found for BossBrain shooter.\n", spot_type->name_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "No [%s] objects found for BossBrain shooter.\n",
+                        spot_type->name_.c_str());
         return;
     }
 
@@ -2937,7 +2945,7 @@ static void ShootToSpot(MapObject *object)
 //
 // -ACB- 1998/08/23
 //
-static void ObjectSpawning(MapObject *parent, BAMAngle angle)
+static void ObjectSpawning(MapObject *parent, epi::BAMAngle angle)
 {
     float                   slope;
     const AttackDefinition *attack;
@@ -3056,9 +3064,9 @@ static void ObjectSpawning(MapObject *parent, BAMAngle angle)
 
 static void ObjectTripleSpawn(MapObject *object)
 {
-    ObjectSpawning(object, object->angle_ + kBAMAngle90);
-    ObjectSpawning(object, object->angle_ + kBAMAngle180);
-    ObjectSpawning(object, object->angle_ + kBAMAngle270);
+    ObjectSpawning(object, object->angle_ + epi::kBAMAngle90);
+    ObjectSpawning(object, object->angle_ + epi::kBAMAngle180);
+    ObjectSpawning(object, object->angle_ + epi::kBAMAngle270);
 }
 
 //
@@ -3073,8 +3081,8 @@ static void ObjectTripleSpawn(MapObject *object)
 
 static void ObjectDoubleSpawn(MapObject *object)
 {
-    ObjectSpawning(object, object->angle_ + kBAMAngle90);
-    ObjectSpawning(object, object->angle_ + kBAMAngle270);
+    ObjectSpawning(object, object->angle_ + epi::kBAMAngle90);
+    ObjectSpawning(object, object->angle_ + epi::kBAMAngle270);
 }
 
 //-------------------------------------------------------------------
@@ -3158,7 +3166,7 @@ void SlammedIntoObject(MapObject *object, MapObject *target)
     }
 
     object->flags_ &= ~kMapObjectFlagSkullFly;
-    object->momentum_.X = object->momentum_.Y = object->momentum_.Z = 0;
+    object->momentum_.x = object->momentum_.y = object->momentum_.z = 0;
 
     MapObjectSetStateDeferred(object, object->info_->idle_state_, 0);
 }
@@ -3174,8 +3182,8 @@ bool UseThing(MapObject *user, MapObject *thing, float open_bottom, float open_t
         return false;
 
     // can be reached ?
-    open_top    = HMM_MIN(open_top, thing->z + thing->height_);
-    open_bottom = HMM_MAX(open_bottom, thing->z);
+    open_top    = epi::Min(open_top, thing->z + thing->height_);
+    open_bottom = epi::Max(open_bottom, thing->z);
 
     if (user->z >= open_top || (user->z + user->height_ + kUseZRange < open_bottom))
         return false;
@@ -3331,7 +3339,7 @@ void A_PathFollow(MapObject *mo)
     float dx = mo->path_trigger_->x - mo->x;
     float dy = mo->path_trigger_->y - mo->y;
 
-    BAMAngle diff = PointToAngle(0, 0, dx, dy) - mo->angle_;
+    epi::BAMAngle diff = PointToAngle(0, 0, dx, dy) - mo->angle_;
 
     // movedir value:
     //   0 for slow turning.
@@ -3343,11 +3351,11 @@ void A_PathFollow(MapObject *mo)
 
     if (mo->move_direction_ == kDirectionSlowTurn || mo->move_direction_ == kDirectionFastTurn)
     {
-        if (diff > kBAMAngle15 && diff < (kBAMAngle360 - kBAMAngle15))
+        if (diff > epi::kBAMAngle15 && diff < (epi::kBAMAngle360 - epi::kBAMAngle15))
         {
-            BAMAngle step = kBAMAngle30;
+            epi::BAMAngle step = epi::kBAMAngle30;
 
-            if (diff < kBAMAngle180)
+            if (diff < epi::kBAMAngle180)
                 mo->angle_ += RandomByteDeterministic() * (step >> 8);
             else
                 mo->angle_ -= RandomByteDeterministic() * (step >> 8);
@@ -3364,17 +3372,17 @@ void A_PathFollow(MapObject *mo)
 
     if (mo->move_direction_ == kDirectionWalking)
     {
-        if (diff < kBAMAngle30)
-            mo->angle_ += kBAMAngle1 * 2;
-        else if (diff > (kBAMAngle360 - kBAMAngle30))
-            mo->angle_ -= kBAMAngle1 * 2;
+        if (diff < epi::kBAMAngle30)
+            mo->angle_ += epi::kBAMAngle1 * 2;
+        else if (diff > (epi::kBAMAngle360 - epi::kBAMAngle30))
+            mo->angle_ -= epi::kBAMAngle1 * 2;
         else
             mo->move_direction_ = kDirectionSlowTurn;
 
         if (!DoMove(mo, true))
         {
             mo->move_direction_ = kDirectionEvasive;
-            mo->angle_          = RandomByteDeterministic() << (kBAMAngleBits - 8);
+            mo->angle_          = RandomByteDeterministic() << (epi::kBAMAngleBits - 8);
             mo->move_count_     = 1 + (RandomByteDeterministic() & 7);
         }
         return;
@@ -3808,7 +3816,8 @@ static bool CreateAggression(MapObject *mo)
         // OK, you got me
         mo->SetTarget(other);
 
-        LogDebug("Created aggression : %s --> %s\n", mo->info_->name_.c_str(), other->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "Created aggression : %s --> %s\n", mo->info_->name_.c_str(),
+                        other->info_->name_.c_str());
 
         if (mo->info_->seesound_)
             StartSoundEffect(mo->info_->seesound_, GetSoundEffectCategory(mo), mo, SfxFlags(mo->info_));
@@ -3950,9 +3959,9 @@ void A_StandardMeander(MapObject *object)
         delta = object->angle_ - (object->move_direction_ << 29);
 
         if (delta > 0)
-            object->angle_ -= kBAMAngle45;
+            object->angle_ -= epi::kBAMAngle45;
         else if (delta < 0)
-            object->angle_ += kBAMAngle45;
+            object->angle_ += epi::kBAMAngle45;
     }
 }
 
@@ -3976,9 +3985,9 @@ void A_PlayerSupportMeander(MapObject *object)
         delta = object->angle_ - (object->move_direction_ << 29);
 
         if (delta > 0)
-            object->angle_ -= kBAMAngle45;
+            object->angle_ -= epi::kBAMAngle45;
         else if (delta < 0)
-            object->angle_ += kBAMAngle45;
+            object->angle_ += epi::kBAMAngle45;
     }
 
     A_LookForTargets(object);
@@ -4021,9 +4030,9 @@ void A_StandardChase(MapObject *object)
         delta = object->angle_ - (object->move_direction_ << 29);
 
         if (delta > 0)
-            object->angle_ -= kBAMAngle45;
+            object->angle_ -= epi::kBAMAngle45;
         else if (delta < 0)
-            object->angle_ += kBAMAngle45;
+            object->angle_ += epi::kBAMAngle45;
     }
 
     if (!object->target_ || !(object->target_->flags_ & kMapObjectFlagShootable))
@@ -4182,7 +4191,7 @@ void A_KeenDie(MapObject *mo)
             return; // other Keen not dead
     }
 
-    LogDebug("A_KeenDie: ALL DEAD, activating...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "A_KeenDie: ALL DEAD, activating...\n");
 
     RemoteActivation(nullptr, 2 /* door type */, 666 /* tag */, 0, kLineTriggerAny);
 }
@@ -4207,9 +4216,9 @@ void A_CheckMoving(MapObject *mo)
         return;
     }
 
-    if (fabs(mo->momentum_.X) < kStopSpeed && fabs(mo->momentum_.Y) < kStopSpeed)
+    if (fabs(mo->momentum_.x) < kStopSpeed && fabs(mo->momentum_.y) < kStopSpeed)
     {
-        mo->momentum_.X = mo->momentum_.Y = 0;
+        mo->momentum_.x = mo->momentum_.y = 0;
         MapObjectSetStateDeferred(mo, mo->info_->idle_state_, 0);
     }
 }
@@ -5077,7 +5086,7 @@ void A_FindTracer(MapObject *mo)
 
     int *args = (int *)mo->state_->action_par;
 
-    BAMAngle fov         = args[0] == 0 ? kBAMAngle0 : epi::BAMFromDegrees((float)args[0] / 65536.0f);
+    epi::BAMAngle fov         = args[0] == 0 ? epi::kBAMAngle0 : epi::BAMFromDegrees((float)args[0] / 65536.0f);
     uint32_t rangeblocks = args[1] != 0 ? args[1] : 10;
 
     MapObject *target = A_LookForBlockmapTarget(mo, rangeblocks, fov);
@@ -5101,41 +5110,41 @@ void A_SeekTracer(MapObject *mo)
 
     int *args = (int *)mo->state_->action_par;
 
-    BAMAngle maxturn = epi::BAMFromDegrees((float)args[1] / 65536.0f);
+    epi::BAMAngle maxturn = epi::BAMFromDegrees((float)args[1] / 65536.0f);
 
     // change angle
-    BAMAngle exact = PointToAngle(mo->x, mo->y, destination->x, destination->y);
+    epi::BAMAngle exact = PointToAngle(mo->x, mo->y, destination->x, destination->y);
 
     if (exact != mo->angle_)
     {
-        if (exact - mo->angle_ > kBAMAngle180)
+        if (exact - mo->angle_ > epi::kBAMAngle180)
         {
             mo->angle_ -= maxturn;
 
-            if (exact - mo->angle_ < kBAMAngle180)
+            if (exact - mo->angle_ < epi::kBAMAngle180)
                 mo->angle_ = exact;
         }
         else
         {
             mo->angle_ += maxturn;
 
-            if (exact - mo->angle_ > kBAMAngle180)
+            if (exact - mo->angle_ > epi::kBAMAngle180)
                 mo->angle_ = exact;
         }
     }
 
-    mo->momentum_.X = mo->speed_ * epi::BAMCos(mo->angle_);
-    mo->momentum_.Y = mo->speed_ * epi::BAMSin(mo->angle_);
+    mo->momentum_.x = mo->speed_ * epi::BAMCos(mo->angle_);
+    mo->momentum_.y = mo->speed_ * epi::BAMSin(mo->angle_);
 
     // change slope
     float slope = ApproximateSlope(destination->x - mo->x, destination->y - mo->y, MapObjectMidZ(destination) - mo->z);
 
     slope *= mo->speed_;
 
-    if (slope < mo->momentum_.Z)
-        mo->momentum_.Z -= 0.125f;
+    if (slope < mo->momentum_.z)
+        mo->momentum_.z -= 0.125f;
     else
-        mo->momentum_.Z += 0.125f;
+        mo->momentum_.z += 0.125f;
 }
 
 void A_JumpIfHealthBelow(MapObject *mo)
@@ -5309,7 +5318,7 @@ void A_RadiusDamage(MapObject *mo)
 #ifdef DEVELOPERS
     if (!damage)
     {
-        LogDebug("%s caused no explosion damage\n", mo->info_->name.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "%s caused no explosion damage\n", mo->info_->name.c_str());
         return;
     }
 #endif
@@ -5386,7 +5395,7 @@ void A_SpawnObject(MapObject *mo)
     if (!type)
         FatalError("A_SpawnObject action used with %s, but it doesn't exist?\n", ref->spawn_name);
 
-    BAMAngle newangle = mo->angle_ + ref->angle;
+    epi::BAMAngle newangle = mo->angle_ + ref->angle;
     float    newcos   = epi::BAMCos(newangle);
     float    newsin   = epi::BAMSin(newangle);
 
@@ -5396,9 +5405,9 @@ void A_SpawnObject(MapObject *mo)
     EPI_ASSERT(spawn);
 
     spawn->angle_ = newangle;
-    spawn->momentum_.X += newcos * ref->x_velocity - ref->y_velocity * newsin;
-    spawn->momentum_.Y += newsin * ref->x_velocity + newcos * ref->y_velocity;
-    spawn->momentum_.Z += ref->z_velocity;
+    spawn->momentum_.x += newcos * ref->x_velocity - ref->y_velocity * newsin;
+    spawn->momentum_.y += newsin * ref->x_velocity + newcos * ref->y_velocity;
+    spawn->momentum_.z += ref->z_velocity;
     spawn->side_ = mo->side_;
 
     spawn->SetRealSource(mo);
@@ -5494,15 +5503,15 @@ void A_Mushroom(MapObject *mo)
                 if (dist < 1.0f)
                     dist = 1.0f;
 
-                proj->momentum_.Z = (tz - mo->z) / dist;
-                proj->momentum_.X = proj->info_->speed_ * epi::BAMCos(proj->angle_);
-                proj->momentum_.Y = proj->info_->speed_ * epi::BAMSin(proj->angle_);
-                proj->momentum_   = HMM_MulV3F(proj->momentum_, speed);
+                proj->momentum_.z = (tz - mo->z) / dist;
+                proj->momentum_.x = proj->info_->speed_ * epi::BAMCos(proj->angle_);
+                proj->momentum_.y = proj->info_->speed_ * epi::BAMSin(proj->angle_);
+                proj->momentum_   = epi::ScaleVector(proj->momentum_, speed);
                 if (proj->flags_ & kMapObjectFlagPreserveMomentum)
                 {
-                    proj->momentum_.X += mo->momentum_.X;
-                    proj->momentum_.Y += mo->momentum_.Y;
-                    proj->momentum_.Z += mo->momentum_.Z;
+                    proj->momentum_.x += mo->momentum_.x;
+                    proj->momentum_.y += mo->momentum_.y;
+                    proj->momentum_.z += mo->momentum_.z;
                 }
                 proj->SetRealSource(mo);
                 proj->SetSpawnSource(mo);
@@ -5520,7 +5529,7 @@ void A_PainChanceSet(MapObject *mo)
     if (st && st->action_par)
     {
         value = ((float *)st->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
     mo->pain_chance_ = value;
 }

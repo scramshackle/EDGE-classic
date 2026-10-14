@@ -33,10 +33,10 @@
 #include <algorithm> // sort
 #include <string_view>
 
+#include "dm_format.h"
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_filesystem.h"
 #include "epi_str_compare.h"
@@ -136,7 +136,7 @@ static SpriteFrame *WhatFrame(SpriteDefinition *def, const char *name, int pos)
             break;
 
         default:
-            LogWarning("Sprite lump %s has illegal frame.\n", name);
+            epi::LogMessage(epi::kLogLevelWarning, "Sprite lump %s has illegal frame.\n", name);
             return nullptr;
         }
 
@@ -180,7 +180,7 @@ static int WhatRot(SpriteFrame *frame, const char *name, int pos)
         rot = (rot_ch - 'A') + 10;
     else
     {
-        LogWarning("Sprite lump %s has illegal rotation.\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "Sprite lump %s has illegal rotation.\n", name);
         return -1;
     }
 
@@ -449,8 +449,8 @@ static void FillSpriteFramesUser()
                 delete offset_check;
 
                 const Patch *pat      = (Patch *)header;
-                change_img->offset_x_ = AlignedLittleEndianS16(pat->left_offset);
-                change_img->offset_y_ = AlignedLittleEndianS16(pat->top_offset);
+                change_img->offset_x_ = epi::AlignedLittleEndianS16(pat->left_offset);
+                change_img->offset_y_ = epi::AlignedLittleEndianS16(pat->top_offset);
                 // adjust sprite offsets so that (0,0) is normal
                 if (sprite_map[S]->HasWeapon())
                 {
@@ -512,8 +512,8 @@ static void MarkCompletedFrames(void)
 
             if (rot_count < frame->rotations_)
             {
-                LogWarning("Sprite %s:%c is missing rotations (%d of %d).\n", def->name_.c_str(), 'A' + f,
-                           frame->rotations_ - rot_count, frame->rotations_);
+                epi::LogMessage(epi::kLogLevelWarning, "Sprite %s:%c is missing rotations (%d of %d).\n",
+                                def->name_.c_str(), 'A' + f, frame->rotations_ - rot_count, frame->rotations_);
 
                 // try to fix cases where some dumbass used A1 instead of A0
                 if (rot_count == 1 && !frame->is_weapon_)
@@ -539,12 +539,13 @@ static void CheckSpriteFrames(SpriteDefinition *def)
     for (int i = 0; i < def->total_frames_; i++)
         if (!def->frames_[i].finished_)
         {
-            LogDebug("Frame %d/%d in sprite %s is not finished\n", 1 + i, def->total_frames_, def->name_.c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "Frame %d/%d in sprite %s is not finished\n", 1 + i,
+                            def->total_frames_, def->name_.c_str());
             missing++;
         }
 
     if (missing > 0 && missing < def->total_frames_)
-        LogWarning("Missing %d frames in sprite: %s\n", missing, def->name_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Missing %d frames in sprite: %s\n", missing, def->name_.c_str());
 
     // free some memory for completely missing sprites
     if (missing == def->total_frames_)
@@ -576,7 +577,7 @@ void InitializeSprites(void)
 
     StartupProgressMessage("Finding sprite patches...");
 
-    LogPrint("InitializeSprites: Finding sprite patches\n");
+    epi::LogMessage(epi::kLogLevelPrint, "InitializeSprites: Finding sprite patches\n");
 
     // 1. Allocate sprite definitions (ignore nullptr sprite, #0)
 

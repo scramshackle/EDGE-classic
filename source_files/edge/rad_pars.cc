@@ -17,6 +17,7 @@
 //----------------------------------------------------------------------------
 
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 
 #include <unordered_map>
@@ -24,6 +25,7 @@
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
@@ -37,7 +39,6 @@
 #include "rad_act.h"
 #include "rad_trig.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -89,17 +90,17 @@ static char *pending_label     = nullptr;
 
     // put actual message on first line
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     pos = buffer + strlen(buffer);
 
-    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred near line %d of %s\n",
-                   current_script_line_number, current_script_filename);
+    epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Error occurred near line %d of %s\n",
+                             current_script_line_number, current_script_filename);
     pos += strlen(pos);
 
-    stbsp_snprintf(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
-                   current_script_line.c_str());
+    epi::FormatToBufferSized(pos, (int)(sizeof(buffer) - (size_t)(pos - buffer)), "Line contents: %s\n",
+                             current_script_line.c_str());
     pos += strlen(pos);
 
     // check for buffer overflow
@@ -107,7 +108,7 @@ static char *pending_label     = nullptr;
         FatalError("Buffer overflow in ScriptError.\n");
 
     // add a blank line for readability in the log file
-    LogPrint("\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
 
     FatalError("%s", buffer);
 }
@@ -121,13 +122,14 @@ void ScriptWarning(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
-    LogWarning("\n");
-    LogWarning("Found problem near line %d of %s\n", current_script_line_number, current_script_filename);
-    LogWarning("Line contents: %s\n", current_script_line.c_str());
-    LogWarning("%s", buffer);
+    epi::LogMessage(epi::kLogLevelWarning, "\n");
+    epi::LogMessage(epi::kLogLevelWarning, "Found problem near line %d of %s\n", current_script_line_number,
+                    current_script_filename);
+    epi::LogMessage(epi::kLogLevelWarning, "Line contents: %s\n", current_script_line.c_str());
+    epi::LogMessage(epi::kLogLevelWarning, "%s", buffer);
 }
 
 void ScriptWarnError(const char *err, ...)
@@ -136,7 +138,7 @@ void ScriptWarnError(const char *err, ...)
     char    buffer[1024];
 
     va_start(argptr, err);
-    stbsp_vsnprintf(buffer, sizeof(buffer), err, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), err, argptr);
     va_end(argptr);
 
     if (strict_errors)
@@ -268,11 +270,12 @@ static void ScriptCheckForTime(const char *info, void *storage)
     if (!epi::ScanFloat(info, &val))
     {
         // LogWarning("Bad time value '%s'.\n", info);
-        LogWarning("RTS: Bad time value '%s' near line %d.\n", info, current_script_line_number);
+        epi::LogMessage(epi::kLogLevelWarning, "RTS: Bad time value '%s' near line %d.\n", info,
+                        current_script_line_number);
         return;
     }
 
-    *dest = RoundToInteger(val * (float)kTicRate);
+    *dest = epi::RoundToInteger(val * (float)kTicRate);
 }
 
 static ArmourType ScriptCheckForArmourType(const char *info)
@@ -520,12 +523,12 @@ static void ScriptComputeScriptCRC(RADScript *scr)
     scr->crc += (int)scr->max_players;
     scr->crc += (int)scr->repeat_count;
 
-    scr->crc += (int)RoundToInteger(scr->x);
-    scr->crc += (int)RoundToInteger(scr->y);
-    scr->crc += (int)RoundToInteger(scr->z);
-    scr->crc += (int)RoundToInteger(scr->rad_x);
-    scr->crc += (int)RoundToInteger(scr->rad_y);
-    scr->crc += (int)RoundToInteger(scr->rad_z);
+    scr->crc += (int)epi::RoundToInteger(scr->x);
+    scr->crc += (int)epi::RoundToInteger(scr->y);
+    scr->crc += (int)epi::RoundToInteger(scr->z);
+    scr->crc += (int)epi::RoundToInteger(scr->rad_x);
+    scr->crc += (int)epi::RoundToInteger(scr->rad_y);
+    scr->crc += (int)epi::RoundToInteger(scr->rad_z);
     scr->crc += scr->sector_tag;
     scr->crc += scr->sector_index;
 
@@ -1135,7 +1138,7 @@ static void ScriptParsePathEvent(std::vector<const char *> &pars)
     this_script->path_event_label = new char[i + 1];
     epi::CStringCopyMax((char *)this_script->path_event_label, pars[1], i);
 
-    this_script->path_event_offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    this_script->path_event_offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 }
 
 static void ScriptParseOnDeath(std::vector<const char *> &pars)
@@ -1454,7 +1457,7 @@ static void HandleSpawnKeyword(const char *par, ScriptThingParameter *t)
         int val;
         ScriptCheckForInt(par + 6, &val);
 
-        if (HMM_ABS(val) <= 360)
+        if (epi::Abs(val) <= 360)
             t->angle = epi::BAMFromDegrees((float)val);
         else
             t->angle = val << 16;
@@ -1540,7 +1543,7 @@ static void ScriptParseSpawnThing(std::vector<const char *> &pars)
 
         ScriptCheckForInt(angle_str, &val);
 
-        if (HMM_ABS(val) <= 360)
+        if (epi::Abs(val) <= 360)
             t->angle = epi::BAMFromDegrees((float)val);
         else
             t->angle = val << 16;
@@ -1786,7 +1789,7 @@ static void ScriptParseThingEvent(std::vector<const char *> &pars)
     tev->label = new char[i + 1];
     epi::CStringCopyMax((char *)tev->label, pars[2], i);
 
-    tev->offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    tev->offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 
     // parse the tag value
     if (pars.size() >= 4)
@@ -2253,7 +2256,7 @@ static void ScriptParseWeaponEvent(std::vector<const char *> &pars)
     tev->label = new char[i + 1];
     epi::CStringCopyMax((char *)tev->label, pars[2], i);
 
-    tev->offset = div ? HMM_MAX(0, atoi(div + 1) - 1) : 0;
+    tev->offset = div ? epi::Max(0, atoi(div + 1) - 1) : 0;
 
     AddStateToScript(this_script, 0, ScriptWeaponEvent, tev);
 }
@@ -2499,7 +2502,7 @@ void ReadRADScript(const std::string &data, const std::string &source)
 {
     // FIXME store source somewhere, like current_script_filename
     EPI_UNUSED(source);
-    LogDebug("RTS: Loading LUMP (size=%d)\n", (int)data.size());
+    epi::LogMessage(epi::kLogLevelDebug, "RTS: Loading LUMP (size=%d)\n", (int)data.size());
 
     // WISH: a more helpful filename
     current_script_filename    = "RSCRIPT";
@@ -2515,7 +2518,7 @@ void ReadRADScript(const std::string &data, const std::string &source)
             break;
 
 #if (EDGE_DEBUG_TRIGGER_SCRIPTS)
-        LogDebug("RTS LINE: '%s'\n", current_script_line.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "RTS LINE: '%s'\n", current_script_line.c_str());
 #endif
 
         ScriptParseLine();

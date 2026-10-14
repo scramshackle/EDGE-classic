@@ -39,7 +39,6 @@
 #include "r_misc.h"
 #include "r_static.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_files.h"
 #include "w_wad.h"
@@ -73,13 +72,13 @@ int ConsoleCommandExec(char **argv, int argc)
 
     if (epi::IsPathAbsolute(argv[1]))
     {
-        LogPrint("Absolute path %s not allowed!\n", argv[1]);
+        epi::LogMessage(epi::kLogLevelPrint, "Absolute path %s not allowed!\n", argv[1]);
         return 1;
     }
 
     if (strstr(argv[1], "..") != NULL)
     {
-        LogPrint("Path traversal with .. is not allowed!\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Path traversal with .. is not allowed!\n");
         return 1;
     }
 
@@ -306,13 +305,13 @@ int ConsoleCommandType(char **argv, int argc)
 
     if (epi::IsPathAbsolute(argv[1]))
     {
-        LogPrint("Absolute path %s not allowed!\n", argv[1]);
+        epi::LogMessage(epi::kLogLevelPrint, "Absolute path %s not allowed!\n", argv[1]);
         return 1;
     }
 
     if (strstr(argv[1], "..") != NULL)
     {
-        LogPrint("Path traversal with .. is not allowed!\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Path traversal with .. is not allowed!\n");
         return 1;
     }
 
@@ -408,29 +407,31 @@ int ConsoleCommandChangeDir(char **argv, int argc)
 {
     if (argc == 1 || argc > 2)
     {
-        LogPrint("Usage: %s <home or game>\n", argv[0]);
+        epi::LogMessage(epi::kLogLevelPrint, "Usage: %s <home or game>\n", argv[0]);
         return 1;
     }
 
     if (home_directory == game_directory)
     {
-        LogPrint("Home and game directory are both %s!\nRemaining in current directory.\n",
-                 epi::SanitizePath(working_directory).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Home and game directory are both %s!\nRemaining in current directory.\n",
+                        epi::SanitizePath(working_directory).c_str());
         return 1;
     }
     else if (epi::StringCaseCompareASCII(argv[1], "game") == 0)
     {
         working_directory = game_directory;
-        LogPrint("Switched to game directory %s\n", epi::SanitizePath(working_directory).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Switched to game directory %s\n",
+                        epi::SanitizePath(working_directory).c_str());
     }
     else if (epi::StringCaseCompareASCII(argv[1], "home") == 0)
     {
         working_directory = home_directory;
-        LogPrint("Switched to home directory %s\n", epi::SanitizePath(working_directory).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Switched to home directory %s\n",
+                        epi::SanitizePath(working_directory).c_str());
     }
     else
     {
-        LogPrint("Unknown cd target %s (must be \"home\" or \"game\")\n", argv[1]);
+        epi::LogMessage(epi::kLogLevelPrint, "Unknown cd target %s (must be \"home\" or \"game\")\n", argv[1]);
         return 1;
     }
 
@@ -441,19 +442,21 @@ int ConsoleCommandPrintWorkingDir(char **argv, int argc)
 {
     if (argc > 1)
     {
-        LogPrint("Usage: %s\n", argv[0]);
+        epi::LogMessage(epi::kLogLevelPrint, "Usage: %s\n", argv[0]);
         return 1;
     }
 
     if (home_directory != game_directory)
     {
         if (working_directory == game_directory)
-            LogPrint("Using game directory %s\n", epi::SanitizePath(working_directory).c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Using game directory %s\n",
+                            epi::SanitizePath(working_directory).c_str());
         else
-            LogPrint("Using home directory %s\n", epi::SanitizePath(working_directory).c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Using home directory %s\n",
+                            epi::SanitizePath(working_directory).c_str());
     }
     else
-        LogPrint("Using directory %s\n", epi::SanitizePath(working_directory).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Using directory %s\n", epi::SanitizePath(working_directory).c_str());
 
     return 0;
 }
@@ -477,13 +480,13 @@ int ConsoleCommandDir(char **argv, int argc)
 
     if (epi::IsPathAbsolute(path))
     {
-        LogPrint("Absolute path %s not allowed!\n", path.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Absolute path %s not allowed!\n", path.c_str());
         return 1;
     }
 
     if (path.find("..") != std::string::npos)
     {
-        LogPrint("Path traversal with .. is not allowed!\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Path traversal with .. is not allowed!\n");
         return 1;
     }
 
@@ -493,23 +496,23 @@ int ConsoleCommandDir(char **argv, int argc)
 
     if (!ReadDirectory(fsd, path, mask.c_str()))
     {
-        LogPrint("Failed to read dir: %s\n", path.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Failed to read dir: %s\n", path.c_str());
         return 1;
     }
 
     if (fsd.empty())
     {
-        LogPrint("No files found in provided path %s\n", path.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "No files found in provided path %s\n", path.c_str());
         return 0;
     }
 
-    LogPrint("Directory contents for %s matching %s\n", epi::SanitizePath(epi::GetDirectory(path)).c_str(),
-             mask.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "Directory contents for %s matching %s\n",
+                    epi::SanitizePath(epi::GetDirectory(path)).c_str(), mask.c_str());
 
     for (size_t i = 0; i < fsd.size(); i++)
     {
-        LogPrint("%4d:  %-4s  \"%s\"\n", (int)i + 1, fsd[i].is_dir ? "dir  " : "file",
-                 epi::GetFilename(fsd[i].name).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "%4d:  %-4s  \"%s\"\n", (int)i + 1, fsd[i].is_dir ? "dir  " : "file",
+                        epi::GetFilename(fsd[i].name).c_str());
     }
 
     return 0;
@@ -590,7 +593,7 @@ int ConsoleCommandShowStatic(char **argv, int argc)
 
     if (!level_sectors || total_level_sectors == 0)
     {
-        LogPrint("No level loaded.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "No level loaded.\n");
         return 0;
     }
 
@@ -621,19 +624,19 @@ int ConsoleCommandShowStatic(char **argv, int argc)
             static_sides++;
     }
 
-    LogPrint("Static geometry classification (generation %u):\n", StaticGeometryGeneration());
-    LogPrint("  sectors: %d static, %d dynamic, %d suppressed (of %d)\n", static_sectors, dynamic_sectors,
-             suppressed_sectors, total_level_sectors);
-    LogPrint("  sides:   %d static, %d dynamic (of %d)\n", static_sides, dynamic_sides, total_level_sides);
+    epi::LogMessage(epi::kLogLevelPrint, "Static geometry classification (generation %u):\n",
+                    StaticGeometryGeneration());
+    epi::LogMessage(epi::kLogLevelPrint, "  sectors: %d static, %d dynamic, %d suppressed (of %d)\n", static_sectors,
+                    dynamic_sectors, suppressed_sectors, total_level_sectors);
+    epi::LogMessage(epi::kLogLevelPrint, "  sides:   %d static, %d dynamic (of %d)\n", static_sides, dynamic_sides,
+                    total_level_sides);
 
     int batches, live_spans, dead_spans, mesh_vertices;
 
     StaticMeshStats(&batches, &live_spans, &dead_spans, &mesh_vertices);
 
-    LogPrint("Static mesh: %d batches, %d live spans (%d dead), %d vertices\n", batches, live_spans, dead_spans,
-             mesh_vertices);
-
-
+    epi::LogMessage(epi::kLogLevelPrint, "Static mesh: %d batches, %d live spans (%d dead), %d vertices\n", batches,
+                    live_spans, dead_spans, mesh_vertices);
 
     return 0;
 }
@@ -654,12 +657,12 @@ int ConsoleCommandShowVars(char **argv, int argc)
     if (argc >= 2)
         match = argv[1];
 
-    LogPrint("Console Variables:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Console Variables:\n");
 
     int total = PrintConsoleVariables(match, show_default);
 
     if (total == 0)
-        LogPrint("Nothing matched.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Nothing matched.\n");
 
     return 0;
 }
@@ -671,7 +674,7 @@ int ConsoleCommandShowCommands(char **argv, int argc)
     if (argc >= 2)
         match = argv[1];
 
-    LogPrint("Console Commands:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Console Commands:\n");
 
     int total = 0;
 
@@ -681,12 +684,12 @@ int ConsoleCommandShowCommands(char **argv, int argc)
             if (epi::StringCaseFindASCII(builtin_commands[i].name, match) == std::string_view::npos)
                 continue;
 
-        LogPrint("  %-15s\n", builtin_commands[i].name);
+        epi::LogMessage(epi::kLogLevelPrint, "  %-15s\n", builtin_commands[i].name);
         total++;
     }
 
     if (total == 0)
-        LogPrint("Nothing matched.\n");
+        epi::LogMessage(epi::kLogLevelPrint, "Nothing matched.\n");
 
     return 0;
 }
@@ -695,13 +698,13 @@ int ConsoleCommandShowMaps(char **argv, int argc)
 {
     EPI_UNUSED(argv);
     EPI_UNUSED(argc);
-    LogPrint("Warp Name           Description\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Warp Name           Description\n");
 
     for (size_t i = 0; i < mapdefs.size(); i++)
     {
         if (MapExists(mapdefs[i]) && mapdefs[i]->episode_)
-            LogPrint("  %s                     %s\n", mapdefs[i]->name_.c_str(),
-                     language[mapdefs[i]->description_.c_str()]);
+            epi::LogMessage(epi::kLogLevelPrint, "  %s                     %s\n", mapdefs[i]->name_.c_str(),
+                            language[mapdefs[i]->description_.c_str()]);
     }
 
     return 0;
@@ -720,20 +723,20 @@ int ConsoleCommandHelp(char **argv, int argc)
 {
     EPI_UNUSED(argv);
     EPI_UNUSED(argc);
-    LogPrint("Welcome to the EDGE Console.\n");
-    LogPrint("\n");
-    LogPrint("Use the 'showcmds' command to list all commands.\n");
-    LogPrint("The 'showvars' command will list all variables.\n");
-    LogPrint("Both of these can take a keyword to match the names with.\n");
-    LogPrint("\n");
-    LogPrint("To show the value of a variable, just type its name.\n");
-    LogPrint("To change it, follow the name with a space and the new value.\n");
-    LogPrint("\n");
-    LogPrint("Press ESC key to close the console.\n");
-    LogPrint("The PGUP and PGDN keys scroll the console up and down.\n");
-    LogPrint("The UP and DOWN arrow keys let you recall previous commands.\n");
-    LogPrint("\n");
-    LogPrint("Have a nice day!\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Welcome to the EDGE Console.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Use the 'showcmds' command to list all commands.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "The 'showvars' command will list all variables.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Both of these can take a keyword to match the names with.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
+    epi::LogMessage(epi::kLogLevelPrint, "To show the value of a variable, just type its name.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "To change it, follow the name with a space and the new value.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Press ESC key to close the console.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "The PGUP and PGDN keys scroll the console up and down.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "The UP and DOWN arrow keys let you recall previous commands.\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Have a nice day!\n");
 
     return 0;
 }
@@ -742,7 +745,7 @@ int ConsoleCommandVersion(char **argv, int argc)
 {
     EPI_UNUSED(argv);
     EPI_UNUSED(argc);
-    LogPrint("%s v%s\n", application_name.c_str(), edge_version.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "%s v%s\n", application_name.c_str(), edge_version.c_str());
     return 0;
 }
 
@@ -909,7 +912,7 @@ void TryConsoleCommand(const char *cmd)
     {
         if (argc <= 1)
         {
-            LogPrint("%s \"%s\"\n", argv[0], var->c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "%s \"%s\"\n", argv[0], var->c_str());
         }
         else if (argc - 1 >= 2) // Assume string with spaces; concat args into
                                 // one string and try it
@@ -923,7 +926,7 @@ void TryConsoleCommand(const char *cmd)
             *var = concatter.c_str();
         }
         else if ((var->flags_ & kConsoleVariableFlagReadOnly) != 0)
-            LogPrint("The cvar '%s' is read only.\n", var->name_);
+            epi::LogMessage(epi::kLogLevelPrint, "The cvar '%s' is read only.\n", var->name_);
         else
         {
             *var = argv[1];
@@ -933,7 +936,7 @@ void TryConsoleCommand(const char *cmd)
         return;
     }
 
-    LogPrint("Unknown console command: %s\n", argv[0]);
+    epi::LogMessage(epi::kLogLevelPrint, "Unknown console command: %s\n", argv[0]);
 
     KillArgs(argv, argc);
     return;

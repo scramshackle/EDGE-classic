@@ -53,7 +53,7 @@ static SDL_GPUTexture *CreatePlaneTexture(SDL_GPUDevice *device, int width, int 
     SDL_GPUTexture *texture = SDL_CreateGPUTexture(device, &info);
 
     if (!texture)
-        LogPrint("GpuMovie: SDL_CreateGPUTexture failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuMovie: SDL_CreateGPUTexture failed: %s\n", SDL_GetError());
 
     return texture;
 }
@@ -102,8 +102,7 @@ void MovieSetupPlanes(const MoviePlaneSizes &sizes)
     movie_staging_dirty = false;
 
     if (!movie_transfer)
-        LogPrint("GpuMovie: SDL_CreateGPUTransferBuffer failed: %s\n", SDL_GetError());
-
+        epi::LogMessage(epi::kLogLevelPrint, "GpuMovie: SDL_CreateGPUTransferBuffer failed: %s\n", SDL_GetError());
 }
 
 void MovieUploadPlanes(const uint8_t *luma, const uint8_t *chroma_blue, const uint8_t *chroma_red)
@@ -185,14 +184,14 @@ void MovieDrawFrame(float x1, float y1, float x2, float y2, float luma_scale_x, 
 
     EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
 
-    quad[0].position               = {{x1, y1, 0.0f}};
-    quad[0].texture_coordinates[0] = {{0.0f, 0.0f}};
-    quad[1].position               = {{x2, y1, 0.0f}};
-    quad[1].texture_coordinates[0] = {{1.0f, 0.0f}};
-    quad[2].position               = {{x2, y2, 0.0f}};
-    quad[2].texture_coordinates[0] = {{1.0f, 1.0f}};
-    quad[3].position               = {{x1, y2, 0.0f}};
-    quad[3].texture_coordinates[0] = {{0.0f, 1.0f}};
+    quad[0].position               = {x1, y1, 0.0f};
+    quad[0].texture_coordinates[0] = {0.0f, 0.0f};
+    quad[1].position               = {x2, y1, 0.0f};
+    quad[1].texture_coordinates[0] = {1.0f, 0.0f};
+    quad[2].position               = {x2, y2, 0.0f};
+    quad[2].texture_coordinates[0] = {1.0f, 1.0f};
+    quad[3].position               = {x1, y2, 0.0f};
+    quad[3].texture_coordinates[0] = {0.0f, 1.0f};
 
     float plane_scales[4] = {luma_scale_x, luma_scale_y, chroma_scale_x, chroma_scale_y};
 

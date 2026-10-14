@@ -153,7 +153,7 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     render_state->TextureMagFilter(smooth ? GL_LINEAR : GL_NEAREST);
 
     // minification mode
-    int mip_level = HMM_Clamp(0, image_mipmapping, 2);
+    int mip_level = epi::Clamp(image_mipmapping, 0, 2);
 
     static GLuint minif_modes[2 * 3] = {GL_NEAREST, GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_LINEAR,
 
@@ -165,8 +165,8 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
     {
         if (img->width_ != new_w || img->height_ != new_h)
         {
-            int grow_w = HMM_MAX(new_w, (int)img->width_);
-            int grow_h = HMM_MAX(new_h, (int)img->height_);
+            int grow_w = epi::Max(new_w, (int)img->width_);
+            int grow_h = epi::Max(new_h, (int)img->height_);
 
             if (grow_w != img->width_ || grow_h != img->height_)
                 img->Grow(grow_w, grow_h);
@@ -185,8 +185,8 @@ GLuint UploadTexture(ImageData *img, int flags, int max_pix)
         if (nomip || !image_mipmapping || (new_w == 1 && new_h == 1))
             break;
 
-        new_w = HMM_MAX(1, new_w / 2);
-        new_h = HMM_MAX(1, new_h / 2);
+        new_w = epi::Max(1, new_w / 2);
+        new_h = epi::Max(1, new_h / 2);
     }
 
     render_state->FinishTextures(1, &id);

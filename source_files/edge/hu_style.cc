@@ -18,6 +18,7 @@
 
 #include "hu_style.h"
 
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi.h"

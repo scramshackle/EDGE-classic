@@ -199,7 +199,7 @@ class DamageClass
     bool no_armour_;
 
     // Color of the flash when player is hit by this damage type
-    RGBAColor damage_flash_colour_;
+    epi::RGBAColor damage_flash_colour_;
 
     // Apply damange unconditionally
     bool bypass_all_;
@@ -215,7 +215,7 @@ class DamageClass
     // to help integrate MBF21 instakill sector damage. Only considered
     // if non-zero for backwards compatability. "P" indicates players,
     // "M" indicates monsters, and "O" indicates other
-    BitSet only_affects_;
+    epi::BitSet only_affects_;
 };
 
 enum AttackStyle
@@ -279,13 +279,13 @@ class AttackDefinition
     struct SoundEffect *initsound_;
     struct SoundEffect *sound_;
     float               accuracy_slope_;
-    BAMAngle            accuracy_angle_;
+    epi::BAMAngle       accuracy_angle_;
     float               xoffset_;
     float               yoffset_;
     float               zoffset_;
-    BAMAngle            angle_offset_; // -AJA- 1999/09/10.
+    epi::BAMAngle       angle_offset_; // -AJA- 1999/09/10.
     float               slope_offset_; //
-    BAMAngle            trace_angle_;  // -AJA- 2005/02/08.
+    epi::BAMAngle       trace_angle_;  // -AJA- 2005/02/08.
     float               assault_speed_;
     float               height_;
     float               range_;
@@ -295,7 +295,7 @@ class AttackDefinition
     DamageClass         damage_;
 
     // class of the attack.
-    BitSet attack_class_;
+    epi::BitSet attack_class_;
 
     // object init state.  The integer value only becomes valid after
     // DDFAttackCleanUp() has been called.
@@ -603,8 +603,8 @@ class WeaponDefinition
   public:
     inline int KeyPri(int idx) const // next/prev order value
     {
-        int key = 1 + HMM_MAX(-1, HMM_MIN(10, bind_key_));
-        int pri = 1 + HMM_MAX(-1, HMM_MIN(900, priority_));
+        int key = 1 + epi::Max(-1, epi::Min(10, bind_key_));
+        int pri = 1 + epi::Max(-1, epi::Min(900, priority_));
 
         return (pri * 20 + key) * 100 + idx;
     }

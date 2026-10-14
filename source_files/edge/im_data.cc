@@ -22,9 +22,10 @@
 
 #include <unordered_map>
 
-#include "HandmadeMath.h"
+#include "dm_colors.h"
 #include "epi.h"
 #include "epi_color.h"
+#include "epi_math.h"
 
 ImageData::ImageData(int width, int height, int depth) : width_(width), height_(height), depth_(depth)
 {
@@ -55,7 +56,7 @@ void ImageData::Whiten()
         {
             uint8_t *src = PixelAt(x, y);
 
-            int ity = HMM_MAX(src[0], HMM_MAX(src[1], src[2]));
+            int ity = epi::Max(src[0], epi::Max(src[1], src[2]));
 
             // soften the above equation, take average into account
             ity = (ity * 196 + src[0] * 20 + src[1] * 20 + src[2] * 20) >> 8;
@@ -182,8 +183,8 @@ void ImageData::Shrink(int new_w, int new_h)
             }
     }
 
-    width_  = HMM_MAX(1, width_ * new_w / width_);
-    height_ = HMM_MAX(1, height_ * new_h / height_);
+    width_  = epi::Max(1, width_ * new_w / width_);
+    height_ = epi::Max(1, height_ * new_h / height_);
 
     width_  = new_w;
     height_ = new_h;
@@ -244,8 +245,8 @@ void ImageData::ShrinkMasked(int new_w, int new_h)
             }
         }
 
-    width_  = HMM_MAX(1, width_ * new_w / width_);
-    height_ = HMM_MAX(1, height_ * new_h / height_);
+    width_  = epi::Max(1, width_ * new_w / width_);
+    height_ = epi::Max(1, height_ * new_h / height_);
 
     width_  = new_w;
     height_ = new_h;
@@ -417,12 +418,12 @@ void ImageData::EightWaySymmetry()
 }
 
 void ImageData::DetermineRealBounds(uint16_t *bottom, uint16_t *left, uint16_t *right, uint16_t *top,
-                                    RGBAColor background_color, int from_x, int to_x, int from_y, int to_y)
+                                    epi::RGBAColor background_color, int from_x, int to_x, int from_y, int to_y)
 {
-    from_x = HMM_MAX(0, from_x);
-    to_x   = HMM_MIN(to_x, width_ - 1);
-    from_y = HMM_MAX(0, from_y);
-    to_y   = HMM_MIN(to_y, height_ - 1);
+    from_x = epi::Max(0, from_x);
+    to_x   = epi::Min(to_x, width_ - 1);
+    from_y = epi::Max(0, from_y);
+    to_y   = epi::Min(to_y, height_ - 1);
 
     EPI_ASSERT(bottom || left || right || top);
 
@@ -552,7 +553,7 @@ void ImageData::DetermineRealBounds(uint16_t *bottom, uint16_t *left, uint16_t *
     }
 }
 
-RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
+epi::RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
 {
     // make sure we don't overflow
     EPI_ASSERT(width_ * height_ <= 2048 * 2048);
@@ -566,10 +567,10 @@ RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
     uint8_t hue[3] = {0, 0, 0};
 
     // Sanity checking; at a minimum sample a 1x1 portion of the image
-    from_x = HMM_Clamp(0, from_x, width_ - 1);
-    to_x   = HMM_Clamp(1, to_x, width_);
-    from_y = HMM_Clamp(0, from_y, height_ - 1);
-    to_y   = HMM_Clamp(1, to_y, height_);
+    from_x = epi::Clamp(from_x, 0, width_ - 1);
+    to_x   = epi::Clamp<int>(to_x, 1, width_);
+    from_y = epi::Clamp(from_y, 0, height_ - 1);
+    to_y   = epi::Clamp<int>(to_y, 1, height_);
 
     for (int y = from_y; y < to_y; y++)
     {
@@ -582,7 +583,7 @@ RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
             int b = src[2];
             int a = (depth_ == 4) ? src[3] : 255;
 
-            int v = HMM_MAX(r, HMM_MAX(g, b));
+            int v = epi::Max(r, epi::Max(g, b));
 
             // brighten color
             if (v > 0)
@@ -597,7 +598,7 @@ RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
             // compute weighting (based on saturation)
             if (v > 0)
             {
-                int m = HMM_MIN(r, HMM_MIN(g, b));
+                int m = epi::Min(r, epi::Min(g, b));
 
                 v = 4 + 12 * (v - m) / v;
             }
@@ -631,18 +632,18 @@ RGBAColor ImageData::AverageHue(int from_x, int to_x, int from_y, int to_y)
     return epi::MakeRGBA(hue[0], hue[1], hue[2]);
 }
 
-RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
+epi::RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
 {
     // make sure we don't overflow
     EPI_ASSERT(width_ * height_ <= 2048 * 2048);
 
-    std::unordered_map<RGBAColor, unsigned int> seen_colors;
+    std::unordered_map<epi::RGBAColor, unsigned int> seen_colors;
 
     // Sanity checking; at a minimum sample a 1x1 portion of the image
-    from_x = HMM_Clamp(0, from_x, width_ - 1);
-    to_x   = HMM_Clamp(1, to_x, width_);
-    from_y = HMM_Clamp(0, from_y, height_ - 1);
-    to_y   = HMM_Clamp(1, to_y, height_);
+    from_x = epi::Clamp(from_x, 0, width_ - 1);
+    to_x   = epi::Clamp<int>(to_x, 1, width_);
+    from_y = epi::Clamp(from_y, 0, height_ - 1);
+    to_y   = epi::Clamp<int>(to_y, 1, height_);
 
     for (int y = from_y; y < to_y; y++)
     {
@@ -652,8 +653,8 @@ RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
         {
             if (depth_ == 4 && src[3] == 0)
                 continue;
-            RGBAColor color = epi::MakeRGBA(src[0], src[1], src[2]);
-            std::pair<std::unordered_map<RGBAColor, unsigned int>::iterator, bool> res =
+            epi::RGBAColor color = epi::MakeRGBA(src[0], src[1], src[2]);
+            std::pair<std::unordered_map<epi::RGBAColor, unsigned int>::iterator, bool> res =
                 seen_colors.try_emplace(color, 0);
             // If color already seen, increment the hit counter
             if (!res.second)
@@ -662,15 +663,15 @@ RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
     }
 
     unsigned int highest_count = 0;
-    RGBAColor    average_color = kRGBABlack;
-    for (std::pair<const RGBAColor, unsigned int> color : seen_colors)
+    epi::RGBAColor average_color = kRGBABlack;
+    for (std::pair<const epi::RGBAColor, unsigned int> color : seen_colors)
     {
         if (color.second > highest_count)
             highest_count = color.second;
     }
 
     // If multiple colors were seen "the most", just use the last one spotted
-    for (std::pair<const RGBAColor, unsigned int> color : seen_colors)
+    for (std::pair<const epi::RGBAColor, unsigned int> color : seen_colors)
     {
         if (color.second == highest_count)
         {
@@ -681,7 +682,7 @@ RGBAColor ImageData::AverageColor(int from_x, int to_x, int from_y, int to_y)
     return average_color;
 }
 
-RGBAColor ImageData::LightestColor(int from_x, int to_x, int from_y, int to_y)
+epi::RGBAColor ImageData::LightestColor(int from_x, int to_x, int from_y, int to_y)
 {
     // make sure we don't overflow
     EPI_ASSERT(width_ * height_ <= 2048 * 2048);
@@ -692,10 +693,10 @@ RGBAColor ImageData::LightestColor(int from_x, int to_x, int from_y, int to_y)
     int lightest_b     = 0;
 
     // Sanity checking; at a minimum sample a 1x1 portion of the image
-    from_x = HMM_Clamp(0, from_x, width_ - 1);
-    to_x   = HMM_Clamp(1, to_x, width_);
-    from_y = HMM_Clamp(0, from_y, height_ - 1);
-    to_y   = HMM_Clamp(1, to_y, height_);
+    from_x = epi::Clamp(from_x, 0, width_ - 1);
+    to_x   = epi::Clamp<int>(to_x, 1, width_);
+    from_y = epi::Clamp(from_y, 0, height_ - 1);
+    to_y   = epi::Clamp<int>(to_y, 1, height_);
 
     for (int y = from_y; y < to_y; y++)
     {
@@ -719,7 +720,7 @@ RGBAColor ImageData::LightestColor(int from_x, int to_x, int from_y, int to_y)
     return epi::MakeRGBA(lightest_r, lightest_g, lightest_b);
 }
 
-RGBAColor ImageData::DarkestColor(int from_x, int to_x, int from_y, int to_y)
+epi::RGBAColor ImageData::DarkestColor(int from_x, int to_x, int from_y, int to_y)
 {
     // make sure we don't overflow
     EPI_ASSERT(width_ * height_ <= 2048 * 2048);
@@ -730,10 +731,10 @@ RGBAColor ImageData::DarkestColor(int from_x, int to_x, int from_y, int to_y)
     int darkest_b     = 0;
 
     // Sanity checking; at a minimum sample a 1x1 portion of the image
-    from_x = HMM_Clamp(0, from_x, width_ - 1);
-    to_x   = HMM_Clamp(1, to_x, width_);
-    from_y = HMM_Clamp(0, from_y, height_ - 1);
-    to_y   = HMM_Clamp(1, to_y, height_);
+    from_x = epi::Clamp(from_x, 0, width_ - 1);
+    to_x   = epi::Clamp<int>(to_x, 1, width_);
+    from_y = epi::Clamp(from_y, 0, height_ - 1);
+    to_y   = epi::Clamp<int>(to_y, 1, height_);
 
     for (int y = from_y; y < to_y; y++)
     {
@@ -761,15 +762,15 @@ void ImageData::SetHSV(int rotation, int saturation, int value)
 {
     EPI_ASSERT(depth_ >= 3);
 
-    rotation   = HMM_Clamp(-1800, rotation, 1800);
-    saturation = HMM_Clamp(-1, saturation, 255);
+    rotation   = epi::Clamp(rotation, -1800, 1800);
+    saturation = epi::Clamp(saturation, -1, 255);
 
     for (int y = 0; y < height_; y++)
         for (int x = 0; x < width_; x++)
         {
             uint8_t *src = PixelAt(x, y);
 
-            RGBAColor col = epi::MakeRGBA(src[0], src[1], src[2], depth_ == 4 ? src[3] : 255);
+            epi::RGBAColor col = epi::MakeRGBA(src[0], src[1], src[2], depth_ == 4 ? src[3] : 255);
 
             epi::HSVColor hue(col);
 
@@ -780,7 +781,7 @@ void ImageData::SetHSV(int rotation, int saturation, int value)
                 hue.SetSaturation(saturation);
 
             if (value)
-                hue.SetValue(HMM_Clamp(0, hue.v_ + value, 255));
+                hue.SetValue(epi::Clamp(hue.v_ + value, 0, 255));
 
             col = hue.ToRGBA();
 

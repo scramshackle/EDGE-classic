@@ -22,6 +22,7 @@
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "i_system.h"
 #include "s_blit.h"
 #include "s_cache.h"
 #include "snd_gather.h"
@@ -39,7 +40,7 @@ bool LoadDoomSound(SoundData *buf, const uint8_t *data, int length)
     buf->frequency_ = data[2] + (data[3] << 8);
 
     if (buf->frequency_ < 8000 || buf->frequency_ > 48000)
-        LogWarning("Sound Load: weird frequency: %d Hz\n", buf->frequency_);
+        epi::LogMessage(epi::kLogLevelWarning, "Sound Load: weird frequency: %d Hz\n", buf->frequency_);
 
     if (buf->frequency_ < 4000)
         buf->frequency_ = 4000;
@@ -84,7 +85,7 @@ bool LoadPCSpeakerSound(SoundData *buf, const uint8_t *data, int length)
 {
     if (length < 4)
     {
-        LogWarning("Invalid PC Speaker Sound (too short)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Invalid PC Speaker Sound (too short)\n");
         return false;
     }
     int      sign = -1;
@@ -95,12 +96,12 @@ bool LoadPCSpeakerSound(SoundData *buf, const uint8_t *data, int length)
     memcpy(&total_samples, data + 2, 2);
     if (zeroed != 0)
     {
-        LogWarning("Invalid PC Speaker Sound (bad magic number)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Invalid PC Speaker Sound (bad magic number)\n");
         return false;
     }
     if (total_samples < 4 || total_samples > length - 4)
     {
-        LogWarning("Invalid PC Speaker Sound (bad sample count)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Invalid PC Speaker Sound (bad sample count)\n");
         return false;
     }
     data += 4;
@@ -111,7 +112,7 @@ bool LoadPCSpeakerSound(SoundData *buf, const uint8_t *data, int length)
     {
         if (*data > 128)
         {
-            LogWarning("Invalid PC Speaker Sound (bad tone value %d)\n", *data);
+            epi::LogMessage(epi::kLogLevelWarning, "Invalid PC Speaker Sound (bad tone value %d)\n", *data);
             return false;
         }
         uint32_t tone         = kFrequencyTable[*data++];

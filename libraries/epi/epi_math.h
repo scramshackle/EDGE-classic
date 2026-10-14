@@ -34,8 +34,10 @@
 
 #pragma once
 
+#include <math.h>
 #include <stdint.h>
-#include <string.h>
+
+#include <bit>
 
 #include "epi.h"
 
@@ -44,12 +46,10 @@ namespace epi
 
 constexpr uint32_t kAlmostEqualsMaxUlps = 4;
 
-inline bool AlmostEquals(float first, float second)
+constexpr bool AlmostEquals(float first, float second)
 {
-    uint32_t bits_first;
-    uint32_t bits_second;
-    memcpy(&bits_first, &first, sizeof(uint32_t));
-    memcpy(&bits_second, &second, sizeof(uint32_t));
+    uint32_t bits_first  = std::bit_cast<uint32_t>(first);
+    uint32_t bits_second = std::bit_cast<uint32_t>(second);
 
     constexpr uint32_t kExponentMask = UINT32_C(0x7F800000);
     constexpr uint32_t kAbsMask      = UINT32_C(0x7FFFFFFF);
@@ -67,12 +67,10 @@ inline bool AlmostEquals(float first, float second)
     return distance <= kAlmostEqualsMaxUlps;
 }
 
-inline bool AlmostEquals(double first, double second)
+constexpr bool AlmostEquals(double first, double second)
 {
-    uint64_t bits_first;
-    uint64_t bits_second;
-    memcpy(&bits_first, &first, sizeof(uint64_t));
-    memcpy(&bits_second, &second, sizeof(uint64_t));
+    uint64_t bits_first  = std::bit_cast<uint64_t>(first);
+    uint64_t bits_second = std::bit_cast<uint64_t>(second);
 
     constexpr uint64_t kExponentMask = UINT64_C(0x7FF0000000000000);
     constexpr uint64_t kAbsMask      = UINT64_C(0x7FFFFFFFFFFFFFFF);
@@ -90,25 +88,63 @@ inline bool AlmostEquals(double first, double second)
     return distance <= kAlmostEqualsMaxUlps;
 }
 
-inline int HighestSetBit(uint32_t value)
+constexpr int HighestSetBit(uint32_t value)
 {
-    int index = -1;
-    while (value != 0)
-    {
-        value >>= 1;
-        index++;
-    }
-    return index;
+    return (int)std::bit_width(value) - 1;
 }
 
 inline int NextPowerOfTwo(int value)
 {
     EPI_ASSERT(value <= (1 << 30));
 
-    int result = 1;
-    while (result < value)
-        result <<= 1;
+    if (value <= 1)
+        return 1;
+
+    return (int)std::bit_ceil((uint32_t)value);
+}
+
+constexpr double kPi               = 3.14159265358979323846;
+constexpr float  kPiFloat          = 3.14159265359f;
+constexpr float  kDegreesToRadians = (float)(kPi / 180.0);
+
+template <typename T> constexpr T Min(T a, T b)
+{
+    return (a > b) ? b : a;
+}
+
+template <typename T> constexpr T Max(T a, T b)
+{
+    return (a < b) ? b : a;
+}
+
+template <typename T> constexpr T Abs(T value)
+{
+    return (value > 0) ? value : -value;
+}
+
+template <typename T> constexpr T Clamp(T value, T low, T high)
+{
+    T result = value;
+    if (result < low)
+        result = low;
+    if (result > high)
+        result = high;
     return result;
+}
+
+inline float Lerp(float a, float b, float time)
+{
+    return (1.0f - time) * a + time * b;
+}
+
+inline int RoundToInteger(float x)
+{
+    return (int)roundf(x);
+}
+
+inline int RoundToInteger(double x)
+{
+    return (int)round(x);
 }
 
 class RNG

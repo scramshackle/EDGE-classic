@@ -18,15 +18,17 @@
 
 #include "con_var.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "con_main.h"
 #include "epi.h"
 #include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
+#include "i_system.h"
 #include "m_argv.h"
-#include "stb_sprintf.h"
 
 // NOTE: we must use a plain linked list (and not std::vector) here,
 //       because constructors run very early (before main is called)
@@ -54,9 +56,10 @@ ConsoleVariable &ConsoleVariable::operator=(int value)
 {
     if (value < min_ || value > max_)
     {
-        LogWarning("Value %d exceeds lower/upper limits for %s! Resetting to default "
-                   "value!\n",
-                   value, name_);
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Value %d exceeds lower/upper limits for %s! Resetting to default "
+                        "value!\n",
+                        value, name_);
         s_ = def_;
         ParseString();
     }
@@ -79,15 +82,16 @@ ConsoleVariable &ConsoleVariable::operator=(float value)
 {
     if (value < min_ || value > max_)
     {
-        LogWarning("Value %g exceeds lower/upper limits for %s! Resetting to default "
-                   "value!\n",
-                   value, name_);
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Value %g exceeds lower/upper limits for %s! Resetting to default "
+                        "value!\n",
+                        value, name_);
         s_ = def_;
         ParseString();
     }
     else
     {
-        d_ = RoundToInteger(value);
+        d_ = epi::RoundToInteger(value);
         f_ = value;
         FormatFloat(value);
     }
@@ -117,7 +121,7 @@ ConsoleVariable &ConsoleVariable::operator=(std::string_view value)
 void ConsoleVariable::FormatInteger(int value)
 {
     char buffer[64];
-    stbsp_sprintf(buffer, "%d", value);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%d", value);
     s_ = buffer;
 }
 
@@ -129,15 +133,15 @@ void ConsoleVariable::FormatFloat(float value)
     float ab = fabs(value);
 
     if (ab >= 1e10) // handle huge numbers
-        stbsp_sprintf(buffer, "%1.5e", value);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.5e", value);
     else if (ab >= 1e5)
-        stbsp_sprintf(buffer, "%1.1f", value);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.1f", value);
     else if (ab >= 1e3)
-        stbsp_sprintf(buffer, "%1.3f", value);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.3f", value);
     else if (ab >= 1.0)
-        stbsp_sprintf(buffer, "%1.5f", value);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.5f", value);
     else
-        stbsp_sprintf(buffer, "%1.7f", value);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.7f", value);
 
     s_ = buffer;
 }
@@ -149,9 +153,10 @@ void ConsoleVariable::ParseString()
     f_ = epi::ParseDouble(s_.c_str());
     if (f_ < min_ || f_ > max_)
     {
-        LogWarning("Value %g exceeds lower/upper limits for %s! Resetting to default "
-                   "value!\n",
-                   f_, name_);
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Value %g exceeds lower/upper limits for %s! Resetting to default "
+                        "value!\n",
+                        f_, name_);
         s_ = def_;
         d_ = atoi(s_.c_str());
         f_ = epi::ParseDouble(s_.c_str());
@@ -276,7 +281,7 @@ void HandleProgramArguments(void)
 
         if (p >= program_argument_list.size() || ArgumentIsOption(p))
         {
-            LogWarning("Missing value for option: %s\n", s.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "Missing value for option: %s\n", s.c_str());
             continue;
         }
 
@@ -297,9 +302,9 @@ int PrintConsoleVariables(const char *match, bool show_default)
                 continue;
 
         if (show_default)
-            LogPrint("  %-20s \"%s\" (%s)\n", var->name_, var->c_str(), var->def_);
+            epi::LogMessage(epi::kLogLevelPrint, "  %-20s \"%s\" (%s)\n", var->name_, var->c_str(), var->def_);
         else
-            LogPrint("  %-20s \"%s\"\n", var->name_, var->c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "  %-20s \"%s\"\n", var->name_, var->c_str());
 
         total++;
     }

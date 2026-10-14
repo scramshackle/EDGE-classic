@@ -36,7 +36,7 @@ class BackgroundStyle
     void             Default();
     BackgroundStyle &operator=(const BackgroundStyle &rhs);
 
-    RGBAColor colour_;
+    epi::RGBAColor colour_;
     float     translucency_;
 
     std::string image_name_;

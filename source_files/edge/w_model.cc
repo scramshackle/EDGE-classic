@@ -56,7 +56,7 @@ static void FindModelFrameNames(MD2Model *md, int model_num)
 {
     int missing = 0;
 
-    LogDebug("Finding frame names for model '%s'...\n", ddf_model_names[model_num].c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "Finding frame names for model '%s'...\n", ddf_model_names[model_num].c_str());
 
     for (int stnum = 1; stnum < num_states; stnum++)
     {
@@ -82,7 +82,7 @@ static void FindModelFrameNames(MD2Model *md, int model_num)
         else
         {
             missing++;
-            LogPrint("-- no such frame '%s'\n", st->model_frame);
+            epi::LogMessage(epi::kLogLevelPrint, "-- no such frame '%s'\n", st->model_frame);
         }
     }
 
@@ -95,7 +95,7 @@ static void FindModelFrameNames(MDLModel *md, int model_num)
 {
     int missing = 0;
 
-    LogDebug("Finding frame names for model '%s'...\n", ddf_model_names[model_num].c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "Finding frame names for model '%s'...\n", ddf_model_names[model_num].c_str());
 
     for (int stnum = 1; stnum < num_states; stnum++)
     {
@@ -121,7 +121,7 @@ static void FindModelFrameNames(MDLModel *md, int model_num)
         else
         {
             missing++;
-            LogPrint("-- no such frame '%s'\n", st->model_frame);
+            epi::LogMessage(epi::kLogLevelPrint, "-- no such frame '%s'\n", st->model_frame);
         }
     }
 
@@ -165,14 +165,14 @@ ModelDefinition *LoadModelFromLump(int model_num)
             f = OpenFileFromPack(packname);
             if (f)
             {
-                LogDebug("Loading MD3 model from pack file : %s\n", packname.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "Loading MD3 model from pack file : %s\n", packname.c_str());
                 def->md2_model_ = MD3Load(f, def->radius_);
                 pack_file       = true;
             }
         }
         else
         {
-            LogDebug("Loading MD3 model from lump : %s\n", lumpname.c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "Loading MD3 model from lump : %s\n", lumpname.c_str());
             f = LoadLumpAsFile(lumpname.c_str());
             if (f)
                 def->md2_model_ = MD3Load(f, def->radius_);
@@ -197,14 +197,14 @@ ModelDefinition *LoadModelFromLump(int model_num)
                 f = OpenFileFromPack(packname);
                 if (f)
                 {
-                    LogDebug("Loading MD2 model from pack file : %s\n", packname.c_str());
+                    epi::LogMessage(epi::kLogLevelDebug, "Loading MD2 model from pack file : %s\n", packname.c_str());
                     def->md2_model_ = MD2Load(f, def->radius_);
                     pack_file       = true;
                 }
             }
             else
             {
-                LogDebug("Loading MD2 model from lump : %s\n", lumpname.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "Loading MD2 model from lump : %s\n", lumpname.c_str());
                 f = LoadLumpAsFile(lumpname.c_str());
                 if (f)
                     def->md2_model_ = MD2Load(f, def->radius_);
@@ -230,14 +230,14 @@ ModelDefinition *LoadModelFromLump(int model_num)
                 f = OpenFileFromPack(packname);
                 if (f)
                 {
-                    LogDebug("Loading MDL model from pack file : %s\n", packname.c_str());
+                    epi::LogMessage(epi::kLogLevelDebug, "Loading MDL model from pack file : %s\n", packname.c_str());
                     def->mdl_model_ = MDLLoad(f, def->radius_);
                     pack_file       = true;
                 }
             }
             else
             {
-                LogDebug("Loading MDL model from lump : %s\n", lumpname.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "Loading MDL model from lump : %s\n", lumpname.c_str());
                 f = LoadLumpAsFile(lumpname.c_str());
                 if (f)
                     def->mdl_model_ = MDLLoad(f, def->radius_);
@@ -303,7 +303,7 @@ void InitializeModels(void)
 
     StartupProgressMessage("Setting up models...");
 
-    LogPrint("InitializeModels: Setting up\n");
+    epi::LogMessage(epi::kLogLevelPrint, "InitializeModels: Setting up\n");
 
     models = new ModelDefinition *[total_models];
 
@@ -406,7 +406,7 @@ void PrecacheModels(void)
     {
         if (model_present[i])
         {
-            LogDebug("Precaching model: %s\n", ddf_model_names[i].c_str());
+            epi::LogMessage(epi::kLogLevelDebug, "Precaching model: %s\n", ddf_model_names[i].c_str());
 
             const ModelDefinition *def = GetModel(i);
 

@@ -23,7 +23,8 @@
 //
 //----------------------------------------------------------------------------
 
-#include "edge_profiling.h"
+#include "r_things.h"
+
 #include <limits.h>
 #include <math.h>
 #include <string.h>
@@ -32,16 +33,18 @@
 #include <unordered_map>
 #include <vector>
 
-#include "epi_math.h"
-#include "r_lightgrid.h"
 #include "coal.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
+#include "edge_profiling.h"
 #include "epi_color.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
+#include "epi_vector.h"
 #include "g_game.h" //current_map
 #include "i_defs_gl.h"
 #include "im_data.h"
@@ -56,6 +59,7 @@
 #include "r_effects.h"
 #include "r_gldefs.h"
 #include "r_image.h"
+#include "r_lightgrid.h"
 #include "r_md2.h"
 #include "r_mdl.h"
 #include "r_mirror.h"
@@ -65,7 +69,6 @@
 #include "r_shader.h"
 #include "r_static.h"
 #include "r_texgl.h"
-#include "r_things.h"
 #include "r_units.h"
 #include "script/compat/lua_compat.h"
 #include "vm_coal.h"
@@ -112,7 +115,8 @@ void CollectCrosshairs()
 
     if (!ReadDirectory(chd, crosshair_dir, "*.png"))
     {
-        LogWarning("CollectCrosshairs: Failed to read '%s' directory!\n", crosshair_dir.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "CollectCrosshairs: Failed to read '%s' directory!\n",
+                        crosshair_dir.c_str());
     }
     else
     {
@@ -142,7 +146,8 @@ void CollectCrosshairs()
     chd.clear();
     if (!ReadDirectory(chd, crosshair_dir, "*.tga"))
     {
-        LogWarning("CollectCrosshairs: Failed to read '%s' directory!\n", crosshair_dir.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "CollectCrosshairs: Failed to read '%s' directory!\n",
+                        crosshair_dir.c_str());
     }
     else
     {
@@ -179,7 +184,8 @@ void CollectCrosshairs()
 
         if (!ReadDirectory(chd, crosshair_dir, "*.png"))
         {
-            LogWarning("CollectCrosshairs: Failed to read '%s' directory!\n", crosshair_dir.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "CollectCrosshairs: Failed to read '%s' directory!\n",
+                            crosshair_dir.c_str());
         }
         else
         {
@@ -210,7 +216,8 @@ void CollectCrosshairs()
         chd.clear();
         if (!ReadDirectory(chd, crosshair_dir, "*.tga"))
         {
-            LogWarning("CollectCrosshairs: Failed to read '%s' directory!\n", crosshair_dir.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "CollectCrosshairs: Failed to read '%s' directory!\n",
+                            crosshair_dir.c_str());
         }
         else
         {
@@ -269,9 +276,9 @@ static float GetHoverDeltaZ(MapObject *mo, float bob_mult = 0)
         return mo->phase_;
 
     // compute a different phase for different objects
-    BAMAngle phase = (BAMAngle)(long long)mo;
-    phase ^= (BAMAngle)(phase << 19);
-    phase += (BAMAngle)(level_time_elapsed << (kBAMAngleBits - 6));
+    epi::BAMAngle phase = (epi::BAMAngle)(long long)mo;
+    phase ^= (epi::BAMAngle)(phase << 19);
+    phase += (epi::BAMAngle)(level_time_elapsed << (epi::kBAMAngleBits - 6));
 
     mo->phase_ = epi::BAMSin(phase);
 
@@ -285,9 +292,9 @@ static float GetHoverDeltaZ(MapObject *mo, float bob_mult = 0)
 
 struct PlayerSpriteCoordinateData
 {
-    HMM_Vec3 vertices[4];
-    HMM_Vec2 texture_coordinates[4];
-    HMM_Vec3 light_position;
+    epi::Vec3 vertices[4];
+    epi::Vec2 texture_coordinates[4];
+    epi::Vec3 light_position;
 
     ColorMixer colors[4];
 };
@@ -298,8 +305,8 @@ static void DLIT_PSprite(MapObject *mo, void *dataptr)
 
     EPI_ASSERT(mo->dynamic_light_.shader);
 
-    mo->dynamic_light_.shader->Sample(data->colors + 0, data->light_position.X, data->light_position.Y,
-                                      data->light_position.Z);
+    mo->dynamic_light_.shader->Sample(data->colors + 0, data->light_position.x, data->light_position.y,
+                                      data->light_position.z);
 }
 
 static int GetMulticolMaxRGB(ColorMixer *cols, int num, bool additive)
@@ -310,7 +317,7 @@ static int GetMulticolMaxRGB(ColorMixer *cols, int num, bool additive)
     {
         int mx = additive ? cols->add_MAX() : cols->mod_MAX();
 
-        result = HMM_MAX(result, mx);
+        result = epi::Max(result, mx);
     }
 
     return result;
@@ -388,8 +395,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
     if (!console_active && !paused && !menu_active && !rts_menu_active)
     {
-        psp_x = HMM_Lerp(psp->old_screen_x, fractional_tic, psp->screen_x);
-        psp_y = HMM_Lerp(psp->old_screen_y, fractional_tic, psp->screen_y);
+        psp_x = epi::Lerp(psp->old_screen_x, psp->screen_x, fractional_tic);
+        psp_y = epi::Lerp(psp->old_screen_y, psp->screen_y, fractional_tic);
     }
     else
     {
@@ -444,21 +451,21 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
     PlayerSpriteCoordinateData data;
 
-    data.vertices[0] = {{x1b, y1b, 0}};
-    data.vertices[1] = {{x1t, y1t, 0}};
-    data.vertices[2] = {{x2t, y1t, 0}};
-    data.vertices[3] = {{x2b, y2b, 0}};
+    data.vertices[0] = {x1b, y1b, 0};
+    data.vertices[1] = {x1t, y1t, 0};
+    data.vertices[2] = {x2t, y1t, 0};
+    data.vertices[3] = {x2b, y2b, 0};
 
-    data.texture_coordinates[0] = {{tex_x1, tex_bot_h}};
-    data.texture_coordinates[1] = {{tex_x1, tex_top_h}};
-    data.texture_coordinates[2] = {{tex_x2, tex_top_h}};
-    data.texture_coordinates[3] = {{tex_x2, tex_bot_h}};
+    data.texture_coordinates[0] = {tex_x1, tex_bot_h};
+    data.texture_coordinates[1] = {tex_x1, tex_top_h};
+    data.texture_coordinates[2] = {tex_x2, tex_top_h};
+    data.texture_coordinates[3] = {tex_x2, tex_bot_h};
 
     float away = 120.0;
 
-    data.light_position.X = player->map_object_->x + view_cosine * away;
-    data.light_position.Y = player->map_object_->y + view_sine * away;
-    data.light_position.Z =
+    data.light_position.x = player->map_object_->x + view_cosine * away;
+    data.light_position.y = player->map_object_->y + view_sine * away;
+    data.light_position.z =
         player->map_object_->z + player->map_object_->height_ * player->map_object_->info_->shotheight_;
 
     data.colors[0].Clear();
@@ -477,7 +484,7 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
         trans    = 1.0f;
     }
 
-    RGBAColor fc_to_use = player->map_object_->sector_->properties.fog_color;
+    epi::RGBAColor fc_to_use = player->map_object_->sector_->properties.fog_color;
     float     fd_to_use = player->map_object_->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
@@ -500,12 +507,12 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
             GetColormapShader(props, player->map_object_->info_->force_fullbright_ ? 255 : state->bright,
                               player->map_object_->sector_);
 
-        shader->Sample(data.colors + 0, data.light_position.X, data.light_position.Y, data.light_position.Z);
+        shader->Sample(data.colors + 0, data.light_position.x, data.light_position.y, data.light_position.z);
 
         if (fc_to_use != kRGBANoValue)
         {
-            int       mix_factor = RoundToInteger(255.0f * (fd_to_use * 75));
-            RGBAColor mixme =
+            int            mix_factor = epi::RoundToInteger(255.0f * (fd_to_use * 75));
+            epi::RGBAColor mixme =
                 epi::MixRGBA(epi::MakeRGBAClamped(data.colors[0].modulate_red_, data.colors[0].modulate_green_,
                                                   data.colors[0].modulate_blue_),
                              fc_to_use, mix_factor);
@@ -522,8 +529,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
         if (use_dynamic_lights && render_view_extra_light < 250)
         {
-            data.light_position.X = player->map_object_->x + view_cosine * 24;
-            data.light_position.Y = player->map_object_->y + view_sine * 24;
+            data.light_position.x = player->map_object_->x + view_cosine * 24;
+            data.light_position.y = player->map_object_->y + view_sine * 24;
 
             float r = 96;
 
@@ -536,18 +543,17 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
                 float reach = light->dynamic_light_.r;
 
-                if (fabs(light->x - data.light_position.X) >= reach ||
-                    fabs(light->y - data.light_position.Y) >= reach ||
-                    fabs(MapObjectMidZ(light) - data.light_position.Z) >= reach)
+                if (fabs(light->x - data.light_position.x) >= reach ||
+                    fabs(light->y - data.light_position.y) >= reach ||
+                    fabs(MapObjectMidZ(light) - data.light_position.z) >= reach)
                     continue;
 
                 DLIT_PSprite(light, &data);
             }
 
-            SectorGlowIterator(player->map_object_->sector_, data.light_position.X - r,
-                               data.light_position.Y - r, player->map_object_->z, data.light_position.X + r,
-                               data.light_position.Y + r, player->map_object_->z + player->map_object_->height_,
-                               DLIT_PSprite, &data);
+            SectorGlowIterator(player->map_object_->sector_, data.light_position.x - r, data.light_position.y - r,
+                               player->map_object_->z, data.light_position.x + r, data.light_position.y + r,
+                               player->map_object_->z + player->map_object_->height_, DLIT_PSprite, &data);
         }
     }
 
@@ -604,8 +610,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
 
             if (is_fuzzy)
             {
-                dest->texture_coordinates[1].X = dest->position.X / (float)current_screen_width;
-                dest->texture_coordinates[1].Y = dest->position.Y / (float)current_screen_height;
+                dest->texture_coordinates[1].x = dest->position.x / (float)current_screen_width;
+                dest->texture_coordinates[1].y = dest->position.y / (float)current_screen_height;
 
                 FuzzAdjust(&dest->texture_coordinates[1], player->map_object_);
 
@@ -641,8 +647,8 @@ static void RenderPSprite(PlayerSprite *psp, int which, Player *player, RegionPr
     render_state->Disable(GL_SCISSOR_TEST);
 }
 
-static const RGBAColor crosshair_colors[8] = {kRGBALightGray, kRGBABlue,    kRGBAGreen,  kRGBACyan,
-                                              kRGBARed,       kRGBAFuchsia, kRGBAYellow, kRGBADarkOrange};
+static const epi::RGBAColor crosshair_colors[8] = {kRGBALightGray, kRGBABlue,    kRGBAGreen,  kRGBACyan,
+                                                   kRGBARed,       kRGBAFuchsia, kRGBAYellow, kRGBADarkOrange};
 
 static void DrawStdCrossHair(void)
 {
@@ -656,18 +662,18 @@ static void DrawStdCrossHair(void)
 
     unsigned int tex_id = crosshair->second;
 
-    RGBAColor color = crosshair_colors[crosshair_color.d_ & 7];
+    epi::RGBAColor color = crosshair_colors[crosshair_color.d_ & 7];
 
     float intensity = 1.0f * crosshair_brightness.f_;
 
-    RGBAColor unit_col =
+    epi::RGBAColor unit_col =
         epi::MakeRGBA((uint8_t)(epi::GetRGBARed(color) * intensity), (uint8_t)(epi::GetRGBAGreen(color) * intensity),
                       (uint8_t)(epi::GetRGBABlue(color) * intensity));
 
     float x = view_window_x + view_window_width / 2;
     float y = view_window_y + view_window_height / 2;
 
-    float w = RoundToInteger(current_screen_width * crosshair_size.f_ / 640.0f);
+    float w = epi::RoundToInteger(current_screen_width * crosshair_size.f_ / 640.0f);
 
     StartUnitBatch(false);
 
@@ -675,17 +681,17 @@ static void DrawStdCrossHair(void)
         BeginRenderUnit(GL_QUADS, 4, GL_MODULATE, tex_id, (GLuint)kTextureEnvironmentDisable, 0, 0, kBlendingAdd);
 
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x - w, y - w, 0.0f}};
-    glvert++->texture_coordinates[0] = {{0.0f, 0.0f}};
+    glvert->position                 = {x - w, y - w, 0.0f};
+    glvert++->texture_coordinates[0] = {0.0f, 0.0f};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x - w, y + w, 0.0f}};
-    glvert++->texture_coordinates[0] = {{0.0f, 1.0f}};
+    glvert->position                 = {x - w, y + w, 0.0f};
+    glvert++->texture_coordinates[0] = {0.0f, 1.0f};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x + w, y + w, 0.0f}};
-    glvert++->texture_coordinates[0] = {{1.0f, 1.0f}};
+    glvert->position                 = {x + w, y + w, 0.0f};
+    glvert++->texture_coordinates[0] = {1.0f, 1.0f};
     glvert->rgba                     = unit_col;
-    glvert->position                 = {{x + w, y - w, 0.0f}};
-    glvert++->texture_coordinates[0] = {{1.0f, 0.0f}};
+    glvert->position                 = {x + w, y - w, 0.0f};
+    glvert++->texture_coordinates[0] = {1.0f, 0.0f};
 
     EndRenderUnit(4);
 
@@ -797,8 +803,8 @@ void RenderWeaponModel(Player *p)
 
     if (!console_active && !paused && !menu_active && !erraticism_active && !rts_menu_active)
     {
-        psp_x = HMM_Lerp(psp->old_screen_x, fractional_tic, psp->screen_x);
-        psp_y = HMM_Lerp(psp->old_screen_y, fractional_tic, psp->screen_y);
+        psp_x = epi::Lerp(psp->old_screen_x, psp->screen_x, fractional_tic);
+        psp_y = epi::Lerp(psp->old_screen_y, psp->screen_y, fractional_tic);
     }
     else
     {
@@ -806,21 +812,21 @@ void RenderWeaponModel(Player *p)
         psp_y = psp->screen_y;
     }
 
-    float x = view_x + view_right.X * psp_x / 8.0;
-    float y = view_y + view_right.Y * psp_x / 8.0;
-    float z = view_z + view_right.Z * psp_x / 8.0;
+    float x = view_x + view_right.x * psp_x / 8.0;
+    float y = view_y + view_right.y * psp_x / 8.0;
+    float z = view_z + view_right.z * psp_x / 8.0;
 
-    x -= view_up.X * psp_y / 10.0;
-    y -= view_up.Y * psp_y / 10.0;
-    z -= view_up.Z * psp_y / 10.0;
+    x -= view_up.x * psp_y / 10.0;
+    y -= view_up.y * psp_y / 10.0;
+    z -= view_up.z * psp_y / 10.0;
 
-    x += view_forward.X * w->model_forward_;
-    y += view_forward.Y * w->model_forward_;
-    z += view_forward.Z * w->model_forward_;
+    x += view_forward.x * w->model_forward_;
+    y += view_forward.y * w->model_forward_;
+    z += view_forward.z * w->model_forward_;
 
-    x += view_right.X * w->model_side_;
-    y += view_right.Y * w->model_side_;
-    z += view_right.Z * w->model_side_;
+    x += view_right.x * w->model_side_;
+    y += view_right.y * w->model_side_;
+    z += view_right.z * w->model_side_;
 
     int   last_frame = psp->state->frame;
     float lerp       = 0.0;
@@ -835,7 +841,7 @@ void RenderWeaponModel(Player *p)
             lerp = ((float)psp->state->tics - psp->tics + fractional_tic) / (float)(psp->state->tics);
         else
             lerp = (psp->state->tics - psp->tics + 1) / (float)(psp->state->tics);
-        lerp = HMM_Clamp(0, lerp, 1);
+        lerp = epi::Clamp(lerp, 0.0f, 1.0f);
     }
 
     float bias = 0.0f;
@@ -900,7 +906,7 @@ static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, b
 
     if (frame->rotations_ >= 8)
     {
-        BAMAngle ang;
+        epi::BAMAngle ang;
 
         if (mo->interpolate_ && !console_active && !paused && !menu_active && !erraticism_active && !rts_menu_active)
             ang = epi::BAMInterpolate(mo->old_angle_, mo->angle_, fractional_tic);
@@ -909,17 +915,17 @@ static const Image *RendererGetThingSprite2(MapObject *mo, float mx, float my, b
 
         active_mirror_set.Angle(ang);
 
-        BAMAngle from_view = PointToAngle(view_x, view_y, mx, my);
+        epi::BAMAngle from_view = PointToAngle(view_x, view_y, mx, my);
 
-        ang = from_view - ang + kBAMAngle180;
+        ang = from_view - ang + epi::kBAMAngle180;
 
         if (active_mirror_set.Reflective())
-            ang = (BAMAngle)0 - ang;
+            ang = (epi::BAMAngle)0 - ang;
 
         if (frame->rotations_ == 16)
-            rot = (ang + (kBAMAngle45 / 4)) >> (kBAMAngleBits - 4);
+            rot = (ang + (epi::kBAMAngle45 / 4)) >> (epi::kBAMAngleBits - 4);
         else
-            rot = (ang + (kBAMAngle45 / 2)) >> (kBAMAngleBits - 3);
+            rot = (ang + (epi::kBAMAngle45 / 2)) >> (epi::kBAMAngleBits - 3);
     }
 
     EPI_ASSERT(0 <= rot && rot < 16);
@@ -1009,17 +1015,17 @@ void BSPWalkThing(MapObject *mo)
         if (mo->interpolate_ && !console_active && !paused && !menu_active && !erraticism_active && !rts_menu_active)
         {
             float along = (float)(mo->interpolation_position_ - 1 + fractional_tic) / mo->interpolation_number_;
-            mx          = HMM_Lerp(mo->interpolation_from_.X, along, mo->x);
-            my          = HMM_Lerp(mo->interpolation_from_.Y, along, mo->y);
-            mz          = HMM_Lerp(mo->interpolation_from_.Z, along, mo->z);
-            fz          = HMM_Lerp(mo->old_floor_z_, fractional_tic, mo->floor_z_);
+            mx          = epi::Lerp(mo->interpolation_from_.x, mo->x, along);
+            my          = epi::Lerp(mo->interpolation_from_.y, mo->y, along);
+            mz          = epi::Lerp(mo->interpolation_from_.z, mo->z, along);
+            fz          = epi::Lerp(mo->old_floor_z_, mo->floor_z_, fractional_tic);
         }
         else
         {
             float along = (float)(mo->interpolation_position_ - 1) / mo->interpolation_number_;
-            mx          = HMM_Lerp(mo->interpolation_from_.X, along, mo->x);
-            my          = HMM_Lerp(mo->interpolation_from_.Y, along, mo->y);
-            mz          = HMM_Lerp(mo->interpolation_from_.Z, along, mo->z);
+            mx          = epi::Lerp(mo->interpolation_from_.x, mo->x, along);
+            my          = epi::Lerp(mo->interpolation_from_.y, mo->y, along);
+            mz          = epi::Lerp(mo->interpolation_from_.z, mo->z, along);
             fz          = mo->floor_z_;
         }
     }
@@ -1027,10 +1033,10 @@ void BSPWalkThing(MapObject *mo)
     {
         if (mo->interpolate_ && !console_active && !paused && !menu_active && !erraticism_active && !rts_menu_active)
         {
-            mx = HMM_Lerp(mo->old_x_, fractional_tic, mo->x);
-            my = HMM_Lerp(mo->old_y_, fractional_tic, mo->y);
-            mz = HMM_Lerp(mo->old_z_, fractional_tic, mo->z);
-            fz = HMM_Lerp(mo->old_floor_z_, fractional_tic, mo->floor_z_);
+            mx = epi::Lerp(mo->old_x_, mo->x, fractional_tic);
+            my = epi::Lerp(mo->old_y_, mo->y, fractional_tic);
+            mz = epi::Lerp(mo->old_z_, mo->z, fractional_tic);
+            fz = epi::Lerp(mo->old_floor_z_, mo->floor_z_, fractional_tic);
         }
         else
         {
@@ -1054,14 +1060,14 @@ void BSPWalkThing(MapObject *mo)
     // thing is behind view plane?
     if (!is_model)
     {
-        if (clip_scope != kBAMAngle180 && tz <= 0)
+        if (clip_scope != epi::kBAMAngle180 && tz <= 0)
             return;
     }
     else
     {
         ModelDefinition *md = GetModel(mo->state_->sprite);
         EPI_ASSERT(md);
-        if (clip_scope != kBAMAngle180 && tz < -(md->radius_ * mo->scale_))
+        if (clip_scope != epi::kBAMAngle180 && tz < -(md->radius_ * mo->scale_))
         {
             return;
         }
@@ -1164,7 +1170,7 @@ static void RenderModel(DrawThing *dthing)
             lerp = ((float)mo->state_->tics - mo->tics_ + fractional_tic) / (float)(mo->state_->tics);
         else
             lerp = (mo->state_->tics - mo->tics_ + 1) / (float)(mo->state_->tics);
-        lerp = HMM_Clamp(0, lerp, 1);
+        lerp = epi::Clamp(lerp, 0.0f, 1.0f);
     }
 
     if (md->md2_model_)
@@ -1182,7 +1188,7 @@ struct SpriteBatchKey
     GLuint                  texture;
     GLuint                  fuzz_texture;
     BlendingMode            blending;
-    RGBAColor               fog_color;
+    epi::RGBAColor          fog_color;
     float                   fog_density;
     int                     color_lookup;
     int                     glow_set;
@@ -1479,7 +1485,7 @@ static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *inst
     }
 
     float    fuzz_mul = 0;
-    HMM_Vec2 fuzz_add = {{0, 0}};
+    epi::Vec2 fuzz_add = {0, 0};
 
     if (is_fuzzy)
     {
@@ -1488,7 +1494,7 @@ static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *inst
 
         float dist = ApproximateDistance(mo->x - view_x, mo->y - view_y, mo->z - view_z);
 
-        fuzz_mul = 0.8 / HMM_Clamp(20, dist, 700);
+        fuzz_mul = 0.8 / epi::Clamp(dist, 20.0f, 700.0f);
 
         FuzzAdjust(&fuzz_add, mo);
     }
@@ -1500,7 +1506,7 @@ static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *inst
         light_table = GetSpriteLightTable(source.properties, mo->info_->force_fullbright_ ? 255 : mo->state_->bright,
                                           mo->sector_, &light_level);
 
-    RGBAColor fc_to_use = mo->sector_->properties.fog_color;
+    epi::RGBAColor fc_to_use = mo->sector_->properties.fog_color;
     float     fd_to_use = mo->sector_->properties.fog_density;
     // check for DDFLEVL fog
     if (fc_to_use == kRGBANoValue)
@@ -1547,8 +1553,8 @@ static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *inst
 
     instance->fuzz[0] = mo->radius_ * 2 * fuzz_mul;
     instance->fuzz[1] = mo->height_ * fuzz_mul;
-    instance->fuzz[2] = fuzz_add.X;
-    instance->fuzz[3] = fuzz_add.Y;
+    instance->fuzz[2] = fuzz_add.x;
+    instance->fuzz[3] = fuzz_add.y;
 
     instance->light[0] = (float)light_level;
     instance->light[1] = 0.0f;
@@ -1697,8 +1703,8 @@ static void DynamicThingRemove(MapObject *mo)
 
 static void MarkResidentSlot(ResidentBatch &batch, int slot)
 {
-    batch.dirty_low  = HMM_MIN(batch.dirty_low, slot);
-    batch.dirty_high = HMM_MAX(batch.dirty_high, slot);
+    batch.dirty_low  = epi::Min(batch.dirty_low, slot);
+    batch.dirty_high = epi::Max(batch.dirty_high, slot);
 }
 
 static void ResidentThingRemove(MapObject *mo)
@@ -2086,7 +2092,7 @@ static void UploadResidentBatches(void)
             if (batch.buffer)
                 DeleteStaticVertexBuffer(batch.buffer);
 
-            batch.buffer_capacity = HMM_MAX(256, count + count / 2);
+            batch.buffer_capacity = epi::Max(256, count + count / 2);
             batch.buffer          = CreateSpriteInstanceBuffer(batch.instances.data(), count, batch.buffer_capacity);
         }
         else
@@ -2232,10 +2238,10 @@ static void SetSpriteViewParameters(void)
 {
     float skew = (mirror_view.xy_scale >= 0.99f) ? sprite_skew : 0.0f;
 
-    render_unit_sprite_view[0] = HMM_V4(mirror_view.sprite_right.X, mirror_view.sprite_right.Y,
-                                        mirror_view.sprite_forward.X * skew, mirror_view.sprite_forward.Y * skew);
+    render_unit_sprite_view[0] = epi::Vec4{mirror_view.sprite_right.x, mirror_view.sprite_right.y,
+                                           mirror_view.sprite_forward.x * skew, mirror_view.sprite_forward.y * skew};
     render_unit_sprite_view[1] =
-        HMM_V4(mirror_view.reflective ? 1.0f : 0.0f, (float)render_view_extra_light, 0.0f, 0.0f);
+        epi::Vec4{mirror_view.reflective ? 1.0f : 0.0f, (float)render_view_extra_light, 0.0f, 0.0f};
 }
 
 void RenderThings(std::vector<DrawThing *> &things, std::vector<DrawThing *> &transparent_things)

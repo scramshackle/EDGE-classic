@@ -70,8 +70,8 @@ enum AutomapArrowStyle
 };
 struct AutomapLine
 {
-    HMM_Vec4  points;
-    RGBAColor color;
+    epi::Vec4 points;
+    epi::RGBAColor color;
 };
 
 extern std::vector<AutomapLine *> automap_lines;
@@ -95,7 +95,7 @@ void AutomapRender(float x, float y, float w, float h, MapObject *focus);
 // if the level is completed while it is up.
 void AutomapStop(void);
 
-void AutomapSetColor(int which, RGBAColor color);
+void AutomapSetColor(int which, epi::RGBAColor color);
 
 void AutomapSetArrow(AutomapArrowStyle type);
 

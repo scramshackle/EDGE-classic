@@ -108,7 +108,7 @@ bool AbstractMusicPlayer::OpenStream(int frequency, int channels, SDL_AudioForma
 
     if (!stream_)
     {
-        LogWarning("Failed to create music stream: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to create music stream: %s\n", SDL_GetError());
         return false;
     }
 
@@ -120,7 +120,7 @@ bool AbstractMusicPlayer::OpenStream(int frequency, int channels, SDL_AudioForma
 
     if (!SDL_BindAudioStream(music_device, stream_))
     {
-        LogWarning("Failed to bind music stream: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to bind music stream: %s\n", SDL_GetError());
         SDL_DestroyAudioStream(stream_);
         stream_ = nullptr;
         return false;
@@ -247,7 +247,7 @@ void ChangeMusic(int entry_number, bool loop)
     const PlaylistEntry *play = playlist.Find(entry_number);
     if (!play)
     {
-        LogWarning("Could not find music entry [%d]\n", entry_number);
+        epi::LogMessage(epi::kLogLevelWarning, "Could not find music entry [%d]\n", entry_number);
         return;
     }
 
@@ -262,7 +262,7 @@ void ChangeMusic(int entry_number, bool loop)
         F = epi::FileOpen(fn, epi::kFileAccessRead | epi::kFileAccessBinary);
         if (!F)
         {
-            LogWarning("ChangeMusic: Can't Find File '%s'\n", fn.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "ChangeMusic: Can't Find File '%s'\n", fn.c_str());
             return;
         }
         break;
@@ -272,7 +272,7 @@ void ChangeMusic(int entry_number, bool loop)
         F = OpenFileFromPack(play->info_);
         if (!F)
         {
-            LogWarning("ChangeMusic: PK3 entry '%s' not found.\n", play->info_.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "ChangeMusic: PK3 entry '%s' not found.\n", play->info_.c_str());
             return;
         }
         break;
@@ -282,7 +282,7 @@ void ChangeMusic(int entry_number, bool loop)
         int lump = CheckLumpNumberForName(play->info_.c_str());
         if (lump < 0)
         {
-            LogWarning("ChangeMusic: LUMP '%s' not found.\n", play->info_.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "ChangeMusic: LUMP '%s' not found.\n", play->info_.c_str());
             return;
         }
 
@@ -291,7 +291,7 @@ void ChangeMusic(int entry_number, bool loop)
     }
 
     default:
-        LogPrint("ChangeMusic: invalid method %d for MUS/MIDI\n", play->infotype_);
+        epi::LogMessage(epi::kLogLevelPrint, "ChangeMusic: invalid method %d for MUS/MIDI\n", play->infotype_);
         return;
     }
 
@@ -301,14 +301,14 @@ void ChangeMusic(int entry_number, bool loop)
     if (!data)
     {
         delete F;
-        LogWarning("ChangeMusic: Error loading data.\n");
+        epi::LogMessage(epi::kLogLevelWarning, "ChangeMusic: Error loading data.\n");
         return;
     }
     if (length < 4)
     {
         delete F;
         delete[] data;
-        LogPrint("ChangeMusic: ignored short data (%d bytes)\n", length);
+        epi::LogMessage(epi::kLogLevelPrint, "ChangeMusic: ignored short data (%d bytes)\n", length);
         return;
     }
 
@@ -370,7 +370,7 @@ void ChangeMusic(int entry_number, bool loop)
     default:
         delete F;
         delete[] data;
-        LogPrint("ChangeMusic: unknown format\n");
+        epi::LogMessage(epi::kLogLevelPrint, "ChangeMusic: unknown format\n");
         break;
     }
 }

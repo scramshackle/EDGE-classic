@@ -95,15 +95,15 @@ class ReverbDefinition final
 
     // Constants and functions for DDF parsing
 
-    EPI_KNOWN_STRINGHASH(kDecayTime, "DECAYTIME")
-    EPI_KNOWN_STRINGHASH(kRoomSize, "ROOMSIZE")
-    EPI_KNOWN_STRINGHASH(kPreDelay, "PREDELAY")
-    EPI_KNOWN_STRINGHASH(kDiffusion, "DIFFUSION")
-    EPI_KNOWN_STRINGHASH(kHighFrequencyDamping, "HIGHFREQUENCYDAMPING")
-    EPI_KNOWN_STRINGHASH(kLowFrequencyDamping, "LOWFREQUENCYDAMPING")
-    EPI_KNOWN_STRINGHASH(kWetLevel, "WETLEVEL")
-    EPI_KNOWN_STRINGHASH(kDryLevel, "DRYLEVEL")
-    EPI_KNOWN_STRINGHASH(kWidthKey, "REVERBWIDTH")
+    static constexpr uint32_t kDecayTime            = epi::KnownStringHash("DECAYTIME");
+    static constexpr uint32_t kRoomSize             = epi::KnownStringHash("ROOMSIZE");
+    static constexpr uint32_t kPreDelay             = epi::KnownStringHash("PREDELAY");
+    static constexpr uint32_t kDiffusion            = epi::KnownStringHash("DIFFUSION");
+    static constexpr uint32_t kHighFrequencyDamping = epi::KnownStringHash("HIGHFREQUENCYDAMPING");
+    static constexpr uint32_t kLowFrequencyDamping  = epi::KnownStringHash("LOWFREQUENCYDAMPING");
+    static constexpr uint32_t kWetLevel             = epi::KnownStringHash("WETLEVEL");
+    static constexpr uint32_t kDryLevel             = epi::KnownStringHash("DRYLEVEL");
+    static constexpr uint32_t kWidthKey             = epi::KnownStringHash("REVERBWIDTH");
 
     static void StartEntry(const char *name, bool extend);
     static void ParseField(const char *field, const char *contents, int index, bool is_last);

@@ -1,20 +1,18 @@
 #include "gpu_immediate.h"
 
-#include "gpu_lights.h"
-
-#include "r_lightgrid.h"
-
-#include "gpu_images.h"
-
 #include <math.h>
 #include <string.h>
 
 #include "epi.h"
 #include "epi_math.h"
+#include "epi_vector.h"
 #include "gpu_device.h"
+#include "gpu_images.h"
+#include "gpu_lights.h"
 #include "gpu_matrix.h"
 #include "i_system.h"
 #include "r_backend.h"
+#include "r_lightgrid.h"
 
 GpuImmediate gpu_immediate;
 
@@ -68,7 +66,8 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
 
     if (!default_texture_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTexture (default) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTexture (default) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -86,7 +85,8 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
 
     if (!default_sampler_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUSampler (default) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUSampler (default) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -100,7 +100,8 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
 
     if (!transfer)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (default texture) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTransferBuffer (default texture) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -108,7 +109,8 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
 
     if (!pixels)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (default texture) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (default texture) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         return false;
     }
@@ -124,7 +126,8 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
 
     if (!command_buffer)
     {
-        LogPrint("GpuImmediate: SDL_AcquireGPUCommandBuffer (default texture) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_AcquireGPUCommandBuffer (default texture) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         return false;
     }
@@ -159,7 +162,7 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
         matrix_top_[i]      = 0;
-        matrix_stack_[i][0] = HMM_M4D(1.0f);
+        matrix_stack_[i][0] = epi::IdentityMatrix();
     }
 
     return true;
@@ -183,7 +186,7 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
 
     if (!quad_index_buffer_ || !fan_index_buffer_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUBuffer (index) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUBuffer (index) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -197,7 +200,8 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
 
     if (!transfer)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (index) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTransferBuffer (index) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -205,7 +209,8 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
 
     if (!indices)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (index) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (index) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         return false;
     }
@@ -240,7 +245,8 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
 
     if (!command_buffer)
     {
-        LogPrint("GpuImmediate: SDL_AcquireGPUCommandBuffer (index) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_AcquireGPUCommandBuffer (index) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         return false;
     }
@@ -396,7 +402,7 @@ void GpuImmediate::BeginFrame()
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
         matrix_top_[i]      = 0;
-        matrix_stack_[i][0] = HMM_M4D(1.0f);
+        matrix_stack_[i][0] = epi::IdentityMatrix();
     }
 
     current_matrix_mode_ = kGpuMatrixModeModelView;
@@ -431,7 +437,7 @@ void GpuImmediate::BeginFrame()
 
 void GpuImmediate::LoadIdentity()
 {
-    matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = HMM_M4D(1.0f);
+    matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = epi::IdentityMatrix();
     MarkMatrixDirty();
 }
 
@@ -462,24 +468,24 @@ void GpuImmediate::PopMatrix()
     MarkMatrixDirty();
 }
 
-void GpuImmediate::LoadMatrix(const HMM_Mat4 &matrix)
+void GpuImmediate::LoadMatrix(const epi::Mat4 &matrix)
 {
     matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]] = matrix;
     MarkMatrixDirty();
 }
 
-void GpuImmediate::MultiplyMatrix(const HMM_Mat4 &matrix)
+void GpuImmediate::MultiplyMatrix(const epi::Mat4 &matrix)
 {
-    HMM_Mat4 &current = matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]];
+    epi::Mat4 &current = matrix_stack_[current_matrix_mode_][matrix_top_[current_matrix_mode_]];
 
-    current = HMM_MulM4(current, matrix);
+    current = epi::MultiplyMatrices(current, matrix);
 
     MarkMatrixDirty();
 }
 
 void GpuImmediate::Translate(float x, float y, float z)
 {
-    MultiplyMatrix(HMM_Translate(HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::TranslationMatrix(epi::Vec3{x, y, z}));
 }
 
 void GpuImmediate::Rotate(float radians, float x, float y, float z)
@@ -487,12 +493,12 @@ void GpuImmediate::Rotate(float radians, float x, float y, float z)
     if (sqrtf(x * x + y * y + z * z) < 1.0e-4f)
         return;
 
-    MultiplyMatrix(HMM_Rotate_RH(radians, HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::RotationMatrix(radians, epi::Vec3{x, y, z}));
 }
 
 void GpuImmediate::Scale(float x, float y, float z)
 {
-    MultiplyMatrix(HMM_Scale(HMM_V3(x, y, z)));
+    MultiplyMatrix(epi::ScaleMatrix(epi::Vec3{x, y, z}));
 }
 
 void GpuImmediate::Orthographic(float left, float right, float bottom, float top, float z_near, float z_far)
@@ -732,7 +738,7 @@ bool GpuImmediate::RecordFrameStaticUploads()
         if (static_transfer_buffer_)
             SDL_ReleaseGPUTransferBuffer(device_, static_transfer_buffer_);
 
-        size_t capacity = HMM_MAX(bytes, HMM_MAX(static_transfer_capacity_ * 2, (size_t)65536));
+        size_t capacity = epi::Max(bytes, epi::Max(static_transfer_capacity_ * 2, (size_t)65536));
 
         SDL_GPUTransferBufferCreateInfo transfer_info;
         EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
@@ -810,7 +816,7 @@ void GpuImmediate::FlushStaticUploads()
 
     if (!command_buffer)
     {
-        LogPrint("GpuImmediate: static mesh upload failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: static mesh upload failed: %s\n", SDL_GetError());
 
         if (mapped)
             SDL_UnmapGPUTransferBuffer(device_, transfer);
@@ -1044,13 +1050,13 @@ void GpuImmediate::SetViewTint(float r, float g, float b)
     vertex_parameters_dirty_ = true;
 }
 
-void GpuImmediate::SetTextureOffset(const HMM_Vec2 &offset)
+void GpuImmediate::SetTextureOffset(const epi::Vec2 &offset)
 {
-    if (epi::AlmostEquals(texture_offset_[0], offset.X) && epi::AlmostEquals(texture_offset_[1], offset.Y))
+    if (epi::AlmostEquals(texture_offset_[0], offset.x) && epi::AlmostEquals(texture_offset_[1], offset.y))
         return;
 
-    texture_offset_[0] = offset.X;
-    texture_offset_[1] = offset.Y;
+    texture_offset_[0] = offset.x;
+    texture_offset_[1] = offset.y;
 
     vertex_parameters_dirty_ = true;
 }
@@ -1065,7 +1071,7 @@ void GpuImmediate::SetLightRowOffset(float offset)
     vertex_parameters_dirty_ = true;
 }
 
-void GpuImmediate::SetSpriteView(const HMM_Vec4 view[2])
+void GpuImmediate::SetSpriteView(const epi::Vec4 view[2])
 {
     if (!memcmp(sprite_view_, view, sizeof(sprite_view_)))
         return;
@@ -1076,18 +1082,18 @@ void GpuImmediate::SetSpriteView(const HMM_Vec4 view[2])
     vertex_parameters_dirty_ = true;
 }
 
-void GpuImmediate::SetLiquid(const HMM_Vec4 &liquid)
+void GpuImmediate::SetLiquid(const epi::Vec4 &liquid)
 {
     float *current = current_fragment_parameters_.liquid;
 
-    if (epi::AlmostEquals(current[0], liquid.X) && epi::AlmostEquals(current[1], liquid.Y) &&
-        epi::AlmostEquals(current[2], liquid.Z) && epi::AlmostEquals(current[3], liquid.W))
+    if (epi::AlmostEquals(current[0], liquid.x) && epi::AlmostEquals(current[1], liquid.y) &&
+        epi::AlmostEquals(current[2], liquid.z) && epi::AlmostEquals(current[3], liquid.w))
         return;
 
-    current[0] = liquid.X;
-    current[1] = liquid.Y;
-    current[2] = liquid.Z;
-    current[3] = liquid.W;
+    current[0] = liquid.x;
+    current[1] = liquid.y;
+    current[2] = liquid.z;
+    current[3] = liquid.w;
 
     fragment_parameters_dirty_ = true;
 }
@@ -1128,18 +1134,18 @@ void GpuImmediate::SetWhiten(bool enabled)
     fragment_parameters_dirty_ = true;
 }
 
-void GpuImmediate::SetBlur(const HMM_Vec4 &blur)
+void GpuImmediate::SetBlur(const epi::Vec4 &blur)
 {
     float *current = current_fragment_parameters_.blur;
 
-    if (epi::AlmostEquals(current[0], blur.X) && epi::AlmostEquals(current[2], blur.Z) &&
-        epi::AlmostEquals(current[3], blur.W))
+    if (epi::AlmostEquals(current[0], blur.x) && epi::AlmostEquals(current[2], blur.z) &&
+        epi::AlmostEquals(current[3], blur.w))
         return;
 
-    current[0] = blur.X;
-    current[1] = blur.Y;
-    current[2] = blur.Z;
-    current[3] = blur.W;
+    current[0] = blur.x;
+    current[1] = blur.y;
+    current[2] = blur.z;
+    current[3] = blur.w;
 
     fragment_parameters_dirty_ = true;
 }
@@ -1189,10 +1195,10 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
         float sky_target_height =
             render_backend->RenderTargetActive() ? (float)gpu_device.WorldHeight() : (float)gpu_device.TargetHeight();
 
-        current_fragment_parameters_.sky_viewport[0] = sky_pass->viewport_origin.X * sky_scale_x;
-        current_fragment_parameters_.sky_viewport[1] = sky_target_height - sky_pass->viewport_origin.Y * sky_scale_y;
-        current_fragment_parameters_.sky_viewport[2] = sky_pass->viewport_size.X * sky_scale_x;
-        current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.Y * sky_scale_y;
+        current_fragment_parameters_.sky_viewport[0] = sky_pass->viewport_origin.x * sky_scale_x;
+        current_fragment_parameters_.sky_viewport[1] = sky_target_height - sky_pass->viewport_origin.y * sky_scale_y;
+        current_fragment_parameters_.sky_viewport[2] = sky_pass->viewport_size.x * sky_scale_x;
+        current_fragment_parameters_.sky_viewport[3] = -sky_pass->viewport_size.y * sky_scale_y;
 
         current_fragment_parameters_.sky_stretch_mode       = (float)sky_pass->stretch_mode;
         current_fragment_parameters_.sky_u_scale            = sky_pass->u_scale;
@@ -1471,8 +1477,8 @@ int32_t GpuImmediate::CurrentVertexParameters()
     GpuVertexParameters parameters;
 
     parameters.mv  = matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]];
-    parameters.mvp = HMM_MulM4(matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]],
-                               parameters.mv);
+    parameters.mvp = epi::MultiplyMatrices(
+        matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]], parameters.mv);
     parameters.tm  = matrix_stack_[kGpuMatrixModeTexture][matrix_top_[kGpuMatrixModeTexture]];
 
 
@@ -1490,11 +1496,14 @@ int32_t GpuImmediate::CurrentVertexParameters()
     parameters.light_row_offset   = light_row_offset_;
     parameters.vertex_padding0    = 0.0f;
 
-    for (int i = 0; i < 4; i++)
-    {
-        parameters.sprite_view0[i] = sprite_view_[0].Elements[i];
-        parameters.sprite_view1[i] = sprite_view_[1].Elements[i];
-    }
+    parameters.sprite_view0[0] = sprite_view_[0].x;
+    parameters.sprite_view0[1] = sprite_view_[0].y;
+    parameters.sprite_view0[2] = sprite_view_[0].z;
+    parameters.sprite_view0[3] = sprite_view_[0].w;
+    parameters.sprite_view1[0] = sprite_view_[1].x;
+    parameters.sprite_view1[1] = sprite_view_[1].y;
+    parameters.sprite_view1[2] = sprite_view_[1].z;
+    parameters.sprite_view1[3] = sprite_view_[1].w;
 
     vertex_parameters_.push_back(parameters);
 
@@ -1692,8 +1701,8 @@ void GpuImmediate::RecordMovieDraw(SDL_GPUTexture *luma, SDL_GPUTexture *chroma_
     movie->sampler     = sampler;
     movie->base_vertex = pending_base_;
 
-    movie->mvp = HMM_MulM4(matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]],
-                           matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]]);
+    movie->mvp = epi::MultiplyMatrices(matrix_stack_[kGpuMatrixModeProjection][matrix_top_[kGpuMatrixModeProjection]],
+                                       matrix_stack_[kGpuMatrixModeModelView][matrix_top_[kGpuMatrixModeModelView]]);
 
     for (int32_t i = 0; i < 4; i++)
         movie->plane_scales[i] = plane_scales[i];
@@ -1726,7 +1735,8 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
 
     if (!buffer)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUBuffer (%s) failed: %s\n", what,
+                        SDL_GetError());
         return nullptr;
     }
 
@@ -1740,7 +1750,8 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
 
     if (!transfer)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTransferBuffer (%s) failed: %s\n", what,
+                        SDL_GetError());
         SDL_ReleaseGPUBuffer(device, buffer);
         return nullptr;
     }
@@ -1749,7 +1760,8 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
 
     if (!mapped)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (%s) failed: %s\n", what,
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         SDL_ReleaseGPUBuffer(device, buffer);
         return nullptr;
@@ -1763,7 +1775,8 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
 
     if (!command_buffer)
     {
-        LogPrint("GpuImmediate: SDL_AcquireGPUCommandBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_AcquireGPUCommandBuffer (%s) failed: %s\n", what,
+                        SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         SDL_ReleaseGPUBuffer(device, buffer);
         return nullptr;
@@ -1825,7 +1838,7 @@ uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, const uint16_t
 
     if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer)
     {
-        LogPrint("GpuImmediate: model mesh creation failed\n");
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: model mesh creation failed\n");
 
         model_meshes_.push_back(mesh);
         DeleteModelMesh((uint32_t)model_meshes_.size());
@@ -2017,7 +2030,7 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
 
     if (!vertex_buffer_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUBuffer (vertex) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUBuffer (vertex) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -2031,7 +2044,8 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
 
     if (!vertex_transfer_buffer_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (vertex) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTransferBuffer (vertex) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUBuffer(device_, vertex_buffer_);
         vertex_buffer_ = nullptr;
         return false;
@@ -2074,7 +2088,7 @@ bool GpuImmediate::EnsureSpriteCapacity(size_t bytes)
 
     if (!sprite_buffer_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUBuffer (sprite) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUBuffer (sprite) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -2088,7 +2102,8 @@ bool GpuImmediate::EnsureSpriteCapacity(size_t bytes)
 
     if (!sprite_transfer_buffer_)
     {
-        LogPrint("GpuImmediate: SDL_CreateGPUTransferBuffer (sprite) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_CreateGPUTransferBuffer (sprite) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUBuffer(device_, sprite_buffer_);
         sprite_buffer_ = nullptr;
         return false;
@@ -2113,7 +2128,8 @@ void GpuImmediate::UploadSpriteInstances()
 
     if (!mapped)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (sprite) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (sprite) failed: %s\n",
+                        SDL_GetError());
         return;
     }
 
@@ -2264,7 +2280,8 @@ bool GpuImmediate::EnsureIndexCapacity(size_t bytes)
 
     if (!dynamic_index_buffer_ || !dynamic_index_transfer_buffer_)
     {
-        LogPrint("GpuImmediate: dynamic index buffer allocation failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: dynamic index buffer allocation failed: %s\n",
+                        SDL_GetError());
         dynamic_index_capacity_ = 0;
         return false;
     }
@@ -2288,7 +2305,8 @@ void GpuImmediate::UploadIndices()
 
     if (!mapped)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (dynamic index) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (dynamic index) failed: %s\n",
+                        SDL_GetError());
         return;
     }
 
@@ -2328,7 +2346,8 @@ void GpuImmediate::UploadVertices()
 
     if (!mapped)
     {
-        LogPrint("GpuImmediate: SDL_MapGPUTransferBuffer (vertex) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuImmediate: SDL_MapGPUTransferBuffer (vertex) failed: %s\n",
+                        SDL_GetError());
         return;
     }
 
@@ -2418,16 +2437,16 @@ void GpuImmediate::ApplyPassState()
     {
         int32_t target_width = gpu_device.CurrentTargetWidth();
 
-        int32_t left   = HMM_MAX(0, current_scissor_.x);
-        int32_t bottom = HMM_MAX(0, current_scissor_.y);
-        int32_t right  = HMM_MIN(target_width, current_scissor_.x + current_scissor_.width);
-        int32_t top    = HMM_MIN(target_height, current_scissor_.y + current_scissor_.height);
+        int32_t left   = epi::Max(0, current_scissor_.x);
+        int32_t bottom = epi::Max(0, current_scissor_.y);
+        int32_t right  = epi::Min(target_width, current_scissor_.x + current_scissor_.width);
+        int32_t top    = epi::Min(target_height, current_scissor_.y + current_scissor_.height);
 
         SDL_Rect rectangle;
         rectangle.x = left;
         rectangle.y = target_height - top;
-        rectangle.w = HMM_MAX(0, right - left);
-        rectangle.h = HMM_MAX(0, top - bottom);
+        rectangle.w = epi::Max(0, right - left);
+        rectangle.h = epi::Max(0, top - bottom);
 
         SDL_SetGPUScissor(pass, &rectangle);
     }

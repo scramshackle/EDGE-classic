@@ -19,9 +19,11 @@
 #include "r_shader.h"
 
 #include <float.h>
+#include <math.h>
 
 #include "con_var.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "epi.h"
 #include "i_defs_gl.h"
 #include "p_mobj.h"
@@ -44,7 +46,7 @@ static inline float LightFalloffIntensity(float d)
     return exp(kLightFalloffCurve * d * d);
 }
 
-static RGBAColor LightCurvePoint(float d, RGBAColor tint)
+static epi::RGBAColor LightCurvePoint(float d, epi::RGBAColor tint)
 {
     float intensity = LightFalloffIntensity(d);
 
@@ -81,7 +83,7 @@ class dynlight_shader_c : public AbstractShader
         return radius;
     }
 
-    inline RGBAColor WhatColor()
+    inline epi::RGBAColor WhatColor()
     {
         return mo->dynamic_light_.color;
     }
@@ -107,7 +109,7 @@ class dynlight_shader_c : public AbstractShader
         if (WhatType() == kDynamicLightTypeNone)
             return;
 
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
+        epi::RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
 
@@ -135,14 +137,14 @@ class dynlight_shader_c : public AbstractShader
         float light_y = mo->y;
         float light_z = MapObjectMidZ(mo);
 
-        out->position = {{light_x, light_y, light_z}};
+        out->position = {light_x, light_y, light_z};
         out->radius   = WhatRadius();
 
-        RGBAColor col = WhatColor();
+        epi::RGBAColor col = WhatColor();
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
 
-        out->color = {{L * epi::GetRGBARed(col), L * epi::GetRGBAGreen(col), L * epi::GetRGBABlue(col)}};
+        out->color = {L * epi::GetRGBARed(col), L * epi::GetRGBAGreen(col), L * epi::GetRGBABlue(col)};
 
         out->additive = (WhatType() == kDynamicLightTypeAdd);
 
@@ -189,7 +191,7 @@ class plane_glow_c : public AbstractShader
         return radius;
     }
 
-    inline RGBAColor WhatColor()
+    inline epi::RGBAColor WhatColor()
     {
         return mo->dynamic_light_.color;
     }
@@ -211,7 +213,7 @@ class plane_glow_c : public AbstractShader
         if (WhatType() == kDynamicLightTypeNone)
             return;
 
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
+        epi::RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         float L = (mo->info_->force_fullbright_ ? 255.0f : mo->state_->bright) / 255.0;
 
@@ -252,7 +254,7 @@ class wall_glow_c : public AbstractShader
 
     inline float Dist(float x, float y)
     {
-        return (ld->vertex_1->X - x) * norm_x + (ld->vertex_1->Y - y) * norm_y;
+        return (ld->vertex_1->x - x) * norm_x + (ld->vertex_1->y - y) * norm_y;
     }
 
     inline float WhatRadius()
@@ -260,7 +262,7 @@ class wall_glow_c : public AbstractShader
         return radius;
     }
 
-    inline RGBAColor WhatColor()
+    inline epi::RGBAColor WhatColor()
     {
         return mo->dynamic_light_.color;
     }
@@ -275,8 +277,8 @@ class wall_glow_c : public AbstractShader
     {
         EPI_ASSERT(mo->dynamic_light_.glow_wall);
         ld     = mo->dynamic_light_.glow_wall;
-        norm_x = (ld->vertex_1->Y - ld->vertex_2->Y) / ld->length;
-        norm_y = (ld->vertex_2->X - ld->vertex_1->X) / ld->length;
+        norm_x = (ld->vertex_1->y - ld->vertex_2->y) / ld->length;
+        norm_y = (ld->vertex_2->x - ld->vertex_1->x) / ld->length;
     }
 
     ~wall_glow_c()
@@ -295,7 +297,7 @@ class wall_glow_c : public AbstractShader
         if (WhatType() == kDynamicLightTypeNone)
             return;
 
-        RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
+        epi::RGBAColor new_col = LightCurvePoint(dist / WhatRadius(), WhatColor());
 
         if (new_col != kRGBABlack && L > 1 / 256.0)
         {

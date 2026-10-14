@@ -37,7 +37,6 @@
 #include "epi_str_util.h"
 #include "r_misc.h"
 #include "rad_trig.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 
@@ -471,7 +470,7 @@ void *SV_ButtonFindByIndex(int index)
 {
     if (index < 0 || index >= (int)active_buttons.size())
     {
-        LogWarning("LOADGAME: Invalid Button: %d\n", index);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Invalid Button: %d\n", index);
         index = 0;
     }
 
@@ -652,7 +651,7 @@ void *SV_TipFindByIndex(int index)
 {
     if (index < 0 || index >= kMaximumTipSlots)
     {
-        LogWarning("LOADGAME: Invalid Tip: %d\n", index);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Invalid Tip: %d\n", index);
         index = kMaximumTipSlots - 1;
     }
 
@@ -892,7 +891,7 @@ void SR_LightPutType(void *storage, int index)
 
     // not found !
 
-    LogWarning("SAVEGAME: could not find lightdef_c %p !\n", src);
+    epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: could not find lightdef_c %p !\n", src);
     SaveChunkPutString("S:1");
 }
 
@@ -920,7 +919,7 @@ bool SaveGameTriggerGetState(void *storage, int index)
 
     if (!temp)
     {
-        LogWarning("LOADGAME: invalid RTS state !\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: invalid RTS state !\n");
         temp = trig->info->last_state;
     }
 
@@ -1029,7 +1028,7 @@ bool SaveGameGetRADScript(void *storage, int index)
 
     if (!temp)
     {
-        LogWarning("LOADGAME: No such RTS script !!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: No such RTS script !!\n");
         temp = current_scripts;
     }
 
@@ -1081,7 +1080,7 @@ void SaveGamePutRADScript(void *storage, int index)
     if (!temp)
         FatalError("SaveGamePutRADScript: invalid ScriptPtr %p\n", src);
 
-    stbsp_sprintf(buffer, "B:%s:%d:%X", src->mapid, idx_val, src->crc.GetCRC());
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "B:%s:%d:%X", src->mapid, idx_val, src->crc.GetCRC());
 
     SaveChunkPutString(buffer);
 }
@@ -1236,7 +1235,7 @@ void SR_PlaneMovePutType(void *storage, int index)
 
     // not found !
 
-    LogWarning("SAVEGAME: could not find moving_plane %p !\n", src);
+    epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: could not find moving_plane %p !\n", src);
     SaveChunkPutString("L:C:1");
 }
 
@@ -1292,7 +1291,7 @@ void SR_SliderPutInfo(void *storage, int index)
 
     // not found !
 
-    LogWarning("SAVEGAME: could not find sliding door %p !\n", src);
+    epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: could not find sliding door %p !\n", src);
     SaveChunkPutString(":1");
 }
 

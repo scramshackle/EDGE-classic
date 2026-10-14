@@ -34,15 +34,16 @@
 //
 
 #include <float.h>
+#include <math.h>
 
 #include <algorithm>
 #include <vector>
 
-#include "epi_math.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "m_bbox.h"
 #include "p_local.h"
 #include "p_spec.h"
@@ -208,16 +209,16 @@ int BoxOnLineSide(const float *tmbox, Line *ld)
 
     DividingLine div;
 
-    div.x       = ld->vertex_1->X;
-    div.y       = ld->vertex_1->Y;
+    div.x       = ld->vertex_1->x;
+    div.y       = ld->vertex_1->y;
     div.delta_x = ld->delta_x;
     div.delta_y = ld->delta_y;
 
     switch (ld->slope_type)
     {
     case kLineClipHorizontal:
-        p1 = tmbox[kBoundingBoxTop] > ld->vertex_1->Y;
-        p2 = tmbox[kBoundingBoxBottom] > ld->vertex_1->Y;
+        p1 = tmbox[kBoundingBoxTop] > ld->vertex_1->y;
+        p2 = tmbox[kBoundingBoxBottom] > ld->vertex_1->y;
         if (ld->delta_x < 0)
         {
             p1 ^= 1;
@@ -226,8 +227,8 @@ int BoxOnLineSide(const float *tmbox, Line *ld)
         break;
 
     case kLineClipVertical:
-        p1 = tmbox[kBoundingBoxRight] < ld->vertex_1->X;
-        p2 = tmbox[kBoundingBoxLeft] < ld->vertex_1->X;
+        p1 = tmbox[kBoundingBoxRight] < ld->vertex_1->x;
+        p2 = tmbox[kBoundingBoxLeft] < ld->vertex_1->x;
         if (ld->delta_y < 0)
         {
             p1 ^= 1;
@@ -453,8 +454,8 @@ static int GapRestrict(VerticalGap *dest, int d_num, VerticalGap *src, int s_num
             if (dest[d].ceiling <= dest[d].floor)
                 continue;
 
-            f = HMM_MAX(src[s].floor, dest[d].floor);
-            c = HMM_MIN(src[s].ceiling, dest[d].ceiling);
+            f = epi::Max(src[s].floor, dest[d].floor);
+            c = epi::Min(src[s].ceiling, dest[d].ceiling);
 
             if (f < c)
             {
@@ -524,7 +525,7 @@ int FindThingGap(VerticalGap *gaps, int gap_num, float z1, float z2)
             return i;
         }
 
-        dist = HMM_ABS(z1 - gaps[i].floor);
+        dist = epi::Abs(z1 - gaps[i].floor);
 
         if (z2 - z1 <= gaps[i].ceiling - gaps[i].floor)
         { // [2]
@@ -671,23 +672,23 @@ void DumpExtraFloors(const sector_t *sec)
 {
     const extrafloor_t *ef;
 
-    LogDebug("EXTRAFLOORS IN Sector %d  (%d used, %d max)\n", (int)(sec - sectors), sec->extrafloor_used,
-             sec->extrafloor_maximum);
+    epi::LogMessage(epi::kLogLevelDebug, "EXTRAFLOORS IN Sector %d  (%d used, %d max)\n", (int)(sec - sectors),
+                    sec->extrafloor_used, sec->extrafloor_maximum);
 
-    LogDebug("  Basic height: %1.1f .. %1.1f\n", sec->floor_height, sec->ceiling_height);
+    epi::LogMessage(epi::kLogLevelDebug, "  Basic height: %1.1f .. %1.1f\n", sec->floor_height, sec->ceiling_height);
 
     for (ef = sec->bottom_extrafloor; ef; ef = ef->higher)
     {
-        LogDebug("  Solid %s: %1.1f .. %1.1f\n",
-                 (ef->extrafloor_definition->type & kExtraFloorTypeThick) ? "Thick" : "Thin", ef->bottom_height,
-                 ef->top_height);
+        epi::LogMessage(epi::kLogLevelDebug, "  Solid %s: %1.1f .. %1.1f\n",
+                        (ef->extrafloor_definition->type & kExtraFloorTypeThick) ? "Thick" : "Thin", ef->bottom_height,
+                        ef->top_height);
     }
 
     for (ef = sec->bottom_liquid; ef; ef = ef->higher)
     {
-        LogDebug("  Liquid %s: %1.1f .. %1.1f\n",
-                 (ef->extrafloor_definition->type & kExtraFloorTypeThick) ? "Thick" : "Thin", ef->bottom_height,
-                 ef->top_height);
+        epi::LogMessage(epi::kLogLevelDebug, "  Liquid %s: %1.1f .. %1.1f\n",
+                        (ef->extrafloor_definition->type & kExtraFloorTypeThick) ? "Thick" : "Thin", ef->bottom_height,
+                        ef->top_height);
     }
 }
 #endif
@@ -831,21 +832,24 @@ void AddExtraFloor(Sector *sec, Line *line)
         break;
 
     case kFitStuckInCeiling:
-        LogWarning("Extrafloor with z range of %1.0f / %1.0f is stuck "
-                   "in sector #%d's ceiling.\n",
-                   newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Extrafloor with z range of %1.0f / %1.0f is stuck "
+                        "in sector #%d's ceiling.\n",
+                        newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
         break;
 
     case kFitStuckInFloor:
-        LogWarning("Extrafloor with z range of %1.0f / %1.0f is stuck "
-                   "in sector #%d's floor.\n",
-                   newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Extrafloor with z range of %1.0f / %1.0f is stuck "
+                        "in sector #%d's floor.\n",
+                        newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
         break;
 
     case kFitStuckInExtraFloor:
-        LogWarning("Extrafloor with z range of %1.0f / %1.0f is stuck "
-                   "in sector #%d in another extrafloor.\n",
-                   newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "Extrafloor with z range of %1.0f / %1.0f is stuck "
+                        "in sector #%d in another extrafloor.\n",
+                        newbie->bottom_height, newbie->top_height, (int)(sec - level_sectors));
         break;
 
     default:

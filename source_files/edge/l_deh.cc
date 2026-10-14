@@ -40,8 +40,8 @@ void ConvertDehacked(const uint8_t *data, int length, const std::string &source)
 
     if (ret != kDehackedConversionOK)
     {
-        LogPrint("Dehacked: FAILED to add lump:\n");
-        LogPrint("- %s\n", DehackedGetError());
+        epi::LogMessage(epi::kLogLevelPrint, "Dehacked: FAILED to add lump:\n");
+        epi::LogMessage(epi::kLogLevelPrint, "- %s\n", DehackedGetError());
 
         DehackedShutdown();
 

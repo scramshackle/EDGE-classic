@@ -33,13 +33,10 @@
 
 #include <vector>
 
-#include "epi_math.h"
 #include "c_local.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
-
-[[noreturn]] extern void FatalError(const char *error, ...);
 
 namespace coal
 {
@@ -149,10 +146,10 @@ void RealVM::LexNewLine()
     char    buffer[1024];
 
     va_start(argptr, error);
-    stbsp_vsnprintf(buffer, sizeof(buffer), error, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), error, argptr);
     va_end(argptr);
 
-    FatalError("%s:%i: %s", comp_.source_file, comp_.source_line, buffer);
+    epi::FatalError("%s:%i: %s", comp_.source_file, comp_.source_line, buffer);
 }
 
 void RealVM::LexString()

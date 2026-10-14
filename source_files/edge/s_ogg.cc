@@ -24,6 +24,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 // clang-format off
 #define OV_EXCLUDE_STATIC_CALLBACKS
 #include "minivorbis.h"
@@ -120,7 +121,7 @@ bool OGGPlayer::OpenMemory(const uint8_t *data, int length)
     {
         delete ogg_memfile_;
         ogg_memfile_ = nullptr;
-        LogWarning("Failed to load OGG music (corrupt ogg?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load OGG music (corrupt ogg?)\n");
         return false;
     }
 
@@ -131,7 +132,7 @@ bool OGGPlayer::OpenMemory(const uint8_t *data, int length)
     if (!info)
     {
         Close();
-        LogWarning("Failed to load OGG music (corrupt ogg?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load OGG music (corrupt ogg?)\n");
         return false;
     }
 
@@ -241,7 +242,7 @@ bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
     if (ov_open_callbacks((void *)memfile, &ogg_file, NULL, 0, ogg_epi_callbacks) < 0)
     {
         delete memfile;
-        LogWarning("Failed to load OGG sound (corrupt ogg?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load OGG sound (corrupt ogg?)\n");
         return false;
     }
 
@@ -251,13 +252,13 @@ bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
     {
         ov_clear(&ogg_file);
         delete memfile;
-        LogWarning("Failed to load OGG sound (corrupt ogg?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load OGG sound (corrupt ogg?)\n");
         return false;
     }
 
     if (info->channels > 2)
     {
-        LogWarning("OGG SFX Loader: too many channels: %d\n", info->channels);
+        epi::LogMessage(epi::kLogLevelWarning, "OGG SFX Loader: too many channels: %d\n", info->channels);
         ov_clear(&ogg_file);
         delete memfile;
         return false;
@@ -267,13 +268,13 @@ bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
 
     if (frame_count <= 0)
     {
-        LogWarning("OGG SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "OGG SFX Loader: no samples!\n");
         ov_clear(&ogg_file);
         delete memfile;
         return false;
     }
 
-    LogDebug("OGG SFX Loader: freq %d Hz, %d channels\n", (int)info->rate, info->channels);
+    epi::LogMessage(epi::kLogLevelDebug, "OGG SFX Loader: freq %d Hz, %d channels\n", (int)info->rate, info->channels);
 
     int  channels  = info->channels;
     bool is_stereo = (channels > 1);
@@ -309,7 +310,7 @@ bool LoadOGGSound(SoundData *buf, const uint8_t *data, int length)
     gather.CommitChunk(frames_read);
 
     if (!gather.Finalise(buf))
-        LogWarning("OGG SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "OGG SFX Loader: no samples!\n");
 
     ov_clear(&ogg_file);
     delete memfile;

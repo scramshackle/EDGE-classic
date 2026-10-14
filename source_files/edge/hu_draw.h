@@ -27,6 +27,7 @@
 
 #include <map>
 
+#include "dm_colors.h"
 #include "hu_font.h"
 #include "r_image.h"
 #include "r_units.h"
@@ -50,7 +51,7 @@ float HUDToRealCoordinatesY(float y);
 
 void  HUDSetFont(Font *font = nullptr);
 void  HUDSetScale(float scale = 1.0f);
-void  HUDSetTextColor(RGBAColor color = kRGBANoValue);
+void  HUDSetTextColor(epi::RGBAColor color = kRGBANoValue);
 void  HUDSetAlpha(float alpha = 1.0f);
 void  HUDSetImageWhiten(bool whiten);
 float HUDGetAlpha(void);
@@ -71,25 +72,25 @@ void HUDPushScissor(float x1, float y1, float x2, float y2, bool expand = false)
 void HUDPopScissor();
 
 void HUDRawImage(float hx1, float hy1, float hx2, float hy2, const Image *image, float tx1, float ty1, float tx2,
-                 float ty2, float alpha = 1.0f, RGBAColor text_col = kRGBANoValue, float sx = 0.0, float sy = 0.0,
+                 float ty2, float alpha = 1.0f, epi::RGBAColor text_col = kRGBANoValue, float sx = 0.0, float sy = 0.0,
                  bool font_draw = false);
 
 // Draw a solid colour box (possibly translucent) in the given
 // rectangle.
-void HUDSolidBox(float x1, float y1, float x2, float y2, RGBAColor col);
+void HUDSolidBox(float x1, float y1, float x2, float y2, epi::RGBAColor col);
 
 // Draw a solid colour line (possibly translucent) between the two
 // end points.  Coordinates are inclusive.  Drawing will be clipped
 // to the current scissor rectangle.
-void HUDSolidLine(float x1, float y1, float x2, float y2, RGBAColor col);
+void HUDSolidLine(float x1, float y1, float x2, float y2, epi::RGBAColor col);
 
 // Draw a thin outline of a box.
-void HUDThinBox(float x1, float y1, float x2, float y2, RGBAColor col, float thickness = 0.0f,
+void HUDThinBox(float x1, float y1, float x2, float y2, epi::RGBAColor col, float thickness = 0.0f,
                 BlendingMode special_blend = kBlendingNone);
 
 // Like HUDSolidBox but the colors of each corner (TL, BL, TR, BR) can
 // be specified individually.
-void HUDGradientBox(float x1, float y1, float x2, float y2, RGBAColor *cols);
+void HUDGradientBox(float x1, float y1, float x2, float y2, epi::RGBAColor *cols);
 
 void HUDDrawImage(float x, float y, const Image *image, const Colormap *colmap = nullptr);
 void HUDDrawImageNoOffset(float x, float y, const Image *image);

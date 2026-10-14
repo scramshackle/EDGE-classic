@@ -24,10 +24,11 @@
 
 #include <math.h>
 
-#include "epi.h"
-
 namespace epi
 {
+
+static constexpr uint32_t kAdlerModulus      = 65521;
+static constexpr int      kAdlerMaxBlockSize = 5552;
 
 // ---- Primitive routines ----
 CRC32 &CRC32::operator+=(uint8_t data)
@@ -48,10 +49,19 @@ CRC32 &CRC32::AddBlock(const uint8_t *data, int len)
     uint32_t s1 = crc_ & 0xFFFF;
     uint32_t s2 = (crc_ >> 16) & 0xFFFF;
 
-    for (; len > 0; data++, len--)
+    while (len > 0)
     {
-        s1 = (s1 + *data) % 65521;
-        s2 = (s2 + s1) % 65521;
+        int block_size = (len < kAdlerMaxBlockSize) ? len : kAdlerMaxBlockSize;
+        len -= block_size;
+
+        for (; block_size > 0; data++, block_size--)
+        {
+            s1 += *data;
+            s2 += s1;
+        }
+
+        s1 %= kAdlerModulus;
+        s2 %= kAdlerModulus;
     }
 
     crc_ = (s2 << 16) | s1;

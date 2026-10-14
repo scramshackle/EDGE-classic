@@ -33,12 +33,10 @@
 
 #include <vector>
 
-#include "epi_math.h"
 #include "c_local.h"
 #include "epi.h"
-#include "stb_sprintf.h"
-
-[[noreturn]] extern void FatalError(const char *error, ...);
+#include "epi_math.h"
+#include "epi_str_util.h"
 
 namespace coal
 {
@@ -50,7 +48,7 @@ int RealVM::GetNativeFunc(const char *name, const char *module)
     char buffer[256];
 
     if (module)
-        stbsp_sprintf(buffer, "%s.%s", module, name);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%s.%s", module, name);
     else
         strcpy(buffer, name);
 
@@ -187,7 +185,7 @@ void RealVM::ReturnString(const char *s, int len)
     char    buffer[1024];
 
     va_start(argptr, error);
-    stbsp_vsnprintf(buffer, sizeof(buffer), error, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), error, argptr);
     va_end(argptr);
 
     Printer("COAL ERROR: %s\n", buffer);
@@ -198,7 +196,7 @@ void RealVM::ReturnString(const char *s, int len)
     /* clear the stack so SV/Host_Error can shutdown functions */
     exec_.call_depth = 0;
 
-    FatalError("%s", buffer);
+    epi::FatalError("%s", buffer);
 }
 
 int RealVM::StringConcat(const char *s1, const char *s2)
@@ -224,11 +222,11 @@ int RealVM::StringConcatFloat(const char *s, double f)
 
     if (epi::AlmostEquals(f, round(f)))
     {
-        stbsp_sprintf(buffer, "%1.0f", f);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%1.0f", f);
     }
     else
     {
-        stbsp_sprintf(buffer, "%8.6f", f);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "%8.6f", f);
     }
 
     return StringConcat(s, buffer);
@@ -240,11 +238,11 @@ int RealVM::StringConcatVector(const char *s, double *v)
 
     if (epi::AlmostEquals(v[0], round(v[0])) && epi::AlmostEquals(v[1], round(v[1])) && epi::AlmostEquals(v[2], round(v[2])))
     {
-        stbsp_sprintf(buffer, "'%1.0f %1.0f %1.0f'", v[0], v[1], v[2]);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "'%1.0f %1.0f %1.0f'", v[0], v[1], v[2]);
     }
     else
     {
-        stbsp_sprintf(buffer, "'%6.4f %6.4f %6.4f'", v[0], v[1], v[2]);
+        epi::FormatToBufferSized(buffer, sizeof(buffer), "'%6.4f %6.4f %6.4f'", v[0], v[1], v[2]);
     }
 
     return StringConcat(s, buffer);
@@ -690,7 +688,7 @@ const char *RealVM::RegString(Statement *st, int who)
     if (val == kDefaultOffset * 8)
         return "default";
 
-    stbsp_sprintf(buffer, "%s[%d]", (val < 0) ? "stack" : "glob", abs(val));
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%s[%d]", (val < 0) ? "stack" : "glob", abs(val));
     return buffer;
 }
 

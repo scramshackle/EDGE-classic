@@ -18,6 +18,7 @@
 
 #include "ddf_states.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "ddf_local.h"
@@ -116,7 +117,7 @@ void DDFStateInit(void)
     // create states array with a single 'S_NULL' state
     states = (State *)malloc(sizeof(State));
     if (states == nullptr)
-        FatalError("could not allocate states\n");
+        epi::FatalError("could not allocate states\n");
 
     states[0]  = template_state;
     num_states = 1;
@@ -349,7 +350,7 @@ void DDFStateReadState(const char *info, const char *label, std::vector<StateRan
         cur->nextstate = (StateGetRedirector(stateinfo[0].c_str()) + 1) << 16;
 
         if (!stateinfo[1].empty())
-            cur->nextstate += HMM_MAX(0, atoi(stateinfo[1].c_str()) - 1);
+            cur->nextstate += epi::Max(0, atoi(stateinfo[1].c_str()) - 1);
 
         return;
     }
@@ -362,7 +363,7 @@ void DDFStateReadState(const char *info, const char *label, std::vector<StateRan
 
     states = (State *)realloc(states, num_states * sizeof(State));
     if (states == nullptr)
-        FatalError("could not allocate states\n");
+        epi::FatalError("could not allocate states\n");
 
     cur = &states[num_states - 1];
 
@@ -490,7 +491,7 @@ void DDFStateReadState(const char *info, const char *label, std::vector<StateRan
     else if (epi::StringPrefixCaseCompareASCII(stateinfo[3], "LIT") == 0)
     {
         cur->bright = strtol(stateinfo[3].c_str() + 3, nullptr, 10);
-        cur->bright = HMM_Clamp(0, cur->bright * 255 / 99, 255);
+        cur->bright = epi::Clamp(cur->bright * 255 / 99, 0, 255);
     }
     else
         DDFWarnError("DDFMainLoadStates: Lighting is not BRIGHT or NORMAL\n");
@@ -835,7 +836,7 @@ void DDFStateGetJump(const char *arg, State *cur_state)
     buffer[len] = 0;
 
     if (*arg == ':')
-        offset = HMM_MAX(0, atoi(arg + 1) - 1);
+        offset = epi::Max(0, atoi(arg + 1) - 1);
 
     // set the jump state
     cur_state->jumpstate  = ((StateGetRedirector(buffer) + 1) << 16) + offset;
@@ -883,7 +884,7 @@ void DDFStateGetJumpInt(const char *arg, State *cur_state)
     buffer[len] = 0;
 
     if (*arg == ':')
-        offset = HMM_MAX(0, atoi(arg + 1) - 1);
+        offset = epi::Max(0, atoi(arg + 1) - 1);
 
     // set the jump state
     cur_state->jumpstate  = ((StateGetRedirector(buffer) + 1) << 16) + offset;
@@ -942,7 +943,7 @@ void DDFStateGetJumpIntPair(const char *arg, State *cur_state)
     buffer[len] = 0;
 
     if (*arg == ':')
-        offset = HMM_MAX(0, atoi(arg + 1) - 1);
+        offset = epi::Max(0, atoi(arg + 1) - 1);
 
     // set the jump state
     cur_state->jumpstate  = ((StateGetRedirector(buffer) + 1) << 16) + offset;
@@ -970,7 +971,7 @@ void DDFStateGetFrame(const char *arg, State *cur_state)
     buffer[len] = 0;
 
     if (*arg == ':')
-        offset = HMM_MAX(0, atoi(arg + 1) - 1);
+        offset = epi::Max(0, atoi(arg + 1) - 1);
 
     // set the jump state
     cur_state->jumpstate = ((StateGetRedirector(buffer) + 1) << 16) + offset;
@@ -1037,7 +1038,7 @@ void DDFStateGetMorph(const char *arg, State *cur_state)
         morph->start_.label_ = buffer;
 
         if (*s == ':')
-            morph->start_.offset_ = HMM_MAX(0, atoi(s + 1) - 1);
+            morph->start_.offset_ = epi::Max(0, atoi(s + 1) - 1);
     }
 
     cur_state->action_par = morph;
@@ -1104,7 +1105,7 @@ void DDFStateGetBecome(const char *arg, State *cur_state)
         become->start_.label_ = buffer;
 
         if (*s == ':')
-            become->start_.offset_ = HMM_MAX(0, atoi(s + 1) - 1);
+            become->start_.offset_ = epi::Max(0, atoi(s + 1) - 1);
     }
 
     cur_state->action_par = become;
@@ -1171,7 +1172,7 @@ void DDFStateGetBecomeWeapon(const char *arg, State *cur_state)
         become->start_.label_ = buffer;
 
         if (*s == ':')
-            become->start_.offset_ = HMM_MAX(0, atoi(s + 1) - 1);
+            become->start_.offset_ = epi::Max(0, atoi(s + 1) - 1);
     }
 
     cur_state->action_par = become;
@@ -1179,13 +1180,13 @@ void DDFStateGetBecomeWeapon(const char *arg, State *cur_state)
 
 void DDFStateGetAngle(const char *arg, State *cur_state)
 {
-    BAMAngle *value;
+    epi::BAMAngle *value;
     float     tmp;
 
     if (!arg || !arg[0])
         return;
 
-    value = new BAMAngle;
+    value = new epi::BAMAngle;
 
     if (!epi::ScanFloat(arg, &tmp))
         DDFError("DDFStateGetAngle: bad value: %s\n", arg);
@@ -1212,7 +1213,7 @@ void DDFStateGetSlope(const char *arg, State *cur_state)
     if (tmp < -89.5f)
         tmp = -89.5f;
 
-    *value = tan(tmp * HMM_PI / 180.0);
+    *value = tan(tmp * epi::kPi / 180.0);
 
     cur_state->action_par = value;
 }
@@ -1222,7 +1223,7 @@ void DDFStateGetRGB(const char *arg, State *cur_state)
     if (!arg || !arg[0])
         return;
 
-    cur_state->action_par = new RGBAColor;
+    cur_state->action_par = new epi::RGBAColor;
 
     DDFMainGetRGB(arg, cur_state->action_par);
 }

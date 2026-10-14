@@ -23,6 +23,7 @@
 
 #include "ddf_colormap.h"
 #include "ddf_local.h"
+#include "dm_colors.h"
 #include "epi_str_compare.h"
 #include "w_wad.h"
 
@@ -164,7 +165,7 @@ static void LevelDoTemplate(const char *contents)
 static void LevelParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("LEVEL_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "LEVEL_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -253,7 +254,7 @@ void DDFLevelInit(void)
 void DDFLevelCleanUp(void)
 {
     if (mapdefs.empty())
-        FatalError("There are no levels defined in DDF !\n");
+        epi::FatalError("There are no levels defined in DDF !\n");
 
     mapdefs.shrink_to_fit();
 
@@ -267,7 +268,8 @@ void DDFLevelCleanUp(void)
         m->episode_ = gamedefs.Lookup(m->episode_name_.c_str());
 
         if (m->episode_name_.empty())
-            LogPrint("WARNING: Cannot find episode name for map entry [%s]\n", m->name_.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "WARNING: Cannot find episode name for map entry [%s]\n",
+                            m->name_.c_str());
     }
 }
 

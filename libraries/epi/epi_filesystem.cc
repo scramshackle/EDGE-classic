@@ -18,12 +18,20 @@
 
 #include "epi_filesystem.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <string>
 
 #include "epi.h"
 #include "epi_file.h"
 #include "epi_str_compare.h"
+#include "epi_str_util.h"
 #include "epi_windows.h"
-#ifdef EDGE_WEB
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 #ifndef _WIN32
@@ -60,7 +68,7 @@ bool IsPathAbsolute(std::string_view path)
     }
 
     // Check for share name...
-    if (path.size() > 1 && path[0] == '\\' && path[1] == '\\')
+    if (path.starts_with("\\\\"))
         return true;
 
     return false;
@@ -290,7 +298,7 @@ bool FileDelete(std::string_view name)
     EPI_ASSERT(!name.empty());
     return remove(std::string(name).c_str()) == 0;
 }
-#ifndef EDGE_WEB
+#ifndef __EMSCRIPTEN__
 std::string CurrentDirectoryGet()
 {
     std::string directory;
@@ -651,7 +659,7 @@ bool FileCopy(std::string_view src, std::string_view dest)
 }
 
 // Emscripten-specific
-#ifdef EDGE_WEB
+#ifdef __EMSCRIPTEN__
 void SyncFilesystem(bool populate)
 {
     EM_ASM_(

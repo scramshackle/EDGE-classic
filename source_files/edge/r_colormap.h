@@ -34,7 +34,7 @@ struct SpriteLightTable;
 void InitializePalette(void);
 
 // -ACB- 1999/10/11 Gets an RGB colour from the current palette
-void PalettedColourToRGB(int indexcol, uint8_t *returncol, RGBAColor last_damage_colour, float damageAmount);
+void PalettedColourToRGB(int indexcol, uint8_t *returncol, epi::RGBAColor last_damage_colour, float damageAmount);
 
 // -AJA- 1999/07/03: Some palette stuff.
 extern uint8_t playpal_data[14][256][3];
@@ -65,8 +65,8 @@ int  ColorLookupForColormap(const Colormap *colmap);
 void ResetColorLookups(void);
 bool ColormapTintFactors(const Colormap *colmap, float *r, float *g, float *b);
 
-RGBAColor GetFontColor(const Colormap *colmap);
-RGBAColor ParseFontColor(const char *name, bool strict = false);
+epi::RGBAColor GetFontColor(const Colormap *colmap);
+epi::RGBAColor ParseFontColor(const char *name, bool strict = false);
 
 AbstractShader *GetColormapShader(const struct RegionProperties *props, int light_add = 0, Sector *sec = nullptr);
 

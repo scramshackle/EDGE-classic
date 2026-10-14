@@ -4,16 +4,17 @@
 #include <stdio.h>
 
 #include "epi.h"
+#include "epi_str_util.h"
 #include "i_system.h"
 #include "r_lightgrid.h"
-#include "stb_sprintf.h"
 
 static const char *Gles2ShaderDefines()
 {
     static char defines[128];
 
-    stbsp_snprintf(defines, sizeof(defines), "#define EDGE_LIGHT_MAX_PER_CLUSTER %d\n#define EDGE_LIGHT_MAX_GLOWS %d\n",
-                   kLightGridMaximumPerCluster, kLightGridMaximumGlows);
+    epi::FormatToBufferSized(defines, sizeof(defines),
+                             "#define EDGE_LIGHT_MAX_PER_CLUSTER %d\n#define EDGE_LIGHT_MAX_GLOWS %d\n",
+                             kLightGridMaximumPerCluster, kLightGridMaximumGlows);
 
     return defines;
 }
@@ -26,10 +27,10 @@ static bool LoadInstancingEntryPoints(const char *suffix)
 {
     char name[64];
 
-    stbsp_snprintf(name, sizeof(name), "glDrawElementsInstanced%s", suffix);
+    epi::FormatToBufferSized(name, sizeof(name), "glDrawElementsInstanced%s", suffix);
     gles2_draw_elements_instanced = (Gles2DrawElementsInstancedFunction)SDL_GL_GetProcAddress(name);
 
-    stbsp_snprintf(name, sizeof(name), "glVertexAttribDivisor%s", suffix);
+    epi::FormatToBufferSized(name, sizeof(name), "glVertexAttribDivisor%s", suffix);
     gles2_vertex_attrib_divisor = (Gles2VertexAttribDivisorFunction)SDL_GL_GetProcAddress(name);
 
     return gles2_draw_elements_instanced && gles2_vertex_attrib_divisor;
@@ -130,7 +131,7 @@ const char *Gles2ShaderPreamble(bool fragment_stage)
 
     static char preamble[256];
 
-    stbsp_snprintf(preamble, sizeof(preamble), "#version 110\n%s", Gles2ShaderDefines());
+    epi::FormatToBufferSized(preamble, sizeof(preamble), "#version 110\n%s", Gles2ShaderDefines());
 
     return preamble;
 }
@@ -175,19 +176,19 @@ const char *Gles2ShaderPreamble(bool fragment_stage)
 
     if (fragment_stage)
     {
-        stbsp_snprintf(preamble, sizeof(preamble),
-                       "#version 100\n%s"
-                       "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
-                       "precision highp float;\n"
-                       "#else\n"
-                       "precision mediump float;\n"
-                       "#endif\n",
-                       Gles2ShaderDefines());
+        epi::FormatToBufferSized(preamble, sizeof(preamble),
+                                 "#version 100\n%s"
+                                 "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+                                 "precision highp float;\n"
+                                 "#else\n"
+                                 "precision mediump float;\n"
+                                 "#endif\n",
+                                 Gles2ShaderDefines());
 
         return preamble;
     }
 
-    stbsp_snprintf(preamble, sizeof(preamble), "#version 100\n%s", Gles2ShaderDefines());
+    epi::FormatToBufferSized(preamble, sizeof(preamble), "#version 100\n%s", Gles2ShaderDefines());
 
     return preamble;
 }
