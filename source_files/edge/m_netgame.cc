@@ -28,6 +28,7 @@
 #include "con_main.h"
 #include "ddf_font.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "dstrings.h"
@@ -263,9 +264,9 @@ static void ChangeGame(NewGameParameters *param, int dir)
         }
     }
 
-    LogDebug("DIR: %d  CURRENT: %s   CLOSEST: %s   FURTHEST: %s\n", dir,
-             network_game_parameters->map_->episode_->name_.c_str(), closest ? closest->name_.c_str() : "none",
-             furthest ? furthest->name_.c_str() : "none");
+    epi::LogMessage(epi::kLogLevelDebug, "DIR: %d  CURRENT: %s   CLOSEST: %s   FURTHEST: %s\n", dir,
+                    network_game_parameters->map_->episode_->name_.c_str(), closest ? closest->name_.c_str() : "none",
+                    furthest ? furthest->name_.c_str() : "none");
 
     if (closest)
     {
@@ -371,13 +372,13 @@ static void HostChangeOption(int opt, int key)
 
     case 5: // Bot Skill
         bot_skill = bot_skill.d_ + dir;
-        bot_skill = HMM_Clamp(0, bot_skill.d_, 4);
+        bot_skill = epi::Clamp(bot_skill.d_, 0, 4);
 
         break;
 
     case 6:
         player_deathmatch_damage_resistance = player_deathmatch_damage_resistance.d_ + dir;
-        player_deathmatch_damage_resistance = HMM_Clamp(0, player_deathmatch_damage_resistance.d_, 18);
+        player_deathmatch_damage_resistance = epi::Clamp(player_deathmatch_damage_resistance.d_, 0, 18);
 
         break;
 
@@ -472,12 +473,12 @@ void OptionMenuDrawHostMenu(void)
     y += deltay;
     idx++;
 
-    int skill = HMM_Clamp(0, bot_skill.d_, 4);
+    int skill = epi::Clamp(bot_skill.d_, 0, 4);
     DrawKeyword(idx, network_game_host_style, y, "Bot Skill", GetBotSkillName(skill));
     y += deltay;
     idx++;
 
-    int dm_damage_resistance = HMM_Clamp(0, player_deathmatch_damage_resistance.d_, 18);
+    int dm_damage_resistance = epi::Clamp(player_deathmatch_damage_resistance.d_, 0, 18);
     DrawKeyword(idx, network_game_host_style, y, "Player Damage Resistance",
                 GetPlayerDamageResistanceNameName(dm_damage_resistance));
     y += deltay;

@@ -52,7 +52,7 @@ uint8_t  SaveChunkGetByte(void);
 uint16_t SaveChunkGetShort(void);
 uint32_t SaveChunkGetInteger(void);
 
-BAMAngle SaveChunkGetAngle(void);
+epi::BAMAngle SaveChunkGetAngle(void);
 float    SaveChunkGetFloat(void);
 
 const char *SaveChunkGetString(void);
@@ -75,7 +75,7 @@ void SaveChunkPutByte(uint8_t value);
 void SaveChunkPutShort(uint16_t value);
 void SaveChunkPutInteger(uint32_t value);
 
-void SaveChunkPutAngle(BAMAngle value);
+void SaveChunkPutAngle(epi::BAMAngle value);
 void SaveChunkPutFloat(float value);
 
 void SaveChunkPutString(const char *str);

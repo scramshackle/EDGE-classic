@@ -18,13 +18,13 @@
 
 #pragma once
 
+namespace epi
+{
+
 // a bitset is a set of named bits, from `A' to `Z'.
 typedef int BitSet;
 
 constexpr int kBitSetFull = 0x7FFFFFFF;
-
-namespace epi
-{
 
 // Case-insensitive, i.e. 'a' will return the same bit as 'A'
 // Returns 0 if not an ASCII alphabetical character

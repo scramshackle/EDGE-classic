@@ -116,11 +116,11 @@ void RemoveMapObject(MapObject *th);
 int  MapObjectFindLabel(MapObject *mobj, const char *label);
 bool MapObjectSetState(MapObject *mobj, int state);
 bool MapObjectSetStateDeferred(MapObject *mobj, int state, int tic_skip);
-void MapObjectSetDirectionAndSpeed(MapObject *mobj, BAMAngle angle, float slope, float speed);
+void MapObjectSetDirectionAndSpeed(MapObject *mobj, epi::BAMAngle angle, float slope, float speed);
 void RunMapObjectThinkers();
-void SpawnDebris(float x, float y, float z, BAMAngle angle, const MapObjectDefinition *debris);
-void SpawnPuff(float x, float y, float z, const MapObjectDefinition *puff, BAMAngle angle, bool shrink_it = true);
-void SpawnBlood(float x, float y, float z, float damage, BAMAngle angle, const MapObjectDefinition *blood);
+void SpawnDebris(float x, float y, float z, epi::BAMAngle angle, const MapObjectDefinition *debris);
+void SpawnPuff(float x, float y, float z, const MapObjectDefinition *puff, epi::BAMAngle angle, bool shrink_it = true);
+void SpawnBlood(float x, float y, float z, float damage, epi::BAMAngle angle, const MapObjectDefinition *blood);
 void CalculateFullRegionProperties(const MapObject *mo, RegionProperties *newregp);
 bool HitLiquidFloor(MapObject *thing);
 
@@ -150,7 +150,7 @@ extern float         yspeed[8];
 void NoiseAlert(Player *p);
 void NewChaseDir(MapObject *actor);
 bool DoMove(MapObject *actor, bool path);
-bool LookForPlayers(MapObject *actor, BAMAngle range, bool ToSupport = false);
+bool LookForPlayers(MapObject *actor, epi::BAMAngle range, bool ToSupport = false);
 
 MapObject *LookForShootSpot(const MapObjectDefinition *spot_type);
 
@@ -203,11 +203,11 @@ extern std::vector<Line *> special_lines_hit;
 
 bool       MapCheckBlockingLine(MapObject *thing, MapObject *spawnthing);
 MapObject *FindCorpseForResurrection(MapObject *thing);
-MapObject *MapTargetAutoAim(MapObject *source, BAMAngle angle, float distance, bool force_aim);
-MapObject *DoMapTargetAutoAim(MapObject *source, BAMAngle angle, float distance, bool force_aim);
+MapObject *MapTargetAutoAim(MapObject *source, epi::BAMAngle angle, float distance, bool force_aim);
+MapObject *DoMapTargetAutoAim(MapObject *source, epi::BAMAngle angle, float distance, bool force_aim);
 void       TargetTheory(MapObject *source, MapObject *target, float *x, float *y, float *z);
 
-MapObject *AimLineAttack(MapObject *t1, BAMAngle angle, float distance, float *slope);
+MapObject *AimLineAttack(MapObject *t1, epi::BAMAngle angle, float distance, float *slope);
 bool       CheckSolidSectorMove(Sector *sec, bool is_ceiling, float dh);
 bool       SolidSectorMove(Sector *sec, bool is_ceiling, float dh, int crush = 10, bool nocarething = false);
 bool       CheckAbsolutePosition(MapObject *thing, float x, float y, float z);
@@ -221,12 +221,12 @@ bool TeleportMove(MapObject *thing, float x, float y, float z);
 bool TryMove(MapObject *thing, float x, float y);
 void SlideMove(MapObject *mo, float x, float y);
 void UseLines(Player *player);
-void LineAttack(MapObject *t1, BAMAngle angle, float distance, float slope, float damage, const DamageClass *damtype,
-                const MapObjectDefinition *puff, const MapObjectDefinition *blood);
+void LineAttack(MapObject *t1, epi::BAMAngle angle, float distance, float slope, float damage,
+                const DamageClass *damtype, const MapObjectDefinition *puff, const MapObjectDefinition *blood);
 
 void UnblockLineEffectDebris(Line *TheLine, const LineType *special);
 
-MapObject *GetMapTargetAimInfo(MapObject *source, BAMAngle angle, float distance);
+MapObject *GetMapTargetAimInfo(MapObject *source, epi::BAMAngle angle, float distance);
 
 bool ReplaceMidTexFromPart(Line *TheLine, ScrollingPart parts);
 

@@ -360,101 +360,101 @@ namespace udmf
 {
 
 // generic keys
-EPI_KNOWN_STRINGHASH(kSpecial, "SPECIAL")
-EPI_KNOWN_STRINGHASH(kID, "ID")
-EPI_KNOWN_STRINGHASH(kX, "X")
-EPI_KNOWN_STRINGHASH(kY, "Y")
-EPI_KNOWN_STRINGHASH(kSector, "SECTOR")
-EPI_KNOWN_STRINGHASH(kThing, "THING")
-EPI_KNOWN_STRINGHASH(kVertex, "VERTEX")
-EPI_KNOWN_STRINGHASH(kLinedef, "LINEDEF")
-EPI_KNOWN_STRINGHASH(kSidedef, "SIDEDEF")
+constexpr uint32_t kSpecial = epi::KnownStringHash("SPECIAL");
+constexpr uint32_t kID      = epi::KnownStringHash("ID");
+constexpr uint32_t kX       = epi::KnownStringHash("X");
+constexpr uint32_t kY       = epi::KnownStringHash("Y");
+constexpr uint32_t kSector  = epi::KnownStringHash("SECTOR");
+constexpr uint32_t kThing   = epi::KnownStringHash("THING");
+constexpr uint32_t kVertex  = epi::KnownStringHash("VERTEX");
+constexpr uint32_t kLinedef = epi::KnownStringHash("LINEDEF");
+constexpr uint32_t kSidedef = epi::KnownStringHash("SIDEDEF");
 
 // vertexes
-EPI_KNOWN_STRINGHASH(kZFloor, "ZFLOOR")
-EPI_KNOWN_STRINGHASH(kZCeiling, "ZCEILING")
+constexpr uint32_t kZFloor   = epi::KnownStringHash("ZFLOOR");
+constexpr uint32_t kZCeiling = epi::KnownStringHash("ZCEILING");
 
 // linedefs
-EPI_KNOWN_STRINGHASH(kArg0, "ARG0")
-EPI_KNOWN_STRINGHASH(kV1, "V1")
-EPI_KNOWN_STRINGHASH(kV2, "V2")
-EPI_KNOWN_STRINGHASH(kSideFront, "SIDEFRONT")
-EPI_KNOWN_STRINGHASH(kSideBack, "SIDEBACK")
-EPI_KNOWN_STRINGHASH(kBlocking, "BLOCKING")
-EPI_KNOWN_STRINGHASH(kBlockMonsters, "BLOCKMONSTERS")
-EPI_KNOWN_STRINGHASH(kTwoSided, "TWOSIDED")
-EPI_KNOWN_STRINGHASH(kDontPegTop, "DONTPEGTOP")
-EPI_KNOWN_STRINGHASH(kDontPegBottom, "DONTPEGBOTTOM")
-EPI_KNOWN_STRINGHASH(kSecret, "SECRET")
-EPI_KNOWN_STRINGHASH(kBlockSound, "BLOCKSOUND")
-EPI_KNOWN_STRINGHASH(kDontDraw, "DONTDRAW")
-EPI_KNOWN_STRINGHASH(kMapped, "MAPPED")
-EPI_KNOWN_STRINGHASH(kPassUse, "PASSUSE")
-EPI_KNOWN_STRINGHASH(kBlockPlayers, "BLOCKPLAYERS")
-EPI_KNOWN_STRINGHASH(kBlockSight, "BLOCKSIGHT")
+constexpr uint32_t kArg0          = epi::KnownStringHash("ARG0");
+constexpr uint32_t kV1            = epi::KnownStringHash("V1");
+constexpr uint32_t kV2            = epi::KnownStringHash("V2");
+constexpr uint32_t kSideFront     = epi::KnownStringHash("SIDEFRONT");
+constexpr uint32_t kSideBack      = epi::KnownStringHash("SIDEBACK");
+constexpr uint32_t kBlocking      = epi::KnownStringHash("BLOCKING");
+constexpr uint32_t kBlockMonsters = epi::KnownStringHash("BLOCKMONSTERS");
+constexpr uint32_t kTwoSided      = epi::KnownStringHash("TWOSIDED");
+constexpr uint32_t kDontPegTop    = epi::KnownStringHash("DONTPEGTOP");
+constexpr uint32_t kDontPegBottom = epi::KnownStringHash("DONTPEGBOTTOM");
+constexpr uint32_t kSecret        = epi::KnownStringHash("SECRET");
+constexpr uint32_t kBlockSound    = epi::KnownStringHash("BLOCKSOUND");
+constexpr uint32_t kDontDraw      = epi::KnownStringHash("DONTDRAW");
+constexpr uint32_t kMapped        = epi::KnownStringHash("MAPPED");
+constexpr uint32_t kPassUse       = epi::KnownStringHash("PASSUSE");
+constexpr uint32_t kBlockPlayers  = epi::KnownStringHash("BLOCKPLAYERS");
+constexpr uint32_t kBlockSight    = epi::KnownStringHash("BLOCKSIGHT");
 
 // sidedefs
-EPI_KNOWN_STRINGHASH(kOffsetX, "OFFSETX")
-EPI_KNOWN_STRINGHASH(kOffsetY, "OFFSETY")
-EPI_KNOWN_STRINGHASH(kOffsetX_Bottom, "OFFSETX_BOTTOM")
-EPI_KNOWN_STRINGHASH(kOffsetX_Mid, "OFFSETX_MID")
-EPI_KNOWN_STRINGHASH(kOffsetX_Top, "OFFSETX_TOP")
-EPI_KNOWN_STRINGHASH(kOffsetY_Bottom, "OFFSETY_BOTTOM")
-EPI_KNOWN_STRINGHASH(kOffsetY_Mid, "OFFSETY_MID")
-EPI_KNOWN_STRINGHASH(kOffsetY_Top, "OFFSETY_TOP")
-EPI_KNOWN_STRINGHASH(kScaleX_Bottom, "SCALEX_BOTTOM")
-EPI_KNOWN_STRINGHASH(kScaleX_Mid, "SCALEX_MID")
-EPI_KNOWN_STRINGHASH(kScaleX_Top, "SCALEX_TOP")
-EPI_KNOWN_STRINGHASH(kScaleY_Bottom, "SCALEY_BOTTOM")
-EPI_KNOWN_STRINGHASH(kScaleY_Mid, "SCALEY_MID")
-EPI_KNOWN_STRINGHASH(kScaleY_Top, "SCALEY_TOP")
-EPI_KNOWN_STRINGHASH(kTextureTop, "TEXTURETOP")
-EPI_KNOWN_STRINGHASH(kTextureBottom, "TEXTUREBOTTOM")
-EPI_KNOWN_STRINGHASH(kTextureMiddle, "TEXTUREMIDDLE")
+constexpr uint32_t kOffsetX        = epi::KnownStringHash("OFFSETX");
+constexpr uint32_t kOffsetY        = epi::KnownStringHash("OFFSETY");
+constexpr uint32_t kOffsetX_Bottom = epi::KnownStringHash("OFFSETX_BOTTOM");
+constexpr uint32_t kOffsetX_Mid    = epi::KnownStringHash("OFFSETX_MID");
+constexpr uint32_t kOffsetX_Top    = epi::KnownStringHash("OFFSETX_TOP");
+constexpr uint32_t kOffsetY_Bottom = epi::KnownStringHash("OFFSETY_BOTTOM");
+constexpr uint32_t kOffsetY_Mid    = epi::KnownStringHash("OFFSETY_MID");
+constexpr uint32_t kOffsetY_Top    = epi::KnownStringHash("OFFSETY_TOP");
+constexpr uint32_t kScaleX_Bottom  = epi::KnownStringHash("SCALEX_BOTTOM");
+constexpr uint32_t kScaleX_Mid     = epi::KnownStringHash("SCALEX_MID");
+constexpr uint32_t kScaleX_Top     = epi::KnownStringHash("SCALEX_TOP");
+constexpr uint32_t kScaleY_Bottom  = epi::KnownStringHash("SCALEY_BOTTOM");
+constexpr uint32_t kScaleY_Mid     = epi::KnownStringHash("SCALEY_MID");
+constexpr uint32_t kScaleY_Top     = epi::KnownStringHash("SCALEY_TOP");
+constexpr uint32_t kTextureTop     = epi::KnownStringHash("TEXTURETOP");
+constexpr uint32_t kTextureBottom  = epi::KnownStringHash("TEXTUREBOTTOM");
+constexpr uint32_t kTextureMiddle  = epi::KnownStringHash("TEXTUREMIDDLE");
 
 // sectors
-EPI_KNOWN_STRINGHASH(kHeightFloor, "HEIGHTFLOOR")
-EPI_KNOWN_STRINGHASH(kHeightCeiling, "HEIGHTCEILING")
-EPI_KNOWN_STRINGHASH(kTextureFloor, "TEXTUREFLOOR")
-EPI_KNOWN_STRINGHASH(kTextureCeiling, "TEXTURECEILING")
-EPI_KNOWN_STRINGHASH(kLightLevel, "LIGHTLEVEL")
-EPI_KNOWN_STRINGHASH(kLightColor, "LIGHTCOLOR")
-EPI_KNOWN_STRINGHASH(kFadeColor, "FADECOLOR")
-EPI_KNOWN_STRINGHASH(kFogDensity, "FOGDENSITY")
-EPI_KNOWN_STRINGHASH(kXPanningFloor, "XPANNINGFLOOR")
-EPI_KNOWN_STRINGHASH(kYPanningFloor, "YPANNINGFLOOR")
-EPI_KNOWN_STRINGHASH(kXPanningCeiling, "XPANNINGCEILING")
-EPI_KNOWN_STRINGHASH(kYPanningCeiling, "YPANNINGCEILING")
-EPI_KNOWN_STRINGHASH(kXScaleFloor, "XSCALEFLOOR")
-EPI_KNOWN_STRINGHASH(kYScaleFloor, "YSCALEFLOOR")
-EPI_KNOWN_STRINGHASH(kXScaleCeiling, "XSCALECEILING")
-EPI_KNOWN_STRINGHASH(kYScaleCeiling, "YSCALECEILING")
-EPI_KNOWN_STRINGHASH(kAlphaFloor, "ALPHAFLOOR")
-EPI_KNOWN_STRINGHASH(kAlphaCeiling, "ALPHACEILING")
-EPI_KNOWN_STRINGHASH(kRotationFloor, "ROTATIONFLOOR")
-EPI_KNOWN_STRINGHASH(kRotationCeiling, "ROTATIONCEILING")
-EPI_KNOWN_STRINGHASH(kGravity, "GRAVITY")
-EPI_KNOWN_STRINGHASH(kReverbPreset, "REVERBPRESET")
+constexpr uint32_t kHeightFloor     = epi::KnownStringHash("HEIGHTFLOOR");
+constexpr uint32_t kHeightCeiling   = epi::KnownStringHash("HEIGHTCEILING");
+constexpr uint32_t kTextureFloor    = epi::KnownStringHash("TEXTUREFLOOR");
+constexpr uint32_t kTextureCeiling  = epi::KnownStringHash("TEXTURECEILING");
+constexpr uint32_t kLightLevel      = epi::KnownStringHash("LIGHTLEVEL");
+constexpr uint32_t kLightColor      = epi::KnownStringHash("LIGHTCOLOR");
+constexpr uint32_t kFadeColor       = epi::KnownStringHash("FADECOLOR");
+constexpr uint32_t kFogDensity      = epi::KnownStringHash("FOGDENSITY");
+constexpr uint32_t kXPanningFloor   = epi::KnownStringHash("XPANNINGFLOOR");
+constexpr uint32_t kYPanningFloor   = epi::KnownStringHash("YPANNINGFLOOR");
+constexpr uint32_t kXPanningCeiling = epi::KnownStringHash("XPANNINGCEILING");
+constexpr uint32_t kYPanningCeiling = epi::KnownStringHash("YPANNINGCEILING");
+constexpr uint32_t kXScaleFloor     = epi::KnownStringHash("XSCALEFLOOR");
+constexpr uint32_t kYScaleFloor     = epi::KnownStringHash("YSCALEFLOOR");
+constexpr uint32_t kXScaleCeiling   = epi::KnownStringHash("XSCALECEILING");
+constexpr uint32_t kYScaleCeiling   = epi::KnownStringHash("YSCALECEILING");
+constexpr uint32_t kAlphaFloor      = epi::KnownStringHash("ALPHAFLOOR");
+constexpr uint32_t kAlphaCeiling    = epi::KnownStringHash("ALPHACEILING");
+constexpr uint32_t kRotationFloor   = epi::KnownStringHash("ROTATIONFLOOR");
+constexpr uint32_t kRotationCeiling = epi::KnownStringHash("ROTATIONCEILING");
+constexpr uint32_t kGravity         = epi::KnownStringHash("GRAVITY");
+constexpr uint32_t kReverbPreset    = epi::KnownStringHash("REVERBPRESET");
 
 // things
-EPI_KNOWN_STRINGHASH(kHeight, "HEIGHT")
-EPI_KNOWN_STRINGHASH(kAngle, "ANGLE")
-EPI_KNOWN_STRINGHASH(kType, "TYPE")
-EPI_KNOWN_STRINGHASH(kSkill1, "SKILL1")
-EPI_KNOWN_STRINGHASH(kSkill2, "SKILL2")
-EPI_KNOWN_STRINGHASH(kSkill3, "SKILL3")
-EPI_KNOWN_STRINGHASH(kSkill4, "SKILL4")
-EPI_KNOWN_STRINGHASH(kSkill5, "SKILL5")
-EPI_KNOWN_STRINGHASH(kAmbush, "AMBUSH")
-EPI_KNOWN_STRINGHASH(kSingle, "SINGLE")
-EPI_KNOWN_STRINGHASH(kDM, "DM")
-EPI_KNOWN_STRINGHASH(kCoop, "COOP")
-EPI_KNOWN_STRINGHASH(kFriend, "FRIEND")
-EPI_KNOWN_STRINGHASH(kHealth, "HEALTH")
-EPI_KNOWN_STRINGHASH(kAlpha, "ALPHA")
-EPI_KNOWN_STRINGHASH(kScale, "SCALE")
-EPI_KNOWN_STRINGHASH(kScaleX, "SCALEX")
-EPI_KNOWN_STRINGHASH(kScaleY, "SCALEY")
+constexpr uint32_t kHeight = epi::KnownStringHash("HEIGHT");
+constexpr uint32_t kAngle  = epi::KnownStringHash("ANGLE");
+constexpr uint32_t kType   = epi::KnownStringHash("TYPE");
+constexpr uint32_t kSkill1 = epi::KnownStringHash("SKILL1");
+constexpr uint32_t kSkill2 = epi::KnownStringHash("SKILL2");
+constexpr uint32_t kSkill3 = epi::KnownStringHash("SKILL3");
+constexpr uint32_t kSkill4 = epi::KnownStringHash("SKILL4");
+constexpr uint32_t kSkill5 = epi::KnownStringHash("SKILL5");
+constexpr uint32_t kAmbush = epi::KnownStringHash("AMBUSH");
+constexpr uint32_t kSingle = epi::KnownStringHash("SINGLE");
+constexpr uint32_t kDM     = epi::KnownStringHash("DM");
+constexpr uint32_t kCoop   = epi::KnownStringHash("COOP");
+constexpr uint32_t kFriend = epi::KnownStringHash("FRIEND");
+constexpr uint32_t kHealth = epi::KnownStringHash("HEALTH");
+constexpr uint32_t kAlpha  = epi::KnownStringHash("ALPHA");
+constexpr uint32_t kScale  = epi::KnownStringHash("SCALE");
+constexpr uint32_t kScaleX = epi::KnownStringHash("SCALEX");
+constexpr uint32_t kScaleY = epi::KnownStringHash("SCALEY");
 
 } // namespace udmf
 

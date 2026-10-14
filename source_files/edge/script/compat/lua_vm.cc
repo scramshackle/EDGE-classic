@@ -87,7 +87,7 @@ int LuaDoFile(lua_State *L, const char *filename, const char *source)
         lua_getfield(L, -1, filename);
         if (lua_isstring(L, -1))
         {
-            LogWarning("LUA: Redundant execution of %s", filename);
+            epi::LogMessage(epi::kLogLevelWarning, "LUA: Redundant execution of %s", filename);
             lua_pop(L, 2);
             return 0;
         }
@@ -135,9 +135,9 @@ static int  LuaDbgNOP(lua_State *L)
     if (!dbg_nop_warn)
     {
         dbg_nop_warn = true;
-        LogWarning("LUA: dbg() called without lua_debug being set.  Please check that "
-                   "a stray dbg call didn't get left "
-                   "in source.");
+        epi::LogMessage(epi::kLogLevelWarning, "LUA: dbg() called without lua_debug being set.  Please check that "
+                                               "a stray dbg call didn't get left "
+                                               "in source.");
     }
     return 0;
 }
@@ -148,7 +148,7 @@ void LuaCallGlobalFunction(lua_State *L, const char *function_name, MapObject *m
     // nothing
     if (GetCOALDetected())
     {
-        LogWarning("Error calling LUA function '%s': No LUAHUDS present\n", function_name);
+        epi::LogMessage(epi::kLogLevelWarning, "Error calling LUA function '%s': No LUAHUDS present\n", function_name);
     }
     else
     {
@@ -195,7 +195,7 @@ static int LuaSandbox_Warning(lua_State *L)
 {
     const char *function_name = luaL_checkstring(L, lua_upvalueindex(1));
 
-    LogWarning("LUA: Called sandbox disabled function %s\n", function_name);
+    epi::LogMessage(epi::kLogLevelWarning, "LUA: Called sandbox disabled function %s\n", function_name);
 
     return 0;
 }

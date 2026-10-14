@@ -20,6 +20,7 @@
 
 #include <vector>
 
+#include "dm_colors.h"
 #include "epi.h"
 #include "g_game.h"
 #include "i_defs_gl.h"

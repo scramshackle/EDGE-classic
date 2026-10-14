@@ -33,13 +33,14 @@ bool GpuDevice::Init(SDL_Window *window)
 
     if (!device_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUDeviceWithProperties failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUDeviceWithProperties failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
     if (!SDL_ClaimWindowForGPUDevice(device_, window_))
     {
-        LogPrint("GpuDevice: SDL_ClaimWindowForGPUDevice failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_ClaimWindowForGPUDevice failed: %s\n", SDL_GetError());
         SDL_DestroyGPUDevice(device_);
         device_ = nullptr;
         return false;
@@ -70,13 +71,14 @@ bool GpuDevice::Init(SDL_Window *window)
 
     clear_pair_texture_ = SDL_CreateGPUTexture(device_, &pair_info);
 
-    LogPrint("SDL_GPU: driver '%s'\n", SDL_GetGPUDeviceDriver(device_));
+    epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: driver '%s'\n", SDL_GetGPUDeviceDriver(device_));
 #if (SDL_MINOR_VERSION >= 4)
     SDL_PropertiesID device_props = SDL_GetGPUDeviceProperties(device_);
-    LogPrint("SDL_GPU: device '%s'\n", SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_NAME_STRING, "unknown"));
-    LogPrint("SDL_GPU: driver name '%s' version '%s'\n",
-             SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING, "unknown"),
-             SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING, "unknown"));
+    epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: device '%s'\n",
+                    SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_NAME_STRING, "unknown"));
+    epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: driver name '%s' version '%s'\n",
+                    SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING, "unknown"),
+                    SDL_GetStringProperty(device_props, SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING, "unknown"));
 #endif
     return true;
 }
@@ -167,11 +169,11 @@ void GpuDevice::SetVerticalSync(int mode)
 
     if (!SDL_SetGPUSwapchainParameters(device_, window_, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, present))
     {
-        LogPrint("GpuDevice: SDL_SetGPUSwapchainParameters failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_SetGPUSwapchainParameters failed: %s\n", SDL_GetError());
         return;
     }
 
-    LogPrint("SDL_GPU: present mode '%s' (vsync %d)\n", present_name, mode);
+    epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: present mode '%s' (vsync %d)\n", present_name, mode);
 }
 
 bool GpuDevice::CreateFrameTextures(int32_t width, int32_t height)
@@ -207,7 +209,7 @@ bool GpuDevice::CreateFrameTextures(int32_t width, int32_t height)
 
     if (!color_texture_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUTexture (color) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTexture (color) failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -218,7 +220,7 @@ bool GpuDevice::CreateFrameTextures(int32_t width, int32_t height)
 
     if (!depth_texture_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUTexture (depth) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTexture (depth) failed: %s\n", SDL_GetError());
         SDL_ReleaseGPUTexture(device_, color_texture_);
         color_texture_ = nullptr;
         return false;
@@ -246,7 +248,7 @@ bool GpuDevice::AcquireFrame(int32_t width, int32_t height)
 
     if (!command_buffer_)
     {
-        LogPrint("GpuDevice: SDL_AcquireGPUCommandBuffer failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_AcquireGPUCommandBuffer failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -302,7 +304,8 @@ bool GpuDevice::BeginReplay(bool present)
             if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer_, window_, &swapchain_texture_, &swapchain_width,
                                                        &swapchain_height))
             {
-                LogPrint("GpuDevice: SDL_WaitAndAcquireGPUSwapchainTexture failed: %s\n", SDL_GetError());
+                epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_WaitAndAcquireGPUSwapchainTexture failed: %s\n",
+                                SDL_GetError());
                 swapchain_texture_ = nullptr;
             }
 
@@ -368,7 +371,8 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
 
     if (!world_color_texture_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUTexture (world color) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTexture (world color) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -383,7 +387,8 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
 
     if (!oit_accumulation_texture_ || !oit_revealage_texture_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUTexture (transparency) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTexture (transparency) failed: %s\n",
+                        SDL_GetError());
 
         ReleaseOitTextures();
         SDL_ReleaseGPUTexture(device_, world_color_texture_);
@@ -394,7 +399,7 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
     if (!RegisterGpuExternalImage(device_, kGpuImageOitAccumulation, oit_accumulation_texture_, width, height) ||
         !RegisterGpuExternalImage(device_, kGpuImageOitRevealage, oit_revealage_texture_, width, height))
     {
-        LogPrint("GpuDevice: could not register transparency targets for sampling\n");
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: could not register transparency targets for sampling\n");
 
         ReleaseOitTextures();
         SDL_ReleaseGPUTexture(device_, world_color_texture_);
@@ -409,7 +414,8 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
 
     if (!world_depth_texture_)
     {
-        LogPrint("GpuDevice: SDL_CreateGPUTexture (world depth) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTexture (world depth) failed: %s\n",
+                        SDL_GetError());
         SDL_ReleaseGPUTexture(device_, world_color_texture_);
         world_color_texture_ = nullptr;
         return false;
@@ -586,7 +592,7 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     render_pass_ = SDL_BeginGPURenderPass(command_buffer_, color_target, color_target_count, &depth_target);
 
     if (!render_pass_)
-        LogPrint("GpuDevice: SDL_BeginGPURenderPass failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_BeginGPURenderPass failed: %s\n", SDL_GetError());
 
     if (target == kGpuPassTargetMain)
         color_written_ = true;
@@ -631,7 +637,8 @@ SDL_GPUCommandBuffer *GpuDevice::BeginUpload()
     SDL_GPUCommandBuffer *upload_buffer = SDL_AcquireGPUCommandBuffer(device_);
 
     if (!upload_buffer)
-        LogPrint("GpuDevice: SDL_AcquireGPUCommandBuffer (upload) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_AcquireGPUCommandBuffer (upload) failed: %s\n",
+                        SDL_GetError());
 
     return upload_buffer;
 }
@@ -721,7 +728,8 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
 
         if (!download_buffer_)
         {
-            LogPrint("GpuDevice: SDL_CreateGPUTransferBuffer (download) failed: %s\n", SDL_GetError());
+            epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_CreateGPUTransferBuffer (download) failed: %s\n",
+                            SDL_GetError());
             return false;
         }
 
@@ -737,7 +745,8 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
 
     if (!command_buffer)
     {
-        LogPrint("GpuDevice: SDL_AcquireGPUCommandBuffer (download) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_AcquireGPUCommandBuffer (download) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -776,12 +785,14 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
         capture_only_      = false;
 
         if (continue_frame && !command_buffer_)
-            LogPrint("GpuDevice: SDL_AcquireGPUCommandBuffer (after download) failed: %s\n", SDL_GetError());
+            epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_AcquireGPUCommandBuffer (after download) failed: %s\n",
+                            SDL_GetError());
     }
 
     if (!fence)
     {
-        LogPrint("GpuDevice: SDL_SubmitGPUCommandBufferAndAcquireFence failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_SubmitGPUCommandBufferAndAcquireFence failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 
@@ -792,7 +803,8 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
 
     if (!mapped)
     {
-        LogPrint("GpuDevice: SDL_MapGPUTransferBuffer (download) failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuDevice: SDL_MapGPUTransferBuffer (download) failed: %s\n",
+                        SDL_GetError());
         return false;
     }
 

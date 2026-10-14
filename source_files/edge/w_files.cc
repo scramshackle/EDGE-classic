@@ -69,7 +69,7 @@ int GetTotalFiles()
 
 size_t AddDataFile(const std::string &file, FileKind kind)
 {
-    LogDebug("Added filename: %s\n", file.c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "Added filename: %s\n", file.c_str());
 
     size_t index = data_files.size();
 
@@ -103,7 +103,7 @@ static void DEH_ConvertFile(const std::string &filename)
     epi::File *F = epi::FileOpen(filename, epi::kFileAccessRead | epi::kFileAccessBinary);
     if (F == nullptr)
     {
-        LogPrint("FAILED to open file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "FAILED to open file: %s\n", filename.c_str());
         return;
     }
 
@@ -112,7 +112,7 @@ static void DEH_ConvertFile(const std::string &filename)
 
     if (data == nullptr)
     {
-        LogPrint("FAILED to read file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "FAILED to read file: %s\n", filename.c_str());
         delete F;
         return;
     }
@@ -133,7 +133,7 @@ static void W_ExternalDDF(DataFile *df)
     if (type == kDDFTypeUnknown)
         FatalError("Unknown DDF filename: %s\n", bare_name.c_str());
 
-    LogPrint("Reading DDF file: %s\n", df->name_.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "Reading DDF file: %s\n", df->name_.c_str());
 
     epi::File *F = epi::FileOpen(df->name_, epi::kFileAccessRead);
     if (F == nullptr)
@@ -153,7 +153,7 @@ static void W_ExternalDDF(DataFile *df)
 
 static void W_ExternalRTS(DataFile *df)
 {
-    LogPrint("Reading RTS script: %s\n", df->name_.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "Reading RTS script: %s\n", df->name_.c_str());
 
     epi::File *F = epi::FileOpen(df->name_, epi::kFileAccessRead);
     if (F == nullptr)
@@ -179,7 +179,7 @@ void ProcessFile(DataFile *df)
     // open a WAD/PK3 file and add contents to directory
     std::string filename = df->name_;
 
-    LogPrint("  Processing: %s\n", filename.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "  Processing: %s\n", filename.c_str());
 
     if (df->kind_ <= kFileKindXWAD)
     {
@@ -215,7 +215,7 @@ void ProcessFile(DataFile *df)
     else if (df->kind_ == kFileKindDehacked)
     {
         // handle stand-alone DeHackEd patches
-        LogPrint("Converting DEH file: %s\n", df->name_.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Converting DEH file: %s\n", df->name_.c_str());
 
         DEH_ConvertFile(df->name_);
     }
@@ -376,13 +376,14 @@ static const char *FileKindString(FileKind kind)
 
 void ShowLoadedFiles()
 {
-    LogPrint("File list:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "File list:\n");
 
     for (int i = 0; i < (int)data_files.size(); i++)
     {
         DataFile *df = data_files[i];
 
-        LogPrint(" %2d:  %-4s  \"%s\"\n", i + 1, FileKindString(df->kind_), epi::SanitizePath(df->name_).c_str());
+        epi::LogMessage(epi::kLogLevelPrint, " %2d:  %-4s  \"%s\"\n", i + 1, FileKindString(df->kind_),
+                        epi::SanitizePath(df->name_).c_str());
     }
 }
 

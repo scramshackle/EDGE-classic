@@ -16,11 +16,12 @@
 //
 //----------------------------------------------------------------------------
 
+#include "s_midi.h"
+
 #include <stdint.h>
 
 #include <set>
 
-#include "HandmadeMath.h"
 #include "dm_state.h"
 #include "egtlib.h"
 #include "epi.h"
@@ -34,7 +35,6 @@
 #include "i_system.h"
 #include "m_misc.h"
 #include "s_blit.h"
-#include "s_midi.h"
 #include "s_music.h"
 #include "w_files.h"
 
@@ -51,14 +51,15 @@ extern std::set<std::string> available_soundbanks;
 
 bool StartupMIDI(void)
 {
-    LogPrint("Initializing MIDI...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Initializing MIDI...\n");
 
     // Check for presence of previous CVAR value's file
     if (!available_soundbanks.count(midi_soundbank.s_))
     {
-        LogWarning("MIDI: Cannot find previously used soundbank %s, falling back to "
-                   "default!\n",
-                   midi_soundbank.c_str());
+        epi::LogMessage(epi::kLogLevelWarning,
+                        "MIDI: Cannot find previously used soundbank %s, falling back to "
+                        "default!\n",
+                        midi_soundbank.c_str());
         midi_soundbank = "Default.egtb";
     }
 
@@ -67,7 +68,7 @@ bool StartupMIDI(void)
 
     if (!edge_synth)
     {
-        LogWarning("MIDI: Initialization failure.\n");
+        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Initialization failure.\n");
         return false;
     }
 
@@ -83,7 +84,7 @@ bool StartupMIDI(void)
 
     if (!bank)
     {
-        LogWarning("MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
         return false;
     }
 
@@ -91,14 +92,14 @@ bool StartupMIDI(void)
 
     if (!raw_bank)
     {
-        LogWarning("MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
         delete bank;
         return false;
     }
 
     if (egt_loadInstrumentBankFromMemory(edge_synth, (char *)raw_bank, bank->GetLength()) != 0)
     {
-        LogWarning("MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
         delete bank;
         delete[] raw_bank;
         return false;
@@ -118,7 +119,7 @@ void RestartMIDI(void)
     if (midi_disabled)
         return;
 
-    LogPrint("Restarting MIDI...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Restarting MIDI...\n");
 
     int old_entry = entry_playing;
 
@@ -160,7 +161,7 @@ class MIDIPlayer : public AbstractMusicPlayer
 
         if (egt_loadSongFromMemory(edge_synth, (char *)data, length, imf_rate) != 0)
         {
-            LogWarning("Failed to load MIDI music\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Failed to load MIDI music\n");
             return false;
         }
 
@@ -235,7 +236,7 @@ AbstractMusicPlayer *PlayMIDIMusic(uint8_t *data, int length, bool loop)
 
     if (!player)
     {
-        LogDebug("MIDI player: error initializing!\n");
+        epi::LogMessage(epi::kLogLevelDebug, "MIDI player: error initializing!\n");
         delete[] data;
         return nullptr;
     }
@@ -243,7 +244,7 @@ AbstractMusicPlayer *PlayMIDIMusic(uint8_t *data, int length, bool loop)
     if (!player->OpenMemory(data,
                             length)) // Lobo: quietly log it instead of completely exiting EDGE
     {
-        LogDebug("MIDI player: failed to load MIDI file!\n");
+        epi::LogMessage(epi::kLogLevelDebug, "MIDI player: failed to load MIDI file!\n");
         delete[] data;
         delete player;
         return nullptr;
@@ -262,7 +263,7 @@ AbstractMusicPlayer *PlayIMFMusic(uint8_t *data, int length, bool loop, int type
 
     if (!player)
     {
-        LogDebug("IMF player: error initializing!\n");
+        epi::LogMessage(epi::kLogLevelDebug, "IMF player: error initializing!\n");
         delete[] data;
         return nullptr;
     }
@@ -285,7 +286,7 @@ AbstractMusicPlayer *PlayIMFMusic(uint8_t *data, int length, bool loop, int type
 
     if (imf_rate == 0)
     {
-        LogDebug("IMF player: no IMF sample rate provided!\n");
+        epi::LogMessage(epi::kLogLevelDebug, "IMF player: no IMF sample rate provided!\n");
         delete[] data;
         delete player;
         return nullptr;
@@ -293,7 +294,7 @@ AbstractMusicPlayer *PlayIMFMusic(uint8_t *data, int length, bool loop, int type
 
     if (!player->OpenMemory(data, length)) // Lobo: quietly log it instead of completely exiting EDGE
     {
-        LogDebug("IMF player: failed to load IMF file!\n");
+        epi::LogMessage(epi::kLogLevelDebug, "IMF player: failed to load IMF file!\n");
         delete[] data;
         delete player;
         return nullptr;

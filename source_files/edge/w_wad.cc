@@ -47,11 +47,11 @@
 #include "ddf_switch.h"
 #include "ddf_wadfixes.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "dstrings.h"
 #include "e_main.h"
 #include "e_search.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -66,7 +66,6 @@
 #include "r_image.h"
 #include "rad_trig.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "vm_coal.h"
 #include "w_epk.h"
 #include "w_files.h"
@@ -636,7 +635,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsS_END(lump_p->name))
     {
         if (!within_sprite_list)
-            LogWarning("Unexpected S_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected S_END marker in wad.\n");
 
         lump_p->kind       = kLumpMarker;
         within_sprite_list = false;
@@ -651,7 +650,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsF_END(lump_p->name))
     {
         if (!within_flat_list)
-            LogWarning("Unexpected F_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected F_END marker in wad.\n");
 
         lump_p->kind     = kLumpMarker;
         within_flat_list = false;
@@ -666,7 +665,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsP_END(lump_p->name))
     {
         if (!within_patch_list)
-            LogWarning("Unexpected P_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected P_END marker in wad.\n");
 
         lump_p->kind      = kLumpMarker;
         within_patch_list = false;
@@ -681,7 +680,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsC_END(lump_p->name))
     {
         if (!within_colmap_list)
-            LogWarning("Unexpected C_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected C_END marker in wad.\n");
 
         lump_p->kind       = kLumpMarker;
         within_colmap_list = false;
@@ -696,7 +695,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsTX_END(lump_p->name))
     {
         if (!within_tex_list)
-            LogWarning("Unexpected TX_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected TX_END marker in wad.\n");
 
         lump_p->kind    = kLumpMarker;
         within_tex_list = false;
@@ -711,7 +710,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsHI_END(lump_p->name))
     {
         if (!within_hires_list)
-            LogWarning("Unexpected HI_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected HI_END marker in wad.\n");
 
         lump_p->kind      = kLumpMarker;
         within_hires_list = false;
@@ -726,7 +725,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     else if (IsXG_END(lump_p->name))
     {
         if (!within_xgl_list)
-            LogWarning("Unexpected XG_END marker in wad.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "Unexpected XG_END marker in wad.\n");
 
         lump_p->kind    = kLumpMarker;
         within_xgl_list = false;
@@ -803,14 +802,14 @@ static void CheckForLevel(WadFile *wad, int lump, const char *name, const RawWad
     {
         if (strlen(name) > 5)
         {
-            LogWarning("Level name '%s' is too long !!\n", name);
+            epi::LogMessage(epi::kLogLevelWarning, "Level name '%s' is too long !!\n", name);
             return;
         }
 
         // check for duplicates (Slige sometimes does this)
         if (wad->HasLevel(name))
         {
-            LogWarning("Duplicate level '%s' ignored.\n", name);
+            epi::LogMessage(epi::kLogLevelWarning, "Duplicate level '%s' ignored.\n", name);
             return;
         }
 
@@ -844,15 +843,15 @@ int CheckForUniqueGameLumps(epi::File *file)
 
     if (!file)
     {
-        LogWarning("CheckForUniqueGameLumps: Received null file_c pointer!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "CheckForUniqueGameLumps: Received null file_c pointer!\n");
         return -1;
     }
 
     // WAD file
     // TODO: handle Read failure
     file->Read(&header, sizeof(RawWadHeader));
-    header.total_entries   = AlignedLittleEndianS32(header.total_entries);
-    header.directory_start = AlignedLittleEndianS32(header.directory_start);
+    header.total_entries   = epi::AlignedLittleEndianS32(header.total_entries);
+    header.directory_start = epi::AlignedLittleEndianS32(header.directory_start);
     length                 = header.total_entries * sizeof(RawWadEntry);
     RawWadEntry *raw_info  = new RawWadEntry[header.total_entries];
     file->Seek(header.directory_start, epi::File::kSeekpointStart);
@@ -950,11 +949,11 @@ void ProcessFixersForWAD(DataFile *df)
             {
                 AddPendingFile(fix_path, kFileKindEPK);
 
-                LogPrint("WADFIXES: Applying fixes for Doom 2 BFG Edition\n");
+                epi::LogMessage(epi::kLogLevelPrint, "WADFIXES: Applying fixes for Doom 2 BFG Edition\n");
             }
             else
-                LogWarning("WADFIXES: Doom 2 BFG Edition detected, but fix not found "
-                           "in edge_fixes directory!\n");
+                epi::LogMessage(epi::kLogLevelWarning, "WADFIXES: Doom 2 BFG Edition detected, but fix not found "
+                                                       "in edge_fixes directory!\n");
             return;
         }
     }
@@ -976,13 +975,14 @@ void ProcessFixersForWAD(DataFile *df)
             {
                 AddPendingFile(fix_path, kFileKindEPK);
 
-                LogPrint("WADFIXES: Applying fixes for %s\n", fixdefs[i]->name_.c_str());
+                epi::LogMessage(epi::kLogLevelPrint, "WADFIXES: Applying fixes for %s\n", fixdefs[i]->name_.c_str());
             }
             else
             {
-                LogWarning("WADFIXES: %s defined, but no fix WAD located in "
-                           "edge_fixes!\n",
-                           fixdefs[i]->name_.c_str());
+                epi::LogMessage(epi::kLogLevelWarning,
+                                "WADFIXES: %s defined, but no fix WAD located in "
+                                "edge_fixes!\n",
+                                fixdefs[i]->name_.c_str());
                 return;
             }
         }
@@ -995,7 +995,7 @@ void ProcessDehackedInWad(DataFile *df)
     {
         const char *lump_name = lump_info[deh_lump].name;
 
-        LogPrint("Converting [%s] lump in: %s\n", lump_name, df->name_.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Converting [%s] lump in: %s\n", lump_name, df->name_.c_str());
 
         int            length = -1;
         const uint8_t *data   = (const uint8_t *)LoadLumpIntoMemory(deh_lump, &length);
@@ -1022,7 +1022,8 @@ static void ProcessDDFInWad(DataFile *df)
 
         if (lump >= 0)
         {
-            LogPrint("Loading %s lump in %s\n", GetLumpNameFromIndex(lump), bare_filename.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Loading %s lump in %s\n", GetLumpNameFromIndex(lump),
+                            bare_filename.c_str());
 
             std::string data   = LoadLumpAsString(lump);
             std::string source = GetLumpNameFromIndex(lump);
@@ -1088,7 +1089,7 @@ static void ProcessBoomStuffInWad(DataFile *df)
 
     if (animated >= 0)
     {
-        LogPrint("Loading ANIMATED from: %s\n", df->name_.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Loading ANIMATED from: %s\n", df->name_.c_str());
 
         int      length = -1;
         uint8_t *data   = LoadLumpIntoMemory(animated, &length);
@@ -1099,7 +1100,7 @@ static void ProcessBoomStuffInWad(DataFile *df)
 
     if (switches >= 0)
     {
-        LogPrint("Loading SWITCHES from: %s\n", df->name_.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Loading SWITCHES from: %s\n", df->name_.c_str());
 
         int      length = -1;
         uint8_t *data   = LoadLumpIntoMemory(switches, &length);
@@ -1142,8 +1143,8 @@ void ProcessWad(DataFile *df, size_t file_index)
         }
     }
 
-    header.total_entries   = AlignedLittleEndianS32(header.total_entries);
-    header.directory_start = AlignedLittleEndianS32(header.directory_start);
+    header.total_entries   = epi::AlignedLittleEndianS32(header.total_entries);
+    header.directory_start = epi::AlignedLittleEndianS32(header.directory_start);
 
     size_t length = header.total_entries * sizeof(RawWadEntry);
 
@@ -1162,7 +1163,7 @@ void ProcessWad(DataFile *df, size_t file_index)
         bool allow_ddf = (epi::StringCompare(game_base, "custom") == 0 || df->kind_ == kFileKindPWAD ||
                           df->kind_ == kFileKindPackWAD || df->kind_ == kFileKindIPK || df->kind_ == kFileKindIFolder);
 
-        AddLump(df, entry.name, AlignedLittleEndianS32(entry.position), AlignedLittleEndianS32(entry.size),
+        AddLump(df, entry.name, epi::AlignedLittleEndianS32(entry.position), epi::AlignedLittleEndianS32(entry.size),
                 (int)file_index, allow_ddf);
 
         // this will be uppercase
@@ -1174,19 +1175,19 @@ void ProcessWad(DataFile *df, size_t file_index)
     // check for unclosed sprite/flat/patch lists
     const char *filename = df->name_.c_str();
     if (within_sprite_list)
-        LogWarning("Missing S_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing S_END marker in %s.\n", filename);
     if (within_flat_list)
-        LogWarning("Missing F_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing F_END marker in %s.\n", filename);
     if (within_patch_list)
-        LogWarning("Missing P_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing P_END marker in %s.\n", filename);
     if (within_colmap_list)
-        LogWarning("Missing C_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing C_END marker in %s.\n", filename);
     if (within_tex_list)
-        LogWarning("Missing TX_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing TX_END marker in %s.\n", filename);
     if (within_hires_list)
-        LogWarning("Missing HI_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing HI_END marker in %s.\n", filename);
     if (within_xgl_list)
-        LogWarning("Missing XG_END marker in %s.\n", filename);
+        epi::LogMessage(epi::kLogLevelWarning, "Missing XG_END marker in %s.\n", filename);
 
     SortLumps();
 
@@ -1198,7 +1199,7 @@ void ProcessWad(DataFile *df, size_t file_index)
 
     wad->md5_string_ = dir_md5.ToString();
 
-    LogDebug("   md5hash = %s\n", wad->md5_string_.c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "   md5hash = %s\n", wad->md5_string_.c_str());
 
     delete[] raw_info;
     ProcessDehackedInWad(df);
@@ -1218,7 +1219,7 @@ void ReadUMAPINFOLumps(void)
                 continue;
             else
             {
-                LogDebug("Parsing UMAPINFO lump in %s\n", df->name_.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "Parsing UMAPINFO lump in %s\n", df->name_.c_str());
                 ParseUMAPINFO(LoadLumpAsString(df->wad_->umapinfo_lump_));
             }
         }
@@ -1228,7 +1229,7 @@ void ReadUMAPINFOLumps(void)
                 continue;
             else
             {
-                LogDebug("Parsing UMAPINFO.txt in %s\n", df->name_.c_str());
+                epi::LogMessage(epi::kLogLevelDebug, "Parsing UMAPINFO.txt in %s\n", df->name_.c_str());
                 epi::File *uinfo = OpenPackFile(df->pack_, "UMAPINFO.txt");
                 if (uinfo)
                 {
@@ -1808,7 +1809,7 @@ int CheckLumpNumberForName(const char *name)
 
     if (strlen(name) > 8)
     {
-        LogDebug("CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
+        epi::LogMessage(epi::kLogLevelDebug, "CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
         return -1;
     }
 
@@ -1839,7 +1840,7 @@ int CheckDataFileIndexForName(const char *name)
 
     if (strlen(name) > 8)
     {
-        LogDebug("CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
+        epi::LogMessage(epi::kLogLevelDebug, "CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
         return -1;
     }
 
@@ -1867,7 +1868,7 @@ int CheckGraphicLumpNumberForName(const char *name)
 
     if (strlen(name) > 8)
     {
-        LogDebug("CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
+        epi::LogMessage(epi::kLogLevelDebug, "CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
         return -1;
     }
 
@@ -1899,7 +1900,7 @@ int CheckXGLLumpNumberForName(const char *name)
 
     if (strlen(name) > 8)
     {
-        LogWarning("CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
         return -1;
     }
 
@@ -1929,7 +1930,7 @@ int CheckMapLumpNumberForName(const char *name)
 
     if (strlen(name) > 8)
     {
-        LogWarning("CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "CheckLumpNumberForName: Name '%s' longer than 8 chars!\n", name);
         return -1;
     }
 
@@ -2266,7 +2267,7 @@ static const char *UserSkyboxName(const char *base, int face)
     static char       buffer[64];
     static const char letters[] = "NESWTB";
 
-    stbsp_sprintf(buffer, "%s_%c", base, letters[face]);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%s_%c", base, letters[face]);
     return buffer;
 }
 
@@ -2302,8 +2303,8 @@ bool DisableStockSkybox(const char *ActualSky)
                 // we only want pwads
                 if (data_files[filenum]->kind_ == kFileKindPWAD || data_files[filenum]->kind_ == kFileKindPackWAD)
                 {
-                    LogDebug("SKYBOX: Sky is: %s. Type:%d lumpnum:%d filenum:%d \n", tempImage->name_.c_str(),
-                             tempImage->source_type_, lumpnum, filenum);
+                    epi::LogMessage(epi::kLogLevelDebug, "SKYBOX: Sky is: %s. Type:%d lumpnum:%d filenum:%d \n",
+                                    tempImage->name_.c_str(), tempImage->source_type_, lumpnum, filenum);
                     TurnOffSkybox = false;
                     return TurnOffSkybox; // get out of here
                 }
@@ -2323,7 +2324,8 @@ bool DisableStockSkybox(const char *ActualSky)
         }
         else if (tempImage->source_type_ == kImageSourceUser) // texture from images.ddf
         {
-            LogDebug("SKYBOX: Sky is: %s. Type:%d  \n", tempImage->name_.c_str(), tempImage->source_type_);
+            epi::LogMessage(epi::kLogLevelDebug, "SKYBOX: Sky is: %s. Type:%d  \n", tempImage->name_.c_str(),
+                            tempImage->source_type_);
             TurnOffSkybox = true;                             // turn off or not? hmmm...
             return TurnOffSkybox;
         }
@@ -2357,8 +2359,8 @@ bool DisableStockSkybox(const char *ActualSky)
         }
     }
 
-    LogDebug("SKYBOX: Sky is: %s. Type:%d lumpnum:%d filenum:%d \n", tempImage->name_.c_str(), tempImage->source_type_,
-             lumpnum, filenum);
+    epi::LogMessage(epi::kLogLevelDebug, "SKYBOX: Sky is: %s. Type:%d lumpnum:%d filenum:%d \n",
+                    tempImage->name_.c_str(), tempImage->source_type_, lumpnum, filenum);
     return TurnOffSkybox;
 }
 

@@ -29,8 +29,13 @@
 
 #include <string.h>
 
+#include <bit>
+
 #include "epi.h"
 #include "epi_str_util.h"
+
+namespace epi
+{
 
 /* The four core functions - F1 is optimized somewhat */
 
@@ -59,11 +64,8 @@ static inline uint32_t MD5Function4(uint32_t x, uint32_t y, uint32_t z)
 static inline void MD5Step(uint32_t (*func)(uint32_t, uint32_t, uint32_t), uint32_t &w, uint32_t x, uint32_t y,
                            uint32_t z, uint32_t data, uint8_t s)
 {
-    w += func(x, y, z) + data, w = (w << s) | (w >> (32 - s)), w += x;
+    w += func(x, y, z) + data, w = std::rotl(w, s), w += x;
 }
-
-namespace epi
-{
 
 /* The core of the MD5 algorithm, this alters an existing MD5 hash to
  * reflect the addition of 16 longwords of new data.

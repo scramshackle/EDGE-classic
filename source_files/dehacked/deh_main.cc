@@ -116,7 +116,7 @@ DehackedResult Convert(void)
     sounds::ConvertSFX();
     music ::ConvertMUS();
 
-    LogPrint("\n");
+    epi::LogMessage(epi::kLogLevelPrint, "\n");
 
     return kDehackedConversionOK;
 }
@@ -145,7 +145,7 @@ void DehackedStartup()
 {
     dehacked::Init();
 
-    LogPrint("*** DeHackEd -> EDGE Conversion ***\n");
+    epi::LogMessage(epi::kLogLevelPrint, "*** DeHackEd -> EDGE Conversion ***\n");
 }
 
 const char *DehackedGetError(void)

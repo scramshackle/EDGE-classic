@@ -75,7 +75,7 @@ static bool EnsureBuffer(SDL_GPUBuffer **buffer, SDL_GPUTransferBuffer **transfe
 
     if (!*buffer)
     {
-        LogPrint("GpuLights: SDL_CreateGPUBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuLights: SDL_CreateGPUBuffer (%s) failed: %s\n", what, SDL_GetError());
         return false;
     }
 
@@ -89,7 +89,8 @@ static bool EnsureBuffer(SDL_GPUBuffer **buffer, SDL_GPUTransferBuffer **transfe
 
     if (!*transfer)
     {
-        LogPrint("GpuLights: SDL_CreateGPUTransferBuffer (%s) failed: %s\n", what, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuLights: SDL_CreateGPUTransferBuffer (%s) failed: %s\n", what,
+                        SDL_GetError());
         SDL_ReleaseGPUBuffer(device, *buffer);
         *buffer = nullptr;
         return false;
@@ -188,14 +189,14 @@ void GpuUploadLightGrid(const LightGrid *grid)
 
         GpuLightRecord record;
 
-        record.position_radius[0] = light.eye_position.X;
-        record.position_radius[1] = light.eye_position.Y;
-        record.position_radius[2] = light.eye_position.Z;
+        record.position_radius[0] = light.eye_position.x;
+        record.position_radius[1] = light.eye_position.y;
+        record.position_radius[2] = light.eye_position.z;
         record.position_radius[3] = light.radius;
 
-        record.color_additive[0] = light.color.X / 255.0f;
-        record.color_additive[1] = light.color.Y / 255.0f;
-        record.color_additive[2] = light.color.Z / 255.0f;
+        record.color_additive[0] = light.color.x / 255.0f;
+        record.color_additive[1] = light.color.y / 255.0f;
+        record.color_additive[2] = light.color.z / 255.0f;
         record.color_additive[3] = light.additive;
 
         frame_lights.push_back(record);
@@ -243,7 +244,7 @@ static void UploadOne(SDL_GPUBuffer *buffer, SDL_GPUTransferBuffer *transfer, co
 
     if (!mapped)
     {
-        LogPrint("GpuLights: SDL_MapGPUTransferBuffer failed: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuLights: SDL_MapGPUTransferBuffer failed: %s\n", SDL_GetError());
         return;
     }
 

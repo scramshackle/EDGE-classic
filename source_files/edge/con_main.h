@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "dm_colors.h"
 #include "epi.h"
 #include "epi_color.h"
 
@@ -29,13 +30,13 @@ extern std::string working_directory;
 constexpr uint8_t   kENDOOMLines        = 25;
 constexpr uint8_t   kENDOOMBytesPerLine = 160;
 constexpr uint16_t  kENDOOMTotalVerts   = kENDOOMLines * 80 * 4; // 80 characters per line * 4 verts per quad
-constexpr RGBAColor kENDOOMColors[16]   = {
-    MakeRGBAConstant(0x000000FF), MakeRGBAConstant(0x0000AAFF), MakeRGBAConstant(0x00AA00FF),
-    MakeRGBAConstant(0x00AAAAFF), MakeRGBAConstant(0xAA0000FF), MakeRGBAConstant(0xAA00AAFF),
-    MakeRGBAConstant(0xAA5500FF), MakeRGBAConstant(0xAAAAAAFF), MakeRGBAConstant(0x555555FF),
-    MakeRGBAConstant(0x5555FFFF), MakeRGBAConstant(0x55FF55FF), MakeRGBAConstant(0x55FFFFFF),
-    MakeRGBAConstant(0xFF5555FF), MakeRGBAConstant(0xFF55FFFF), MakeRGBAConstant(0xFFFF55FF),
-    MakeRGBAConstant(0xFFFFFFFF)};
+constexpr epi::RGBAColor kENDOOMColors[16]   = {
+    epi::MakeRGBAConstant(0x000000FF), epi::MakeRGBAConstant(0x0000AAFF), epi::MakeRGBAConstant(0x00AA00FF),
+    epi::MakeRGBAConstant(0x00AAAAFF), epi::MakeRGBAConstant(0xAA0000FF), epi::MakeRGBAConstant(0xAA00AAFF),
+    epi::MakeRGBAConstant(0xAA5500FF), epi::MakeRGBAConstant(0xAAAAAAFF), epi::MakeRGBAConstant(0x555555FF),
+    epi::MakeRGBAConstant(0x5555FFFF), epi::MakeRGBAConstant(0x55FF55FF), epi::MakeRGBAConstant(0x55FFFFFF),
+    epi::MakeRGBAConstant(0xFF5555FF), epi::MakeRGBAConstant(0xFF55FFFF), epi::MakeRGBAConstant(0xFFFF55FF),
+    epi::MakeRGBAConstant(0xFFFFFFFF)};
 
 enum ConsoleVisibility
 {
@@ -49,7 +50,7 @@ class ConsoleLine
   public:
     std::string line_;
 
-    RGBAColor color_;
+    epi::RGBAColor color_;
 
     std::vector<uint8_t> endoom_bytes_;
 
@@ -58,11 +59,11 @@ class ConsoleLine
     {
     }
 
-    ConsoleLine(const std::string &text, RGBAColor col = kRGBALightGray) : line_(text), color_(col)
+    ConsoleLine(const std::string &text, epi::RGBAColor col = kRGBALightGray) : line_(text), color_(col)
     {
     }
 
-    ConsoleLine(const char *text, RGBAColor col = kRGBALightGray) : line_(text), color_(col)
+    ConsoleLine(const char *text, epi::RGBAColor col = kRGBALightGray) : line_(text), color_(col)
     {
     }
 
@@ -100,7 +101,7 @@ void CreateQuitScreen();
 void ClearConsole();
 
 // this color will apply to the next ConsoleMessage or ConsolePrint call.
-void ConsoleMessageColor(RGBAColor col);
+void ConsoleMessageColor(epi::RGBAColor col);
 
 bool ConsoleIsVisible();
 

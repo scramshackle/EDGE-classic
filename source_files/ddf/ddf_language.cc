@@ -136,7 +136,7 @@ void DDFReadLangs(const std::string &data)
 void DDFLanguageCleanUp(void)
 {
     if (language.GetChoiceCount() == 0)
-        FatalError("Missing languages !\n");
+        epi::FatalError("Missing languages !\n");
 }
 
 Language::Language()
@@ -242,7 +242,7 @@ const char *Language::GetName(int idx)
 
     // caller must ensure index is valid
     if (idx < 0 || idx >= (int)choices_.size())
-        FatalError("Bug in code calling language_c::GetName\n");
+        epi::FatalError("Bug in code calling language_c::GetName\n");
 
     return choices_[idx]->name.c_str();
 }

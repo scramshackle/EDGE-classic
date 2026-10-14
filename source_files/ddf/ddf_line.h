@@ -254,7 +254,7 @@ class PlaneMoverDefinition
     struct SoundEffect *sfxstart_, *sfxup_, *sfxdown_, *sfxstop_;
 
     // Scrolling. -AJA- 2000/04/16
-    BAMAngle scroll_angle_;
+    epi::BAMAngle scroll_angle_;
     float    scroll_speed_;
 
     // Boom compatibility bits
@@ -724,7 +724,7 @@ class LineType
     SlopeType slope_type_;
 
     // -AJA- 2007/07/05: color for effects (e.g. MIRRORs)
-    RGBAColor fx_color_;
+    epi::RGBAColor fx_color_;
 
   private:
     // disable copy construct and assignment operator
@@ -847,13 +847,13 @@ class SectorType
     // -AJA- 2000/04/16: Pushing (fixed direction).
     float    push_speed_;
     float    push_zspeed_;
-    BAMAngle push_angle_;
+    epi::BAMAngle push_angle_;
 
     float floor_bob_;
     float ceiling_bob_;
 
     Colormap *fog_cmap_;
-    RGBAColor fog_color_;
+    epi::RGBAColor fog_color_;
     float     fog_density_;
 
     ddf::ReverbDefinition *reverb_preset_;

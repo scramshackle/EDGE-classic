@@ -31,11 +31,13 @@
 //
 
 #include <float.h>
+#include <math.h>
 
-#include "epi_math.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
+#include "epi_vector.h"
 #include "g_game.h"
 #include "m_random.h"
 #include "p_action.h"
@@ -178,7 +180,7 @@ void A_NoiseAlert(MapObject *actor)
 //
 bool DoMove(MapObject *actor, bool path)
 {
-    HMM_Vec3 orig_pos{{actor->x, actor->y, actor->z}};
+    epi::Vec3 orig_pos{actor->x, actor->y, actor->z};
 
     float tryx;
     float tryy;
@@ -223,7 +225,7 @@ bool DoMove(MapObject *actor, bool path)
 
     speed *= fric;
 
-    speed = HMM_Clamp(1.0f, speed, actor->speed_);
+    speed = epi::Clamp(speed, 1.0f, actor->speed_);
 
     if (path)
     {
@@ -311,12 +313,12 @@ bool DoMove(MapObject *actor, bool path)
     // -AJA- 2008/01/16: position interpolation
     if ((actor->state_->flags & kStateFrameFlagModel) || (actor->flags_ & kMapObjectFlagFloat))
     {
-        actor->interpolation_number_   = HMM_MAX(1, actor->state_->tics);
+        actor->interpolation_number_   = epi::Max(1, actor->state_->tics);
         actor->interpolation_position_ = 1;
         if (!epi::AlmostEquals(actor->old_x_, kInvalidPosition))
             actor->interpolation_from_ = orig_pos;
         else
-            actor->interpolation_from_ = {{actor->x, actor->y, actor->z}};
+            actor->interpolation_from_ = {actor->x, actor->y, actor->z};
     }
 
     return true;
@@ -500,12 +502,12 @@ void NewChaseDir(MapObject *object)
 // view, 180 degrees for total sight in all dirs.
 // Returns true if a player is found.
 //
-bool LookForPlayers(MapObject *actor, BAMAngle range, bool ToSupport)
+bool LookForPlayers(MapObject *actor, epi::BAMAngle range, bool ToSupport)
 {
     int      c;
     int      stop;
     Player  *player;
-    BAMAngle an;
+    epi::BAMAngle an;
     float    dist;
 
     c    = 0;
@@ -535,7 +537,7 @@ bool LookForPlayers(MapObject *actor, BAMAngle range, bool ToSupport)
                 continue;
         }
 
-        if (range < kBAMAngle180)
+        if (range < epi::kBAMAngle180)
         {
             an = PointToAngle(actor->x, actor->y, player->map_object_->x, player->map_object_->y) - actor->angle_;
 
@@ -603,9 +605,9 @@ static void SpawnDeathMissile(MapObject *source, float x, float y, float z)
     th->SetRealSource(source);
     th->SetSpawnSource(source);
 
-    th->momentum_.X = (x - source->x) / 50.0f;
-    th->momentum_.Y = -0.25f;
-    th->momentum_.Z = (z - source->z) / 50.0f;
+    th->momentum_.x = (x - source->x) / 50.0f;
+    th->momentum_.y = -0.25f;
+    th->momentum_.z = (z - source->z) / 50.0f;
 
     th->tics_ -= RandomByte() & 7;
 
@@ -713,7 +715,7 @@ void A_CubeSpawn(MapObject *cube)
 
     newmobj = CreateMapObject(targ->x, targ->y, targ->z, type);
 
-    if (LookForPlayers(newmobj, kBAMAngle180))
+    if (LookForPlayers(newmobj, epi::kBAMAngle180))
     {
         if (newmobj->info_->chase_state_)
             MapObjectSetState(newmobj, newmobj->info_->chase_state_);

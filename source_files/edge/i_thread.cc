@@ -31,7 +31,8 @@ SystemThread *StartThread(SystemThreadFunction function, void *data, const char 
 
     if (!thread)
     {
-        LogDebug("StartThread: could not start '%s': %s\n", name ? name : "(unnamed)", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelDebug, "StartThread: could not start '%s': %s\n", name ? name : "(unnamed)",
+                        SDL_GetError());
         return nullptr;
     }
 

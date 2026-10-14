@@ -23,12 +23,13 @@
 
 #include <limits.h>
 
-#include "epi_math.h"
 #include "con_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -393,9 +394,9 @@ void ScriptSpawnThing(RADScriptTrigger *R, void *param)
     if (minfo == nullptr)
     {
         if (t->thing_name)
-            LogWarning("Unknown thing type: %s in RTS trigger.\n", t->thing_name);
+            epi::LogMessage(epi::kLogLevelWarning, "Unknown thing type: %s in RTS trigger.\n", t->thing_name);
         else
-            LogWarning("Unknown thing type: %d in RTS trigger.\n", t->thing_type);
+            epi::LogMessage(epi::kLogLevelWarning, "Unknown thing type: %d in RTS trigger.\n", t->thing_type);
 
         return;
     }
@@ -992,9 +993,9 @@ void ScriptMoveSector(RADScriptTrigger *R, void *param)
 static void LightOneSector(Sector *sec, ScriptSectorLightParameter *t)
 {
     if (t->relative)
-        sec->properties.light_level += RoundToInteger(t->value);
+        sec->properties.light_level += epi::RoundToInteger(t->value);
     else
-        sec->properties.light_level = RoundToInteger(t->value);
+        sec->properties.light_level = epi::RoundToInteger(t->value);
 }
 
 void ScriptLightSector(RADScriptTrigger *R, void *param)
@@ -1311,7 +1312,7 @@ void ScriptWaitUntilDead(RADScriptTrigger *R, void *param)
 
     if (R->wud_count == 0)
     {
-        LogDebug("RTS: waiting forever, no %s found\n", wud->mon_names[0]);
+        epi::LogMessage(epi::kLogLevelDebug, "RTS: waiting forever, no %s found\n", wud->mon_names[0]);
         R->wud_count = 1;
     }
 }
@@ -1340,7 +1341,7 @@ void ScriptTeleportToStart(RADScriptTrigger *R, void *param)
         return;                            // should never happen but who knows...
 
     // 1. Stop the player movement and turn him
-    p->map_object_->momentum_.X = p->map_object_->momentum_.Y = p->map_object_->momentum_.Z = 0;
+    p->map_object_->momentum_.x = p->map_object_->momentum_.y = p->map_object_->momentum_.z = 0;
     p->actual_speed_                                                                        = 0;
     p->map_object_->angle_                                                                  = point->angle;
 

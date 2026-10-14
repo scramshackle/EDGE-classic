@@ -260,7 +260,7 @@ void music::AlterBexMusic(const char *new_val)
 
     if (strlen(new_val) < 1 || strlen(new_val) > 6)
     {
-        LogDebug("Dehacked: Warning - Bad length for music name '%s'.\n", new_val);
+        epi::LogMessage(epi::kLogLevelDebug, "Dehacked: Warning - Bad length for music name '%s'.\n", new_val);
         return;
     }
 
@@ -270,7 +270,8 @@ void music::AlterBexMusic(const char *new_val)
         int num = atoi(old_val);
         if (num < 1)
         {
-            LogDebug("Dehacked: Warning - Line %d: illegal music entry '%s'.\n", patch::line_num, old_val);
+            epi::LogMessage(epi::kLogLevelDebug, "Dehacked: Warning - Line %d: illegal music entry '%s'.\n",
+                            patch::line_num, old_val);
         }
         else
         {
@@ -282,12 +283,13 @@ void music::AlterBexMusic(const char *new_val)
 
     if (strlen(old_val) < 1 || strlen(old_val) > 6)
     {
-        LogDebug("Dehacked: Warning - Bad length for music name '%s'.\n", old_val);
+        epi::LogMessage(epi::kLogLevelDebug, "Dehacked: Warning - Bad length for music name '%s'.\n", old_val);
         return;
     }
 
     if (!ReplaceMusic(old_val, new_val))
-        LogDebug("Dehacked: Warning - Line %d: unknown music name '%s'.\n", patch::line_num, old_val);
+        epi::LogMessage(epi::kLogLevelDebug, "Dehacked: Warning - Line %d: unknown music name '%s'.\n", patch::line_num,
+                        old_val);
 }
 
 } // namespace dehacked

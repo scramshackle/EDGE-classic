@@ -29,9 +29,11 @@
 
 #include "e_player.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "bot_think.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "epi_endian.h"
@@ -163,7 +165,7 @@ void PlayerFinishLevel(Player *p, bool keep_cards)
 //
 void Player::Reborn()
 {
-    LogDebug("Player::Reborn\n");
+    epi::LogMessage(epi::kLogLevelDebug, "Player::Reborn\n");
 
     player_state_ = kPlayerAlive;
 
@@ -352,7 +354,8 @@ static void P_SpawnPlayer(Player *p, const SpawnPoint *point, bool is_hub)
 
     const MapObjectDefinition *info = point->info;
 
-    LogDebug("* P_SpawnPlayer %d @ %1.0f,%1.0f\n", point->info->playernum_, point->x, point->y);
+    epi::LogMessage(epi::kLogLevelDebug, "* P_SpawnPlayer %d @ %1.0f,%1.0f\n", point->info->playernum_, point->x,
+                    point->y);
 
     if (info->playernum_ <= 0)
         info = mobjtypes.LookupPlayer(p->player_number_ + 1);
@@ -432,7 +435,8 @@ static void P_SpawnVoodooDoll(Player *p, const SpawnPoint *point)
     EPI_ASSERT(info);
     EPI_ASSERT(info->playernum_ > 0);
 
-    LogDebug("* P_SpawnVoodooDoll %d @ %1.0f,%1.0f\n", p->player_number_ + 1, point->x, point->y);
+    epi::LogMessage(epi::kLogLevelDebug, "* P_SpawnVoodooDoll %d @ %1.0f,%1.0f\n", p->player_number_ + 1, point->x,
+                    point->y);
 
     MapObject *mobj = CreateMapObject(point->x, point->y, point->z, info);
 
@@ -456,7 +460,7 @@ static void P_SpawnVoodooDoll(Player *p, const SpawnPoint *point)
 void DeathMatchSpawnPlayer(Player *p)
 {
     if (p->player_number_ >= (int)deathmatch_starts.size())
-        LogWarning("Few deathmatch spots, %d recommended.\n", p->player_number_ + 1);
+        epi::LogMessage(epi::kLogLevelWarning, "Few deathmatch spots, %d recommended.\n", p->player_number_ + 1);
 
     int begin = RandomByteDeterministic();
 
@@ -503,7 +507,7 @@ void CoopSpawnPlayer(Player *p)
     if (point && GameCheckSpot(p, point))
         return;
 
-    LogWarning("Player %d start is invalid.\n", p->player_number_ + 1);
+    epi::LogMessage(epi::kLogLevelWarning, "Player %d start is invalid.\n", p->player_number_ + 1);
 
     int begin = p->player_number_;
 
@@ -935,7 +939,7 @@ void RemoveOldAvatars(void)
 
         if (mo->hyper_flags_ & kHyperFlagRememberOldAvatars)
         {
-            LogDebug("Removing old avatar: %p\n", mo);
+            epi::LogMessage(epi::kLogLevelDebug, "Removing old avatar: %p\n", mo);
 
             RemoveMapObject(mo);
         }

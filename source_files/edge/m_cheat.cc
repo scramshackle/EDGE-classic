@@ -42,6 +42,7 @@
 #include "dm_state.h"
 #include "dstrings.h"
 #include "epi.h"
+#include "epi_str_util.h"
 #include "g_game.h"
 #include "i_system.h"
 #include "m_menu.h"
@@ -49,7 +50,6 @@
 #include "p_mobj.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 extern ConsoleVariable debug_fps;
@@ -495,7 +495,7 @@ void CheatInitialize(void)
 
     for (i = 0; i < 9; i++)
     {
-        stbsp_sprintf(temp, "idbehold%d", i + 1);
+        epi::FormatToBufferSized(temp, sizeof(temp), "idbehold%d", i + 1);
         cheat_powerup[i].sequence = language[temp];
     }
 
@@ -514,7 +514,7 @@ void CheatInitialize(void)
 
     for (i = 0; i < 11; i++)
     {
-        stbsp_sprintf(temp, "idgive%d", i);
+        epi::FormatToBufferSized(temp, sizeof(temp), "idgive%d", i);
         cheat_give_weapon[i].sequence = language[temp];
     }
 }

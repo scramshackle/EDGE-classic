@@ -46,10 +46,7 @@ class CRC32
     {
     }
 
-    bool operator==(const CRC32 &other) const
-    {
-        return crc_ == other.crc_;
-    }
+    bool operator==(const CRC32 &other) const = default;
 
     CRC32 &operator=(const CRC32 &rhs)
     {

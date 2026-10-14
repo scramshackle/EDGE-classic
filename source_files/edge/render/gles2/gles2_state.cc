@@ -1,5 +1,6 @@
 #include <unordered_map>
 
+#include "dm_colors.h"
 #include "epi.h"
 #include "gles2_immediate.h"
 #include "gles2_lights.h"
@@ -173,7 +174,7 @@ class Gles2RenderState : public RenderState
         glClear(mask);
     }
 
-    void ClearColor(RGBAColor color)
+    void ClearColor(epi::RGBAColor color)
     {
         if (color == clear_color_)
         {
@@ -192,7 +193,7 @@ class Gles2RenderState : public RenderState
         state_dirty_ = true;
     }
 
-    void FogColor(RGBAColor color)
+    void FogColor(epi::RGBAColor color)
     {
         fog_color_   = color;
         state_dirty_ = true;
@@ -528,10 +529,10 @@ class Gles2RenderState : public RenderState
 
         gles2_model_program.Use();
 
-        const HMM_Mat4 &model_view = gles2_immediate.ModelViewMatrix();
-        const HMM_Mat4 &projection = gles2_immediate.ProjectionMatrix();
+        const epi::Mat4 &model_view = gles2_immediate.ModelViewMatrix();
+        const epi::Mat4 &projection = gles2_immediate.ProjectionMatrix();
 
-        gles2_model_program.SetMatrices(HMM_MulM4(projection, model_view), model_view);
+        gles2_model_program.SetMatrices(epi::MultiplyMatrices(projection, model_view), model_view);
         gles2_model_program.SetTransform(info.transform);
         gles2_model_program.SetLerp(info.lerp);
         gles2_model_program.SetTextureTransform(info.texture_scale, info.texture_offset);
@@ -809,8 +810,8 @@ class Gles2RenderState : public RenderState
     GLfloat   fog_start_   = 0.0f;
     GLfloat   fog_end_     = 0.0f;
     GLfloat   fog_density_ = 0.0f;
-    RGBAColor fog_color_   = kRGBABlack;
-    RGBAColor clear_color_ = kRGBABlack;
+    epi::RGBAColor fog_color_   = kRGBABlack;
+    epi::RGBAColor clear_color_ = kRGBABlack;
 
     float line_width_ = 1.0f;
 

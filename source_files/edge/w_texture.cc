@@ -23,10 +23,10 @@
 
 #include "w_texture.h"
 
+#include "dm_format.h"
 #include "e_main.h"
 #include "e_search.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "epi_endian.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
@@ -89,7 +89,7 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
 
     // Load the patch names from pnames.lmp.
     const char *names         = (const char *)LoadLumpIntoMemory(WT->pnames);
-    int         nummappatches = AlignedLittleEndianS32(*((const int *)names)); // Eww...
+    int         nummappatches = epi::AlignedLittleEndianS32(*((const int *)names)); // Eww...
 
     const char *name_p = names + 4;
 
@@ -118,14 +118,14 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
     //   TEXTURE2 for commercial.
     //
     maptex = maptex1 = (const int *)LoadLumpIntoMemory(WT->texture1);
-    numtextures1     = AlignedLittleEndianS32(*maptex);
+    numtextures1     = epi::AlignedLittleEndianS32(*maptex);
     maxoff           = GetLumpLength(WT->texture1);
     directory        = maptex + 1;
 
     if (WT->texture2 != -1)
     {
         maptex2      = (const int *)LoadLumpIntoMemory(WT->texture2);
-        numtextures2 = AlignedLittleEndianS32(*maptex2);
+        numtextures2 = epi::AlignedLittleEndianS32(*maptex2);
         maxoff2      = GetLumpLength(WT->texture2);
     }
     else
@@ -149,26 +149,27 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
             directory = maptex + 1;
         }
 
-        int offset = AlignedLittleEndianS32(*directory);
+        int offset = epi::AlignedLittleEndianS32(*directory);
         if (offset < 0 || offset > maxoff)
             FatalError("InitializeTextures: bad texture directory");
 
         const RawTexture *mtexture = (const RawTexture *)((const uint8_t *)maptex + offset);
 
         // -ES- 2000/02/10 Texture must have patches.
-        int patchcount = AlignedLittleEndianS16(mtexture->patch_count);
+        int patchcount = epi::AlignedLittleEndianS16(mtexture->patch_count);
 
         // Lobo 2021: Changed this to a warning. Allows us to run several DBPs
         //  which have this issue
         if (!patchcount)
         {
-            LogWarning("InitializeTextures: Texture '%.8s' has no patches\n", mtexture->name);
+            epi::LogMessage(epi::kLogLevelWarning, "InitializeTextures: Texture '%.8s' has no patches\n",
+                            mtexture->name);
             // FatalError("InitializeTextures: Texture '%.8s' has no patches",
             // mtexture->name);
             patchcount = 0; // mark it as a dud
         }
 
-        int width = AlignedLittleEndianS16(mtexture->width);
+        int width = epi::AlignedLittleEndianS16(mtexture->width);
         if (width == 0)
             FatalError("InitializeTextures: Texture '%.8s' has zero width", mtexture->name);
 
@@ -183,7 +184,7 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
         texture->column_offset = (unsigned short *)base;
 
         texture->width        = width;
-        texture->height       = AlignedLittleEndianS16(mtexture->height);
+        texture->height       = epi::AlignedLittleEndianS16(mtexture->height);
         texture->scale_x      = mtexture->scale_x;
         texture->scale_y      = mtexture->scale_y;
         texture->file         = file;
@@ -203,10 +204,10 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
 
         for (int k = 0; k < texture->patch_count; k++, mpatch++, patch++)
         {
-            int pname = AlignedLittleEndianS16(mpatch->pname);
+            int pname = epi::AlignedLittleEndianS16(mpatch->pname);
 
-            patch->origin_x = AlignedLittleEndianS16(mpatch->x_origin);
-            patch->origin_y = AlignedLittleEndianS16(mpatch->y_origin);
+            patch->origin_x = epi::AlignedLittleEndianS16(mpatch->x_origin);
+            patch->origin_y = epi::AlignedLittleEndianS16(mpatch->y_origin);
             patch->patch    = patchlookup[pname];
 
             // work-around for strange Y offset in SKY1 of DOOM 1
@@ -215,7 +216,8 @@ static void InstallTextureLumps(int file, const WadTextureResource *WT)
 
             if (patch->patch == -1)
             {
-                LogWarning("Missing patch '%.8s' in texture \'%.8s\'\n", patch_names[pname].c_str(), texture->name);
+                epi::LogMessage(epi::kLogLevelWarning, "Missing patch '%.8s' in texture \'%.8s\'\n",
+                                patch_names[pname].c_str(), texture->name);
 
                 // mark texture as a dud
                 texture->patch_count = 0;
@@ -250,7 +252,7 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
 
     // Load the patch names from pnames.lmp.
     const char *names         = (const char *)LoadLumpIntoMemory(WT->pnames);
-    int         nummappatches = AlignedLittleEndianS32(*((const int *)names)); // Eww...
+    int         nummappatches = epi::AlignedLittleEndianS32(*((const int *)names)); // Eww...
 
     const char *name_p = names + 4;
 
@@ -279,14 +281,14 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
     //   TEXTURE2 for commercial.
     //
     maptex = maptex1 = (const int *)LoadLumpIntoMemory(WT->texture1);
-    numtextures1     = AlignedLittleEndianS32(*maptex);
+    numtextures1     = epi::AlignedLittleEndianS32(*maptex);
     maxoff           = GetLumpLength(WT->texture1);
     directory        = maptex + 1;
 
     if (WT->texture2 != -1)
     {
         maptex2      = (const int *)LoadLumpIntoMemory(WT->texture2);
-        numtextures2 = AlignedLittleEndianS32(*maptex2);
+        numtextures2 = epi::AlignedLittleEndianS32(*maptex2);
         maxoff2      = GetLumpLength(WT->texture2);
     }
     else
@@ -310,26 +312,27 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
             directory = maptex + 1;
         }
 
-        int offset = AlignedLittleEndianS32(*directory);
+        int offset = epi::AlignedLittleEndianS32(*directory);
         if (offset < 0 || offset > maxoff)
             FatalError("InitializeTextures: bad texture directory");
 
         const RawStrifeTexture *mtexture = (const RawStrifeTexture *)((const uint8_t *)maptex + offset);
 
         // -ES- 2000/02/10 Texture must have patches.
-        int patchcount = AlignedLittleEndianS16(mtexture->patch_count);
+        int patchcount = epi::AlignedLittleEndianS16(mtexture->patch_count);
 
         // Lobo 2021: Changed this to a warning. Allows us to run several DBPs
         //  which have this issue
         if (!patchcount)
         {
-            LogWarning("InitializeTextures: Texture '%.8s' has no patches\n", mtexture->name);
+            epi::LogMessage(epi::kLogLevelWarning, "InitializeTextures: Texture '%.8s' has no patches\n",
+                            mtexture->name);
             // FatalError("InitializeTextures: Texture '%.8s' has no patches",
             // mtexture->name);
             patchcount = 0; // mark it as a dud
         }
 
-        int width = AlignedLittleEndianS16(mtexture->width);
+        int width = epi::AlignedLittleEndianS16(mtexture->width);
         if (width == 0)
             FatalError("InitializeTextures: Texture '%.8s' has zero width", mtexture->name);
 
@@ -344,7 +347,7 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
         texture->column_offset = (unsigned short *)base;
 
         texture->width        = width;
-        texture->height       = AlignedLittleEndianS16(mtexture->height);
+        texture->height       = epi::AlignedLittleEndianS16(mtexture->height);
         texture->scale_x      = mtexture->scale_x;
         texture->scale_y      = mtexture->scale_y;
         texture->file         = file;
@@ -362,15 +365,16 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
 
         for (int k = 0; k < texture->patch_count; k++, mpatch++, patch++)
         {
-            int pname = AlignedLittleEndianS16(mpatch->pname);
+            int pname = epi::AlignedLittleEndianS16(mpatch->pname);
 
-            patch->origin_x = AlignedLittleEndianS16(mpatch->x_origin);
-            patch->origin_y = AlignedLittleEndianS16(mpatch->y_origin);
+            patch->origin_x = epi::AlignedLittleEndianS16(mpatch->x_origin);
+            patch->origin_y = epi::AlignedLittleEndianS16(mpatch->y_origin);
             patch->patch    = patchlookup[pname];
 
             if (patch->patch == -1)
             {
-                LogWarning("Missing patch '%.8s' in texture \'%.8s\'\n", patch_names[pname].c_str(), texture->name);
+                epi::LogMessage(epi::kLogLevelWarning, "Missing patch '%.8s' in texture \'%.8s\'\n",
+                                patch_names[pname].c_str(), texture->name);
 
                 // mark texture as a dud
                 texture->patch_count = 0;
@@ -406,7 +410,7 @@ void InitializeTextures(void)
     TextureDefinition **cur;
     int                 numtextures = 0;
 
-    LogPrint("Initializing Textures...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Initializing Textures...\n");
 
     EPI_ASSERT(texture_sets.empty());
 
@@ -442,7 +446,7 @@ void InitializeTextures(void)
     {
         // FatalError("No textures found !  Make sure the chosen IWAD is
         // valid.\n");
-        LogWarning("No textures found! Generating fallback texture!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "No textures found! Generating fallback texture!\n");
         CreateFallbackTexture();
         return;
     }

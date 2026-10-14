@@ -26,6 +26,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 #include "s_blit.h"
 #include "s_cache.h"
 #include "s_music.h"
@@ -72,7 +73,7 @@ bool FLACPlayer::OpenMemory(uint8_t *data, int length)
 
     if (!flac_decoder_)
     {
-        LogWarning("Failed to load FLAC music (corrupt flac?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load FLAC music (corrupt flac?)\n");
         return false;
     }
 

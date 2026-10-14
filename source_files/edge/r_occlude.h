@@ -30,8 +30,8 @@ struct OcclusionState
 
 void OcclusionPush(OcclusionState *saved);
 void OcclusionPop(const OcclusionState *saved);
-void OcclusionSet(BAMAngle low, BAMAngle high);
-bool OcclusionTest(BAMAngle low, BAMAngle high);
+void OcclusionSet(epi::BAMAngle low, epi::BAMAngle high);
+bool OcclusionTest(epi::BAMAngle low, epi::BAMAngle high);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

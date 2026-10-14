@@ -1,6 +1,6 @@
-#include "edge_profiling.h"
 #include "../../r_backend.h"
-
+#include "dm_colors.h"
+#include "edge_profiling.h"
 #include "epi.h"
 #include "epi_bam.h"
 #include "g_game.h"
@@ -8,8 +8,6 @@
 #include "gpu_images.h"
 #include "gpu_immediate.h"
 #include "gpu_lights.h"
-
-#include "r_lightgrid.h"
 #include "gpu_pipeline.h"
 #include "gpu_shaders.h"
 #include "i_defs_gl.h"
@@ -18,6 +16,7 @@
 #include "r_draw.h"
 #include "r_gldefs.h"
 #include "r_image.h"
+#include "r_lightgrid.h"
 #include "r_misc.h"
 #include "r_modes.h"
 #include "r_state.h"
@@ -26,7 +25,7 @@ extern ConsoleVariable vsync;
 
 void SetupSkyMatrices(void);
 
-static constexpr float kGpuDegreesToRadians = HMM_DegToRad;
+static constexpr float kGpuDegreesToRadians = epi::kDegreesToRadians;
 
 class GpuRenderBackend : public RenderBackend
 {
@@ -90,7 +89,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.Rotate(90.0f * kGpuDegreesToRadians - (float)epi::RadiansFromBAM(view_angle), 0.0f, 0.0f, 1.0f);
 
         if (!epi::AlmostEquals(view_rotation, 0.0f))
-            gpu_immediate.Rotate(view_rotation * kGpuDegreesToRadians, view_forward.X, view_forward.Y, view_forward.Z);
+            gpu_immediate.Rotate(view_rotation * kGpuDegreesToRadians, view_forward.x, view_forward.y, view_forward.z);
 
         gpu_immediate.Translate(-view_x, -view_y, -view_z);
 
@@ -99,7 +98,7 @@ class GpuRenderBackend : public RenderBackend
 
         if (oblique_near_plane_active_)
         {
-            HMM_Vec4 eye_plane = EyeSpacePlane(gpu_immediate.ModelViewMatrix(), oblique_near_plane_);
+            epi::Vec4 eye_plane = EyeSpacePlane(gpu_immediate.ModelViewMatrix(), oblique_near_plane_);
 
             gpu_immediate.MatrixModeProjection();
             gpu_immediate.LoadMatrix(ObliqueNearPlaneProjection(gpu_immediate.ProjectionMatrix(), eye_plane, kClipVolumeZeroToW));
@@ -110,11 +109,11 @@ class GpuRenderBackend : public RenderBackend
   public:
     void Init()
     {
-        LogPrint("SDL_GPU: Initialising...\n");
+        epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: Initialising...\n");
 
         max_texture_size_ = 4096;
 
-        LogPrint("SDL_GPU: Max Texture Size: %d\n", max_texture_size_);
+        epi::LogMessage(epi::kLogLevelPrint, "SDL_GPU: Max Texture Size: %d\n", max_texture_size_);
 
         if (!CreateWorldShaders(gpu_device.Handle()))
             FatalError("SDL_GPU: failed to create the world shaders.\n");
@@ -132,12 +131,12 @@ class GpuRenderBackend : public RenderBackend
         RenderBackend::Init();
     }
 
-    HMM_Mat4 WorldViewProjection()
+    epi::Mat4 WorldViewProjection()
     {
-        return gpu_immediate.ProjectionMatrix() * gpu_immediate.ModelViewMatrix();
+        return epi::MultiplyMatrices(gpu_immediate.ProjectionMatrix(), gpu_immediate.ModelViewMatrix());
     }
 
-    HMM_Mat4 WorldModelView()
+    epi::Mat4 WorldModelView()
     {
         return gpu_immediate.ModelViewMatrix();
     }
@@ -243,7 +242,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_device.Shutdown();
     }
 
-    void SetClearColor(RGBAColor color)
+    void SetClearColor(epi::RGBAColor color)
     {
         clear_color_ = color;
     }
@@ -402,9 +401,9 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.SetSkipRGB(false);
         gpu_immediate.SetLineMode(false);
         gpu_immediate.SetViewTint(1.0f, 1.0f, 1.0f);
-        gpu_immediate.SetTextureOffset({{0.0f, 0.0f}});
+        gpu_immediate.SetTextureOffset({0.0f, 0.0f});
         gpu_immediate.SetLightRowOffset(0.0f);
-        gpu_immediate.SetLiquid(HMM_Vec4{});
+        gpu_immediate.SetLiquid(epi::Vec4{});
         gpu_immediate.SetOitComposite(true);
 
         gpu_immediate.SetMultiTexture(accumulation->texture, accumulation->sampler, revealage->texture,
@@ -417,17 +416,17 @@ class GpuRenderBackend : public RenderBackend
         for (int32_t i = 0; i < 4; i++)
             quad[i].rgba = kRGBAWhite;
 
-        quad[0].position               = {{-1.0f, -1.0f, 0.0f}};
-        quad[0].texture_coordinates[0] = {{u0, v_bottom}};
+        quad[0].position               = {-1.0f, -1.0f, 0.0f};
+        quad[0].texture_coordinates[0] = {u0, v_bottom};
 
-        quad[1].position               = {{1.0f, -1.0f, 0.0f}};
-        quad[1].texture_coordinates[0] = {{u1, v_bottom}};
+        quad[1].position               = {1.0f, -1.0f, 0.0f};
+        quad[1].texture_coordinates[0] = {u1, v_bottom};
 
-        quad[2].position               = {{1.0f, 1.0f, 0.0f}};
-        quad[2].texture_coordinates[0] = {{u1, v_top}};
+        quad[2].position               = {1.0f, 1.0f, 0.0f};
+        quad[2].texture_coordinates[0] = {u1, v_top};
 
-        quad[3].position               = {{-1.0f, 1.0f, 0.0f}};
-        quad[3].texture_coordinates[0] = {{u0, v_top}};
+        quad[3].position               = {-1.0f, 1.0f, 0.0f};
+        quad[3].texture_coordinates[0] = {u0, v_top};
 
         if (drawn)
             gpu_immediate.Draw(GL_QUADS, quad, 4);
@@ -443,13 +442,13 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.MatrixModeModelView();
     }
 
-    void PushModelMatrix(const HMM_Mat4 &matrix)
+    void PushModelMatrix(const epi::Mat4 &matrix)
     {
         EPI_ASSERT(world_model_matrix_total_ < kMaximumWorldModelMatrices);
 
         world_model_matrix_stack_[world_model_matrix_total_++] = world_model_matrix_;
 
-        world_model_matrix_ = HMM_MulM4(world_model_matrix_, matrix);
+        world_model_matrix_ = epi::MultiplyMatrices(world_model_matrix_, matrix);
 
         SetupMatrices3D();
     }
@@ -463,7 +462,7 @@ class GpuRenderBackend : public RenderBackend
         SetupMatrices3D();
     }
 
-    void SetObliqueNearPlane(bool enabled, const HMM_Vec4 &plane)
+    void SetObliqueNearPlane(bool enabled, const epi::Vec4 &plane)
     {
         oblique_near_plane_active_ = enabled;
         oblique_near_plane_        = plane;
@@ -527,16 +526,16 @@ class GpuRenderBackend : public RenderBackend
 
     static constexpr int32_t kMaximumWorldModelMatrices = 8;
 
-    HMM_Mat4 world_model_matrix_                                   = HMM_M4D(1.0f);
+    epi::Mat4 world_model_matrix_ = epi::IdentityMatrix();
 
     bool     oblique_near_plane_active_ = false;
-    HMM_Vec4 oblique_near_plane_        = {};
-    HMM_Mat4 world_model_matrix_stack_[kMaximumWorldModelMatrices] = {};
+    epi::Vec4 oblique_near_plane_                                   = {};
+    epi::Mat4 world_model_matrix_stack_[kMaximumWorldModelMatrices] = {};
     int32_t  world_model_matrix_total_                             = 0;
 
     RenderLayer render_layer_ = kRenderLayerInvalid;
 
-    RGBAColor clear_color_ = kRGBABlack;
+    epi::RGBAColor clear_color_ = kRGBABlack;
 
     WorldState world_state_[kRenderWorldMax];
 

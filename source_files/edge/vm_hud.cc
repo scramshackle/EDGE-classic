@@ -22,6 +22,7 @@
 #include "coal.h"
 #include "ddf_font.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_player.h"
@@ -64,16 +65,16 @@ static float ui_hud_automap_zoom;
 
 //------------------------------------------------------------------------
 
-RGBAColor COALVectorToColor(double *v)
+epi::RGBAColor COALVectorToColor(double *v)
 {
     if (v[0] < 0)
         return kRGBANoValue;
 
-    int r = HMM_Clamp(0, (int)v[0], 255);
-    int g = HMM_Clamp(0, (int)v[1], 255);
-    int b = HMM_Clamp(0, (int)v[2], 255);
+    int r = epi::Clamp((int)v[0], 0, 255);
+    int g = epi::Clamp((int)v[1], 0, 255);
+    int b = epi::Clamp((int)v[2], 0, 255);
 
-    RGBAColor rgb = epi::MakeRGBA(r, g, b);
+    epi::RGBAColor rgb = epi::MakeRGBA(r, g, b);
 
     // ensure we don't get the "no color" value by mistake
     if (rgb == kRGBANoValue)
@@ -221,7 +222,7 @@ static void HD_text_color(coal::VM *vm, int argc)
 
     double *v = vm->AccessParam(0);
 
-    RGBAColor color = COALVectorToColor(v);
+    epi::RGBAColor color = COALVectorToColor(v);
 
     HUDSetTextColor(color);
 }
@@ -290,7 +291,7 @@ static void HD_solid_box(coal::VM *vm, int argc)
     float w = *vm->AccessParam(2);
     float h = *vm->AccessParam(3);
 
-    RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
+    epi::RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
 
     HUDSolidBox(x, y, x + w, y + h, rgb);
 }
@@ -306,7 +307,7 @@ static void HD_solid_line(coal::VM *vm, int argc)
     float x2 = *vm->AccessParam(2);
     float y2 = *vm->AccessParam(3);
 
-    RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
+    epi::RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
 
     HUDSolidLine(x1, y1, x2, y2, rgb);
 }
@@ -322,7 +323,7 @@ static void HD_thin_box(coal::VM *vm, int argc)
     float w = *vm->AccessParam(2);
     float h = *vm->AccessParam(3);
 
-    RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
+    epi::RGBAColor rgb = COALVectorToColor(vm->AccessParam(4));
 
     HUDThinBox(x, y, x + w, y + h, rgb);
 }
@@ -338,7 +339,7 @@ static void HD_gradient_box(coal::VM *vm, int argc)
     float w = *vm->AccessParam(2);
     float h = *vm->AccessParam(3);
 
-    RGBAColor cols[4];
+    epi::RGBAColor cols[4];
 
     cols[0] = COALVectorToColor(vm->AccessParam(4));
     cols[1] = COALVectorToColor(vm->AccessParam(5));
@@ -687,7 +688,7 @@ static void HD_automap_color(coal::VM *vm, int argc)
 
     which--;
 
-    RGBAColor rgb = COALVectorToColor(vm->AccessParam(1));
+    epi::RGBAColor rgb = COALVectorToColor(vm->AccessParam(1));
 
     AutomapSetColor(which, rgb);
 }
@@ -721,7 +722,7 @@ static void HD_automap_zoom(coal::VM *vm, int argc)
     float zoom = *vm->AccessParam(0);
 
     // impose a very broad limit
-    ui_hud_automap_zoom = HMM_Clamp(0.2f, zoom, 100.0f);
+    ui_hud_automap_zoom = epi::Clamp(zoom, 0.2f, 100.0f);
 }
 
 // hud.automap_player_arrow(type)
@@ -778,7 +779,7 @@ static void HD_play_sound(coal::VM *vm, int argc)
     if (fx)
         StartSoundEffect(fx);
     else
-        LogWarning("hud.play_sound: unknown sfx '%s'\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "hud.play_sound: unknown sfx '%s'\n", name);
 }
 
 // hud.kill_sound(name)
@@ -794,7 +795,7 @@ static void HD_kill_sound(coal::VM *vm, int argc)
     if (fx)
         StopSoundEffect(fx);
     else
-        LogWarning("hud.kill_sound: unknown sfx '%s'\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "hud.kill_sound: unknown sfx '%s'\n", name);
 }
 
 // hud.screen_aspect()
@@ -830,8 +831,8 @@ static void HD_get_average_color(coal::VM *vm, int argc)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000, from_y ? *from_y : -1,
-                                               to_y ? *to_y : 1000000);
+    epi::RGBAColor col = tmp_img_data->AverageColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000,
+                                                    from_y ? *from_y : -1, to_y ? *to_y : 1000000);
     rgb[0] = epi::GetRGBARed(col);
     rgb[1] = epi::GetRGBAGreen(col);
     rgb[2] = epi::GetRGBABlue(col);
@@ -863,8 +864,8 @@ static void HD_get_lightest_color(coal::VM *vm, int argc)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->LightestColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000, from_y ? *from_y : -1,
-                                                to_y ? *to_y : 1000000);
+    epi::RGBAColor col = tmp_img_data->LightestColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000,
+                                                     from_y ? *from_y : -1, to_y ? *to_y : 1000000);
     rgb[0] = epi::GetRGBARed(col);
     rgb[1] = epi::GetRGBAGreen(col);
     rgb[2] = epi::GetRGBABlue(col);
@@ -896,8 +897,8 @@ static void HD_get_darkest_color(coal::VM *vm, int argc)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->DarkestColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000, from_y ? *from_y : -1,
-                                               to_y ? *to_y : 1000000);
+    epi::RGBAColor col = tmp_img_data->DarkestColor(from_x ? *from_x : -1, to_x ? *to_x : 1000000,
+                                                    from_y ? *from_y : -1, to_y ? *to_y : 1000000);
     rgb[0] = epi::GetRGBARed(col);
     rgb[1] = epi::GetRGBAGreen(col);
     rgb[2] = epi::GetRGBABlue(col);
@@ -930,8 +931,8 @@ static void HD_get_average_hue(coal::VM *vm, int argc)
         tmp_img_data = rgb_img_data;
     }
 
-    RGBAColor hue = tmp_img_data->AverageHue(from_x ? *from_x : -1, to_x ? *to_x : 1000000, from_y ? *from_y : -1,
-                                             to_y ? *to_y : 1000000);
+    epi::RGBAColor hue = tmp_img_data->AverageHue(from_x ? *from_x : -1, to_x ? *to_x : 1000000, from_y ? *from_y : -1,
+                                                  to_y ? *to_y : 1000000);
     delete tmp_img_data;
     rgb[0] = epi::GetRGBARed(hue);
     rgb[1] = epi::GetRGBAGreen(hue);
@@ -961,7 +962,7 @@ static void HD_get_average_top_border_color(coal::VM *vm, int argc)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, tmp_img_c->height_ - 1, tmp_img_c->height_);
+    epi::RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, tmp_img_c->height_ - 1, tmp_img_c->height_);
     rgb[0]        = epi::GetRGBARed(col);
     rgb[1]        = epi::GetRGBAGreen(col);
     rgb[2]        = epi::GetRGBABlue(col);
@@ -988,7 +989,7 @@ static void HD_get_average_bottom_border_color(coal::VM *vm, int argc)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, 0, 1);
+    epi::RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, 0, 1);
     rgb[0]        = epi::GetRGBARed(col);
     rgb[1]        = epi::GetRGBAGreen(col);
     rgb[2]        = epi::GetRGBABlue(col);

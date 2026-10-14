@@ -23,6 +23,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 #include "m4p.h"
 #include "s_blit.h"
 #include "s_cache.h"
@@ -70,11 +71,11 @@ bool M4PPlayer::OpenMemory(const uint8_t *data, int length, bool loop)
 
     looping_ = loop;
 
-    int rate = HMM_MIN(64000, sound_device_frequency);
+    int rate = epi::Min(64000, sound_device_frequency);
 
     if (!m4p_LoadFromData((uint8_t *)data, length, rate, 1024))
     {
-        LogWarning("M4P: failure to load song!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "M4P: failure to load song!\n");
         return false;
     }
 

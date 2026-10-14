@@ -13,16 +13,14 @@ add_library(
   epi_str_compare.cc
   epi_str_hash.cc
   epi_str_util.cc
+  epi_vector.cc
   epi_scanner.cpp
 )
 
-set (EPI_LIBRARIES HandmadeMath stb)
-
-target_link_libraries(epi PUBLIC ${EPI_LIBRARIES})
-
 target_include_directories(epi PUBLIC ./)
 
-target_compile_options(epi PRIVATE
-  $<$<CXX_COMPILER_ID:MSVC>:${EDGE_WARNING_LEVEL}>
-  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:${EDGE_WARNING_LEVEL}>
-)
+if (EPI_EXTRA_CHECKS)
+  target_compile_definitions(epi PUBLIC EPI_EXTRA_CHECKS)
+endif()
+
+target_compile_options(epi PRIVATE ${EDGE_WARNING_LEVEL})

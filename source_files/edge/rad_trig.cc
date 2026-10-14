@@ -34,7 +34,10 @@
 
 #include "rad_trig.h"
 
+#include <math.h>
+
 #include "am_map.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "e_input.h"
@@ -61,7 +64,6 @@
 #include "r_modes.h"
 #include "rad_act.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_wad.h"
 
 // Static Scripts.  Never change once all scripts have been read in.
@@ -125,7 +127,7 @@ class rts_menu_c
         if (key)
         {
             char buffer[8];
-            stbsp_sprintf(buffer, "%c. ", key);
+            epi::FormatToBufferSized(buffer, sizeof(buffer), "%c. ", key);
 
             choice_line = "  " + std::string(buffer) + choice_line;
         }
@@ -307,7 +309,7 @@ RADScriptTrigger *FindScriptTriggerByName(const char *name)
             return trig;
     }
 
-    LogWarning("RTS: No such trigger `%s'.\n", name);
+    epi::LogMessage(epi::kLogLevelWarning, "RTS: No such trigger `%s'.\n", name);
     return nullptr;
 }
 
@@ -1001,7 +1003,7 @@ void ScriptMenuFinish(int result)
     EPI_ASSERT(rts_curr_menu);
 
     // zero is cancelled, otherwise result is 1..N
-    if (result < 0 || result > HMM_MAX(1, rts_curr_menu->NumChoices()))
+    if (result < 0 || result > epi::Max(1, rts_curr_menu->NumChoices()))
         return;
 
     rts_curr_menu->NotifyResult(result);

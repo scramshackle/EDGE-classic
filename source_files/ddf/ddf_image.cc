@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "ddf_local.h"
+#include "dm_colors.h"
 #include "epi_filesystem.h"
 #include "epi_str_compare.h"
 
@@ -136,7 +137,7 @@ static void ImageStartEntry(const char *name, bool extend)
 static void ImageParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("IMAGE_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "IMAGE_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -171,7 +172,7 @@ static void ImageFinishEntry(void)
 
 static void ImageClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in images.ddf\n");
+    epi::LogMessage(epi::kLogLevelWarning, "Ignoring #CLEARALL in images.ddf\n");
 }
 
 void DDFReadImages(const std::string &data)

@@ -35,7 +35,6 @@
 #include "p_local.h"
 #include "p_spec.h"
 #include "r_state.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "w_wad.h"
 
@@ -104,7 +103,7 @@ bool SaveGameGetInteger(void *storage, int index)
 
 bool SaveGameGetAngle(void *storage, int index)
 {
-    ((BAMAngle *)storage)[index] = SaveChunkGetAngle();
+    ((epi::BAMAngle *)storage)[index] = SaveChunkGetAngle();
     return true;
 }
 
@@ -122,16 +121,16 @@ bool SaveGameGetBoolean(void *storage, int index)
 
 bool SaveGameGetVec2(void *storage, int index)
 {
-    ((HMM_Vec2 *)storage)[index].X = SaveChunkGetFloat();
-    ((HMM_Vec2 *)storage)[index].Y = SaveChunkGetFloat();
+    ((epi::Vec2 *)storage)[index].x = SaveChunkGetFloat();
+    ((epi::Vec2 *)storage)[index].y = SaveChunkGetFloat();
     return true;
 }
 
 bool SaveGameGetVec3(void *storage, int index)
 {
-    ((HMM_Vec3 *)storage)[index].X = SaveChunkGetFloat();
-    ((HMM_Vec3 *)storage)[index].Y = SaveChunkGetFloat();
-    ((HMM_Vec3 *)storage)[index].Z = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].x = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].y = SaveChunkGetFloat();
+    ((epi::Vec3 *)storage)[index].z = SaveChunkGetFloat();
     return true;
 }
 
@@ -142,7 +141,7 @@ bool SaveGameGetVec3(void *storage, int index)
 //
 bool SaveGameGetAngleFromSlope(void *storage, int index)
 {
-    ((BAMAngle *)storage)[index] = epi::BAMFromATan(SaveChunkGetFloat());
+    ((epi::BAMAngle *)storage)[index] = epi::BAMFromATan(SaveChunkGetFloat());
     return true;
 }
 
@@ -158,7 +157,7 @@ void SaveGamePutInteger(void *storage, int index)
 
 void SaveGamePutAngle(void *storage, int index)
 {
-    SaveChunkPutAngle(((BAMAngle *)storage)[index]);
+    SaveChunkPutAngle(((epi::BAMAngle *)storage)[index]);
 }
 
 void SaveGamePutFloat(void *storage, int index)
@@ -173,22 +172,22 @@ void SaveGamePutBoolean(void *storage, int index)
 
 void SaveGamePutVec2(void *storage, int index)
 {
-    SaveChunkPutFloat(((HMM_Vec2 *)storage)[index].X);
-    SaveChunkPutFloat(((HMM_Vec2 *)storage)[index].Y);
+    SaveChunkPutFloat(((epi::Vec2 *)storage)[index].x);
+    SaveChunkPutFloat(((epi::Vec2 *)storage)[index].y);
 }
 
 void SaveGamePutVec3(void *storage, int index)
 {
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].X);
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].Y);
-    SaveChunkPutFloat(((HMM_Vec3 *)storage)[index].Z);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].x);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].y);
+    SaveChunkPutFloat(((epi::Vec3 *)storage)[index].z);
 }
 
 void SaveGamePutAngleToSlope(void *storage, int index)
 {
-    BAMAngle val = ((BAMAngle *)storage)[index];
+    epi::BAMAngle val = ((epi::BAMAngle *)storage)[index];
 
-    EPI_ASSERT(val < kBAMAngle90 || val > kBAMAngle270);
+    EPI_ASSERT(val < epi::kBAMAngle90 || val > epi::kBAMAngle270);
 
     SaveChunkPutFloat(epi::BAMTan(val));
 }
@@ -294,7 +293,7 @@ const char *SaveSlotName(int slot)
 
     static char buffer[256];
 
-    stbsp_sprintf(buffer, "slot%03d", slot);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "slot%03d", slot);
 
     return buffer;
 }
@@ -335,18 +334,18 @@ void SaveClearSlot(const char *slot_name)
 
     if (!ReadDirectory(fsd, full_dir, "*.*"))
     {
-        LogDebug("Failed to read directory: %s\n", full_dir.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "Failed to read directory: %s\n", full_dir.c_str());
         return;
     }
 
-    LogDebug("SV_ClearSlot: removing %d files\n", (int)fsd.size());
+    epi::LogMessage(epi::kLogLevelDebug, "SV_ClearSlot: removing %d files\n", (int)fsd.size());
 
     for (size_t i = 0; i < fsd.size(); i++)
     {
         if (fsd[i].is_dir)
             continue;
         std::string cur_file = epi::PathAppend(full_dir, epi::GetFilename(fsd[i].name));
-        LogDebug("  Deleting %s\n", cur_file.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "  Deleting %s\n", cur_file.c_str());
 
         epi::FileDelete(cur_file);
     }
@@ -362,7 +361,7 @@ void SaveCopySlot(const char *src_name, const char *dest_name)
     if (!ReadDirectory(fsd, src_dir, "*.*"))
         FatalError("SV_CopySlot: failed to read dir: %s\n", src_dir.c_str());
 
-    LogDebug("SV_CopySlot: copying %d files\n", (int)fsd.size());
+    epi::LogMessage(epi::kLogLevelDebug, "SV_CopySlot: copying %d files\n", (int)fsd.size());
 
     for (size_t i = 0; i < fsd.size(); i++)
     {
@@ -373,7 +372,7 @@ void SaveCopySlot(const char *src_name, const char *dest_name)
         std::string src_file  = epi::PathAppend(src_dir, fn);
         std::string dest_file = epi::PathAppend(dest_dir, fn);
 
-        LogDebug("  Copying %s --> %s\n", src_file.c_str(), dest_file.c_str());
+        epi::LogMessage(epi::kLogLevelDebug, "  Copying %s --> %s\n", src_file.c_str(), dest_file.c_str());
 
         if (!epi::FileCopy(src_file, dest_file))
             FatalError("SV_CopySlot: failed to copy '%s' to '%s'\n", src_file.c_str(), dest_file.c_str());

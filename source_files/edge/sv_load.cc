@@ -95,7 +95,7 @@ void BeginSaveGameLoad(bool is_hub)
     SaveStruct *S;
     SaveArray  *A;
 
-    LogDebug("SV_BeginLoad...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SV_BeginLoad...\n");
 
     loaded_struct_list = nullptr;
     loaded_array_list  = nullptr;
@@ -139,7 +139,7 @@ void FinishSaveGameLoad(void)
     // Finalise all the arrays, and free some stuff after loading
     // has finished.
 
-    LogDebug("SV_FinishLoad...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SV_FinishLoad...\n");
 
     while (loaded_struct_list)
     {
@@ -463,7 +463,7 @@ bool LoadAllSaveChunks(void)
             continue;
         }
 
-        LogWarning("LOADGAME: Unexpected top-level chunk [%s]\n", marker);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Unexpected top-level chunk [%s]\n", marker);
 
         if (!SaveSkipReadChunk(marker))
             return false;

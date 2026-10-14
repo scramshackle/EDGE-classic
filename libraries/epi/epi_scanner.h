@@ -47,10 +47,13 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include <string>
 #include <string_view>
+
+#include "epi.h"
 
 namespace epi
 {
@@ -109,13 +112,6 @@ class Scanner
         kNoToken = -1
     };
 
-    enum MessageLevel
-    {
-        kError,
-        kWarning,
-        kNotice
-    };
-
     Scanner(std::string_view data, size_t length = 0);
     ~Scanner();
 
@@ -144,7 +140,8 @@ class Scanner
     bool GetNextToken(bool expandState = true);
     void MustGetToken(char token);
     void Rewind(); /// Only can rewind one step.
-    void ScriptMessage(MessageLevel level, const char *error, ...) const;
+    void ScriptMessage(LogLevel level, const char *message, ...) const EPI_PRINTF_FORMAT(3, 4);
+    [[noreturn]] void ScriptError(const char *error, ...) const EPI_PRINTF_FORMAT(2, 3);
     void SetScriptIdentifier(std::string_view ident)
     {
         script_identifier_ = ident;

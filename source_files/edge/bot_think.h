@@ -74,7 +74,7 @@ struct BotCommand
 {
     // desired movement
     int      speed;
-    BAMAngle direction;
+    epi::BAMAngle direction;
 
     // buttons
     bool attack;
@@ -94,7 +94,7 @@ class DeathBot
 
     BotTask task_ = kBotTaskNone;
 
-    BAMAngle look_angle_ = 0;
+    epi::BAMAngle look_angle_ = 0;
     float    look_slope_ = 0;
 
     // 0 = go straight, -1 = left, +1 = right
@@ -108,7 +108,7 @@ class DeathBot
     // we lose patience for every tic which we cannot see our target
     int      patience_    = 0;
     bool     see_enemy_   = false;
-    BAMAngle enemy_angle_ = 0;
+    epi::BAMAngle enemy_angle_ = 0;
     float    enemy_slope_ = 0;
     float    enemy_dist_  = 0;
 
@@ -197,7 +197,7 @@ class DeathBot
     void FinishGetItem();
     void FinishDoorOrLift(bool ok);
 
-    void TurnToward(BAMAngle angle, float slope, bool fast);
+    void TurnToward(epi::BAMAngle angle, float slope, bool fast);
     void TurnToward(const MapObject *mo, bool fast);
     void ShootTarget();
 

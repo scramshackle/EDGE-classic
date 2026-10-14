@@ -16,7 +16,8 @@
 //
 //------------------------------------------------------------------------
 
-#include "epi_math.h"
+#include <math.h>
+
 #include "coal.h"
 #include "ddf_flat.h" // DDFFLAT - Dasho
 #include "ddf_types.h"
@@ -24,6 +25,7 @@
 #include "e_main.h"
 #include "e_player.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "f_interm.h" //Lobo: need this to get access to intermission_stats
 #include "g_game.h"
@@ -345,7 +347,7 @@ static void PL_air_in_lungs(coal::VM *vm, int argc)
 
     float value = ui_player_who->air_in_lungs_ * 100.0f / ui_player_who->map_object_->info_->lung_capacity_;
 
-    value = HMM_Clamp(0.0f, value, 100.0f);
+    value = epi::Clamp(value, 0.0f, 100.0f);
 
     vm->ReturnFloat(value);
 }
@@ -926,13 +928,13 @@ static void PL_hurt_dir(coal::VM *vm, int argc)
         MapObject *badguy = ui_player_who->attacker_;
         MapObject *pmo    = ui_player_who->map_object_;
 
-        BAMAngle diff = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y) - pmo->angle_;
+        epi::BAMAngle diff = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y) - pmo->angle_;
 
-        if (diff >= kBAMAngle45 && diff <= kBAMAngle135)
+        if (diff >= epi::kBAMAngle45 && diff <= epi::kBAMAngle135)
         {
             dir = -1;
         }
-        else if (diff >= kBAMAngle225 && diff <= kBAMAngle315)
+        else if (diff >= epi::kBAMAngle225 && diff <= epi::kBAMAngle315)
         {
             dir = +1;
         }
@@ -953,7 +955,7 @@ static void PL_hurt_angle(coal::VM *vm, int argc)
         MapObject *badguy = ui_player_who->attacker_;
         MapObject *pmo    = ui_player_who->map_object_;
 
-        BAMAngle real_a = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y);
+        epi::BAMAngle real_a = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y);
 
         value = epi::DegreesFromBAM(real_a);
 

@@ -99,7 +99,7 @@ void FreeSoundChannels(void);
 
 void KillSoundChannel(int k);
 
-void UpdateSounds(MapObject *listener, BAMAngle angle);
+void UpdateSounds(MapObject *listener, epi::BAMAngle angle);
 
 void MixSoundEffects(float *output, int frames);
 

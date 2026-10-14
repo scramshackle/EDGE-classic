@@ -45,7 +45,8 @@ static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage sta
     SDL_DestroyProperties(props);
 
     if (!shader)
-        LogPrint("GpuShaders: SDL_CreateGPUShader failed for '%s': %s\n", name, SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "GpuShaders: SDL_CreateGPUShader failed for '%s': %s\n", name,
+                        SDL_GetError());
 
     return shader;
 }

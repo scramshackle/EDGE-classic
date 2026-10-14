@@ -27,6 +27,7 @@
 
 #include "ddf_thing.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "ddf_local.h"
@@ -608,7 +609,7 @@ static void ThingStartEntry(const char *buffer, bool extend)
     {
         name = std::string(buffer, pos - buffer);
 
-        number = HMM_MAX(0, atoi(pos + 1));
+        number = epi::Max(0, atoi(pos + 1));
 
         if (name.empty())
         {
@@ -680,7 +681,7 @@ static void ThingDoTemplate(const char *contents)
 void ThingParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("THING_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "THING_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFCompareName(field, "TEMPLATE") == 0)
@@ -701,7 +702,7 @@ void ThingParseField(const char *field, const char *contents, int index, bool is
     {
         if (DDFMainParseField(thing_commands, field, contents, (uint8_t *)dynamic_mobj))
         {
-            dynamic_mobj->model_rotate_ *= kBAMAngle1; // apply the rotation
+            dynamic_mobj->model_rotate_ *= epi::kBAMAngle1; // apply the rotation
             return;
         }
     }
@@ -779,7 +780,7 @@ static void ThingFinishEntry(void)
         if (dlight_radius_warnings < 3)
             DDFWarning("DLIGHT_RADIUS value %1.1f too large (over 512).\n", dynamic_mobj->dlight_.radius_);
         else if (dlight_radius_warnings == 3)
-            LogWarning("More too large DLIGHT_RADIUS values found....\n");
+            epi::LogMessage(epi::kLogLevelWarning, "More too large DLIGHT_RADIUS values found....\n");
 
         dlight_radius_warnings++;
     }
@@ -849,7 +850,7 @@ static void ThingFinishEntry(void)
 
 static void ThingClearAll(void)
 {
-    LogWarning("Ignoring #CLEARALL in things.ddf\n");
+    epi::LogMessage(epi::kLogLevelWarning, "Ignoring #CLEARALL in things.ddf\n");
 }
 
 void DDFReadThings(const std::string &data)
@@ -924,7 +925,7 @@ void DDFMobjCleanUp(void)
                     if (B->type == kBenefitTypeAmmo)
                     {
                         B->sub.type = weapondefs.deh_ammo_replacements[weap_to_change]->sub.type;
-                        B->amount   = HMM_MAX(B->amount, weapondefs.deh_ammo_replacements[weap_to_change]->amount);
+                        B->amount   = epi::Max(B->amount, weapondefs.deh_ammo_replacements[weap_to_change]->amount);
                         updated     = true;
                         break;
                     }
@@ -1908,7 +1909,7 @@ static void DDFMobjGetAngleRange(const char *info, void *storage)
 {
     EPI_ASSERT(info && storage);
 
-    BAMAngle *dest = (BAMAngle *)storage;
+    epi::BAMAngle *dest = (epi::BAMAngle *)storage;
 
     float val1, val2;
 
@@ -2138,7 +2139,7 @@ static void DDFMobjStateGetDEHProjectile(const char *arg, State *cur_state)
     {
         int slope = 0;
         if (sscanf(args[2].c_str(), "%d", &slope) == 1 && slope != 0)
-            atk->slope_offset_ = tan((float)slope / 65536.0f * HMM_PI / 180.0);
+            atk->slope_offset_ = tan((float)slope / 65536.0f * epi::kPi / 180.0);
     }
     if (arg_size > 3)
     {
@@ -2200,7 +2201,7 @@ static void DDFMobjStateGetDEHBullet(const char *arg, State *cur_state)
     {
         int vspread = 0;
         if (sscanf(args[1].c_str(), "%d", &vspread) == 1 && vspread != 0)
-            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * HMM_PI / 180.0);
+            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * epi::kPi / 180.0);
     }
     if (arg_size > 2)
     {
@@ -2752,7 +2753,7 @@ void MapObjectDefinition::Default()
     bounce_speed_  = 0.5f;
     bounce_up_     = 0.5f;
     sight_slope_   = 16.0f;
-    sight_angle_   = kBAMAngle90;
+    sight_angle_   = epi::kBAMAngle90;
     ride_friction_ = kRideFrictionDefault;
     shadow_trans_  = 0.5f;
     glow_type_     = kSectorGlowTypeNone;
@@ -2778,7 +2779,7 @@ void MapObjectDefinition::Default()
     reload_shots_   = 5;
     armour_protect_ = -1.0; // disabled!
     armour_deplete_ = 1.0f;
-    armour_class_   = kBitSetFull;
+    armour_class_   = epi::kBitSetFull;
 
     side_          = 0;
     playernum_     = 0;
@@ -3060,7 +3061,7 @@ const MapObjectDefinition *MapObjectDefinitionContainer::LookupPlayer(int player
             return m;
     }
 
-    FatalError("Missing DDF entry for player number %d\n", playernum);
+    epi::FatalError("Missing DDF entry for player number %d\n", playernum);
 }
 
 const MapObjectDefinition *MapObjectDefinitionContainer::LookupDoorKey(int theKey)
@@ -3102,7 +3103,7 @@ const MapObjectDefinition *MapObjectDefinitionContainer::LookupDoorKey(int theKe
         }
     }
 
-    LogWarning("Missing DDF entry for key %d\n", theKey);
+    epi::LogMessage(epi::kLogLevelWarning, "Missing DDF entry for key %d\n", theKey);
     return nullptr;
 }
 

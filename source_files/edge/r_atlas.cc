@@ -4,8 +4,8 @@
 
 #include <vector>
 
-#include "HandmadeMath.h"
 #include "epi.h"
+#include "epi_math.h"
 #include "im_data.h"
 #include "r_backend.h"
 #include "r_image.h"
@@ -38,7 +38,7 @@ static std::vector<Image *>     atlas_images;
 
 static int AtlasPageSize(void)
 {
-    return HMM_MIN(kAtlasMaximumPageSize, render_backend->GetMaxTextureSize());
+    return epi::Min(kAtlasMaximumPageSize, render_backend->GetMaxTextureSize());
 }
 
 static int CreateAtlasPage(bool smooth)
@@ -83,11 +83,11 @@ static void UploadAtlasImage(AtlasPage *page, const stbrp_rect &rect, const Imag
 
     for (int y = 0; y < height; y++)
     {
-        int source_y = HMM_Clamp(0, y - kAtlasGutter, data->height_ - 1);
+        int source_y = epi::Clamp(y - kAtlasGutter, 0, data->height_ - 1);
 
         for (int x = 0; x < width; x++)
         {
-            int source_x = HMM_Clamp(0, x - kAtlasGutter, data->width_ - 1);
+            int source_x = epi::Clamp(x - kAtlasGutter, 0, data->width_ - 1);
 
             memcpy(&block[((size_t)y * (size_t)width + (size_t)x) * 4], data->PixelAt(source_x, source_y), 4);
         }

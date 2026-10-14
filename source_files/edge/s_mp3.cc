@@ -26,6 +26,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 #include "s_blit.h"
 #include "s_cache.h"
 #include "s_music.h"
@@ -71,7 +72,7 @@ bool MP3Player::OpenMemory(const uint8_t *data, int length)
 
     if (!drmp3_init_memory(&mp3_decoder_, data, length, NULL))
     {
-        LogWarning("Failed to load MP3 music (corrupt mp3?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load MP3 music (corrupt mp3?)\n");
         return false;
     }
 
@@ -164,13 +165,13 @@ bool LoadMP3Sound(SoundData *buf, const uint8_t *data, int length)
 
     if (!drmp3_init_memory(&decode, data, length, NULL))
     {
-        LogWarning("Failed to load MP3 sound (corrupt mp3?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load MP3 sound (corrupt mp3?)\n");
         return false;
     }
 
     if (decode.channels > 2)
     {
-        LogWarning("MP3 SFX Loader: too many channels: %d\n", decode.channels);
+        epi::LogMessage(epi::kLogLevelWarning, "MP3 SFX Loader: too many channels: %d\n", decode.channels);
         drmp3_uninit(&decode);
         return false;
     }
@@ -179,12 +180,13 @@ bool LoadMP3Sound(SoundData *buf, const uint8_t *data, int length)
 
     if (frame_count == 0)
     {
-        LogWarning("MP3 SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "MP3 SFX Loader: no samples!\n");
         drmp3_uninit(&decode);
         return false;
     }
 
-    LogDebug("MP3 SFX Loader: freq %d Hz, %d channels\n", decode.sampleRate, decode.channels);
+    epi::LogMessage(epi::kLogLevelDebug, "MP3 SFX Loader: freq %d Hz, %d channels\n", decode.sampleRate,
+                    decode.channels);
 
     bool is_stereo = (decode.channels > 1);
 
@@ -199,7 +201,7 @@ bool LoadMP3Sound(SoundData *buf, const uint8_t *data, int length)
     gather.CommitChunk(frames_read);
 
     if (!gather.Finalise(buf))
-        LogWarning("MP3 SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "MP3 SFX Loader: no samples!\n");
 
     drmp3_uninit(&decode);
 

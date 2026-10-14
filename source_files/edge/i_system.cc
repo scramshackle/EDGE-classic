@@ -26,13 +26,13 @@
 #include "e_main.h"
 #include "epi.h"
 #include "epi_simd.h"
+#include "epi_str_util.h"
 #include "epi_windows.h"
 #include "g_game.h"
 #include "m_argv.h"
 #include "m_menu.h"
 #include "m_misc.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -56,23 +56,12 @@ void SystemStartup(void)
     StartupAudio();
 }
 
-void LogWarning(const char *warning, ...)
-{
-    va_list argptr;
-
-    va_start(argptr, warning);
-    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), warning, argptr);
-    va_end(argptr);
-
-    LogPrint("WARNING: %s", message_buffer);
-}
-
 [[noreturn]] void FatalError(const char *error, ...)
 {
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buffer, sizeof(message_buffer), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buffer, sizeof(message_buffer), error, argptr);
     va_end(argptr);
 
     if (log_file)
@@ -99,35 +88,66 @@ void LogWarning(const char *warning, ...)
 #endif
 }
 
-void LogPrint(const char *message, ...)
+static void EPIFatalErrorHandler(const char *message)
 {
-    va_list argptr;
+    FatalError("%s", message);
+}
 
-    char printbuf[kMessageBufferSize];
-    printbuf[kMessageBufferSize - 1] = 0;
+static void WriteDebugFile(const char *message)
+{
+    if (!debug_file)
+        return;
 
-    va_start(argptr, message);
-    stbsp_vsnprintf(printbuf, sizeof(printbuf), message, argptr);
-    va_end(argptr);
+    fprintf(debug_file, "%s", message);
+    fflush(debug_file);
+}
 
-    EPI_ASSERT(printbuf[kMessageBufferSize - 1] == 0);
-
+static void PrintMessage(const char *message)
+{
     if (log_file)
     {
-        fprintf(log_file, "%s", printbuf);
+        fprintf(log_file, "%s", message);
         fflush(log_file);
     }
 
-    // If debuging enabled, print to the debug_file
-    LogDebug("%s", printbuf);
+    WriteDebugFile(message);
 
-    // Send the message to the console.
-    ConsoleMessage(kConsoleOnly, "%s", printbuf);
+    ConsoleMessage(kConsoleOnly, "%s", message);
 
 #ifdef EDGE_WEB
-    // Send to debug console in browser
-    printf("%s", printbuf);
+    printf("%s", message);
 #endif
+}
+
+static void EPILogHandler(epi::LogLevel level, const char *format, va_list arguments)
+{
+    if (level == epi::kLogLevelDebug && !debug_file)
+        return;
+
+    char message[kMessageBufferSize];
+    epi::FormatToBufferSizedArgs(message, sizeof(message), format, arguments);
+
+    switch (level)
+    {
+    case epi::kLogLevelPrint:
+        PrintMessage(message);
+        break;
+    case epi::kLogLevelWarning: {
+        char warning[kMessageBufferSize];
+        epi::FormatToBufferSized(warning, sizeof(warning), "WARNING: %s", message);
+        PrintMessage(warning);
+        break;
+    }
+    case epi::kLogLevelDebug:
+        WriteDebugFile(message);
+        break;
+    }
+}
+
+void SetupEPIHandlers(void)
+{
+    epi::SetFatalErrorHandler(EPIFatalErrorHandler);
+    epi::SetLogHandler(EPILogHandler);
 }
 
 void ShowMessageBox(const char *message, const char *title)

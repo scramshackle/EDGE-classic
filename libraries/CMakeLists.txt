@@ -1,5 +1,6 @@
 add_subdirectory(dr_libs)
 add_subdirectory(egtengine)
+add_subdirectory(epi)
 add_subdirectory(hmm)
 add_subdirectory(libcRSID)
 add_subdirectory(minilua)

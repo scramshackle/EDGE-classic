@@ -1,6 +1,9 @@
 
+#include <math.h>
+
 #include "am_map.h"
 #include "ddf_font.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "e_player.h"
 #include "g_game.h"
@@ -26,16 +29,16 @@ extern Player *ui_hud_who;
 static int   ui_hud_automap_flags[2]; // 0 = disabled, 1 = enabled
 static float ui_hud_automap_zoom;
 
-static RGBAColor HD_VectorToColor(const HMM_Vec3 &v)
+static epi::RGBAColor HD_VectorToColor(const epi::Vec3 &v)
 {
-    if (v.X < 0)
+    if (v.x < 0)
         return kRGBANoValue;
 
-    int r = HMM_Clamp(0, (int)v.X, 255);
-    int g = HMM_Clamp(0, (int)v.Y, 255);
-    int b = HMM_Clamp(0, (int)v.Z, 255);
+    int r = epi::Clamp((int)v.x, 0, 255);
+    int g = epi::Clamp((int)v.y, 0, 255);
+    int b = epi::Clamp((int)v.z, 0, 255);
 
-    RGBAColor rgb = epi::MakeRGBA(r, g, b);
+    epi::RGBAColor rgb = epi::MakeRGBA(r, g, b);
 
     // ensure we don't get the "no color" value by mistake
     if (rgb == kRGBANoValue)
@@ -189,7 +192,7 @@ static int HD_text_font(lua_State *L)
 //
 static int HD_text_color(lua_State *L)
 {
-    RGBAColor color = HD_VectorToColor(LuaCheckVector3(L, 1));
+    epi::RGBAColor color = HD_VectorToColor(LuaCheckVector3(L, 1));
 
     HUDSetTextColor(color);
 
@@ -257,7 +260,7 @@ static int HD_solid_box(lua_State *L)
     float w = luaL_checknumber(L, 3);
     float h = luaL_checknumber(L, 4);
 
-    RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
+    epi::RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
 
     HUDSolidBox(x, y, x + w, y + h, rgb);
 
@@ -273,7 +276,7 @@ static int HD_solid_line(lua_State *L)
     float x2 = luaL_checknumber(L, 3);
     float y2 = luaL_checknumber(L, 4);
 
-    RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
+    epi::RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
 
     HUDSolidLine(x1, y1, x2, y2, rgb);
 
@@ -289,7 +292,7 @@ static int HD_thin_box(lua_State *L)
     float w = luaL_checknumber(L, 3);
     float h = luaL_checknumber(L, 4);
 
-    RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
+    epi::RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 5));
 
     HUDThinBox(x, y, x + w, y + h, rgb);
 
@@ -305,7 +308,7 @@ static int HD_gradient_box(lua_State *L)
     float w = luaL_checknumber(L, 3);
     float h = luaL_checknumber(L, 4);
 
-    RGBAColor cols[4];
+    epi::RGBAColor cols[4];
 
     cols[0] = HD_VectorToColor(LuaCheckVector3(L, 5));
     cols[1] = HD_VectorToColor(LuaCheckVector3(L, 6));
@@ -673,7 +676,7 @@ static int HD_automap_color(lua_State *L)
 
     which--;
 
-    RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 2));
+    epi::RGBAColor rgb = HD_VectorToColor(LuaCheckVector3(L, 2));
 
     AutomapSetColor(which, rgb);
 
@@ -707,7 +710,7 @@ static int HD_automap_zoom(lua_State *L)
     float zoom = luaL_checknumber(L, 1);
 
     // impose a very broad limit
-    ui_hud_automap_zoom = HMM_Clamp(0.2f, zoom, 100.0f);
+    ui_hud_automap_zoom = epi::Clamp(zoom, 0.2f, 100.0f);
 
     return 0;
 }
@@ -768,7 +771,7 @@ static int HD_play_sound(lua_State *L)
     }
     else
     {
-        LogWarning("hud.play_sound: unknown sfx '%s'\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "hud.play_sound: unknown sfx '%s'\n", name);
         lua_pushboolean(L, 0);
     }
 
@@ -790,7 +793,7 @@ static int HD_kill_sound(lua_State *L)
     }
     else
     {
-        LogWarning("hud.kill_sound: unknown sfx '%s'\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "hud.kill_sound: unknown sfx '%s'\n", name);
         lua_pushboolean(L, 0);
     }
 
@@ -807,7 +810,7 @@ static int HD_screen_aspect(lua_State *L)
 
 static int HD_get_average_color(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     double       from_x       = luaL_optnumber(L, 2, -1);
     double       to_x         = luaL_optnumber(L, 3, 1000000);
@@ -825,10 +828,10 @@ static int HD_get_average_color(lua_State *L)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(from_x, to_x, from_y, to_y);
-    rgb.X         = epi::GetRGBARed(col);
-    rgb.Y         = epi::GetRGBAGreen(col);
-    rgb.Z         = epi::GetRGBABlue(col);
+    epi::RGBAColor col = tmp_img_data->AverageColor(from_x, to_x, from_y, to_y);
+    rgb.x         = epi::GetRGBARed(col);
+    rgb.y         = epi::GetRGBAGreen(col);
+    rgb.z         = epi::GetRGBABlue(col);
     delete tmp_img_data;
     if (what_palette)
         delete[] what_palette;
@@ -838,7 +841,7 @@ static int HD_get_average_color(lua_State *L)
 
 static int HD_get_lightest_color(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     double       from_x       = luaL_optnumber(L, 2, -1);
     double       to_x         = luaL_optnumber(L, 3, 1000000);
@@ -856,10 +859,10 @@ static int HD_get_lightest_color(lua_State *L)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->LightestColor(from_x, to_x, from_y, to_y);
-    rgb.X         = epi::GetRGBARed(col);
-    rgb.Y         = epi::GetRGBAGreen(col);
-    rgb.Z         = epi::GetRGBABlue(col);
+    epi::RGBAColor col = tmp_img_data->LightestColor(from_x, to_x, from_y, to_y);
+    rgb.x         = epi::GetRGBARed(col);
+    rgb.y         = epi::GetRGBAGreen(col);
+    rgb.z         = epi::GetRGBABlue(col);
     delete tmp_img_data;
     if (what_palette)
         delete[] what_palette;
@@ -869,7 +872,7 @@ static int HD_get_lightest_color(lua_State *L)
 
 static int HD_get_darkest_color(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     double       from_x       = luaL_optnumber(L, 2, -1);
     double       to_x         = luaL_optnumber(L, 3, 1000000);
@@ -887,10 +890,10 @@ static int HD_get_darkest_color(lua_State *L)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->DarkestColor(from_x, to_x, from_y, to_y);
-    rgb.X         = epi::GetRGBARed(col);
-    rgb.Y         = epi::GetRGBAGreen(col);
-    rgb.Z         = epi::GetRGBABlue(col);
+    epi::RGBAColor col = tmp_img_data->DarkestColor(from_x, to_x, from_y, to_y);
+    rgb.x         = epi::GetRGBARed(col);
+    rgb.y         = epi::GetRGBAGreen(col);
+    rgb.z         = epi::GetRGBABlue(col);
     delete tmp_img_data;
     if (what_palette)
         delete[] what_palette;
@@ -900,7 +903,7 @@ static int HD_get_darkest_color(lua_State *L)
 
 static int HD_get_average_hue(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     double       from_x       = luaL_optnumber(L, 2, -1);
     double       to_x         = luaL_optnumber(L, 3, 1000000);
@@ -919,11 +922,11 @@ static int HD_get_average_hue(lua_State *L)
         tmp_img_data = rgb_img_data;
     }
 
-    RGBAColor hue = tmp_img_data->AverageHue(from_x, to_x, from_y, to_y);
+    epi::RGBAColor hue = tmp_img_data->AverageHue(from_x, to_x, from_y, to_y);
     delete tmp_img_data;
-    rgb.X = epi::GetRGBARed(hue);
-    rgb.Y = epi::GetRGBAGreen(hue);
-    rgb.Z = epi::GetRGBABlue(hue);
+    rgb.x = epi::GetRGBARed(hue);
+    rgb.y = epi::GetRGBAGreen(hue);
+    rgb.z = epi::GetRGBABlue(hue);
     if (what_palette)
         delete[] what_palette;
     LuaPushVector3(L, rgb);
@@ -934,7 +937,7 @@ static int HD_get_average_hue(lua_State *L)
 // keeping them in case COALHUDS in the wild use them - Dasho
 static int HD_get_average_top_border_color(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     uint8_t     *what_palette = nullptr;
     const Image *tmp_img_c    = ImageLookup(name, kImageNamespaceGraphic, 0);
@@ -948,10 +951,10 @@ static int HD_get_average_top_border_color(lua_State *L)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, tmp_img_c->height_ - 1, tmp_img_c->height_);
-    rgb.X         = epi::GetRGBARed(col);
-    rgb.Y         = epi::GetRGBAGreen(col);
-    rgb.Z         = epi::GetRGBABlue(col);
+    epi::RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, tmp_img_c->height_ - 1, tmp_img_c->height_);
+    rgb.x         = epi::GetRGBARed(col);
+    rgb.y         = epi::GetRGBAGreen(col);
+    rgb.z         = epi::GetRGBABlue(col);
     delete tmp_img_data;
     if (what_palette)
         delete[] what_palette;
@@ -960,7 +963,7 @@ static int HD_get_average_top_border_color(lua_State *L)
 }
 static int HD_get_average_bottom_border_color(lua_State *L)
 {
-    HMM_Vec3     rgb;
+    epi::Vec3    rgb;
     const char  *name         = luaL_checkstring(L, 1);
     uint8_t     *what_palette = nullptr;
     const Image *tmp_img_c    = ImageLookup(name, kImageNamespaceGraphic, 0);
@@ -974,10 +977,10 @@ static int HD_get_average_bottom_border_color(lua_State *L)
         delete tmp_img_data;
         tmp_img_data = rgb_img_data;
     }
-    RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, 0, 1);
-    rgb.X         = epi::GetRGBARed(col);
-    rgb.Y         = epi::GetRGBAGreen(col);
-    rgb.Z         = epi::GetRGBABlue(col);
+    epi::RGBAColor col = tmp_img_data->AverageColor(0, tmp_img_c->width_, 0, 1);
+    rgb.x         = epi::GetRGBARed(col);
+    rgb.y         = epi::GetRGBAGreen(col);
+    rgb.z         = epi::GetRGBABlue(col);
     delete tmp_img_data;
     if (what_palette)
         delete[] what_palette;
@@ -1164,7 +1167,7 @@ void LuaRunHUD(void)
 
     LuaCallGlobalFunction(global_lua_state, "draw_all");
 
-    LuaSetVector3(LuaGetGlobalVM(), "player", "inventory_event_handler", HMM_Vec3{{0, 0, 0}});
+    LuaSetVector3(LuaGetGlobalVM(), "player", "inventory_event_handler", epi::Vec3{0, 0, 0});
 
     HUDReset();
 }

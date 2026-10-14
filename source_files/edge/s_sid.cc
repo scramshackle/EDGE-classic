@@ -23,6 +23,7 @@
 #include "epi_filesystem.h"
 #include "i_movie.h"
 #include "i_sound.h"
+#include "i_system.h"
 #include "libcRSID.h"
 #include "s_blit.h"
 #include "s_cache.h"
@@ -71,7 +72,7 @@ bool SIDPlayer::OpenMemory(const uint8_t *data, int length)
 
     if (!sid_)
     {
-        LogWarning("SID: failure to initialize!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "SID: failure to initialize!\n");
         return false;
     }
 
@@ -79,7 +80,7 @@ bool SIDPlayer::OpenMemory(const uint8_t *data, int length)
 
     if (!sid_header_)
     {
-        LogWarning("SID: failure to load song!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "SID: failure to load song!\n");
         return false;
     }
 

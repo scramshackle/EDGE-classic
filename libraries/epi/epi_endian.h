@@ -21,11 +21,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-enum Endianness
+#include <bit>
+
+namespace epi
 {
-    kLittleEndian,
-    kBigEndian
-};
+
+static_assert(std::endian::native == std::endian::little || std::endian::native == std::endian::big,
+              "Mixed-endian platforms are not supported");
 
 // Used to swap values.  Try to use superfast macros on systems
 // that support them, otherwise use regular C++ functions.
@@ -87,114 +89,85 @@ static inline uint64_t __Swap64(uint64_t n)
 }
 #endif
 
-#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) && !defined(_WIN32)
-#pragma message("epi_endian.h: unknown byte order, assuming little-endian")
-#endif
-constexpr Endianness kByteOrder = kLittleEndian;
-
 inline uint16_t AlignedLittleEndianU16(const uint16_t x)
 {
-    return x;
+    if constexpr (std::endian::native == std::endian::little)
+        return x;
+    else
+        return __Swap16(x);
 }
+
 inline int16_t AlignedLittleEndianS16(const uint16_t x)
 {
-    return (int16_t)x;
+    return (int16_t)AlignedLittleEndianU16(x);
 }
+
 inline uint32_t AlignedLittleEndianU32(const uint32_t x)
 {
-    return x;
+    if constexpr (std::endian::native == std::endian::little)
+        return x;
+    else
+        return __Swap32(x);
 }
+
 inline int32_t AlignedLittleEndianS32(const uint32_t x)
 {
-    return (int32_t)x;
+    return (int32_t)AlignedLittleEndianU32(x);
 }
+
 inline uint64_t AlignedLittleEndianU64(const uint64_t x)
 {
-    return x;
+    if constexpr (std::endian::native == std::endian::little)
+        return x;
+    else
+        return __Swap64(x);
 }
+
 inline int64_t AlignedLittleEndianS64(const uint64_t x)
 {
-    return (int64_t)x;
+    return (int64_t)AlignedLittleEndianU64(x);
 }
 
 inline uint16_t AlignedBigEndianU16(const uint16_t x)
 {
-    return __Swap16(x);
-}
-inline int16_t AlignedBigEndianS16(const uint16_t x)
-{
-    return (int16_t)__Swap16(x);
-}
-inline uint32_t AlignedBigEndianU32(const uint32_t x)
-{
-    return __Swap32(x);
-}
-inline int32_t AlignedBigEndianS32(const uint32_t x)
-{
-    return (int32_t)__Swap32(x);
-}
-inline uint64_t AlignedBigEndianU64(const uint64_t x)
-{
-    return __Swap64(x);
-}
-inline int64_t AlignedBigEndianS64(const uint64_t x)
-{
-    return (int64_t)__Swap64(x);
-}
-#else
-constexpr Endianness kByteOrder = kBigEndian;
-
-inline uint16_t AlignedLittleEndianU16(const uint16_t x)
-{
-    return __Swap16(x);
-}
-inline int16_t AlignedLittleEndianS16(const uint16_t x)
-{
-    return (int16_t)__Swap16(x);
-}
-inline uint32_t AlignedLittleEndianU32(const uint32_t x)
-{
-    return __Swap32(x);
-}
-inline int32_t AlignedLittleEndianS32(const uint32_t x)
-{
-    return (int32_t)__Swap32(x);
-}
-inline uint64_t AlignedLittleEndianU64(const uint64_t x)
-{
-    return __Swap64(x);
-}
-inline int64_t AlignedLittleEndianS64(const uint64_t x)
-{
-    return (int64_t)__Swap64(x);
+    if constexpr (std::endian::native == std::endian::big)
+        return x;
+    else
+        return __Swap16(x);
 }
 
-inline uint16_t AlignedBigEndianU16(const uint16_t x)
-{
-    return x;
-}
 inline int16_t AlignedBigEndianS16(const uint16_t x)
 {
-    return (int16_t)x;
+    return (int16_t)AlignedBigEndianU16(x);
 }
+
 inline uint32_t AlignedBigEndianU32(const uint32_t x)
 {
-    return x;
+    if constexpr (std::endian::native == std::endian::big)
+        return x;
+    else
+        return __Swap32(x);
 }
+
 inline int32_t AlignedBigEndianS32(const uint32_t x)
 {
-    return (int32_t)x;
+    return (int32_t)AlignedBigEndianU32(x);
 }
+
 inline uint64_t AlignedBigEndianU64(const uint64_t x)
 {
-    return x;
+    if constexpr (std::endian::native == std::endian::big)
+        return x;
+    else
+        return __Swap64(x);
 }
+
 inline int64_t AlignedBigEndianS64(const uint64_t x)
 {
-    return (int64_t)x;
+    return (int64_t)AlignedBigEndianU64(x);
 }
-#endif
+
+} // namespace epi
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

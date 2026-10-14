@@ -37,9 +37,9 @@
 #include <vector>
 
 #include "dm_defs.h"
+#include "dm_format.h"
 #include "dm_state.h"
 #include "epi.h"
-#include "epi_doomdefs.h"
 #include "m_random.h"
 #include "p_local.h"
 #include "r_state.h"
@@ -79,8 +79,8 @@ static void WindCurrentForce(Force *f, MapObject *mo)
             qty = 1.0f;
     }
 
-    mo->momentum_.X += qty * f->direction.X;
-    mo->momentum_.Y += qty * f->direction.Y;
+    mo->momentum_.x += qty * f->direction.x;
+    mo->momentum_.y += qty * f->direction.y;
 }
 
 static bool PushThingCallback(MapObject *mo, void *dataptr)
@@ -93,11 +93,11 @@ static bool PushThingCallback(MapObject *mo, void *dataptr)
         return true;
 
     // don't apply the force through walls
-    if (!CheckSightToPoint(mo, current_force->point.X, current_force->point.Y, current_force->point.Z))
+    if (!CheckSightToPoint(mo, current_force->point.x, current_force->point.y, current_force->point.z))
         return true;
 
-    float dx = mo->x - current_force->point.X;
-    float dy = mo->y - current_force->point.Y;
+    float dx = mo->x - current_force->point.x;
+    float dy = mo->y - current_force->point.y;
 
     float d_unit = ApproximateDistance(dx, dy);
 
@@ -110,8 +110,8 @@ static bool PushThingCallback(MapObject *mo, void *dataptr)
     // NOTE: magnitude is negative for PULL mode.
     speed = current_force->magnitude * speed * speed;
 
-    mo->momentum_.X += speed * (dx / d_unit);
-    mo->momentum_.Y += speed * (dy / d_unit);
+    mo->momentum_.x += speed * (dx / d_unit);
+    mo->momentum_.y += speed * (dy / d_unit);
 
     return true;
 }
@@ -129,8 +129,8 @@ static void DoForce(Force *f)
         {
             current_force = f;
 
-            float x = f->point.X;
-            float y = f->point.Y;
+            float x = f->point.x;
+            float y = f->point.y;
             float r = f->radius;
 
             BlockmapThingIterator(x - r, y - r, x + r, y + r, PushThingCallback);
@@ -178,9 +178,9 @@ void AddPointForce(Sector *sec, float length)
             Force *f = NewForce();
 
             f->is_point  = true;
-            f->point.X   = mo->x;
-            f->point.Y   = mo->y;
-            f->point.Z   = mo->z;
+            f->point.x   = mo->x;
+            f->point.y   = mo->y;
+            f->point.z   = mo->z;
             f->radius    = length * 2.0f;
             f->magnitude = length * mo->info_->speed_ / kPushFactor;
             f->sector    = sec;
@@ -194,8 +194,8 @@ void AddSectorForce(Sector *sec, bool is_wind, float x_mag, float y_mag)
     f->is_point = false;
     f->is_wind  = is_wind;
 
-    f->direction.X = x_mag / kPushFactor;
-    f->direction.Y = y_mag / kPushFactor;
+    f->direction.x = x_mag / kPushFactor;
+    f->direction.y = y_mag / kPushFactor;
     f->sector      = sec;
 }
 

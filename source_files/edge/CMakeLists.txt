@@ -202,7 +202,6 @@ set (EDGE_LINK_LIBRARIES
   edgetracker
   epi
   ${SDL3_LIBRARIES}
-  HandmadeMath
   minilua
   minivorbis
   miniz

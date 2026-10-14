@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "ddf_local.h"
+#include "dm_colors.h"
 
 GameDefinitionContainer gamedefs;
 
@@ -115,7 +116,7 @@ static void GameDoTemplate(const char *contents)
 static void GameParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("GAME_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "GAME_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);
@@ -187,7 +188,7 @@ void DDFGameInit(void)
 void DDFGameCleanUp(void)
 {
     if (gamedefs.empty())
-        FatalError("There are no games defined in DDF !\n");
+        epi::FatalError("There are no games defined in DDF !\n");
 }
 
 static void DDFGameAddFrame(void)

@@ -34,8 +34,9 @@
 #include <limits.h>
 #include <string.h>
 
-#include "epi_math.h"
 #include "ddf_local.h"
+#include "dm_colors.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 
 // -KM- 1999/01/29 Improved scrolling.
@@ -259,7 +260,7 @@ s_keys[] = {{"NONE", kDoorKeyNone},
 
 static void LinedefStartEntry(const char *name, bool extend)
 {
-    int number = HMM_MAX(0, atoi(name));
+    int number = epi::Max(0, atoi(name));
 
     if (number == 0)
         DDFError("Bad linetype number in lines.ddf: %s\n", name);
@@ -292,7 +293,7 @@ static void LinedefStartEntry(const char *name, bool extend)
 
 static void LinedefDoTemplate(const char *contents)
 {
-    int number = HMM_MAX(0, atoi(contents));
+    int number = epi::Max(0, atoi(contents));
     if (number == 0)
         DDFError("Bad linetype number for template: %s\n", contents);
 
@@ -307,7 +308,7 @@ static void LinedefDoTemplate(const char *contents)
 static void LinedefParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("LINEDEF_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "LINEDEF_PARSE: %s = %s;\n", field, contents);
 #endif
     EPI_UNUSED(index);
     EPI_UNUSED(is_last);

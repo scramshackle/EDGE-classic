@@ -48,7 +48,8 @@
 #include "epi_scanner.h"
 
 #include <stdarg.h>
-#include <string.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 #include "epi.h"
 #include "epi_str_compare.h"
@@ -56,6 +57,8 @@
 
 namespace epi
 {
+
+static constexpr int kScriptMessageBufferSize = 4096;
 
 static constexpr const char *TokenNames[Scanner::kTotalSpecialTokens] = {
     "Identifier",
@@ -635,16 +638,15 @@ void Scanner::MustGetToken(char token)
     {
         ExpandState();
         if (state_.token == Scanner::kNoToken)
-            ScriptMessage(Scanner::kError, "Unexpected end of script.");
+            ScriptError("Unexpected end of script.");
         else if (token < Scanner::kTotalSpecialTokens && state_.token < Scanner::kTotalSpecialTokens)
-            ScriptMessage(Scanner::kError, "Expected '%s' but got '%s' instead.", TokenNames[(int)token],
-                          TokenNames[(int)state_.token]);
+            ScriptError("Expected '%s' but got '%s' instead.", TokenNames[(int)token], TokenNames[(int)state_.token]);
         else if (token < Scanner::kTotalSpecialTokens && state_.token >= Scanner::kTotalSpecialTokens)
-            ScriptMessage(Scanner::kError, "Expected '%s' but got '%c' instead.", TokenNames[(int)token], state_.token);
+            ScriptError("Expected '%s' but got '%c' instead.", TokenNames[(int)token], state_.token);
         else if (token >= Scanner::kTotalSpecialTokens && state_.token < Scanner::kTotalSpecialTokens)
-            ScriptMessage(Scanner::kError, "Expected '%c' but got '%s' instead.", token, TokenNames[(int)state_.token]);
+            ScriptError("Expected '%c' but got '%s' instead.", token, TokenNames[(int)state_.token]);
         else
-            ScriptMessage(Scanner::kError, "Expected '%c' but got '%c' instead.", token, state_.token);
+            ScriptError("Expected '%c' but got '%c' instead.", token, state_.token);
     }
 }
 
@@ -659,38 +661,26 @@ void Scanner::Rewind()
     logical_position_ = previous_state_.token_line_position;
 }
 
-void Scanner::ScriptMessage(MessageLevel level, const char *error, ...) const
+void Scanner::ScriptMessage(LogLevel level, const char *message, ...) const
 {
-    const char *messageLevel;
-    switch (level)
-    {
-    case kWarning:
-        messageLevel = "Warning";
-        break;
-    case kError:
-        messageLevel = "Error";
-        break;
-    default:
-        messageLevel = "Notice";
-        break;
-    }
+    char    formatted[kScriptMessageBufferSize];
+    va_list arguments;
+    va_start(arguments, message);
+    FormatToBufferSizedArgs(formatted, sizeof(formatted), message, arguments);
+    va_end(arguments);
 
-    std::string newMessage = epi::StringFormat("%s:%d:%d:%s: %s\n", script_identifier_.c_str(), GetLine(),
-                                               GetLinePosition(), messageLevel, error);
-    va_list     list;
-    va_start(list, error);
-    switch (level)
-    {
-    case kWarning:
-        LogWarning(newMessage.c_str(), list);
-        break;
-    case kError:
-        FatalError(newMessage.c_str(), list);
-    default:
-        LogPrint(newMessage.c_str(), list);
-        break;
-    }
-    va_end(list);
+    LogMessage(level, "%s:%d:%d: %s\n", script_identifier_.c_str(), GetLine(), GetLinePosition(), formatted);
+}
+
+void Scanner::ScriptError(const char *error, ...) const
+{
+    char    formatted[kScriptMessageBufferSize];
+    va_list arguments;
+    va_start(arguments, error);
+    FormatToBufferSizedArgs(formatted, sizeof(formatted), error, arguments);
+    va_end(arguments);
+
+    FatalError("%s:%d:%d: %s", script_identifier_.c_str(), GetLine(), GetLinePosition(), formatted);
 }
 
 int Scanner::SkipLine()

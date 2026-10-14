@@ -23,10 +23,12 @@
 
 #include "ddf_weapon.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "ddf_local.h"
 #include "ddf_types.h"
+#include "epi_math.h"
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
@@ -451,7 +453,7 @@ static void WeaponDoTemplate(const char *contents)
 static void WeaponParseField(const char *field, const char *contents, int index, bool is_last)
 {
 #if (DDF_DEBUG)
-    LogDebug("WEAPON_PARSE: %s = %s;\n", field, contents);
+    epi::LogMessage(epi::kLogLevelDebug, "WEAPON_PARSE: %s = %s;\n", field, contents);
 #endif
 
     if (DDFCompareName(field, "TEMPLATE") == 0)
@@ -562,9 +564,9 @@ static void WeaponFinishEntry(void)
     }
 
     if (dynamic_weapon->zoom_factor_ > 0.0)
-        dynamic_weapon->zoom_fov_ = RoundToInteger(90 / dynamic_weapon->zoom_factor_);
+        dynamic_weapon->zoom_fov_ = epi::RoundToInteger(90 / dynamic_weapon->zoom_factor_);
 
-    dynamic_weapon->model_rotate_ *= kBAMAngle1;
+    dynamic_weapon->model_rotate_ *= epi::kBAMAngle1;
 
     // Check MBF21 weapon flags that don't correlate to DDFWEAP flags
     for (std::string &flag : flag_tests)
@@ -783,7 +785,7 @@ static void DDFWStateGetDEHBullet(const char *arg, State *cur_state)
         int vspread = 0;
         if (sscanf(args[1].c_str(), "%d", &vspread) == 1 && vspread != 0)
         {
-            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * HMM_PI / 180.0);
+            atk->accuracy_slope_ = tan((float)vspread / 65536.0f * epi::kPi / 180.0);
 
             if (vspread < 0)
                 atk->accuracy_slope_ = -atk->accuracy_slope_;
@@ -855,7 +857,7 @@ static void DDFWStateGetDEHProjectile(const char *arg, State *cur_state)
     {
         int slope = 0;
         if (sscanf(args[2].c_str(), "%d", &slope) == 1 && slope != 0)
-            atk->slope_offset_ = tan((float)slope / -65536.0f * HMM_PI / 180.0);
+            atk->slope_offset_ = tan((float)slope / -65536.0f * epi::kPi / 180.0);
     }
     if (arg_size > 3)
     {
@@ -1169,7 +1171,7 @@ void WeaponDefinition::Default(void)
 
     nothrust_     = false;
     bind_key_     = -1;
-    zoom_fov_     = kBAMAngle360;
+    zoom_fov_     = epi::kBAMAngle360;
     zoom_factor_  = 0.0;
     refire_inacc_ = false;
     show_clip_    = false;

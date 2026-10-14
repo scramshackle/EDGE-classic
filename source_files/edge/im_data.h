@@ -122,23 +122,22 @@ class ImageData
     // Determine the bounds of the image data that actually contain
     // non-backgroundpixels, based on the provided color
     void DetermineRealBounds(uint16_t *bottom, uint16_t *left, uint16_t *right, uint16_t *top,
-                             RGBAColor background_color, int from_x = -1, int to_x = 1000000, int from_y = -1,
+                             epi::RGBAColor background_color, int from_x = -1, int to_x = 1000000, int from_y = -1,
                              int to_y = 1000000);
 
     // compute the average Hue of the RGB(A) image, storing the
     // result in the 'hue' array (r, g, b).  The average intensity
     // will be stored in 'intensity' when given.
-    RGBAColor AverageHue(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
+    epi::RGBAColor AverageHue(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
 
     // compute the average color of the RGB image, based on modal average
-    RGBAColor AverageColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
+    epi::RGBAColor AverageColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
 
     // compute the lightest color in the RGB image
-    RGBAColor LightestColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
+    epi::RGBAColor LightestColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
 
     // compute the darkest color in the RGB image
-    RGBAColor DarkestColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
-
+    epi::RGBAColor DarkestColor(int from_x = -1, int to_x = 1000000, int from_y = -1, int to_y = 1000000);
 
     // Change various HSV color values if needed
     void SetHSV(int rotation, int saturation, int value);

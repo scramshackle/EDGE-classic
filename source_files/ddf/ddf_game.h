@@ -191,7 +191,7 @@ class GameDefinition
 
     // Define a default damage flash color (mostly to remap Chex Quest
     // from red->green) - Dasho
-    RGBAColor default_damage_flash_;
+    epi::RGBAColor default_damage_flash_;
 
   private:
     // disable copy construct and assignment operator

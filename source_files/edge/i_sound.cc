@@ -144,7 +144,8 @@ void StartupAudio(void)
 
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
     {
-        LogPrint("StartupSound: Unable to initialize SDL audio subsystem: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Unable to initialize SDL audio subsystem: %s\n",
+                        SDL_GetError());
         no_sound = true;
         return;
     }
@@ -158,7 +159,7 @@ void StartupAudio(void)
 
     if (sound_device == 0)
     {
-        LogPrint("StartupSound: Unable to open audio device: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Unable to open audio device: %s\n", SDL_GetError());
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         no_sound = true;
         return;
@@ -176,7 +177,7 @@ void StartupAudio(void)
 
     if (music_device == 0)
     {
-        LogPrint("StartupSound: Unable to open music device: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Unable to open music device: %s\n", SDL_GetError());
         no_music = true;
     }
     else
@@ -196,7 +197,7 @@ void StartupAudio(void)
 
     if (!sound_device_stream)
     {
-        LogPrint("StartupSound: Unable to create audio stream: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Unable to create audio stream: %s\n", SDL_GetError());
         ShutdownEffects();
         SDL_CloseAudioDevice(sound_device);
         sound_device = 0;
@@ -210,7 +211,8 @@ void StartupAudio(void)
     SDL_ResumeAudioDevice(sound_device);
 
     // display some useful stuff
-    LogPrint("StartupSound: Success @ %d Hz, %d channels\n", sound_device_frequency, sound_device_channels);
+    epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Success @ %d Hz, %d channels\n", sound_device_frequency,
+                    sound_device_channels);
 
     return;
 }
@@ -238,7 +240,8 @@ void ApplyPendingSoundDeviceFormatChange(void)
     if (obtained.freq == sound_device_frequency && obtained.channels == sound_device_channels)
         return;
 
-    LogPrint("StartupSound: Device format changed to %d Hz, %d channels\n", obtained.freq, obtained.channels);
+    epi::LogMessage(epi::kLogLevelPrint, "StartupSound: Device format changed to %d Hz, %d channels\n", obtained.freq,
+                    obtained.channels);
 
     int  restart_entry = entry_playing;
     bool restart_loop  = entry_looped;

@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 #include "gles2_program.h"
 #include "i_defs_gl.h"
 #include "r_units.h"
@@ -55,9 +55,9 @@ class Gles2Immediate
 
     void PopMatrix();
 
-    void LoadMatrix(const HMM_Mat4 &matrix);
+    void LoadMatrix(const epi::Mat4 &matrix);
 
-    void MultiplyMatrix(const HMM_Mat4 &matrix);
+    void MultiplyMatrix(const epi::Mat4 &matrix);
 
     void Translate(float x, float y, float z);
 
@@ -69,7 +69,7 @@ class Gles2Immediate
 
     void Frustum(float left, float right, float bottom, float top, float z_near, float z_far);
 
-    const HMM_Mat4 &ModelViewMatrix() const
+    const epi::Mat4 &ModelViewMatrix() const
     {
         return matrix_stack_[kGles2MatrixModeModelView][matrix_top_[kGles2MatrixModeModelView]];
     }
@@ -133,7 +133,7 @@ class Gles2Immediate
         return render_target_framebuffer_ != 0;
     }
 
-    const HMM_Mat4 &ProjectionMatrix() const
+    const epi::Mat4 &ProjectionMatrix() const
     {
         return matrix_stack_[kGles2MatrixModeProjection][matrix_top_[kGles2MatrixModeProjection]];
     }
@@ -267,7 +267,7 @@ class Gles2Immediate
 
     std::vector<RendererVertex> scratch_vertices_;
 
-    HMM_Mat4 matrix_stack_[kGles2MatrixModeTotal][kGles2MatrixStackDepth];
+    epi::Mat4 matrix_stack_[kGles2MatrixModeTotal][kGles2MatrixStackDepth];
     int32_t  matrix_top_[kGles2MatrixModeTotal];
 
     Gles2MatrixMode current_matrix_mode_ = kGles2MatrixModeModelView;

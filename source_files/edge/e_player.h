@@ -244,7 +244,7 @@ class Player
     float damage_pain_;
 
     // damage flash colour of last damage type inflicted
-    RGBAColor last_damage_colour_;
+    epi::RGBAColor last_damage_colour_;
 
     // So gun flashes light up the screen.
     int  extra_light_;

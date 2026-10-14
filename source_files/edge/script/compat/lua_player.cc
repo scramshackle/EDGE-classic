@@ -1,11 +1,15 @@
 
-#include "epi_math.h"
+#include <math.h>
+
 #include "ddf_flat.h"
 #include "ddf_types.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "e_main.h"
 #include "e_player.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
+#include "epi_vector.h"
 #include "f_interm.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -86,11 +90,11 @@ static int PL_get_name(lua_State *L)
 //
 static int PL_get_pos(lua_State *L)
 {
-    HMM_Vec3 v;
+    epi::Vec3 v;
 
-    v.X = ui_player_who->map_object_->x;
-    v.Y = ui_player_who->map_object_->y;
-    v.Z = ui_player_who->map_object_->z;
+    v.x = ui_player_who->map_object_->x;
+    v.y = ui_player_who->map_object_->y;
+    v.z = ui_player_who->map_object_->z;
 
     LuaPushVector3(L, v);
     return 1;
@@ -323,7 +327,7 @@ static int PL_air_in_lungs(lua_State *L)
 
     float value = ui_player_who->air_in_lungs_ * 100.0f / ui_player_who->map_object_->info_->lung_capacity_;
 
-    value = HMM_Clamp(0.0f, value, 100.0f);
+    value = epi::Clamp(value, 0.0f, 100.0f);
 
     lua_pushnumber(L, value);
     return 1;
@@ -904,13 +908,13 @@ static int PL_hurt_dir(lua_State *L)
         MapObject *badguy = ui_player_who->attacker_;
         MapObject *pmo    = ui_player_who->map_object_;
 
-        BAMAngle diff = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y) - pmo->angle_;
+        epi::BAMAngle diff = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y) - pmo->angle_;
 
-        if (diff >= kBAMAngle45 && diff <= kBAMAngle135)
+        if (diff >= epi::kBAMAngle45 && diff <= epi::kBAMAngle135)
         {
             dir = -1;
         }
-        else if (diff >= kBAMAngle225 && diff <= kBAMAngle315)
+        else if (diff >= epi::kBAMAngle225 && diff <= epi::kBAMAngle315)
         {
             dir = +1;
         }
@@ -931,7 +935,7 @@ static int PL_hurt_angle(lua_State *L)
         MapObject *badguy = ui_player_who->attacker_;
         MapObject *pmo    = ui_player_who->map_object_;
 
-        BAMAngle real_a = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y);
+        epi::BAMAngle real_a = PointToAngle(pmo->x, pmo->y, badguy->x, badguy->y);
 
         value = epi::DegreesFromBAM(real_a);
 
@@ -2427,19 +2431,19 @@ static int Sector_info(lua_State *L)
 
     //---------------
     // SECTOR.fogcolor
-    HMM_Vec3  rgb;
-    RGBAColor tempcolor = ui_player_who->map_object_->sector_->properties.fog_color;
+    epi::Vec3 rgb;
+    epi::RGBAColor tempcolor = ui_player_who->map_object_->sector_->properties.fog_color;
 
-    rgb.R = -1;
-    rgb.G = -1;
-    rgb.B = -1;
+    rgb.x = -1;
+    rgb.y = -1;
+    rgb.z = -1;
     if (tempcolor != 0)
     {
         if (tempcolor != kRGBANoValue)
         {
-            rgb.R = epi::GetRGBARed(tempcolor);
-            rgb.G = epi::GetRGBAGreen(tempcolor);
-            rgb.B = epi::GetRGBABlue(tempcolor);
+            rgb.x = epi::GetRGBARed(tempcolor);
+            rgb.y = epi::GetRGBAGreen(tempcolor);
+            rgb.z = epi::GetRGBABlue(tempcolor);
         }
     }
 

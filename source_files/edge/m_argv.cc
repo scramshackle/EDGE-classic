@@ -239,7 +239,7 @@ void ApplyResponseFile(std::string_view name)
 
 void DumpArguments(void)
 {
-    LogPrint("Command-line Options:\n");
+    epi::LogMessage(epi::kLogLevelPrint, "Command-line Options:\n");
 
     int i = 0;
 
@@ -250,7 +250,8 @@ void DumpArguments(void)
         if (i > 0 && i + 1 < int(program_argument_list.size()) && !ArgumentIsOption(i + 1))
             pair_it_up = true;
 
-        LogPrint("  %s %s\n", program_argument_list[i].c_str(), pair_it_up ? program_argument_list[i + 1].c_str() : "");
+        epi::LogMessage(epi::kLogLevelPrint, "  %s %s\n", program_argument_list[i].c_str(),
+                        pair_it_up ? program_argument_list[i + 1].c_str() : "");
 
         i += pair_it_up ? 2 : 1;
     }

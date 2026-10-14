@@ -156,8 +156,8 @@ struct SpawnPoint
     float x, y, z;
 
     // direction thing faces
-    BAMAngle angle;
-    BAMAngle vertical_angle;
+    epi::BAMAngle angle;
+    epi::BAMAngle vertical_angle;
 
     // type of thing
     const MapObjectDefinition *info;
@@ -176,7 +176,7 @@ struct DynamicLightState
 {
     float           r;      // radius
     float           target; // target radius
-    RGBAColor       color;
+    epi::RGBAColor  color;
     AbstractShader *shader;
     Line           *glow_wall     = nullptr;
     bool            bad_wall_glow = false;
@@ -195,8 +195,8 @@ class MapObject : public Position
   public:
     const MapObjectDefinition *info_ = nullptr;
 
-    BAMAngle angle_          = 0; // orientation
-    BAMAngle vertical_angle_ = 0; // looking up or down
+    epi::BAMAngle angle_          = 0; // orientation
+    epi::BAMAngle vertical_angle_ = 0; // looking up or down
 
     // For movement checking.
     float radius_ = 0;
@@ -206,7 +206,7 @@ class MapObject : public Position
     float alpha_  = 1.0f;
 
     // Momentum, used to update position.
-    HMM_Vec3 momentum_ = {{0, 0, 0}};
+    epi::Vec3 momentum_ = {0, 0, 0};
 
     // Track hover phase for time stop shenanigans
     float phase_ = 0.0f;
@@ -220,8 +220,8 @@ class MapObject : public Position
     // Uncapped stuff - Dasho
     float    old_x_              = 0;
     float    old_y_              = 0;
-    BAMAngle old_angle_          = 0;
-    BAMAngle old_vertical_angle_ = 0;
+    epi::BAMAngle old_angle_          = 0;
+    epi::BAMAngle old_vertical_angle_ = 0;
 
     // Vert slope stuff maybe
     float old_z_       = 0;
@@ -363,7 +363,7 @@ class MapObject : public Position
     short interpolation_number_   = 0;
     short interpolation_position_ = 0;
 
-    HMM_Vec3 interpolation_from_ = {{0, 0, 0}};
+    epi::Vec3 interpolation_from_ = {0, 0, 0};
 
     // touch list: sectors this thing is in or touches
     struct TouchNode *touch_sectors_ = nullptr;

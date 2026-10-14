@@ -29,6 +29,7 @@
 
 #include "con_main.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
@@ -168,7 +169,7 @@ void StartupGraphics(void)
 
     if (!driver) driver = "default";
 
-    LogPrint("SDL_Video_Driver: %s\n", driver);
+    epi::LogMessage(epi::kLogLevelPrint, "SDL_Video_Driver: %s\n", driver);
 
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
         FatalError("Couldn't init SDL VIDEO!\n%s\n", SDL_GetError());
@@ -216,14 +217,15 @@ void StartupGraphics(void)
     if (current_screen_height > desktop_resolution_height.d_)
         current_screen_height = desktop_resolution_height.d_;
 
-    LogPrint("Desktop resolution: %dx%d\n", desktop_resolution_width.d_, desktop_resolution_height.d_);
+    epi::LogMessage(epi::kLogLevelPrint, "Desktop resolution: %dx%d\n", desktop_resolution_width.d_,
+                    desktop_resolution_height.d_);
 
     int num_modes = 0;
     SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(main_display, &num_modes);
 
 #ifdef EDGE_WEB
     if (!num_modes || !modes)
-        LogPrint("No fullscreen display modes reported; using desktop resolution only\n");
+        epi::LogMessage(epi::kLogLevelPrint, "No fullscreen display modes reported; using desktop resolution only\n");
 #else
     if (!num_modes || !modes)
     {
@@ -279,7 +281,7 @@ void StartupGraphics(void)
 
     SDL_free(modes);
 
-    LogPrint("StartupGraphics: initialisation OK\n");
+    epi::LogMessage(epi::kLogLevelPrint, "StartupGraphics: initialisation OK\n");
 }
 
 static bool InitializeWindow(DisplayMode *mode)
@@ -304,7 +306,7 @@ static bool InitializeWindow(DisplayMode *mode)
 
     if (!program_window)
     {
-        LogPrint("Failed to create window: %s\n", SDL_GetError());
+        epi::LogMessage(epi::kLogLevelPrint, "Failed to create window: %s\n", SDL_GetError());
         return false;
     }
 
@@ -364,8 +366,8 @@ bool SetScreenSize(DisplayMode *mode)
     bool initializing = false;
     GrabCursor(false);
 
-    LogPrint("SetScreenSize: trying %dx%d %dbpp (%s)\n", mode->width, mode->height, mode->depth,
-             mode->window_mode == kWindowModeBorderless ? "borderless" : "windowed");
+    epi::LogMessage(epi::kLogLevelPrint, "SetScreenSize: trying %dx%d %dbpp (%s)\n", mode->width, mode->height,
+                    mode->depth, mode->window_mode == kWindowModeBorderless ? "borderless" : "windowed");
 
     if (program_window == nullptr)
     {
@@ -382,7 +384,8 @@ bool SetScreenSize(DisplayMode *mode)
         SDL_GetWindowSize(program_window, &borderless_mode.width, &borderless_mode.height);
         SDL_SyncWindow(program_window);
 
-        LogPrint("SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height, mode->depth);
+        epi::LogMessage(epi::kLogLevelPrint, "SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height,
+                        mode->depth);
     }
     else /* kWindowModeWindowed */
     {
@@ -392,7 +395,8 @@ bool SetScreenSize(DisplayMode *mode)
         SDL_SyncWindow(program_window);
         SDL_SetWindowPosition(program_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
-        LogPrint("SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height, mode->depth);
+        epi::LogMessage(epi::kLogLevelPrint, "SetScreenSize: mode now %dx%d %dbpp\n", mode->width, mode->height,
+                        mode->depth);
     }
 
     if (!initializing)
@@ -456,17 +460,18 @@ void FinishFrame(void)
 
         const LightGrid *grid = CurrentLightGrid();
 
-        LogPrint("Light survey %d: %d render units, %d dynamic-light, %d glow, %u backend draws, "
-                 "%d walls, %d planes, %d things | grid %d lights, cluster max %d drop %d.\n",
-                 light_survey_frame, ec_frame_stats.draw_render_units, ec_frame_stats.draw_light_dynamic,
-                 ec_frame_stats.draw_light_glow, stats.num_draw_, ec_frame_stats.draw_wall_parts,
-                 ec_frame_stats.draw_planes, ec_frame_stats.draw_things, (int)grid->lights.size(),
-                 grid->max_cluster_count, grid->dropped_cluster);
+        epi::LogMessage(epi::kLogLevelPrint,
+                        "Light survey %d: %d render units, %d dynamic-light, %d glow, %u backend draws, "
+                        "%d walls, %d planes, %d things | grid %d lights, cluster max %d drop %d.\n",
+                        light_survey_frame, ec_frame_stats.draw_render_units, ec_frame_stats.draw_light_dynamic,
+                        ec_frame_stats.draw_light_glow, stats.num_draw_, ec_frame_stats.draw_wall_parts,
+                        ec_frame_stats.draw_planes, ec_frame_stats.draw_things, (int)grid->lights.size(),
+                        grid->max_cluster_count, grid->dropped_cluster);
 
-        LogPrint("Light grid time: collect %llu us, bin %llu us, upload %llu us.\n",
-                 (unsigned long long)ec_frame_stats.light_grid_collect_us,
-                 (unsigned long long)ec_frame_stats.light_grid_bin_us,
-                 (unsigned long long)ec_frame_stats.light_grid_upload_us);
+        epi::LogMessage(epi::kLogLevelPrint, "Light grid time: collect %llu us, bin %llu us, upload %llu us.\n",
+                        (unsigned long long)ec_frame_stats.light_grid_collect_us,
+                        (unsigned long long)ec_frame_stats.light_grid_bin_us,
+                        (unsigned long long)ec_frame_stats.light_grid_upload_us);
 
         light_survey_frame++;
 

@@ -23,6 +23,7 @@
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "i_system.h"
 #include "s_blit.h"
 #include "s_cache.h"
 #include "snd_gather.h"
@@ -34,13 +35,13 @@ bool LoadWAVSound(SoundData *buf, const uint8_t *data, int length)
 
     if (!drwav_init_memory(&decode, data, length, NULL))
     {
-        LogWarning("Failed to load WAV sound (corrupt wav?)\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Failed to load WAV sound (corrupt wav?)\n");
         return false;
     }
 
     if (decode.channels > 2)
     {
-        LogWarning("WAV SFX Loader: too many channels: %d\n", decode.channels);
+        epi::LogMessage(epi::kLogLevelWarning, "WAV SFX Loader: too many channels: %d\n", decode.channels);
         drwav_uninit(&decode);
         return false;
     }
@@ -49,12 +50,13 @@ bool LoadWAVSound(SoundData *buf, const uint8_t *data, int length)
 
     if (frame_count == 0)
     {
-        LogWarning("WAV SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "WAV SFX Loader: no samples!\n");
         drwav_uninit(&decode);
         return false;
     }
 
-    LogDebug("WAV SFX Loader: freq %d Hz, %d channels\n", decode.sampleRate, decode.channels);
+    epi::LogMessage(epi::kLogLevelDebug, "WAV SFX Loader: freq %d Hz, %d channels\n", decode.sampleRate,
+                    decode.channels);
 
     bool is_stereo = (decode.channels > 1);
 
@@ -69,7 +71,7 @@ bool LoadWAVSound(SoundData *buf, const uint8_t *data, int length)
     gather.CommitChunk(frames_read);
 
     if (!gather.Finalise(buf))
-        LogWarning("WAV SFX Loader: no samples!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "WAV SFX Loader: no samples!\n");
 
     drwav_uninit(&decode);
 

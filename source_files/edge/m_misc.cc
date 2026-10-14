@@ -64,7 +64,6 @@
 #include "r_wipe.h"
 #include "s_blit.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "version.h"
 //
 // DEFAULTS
@@ -225,7 +224,7 @@ void SaveDefaults(void)
 
     if (!f)
     {
-        LogWarning("Couldn't open config file %s for writing.", configuration_file.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Couldn't open config file %s for writing.", configuration_file.c_str());
         return; // can't write the file, but don't complain
     }
 
@@ -379,14 +378,15 @@ void LoadDefaults(void)
     // set everything to base values
     ResetDefaults(0);
 
-    LogPrint("LoadDefaults from %s\n", configuration_file.c_str());
+    epi::LogMessage(epi::kLogLevelPrint, "LoadDefaults from %s\n", configuration_file.c_str());
 
     epi::File *file = epi::FileOpen(configuration_file, epi::kFileAccessRead);
 
     if (!file)
     {
-        LogWarning("Couldn't open config file %s for reading.\n", configuration_file.c_str());
-        LogWarning("Resetting config to RECOMMENDED values...\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Couldn't open config file %s for reading.\n",
+                        configuration_file.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "Resetting config to RECOMMENDED values...\n");
         return;
     }
     // load the file into this string
@@ -445,9 +445,9 @@ void TakeScreenshot(bool show_msg)
     if (show_msg)
     {
         if (result)
-            LogPrint("Captured to file: %s\n", fn.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Captured to file: %s\n", fn.c_str());
         else
-            LogPrint("Error saving file: %s\n", fn.c_str());
+            epi::LogMessage(epi::kLogLevelPrint, "Error saving file: %s\n", fn.c_str());
     }
 
     delete img;
@@ -473,9 +473,9 @@ static void SaveScreenshotOnFrameFinished(void *context)
     bool result = SavePNG(filename, img);
 
     if (result)
-        LogPrint("Captured to file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Captured to file: %s\n", filename.c_str());
     else
-        LogPrint("Error saving file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Error saving file: %s\n", filename.c_str());
 
     delete img;
 
@@ -503,7 +503,7 @@ void WarningOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -512,7 +512,7 @@ void WarningOrError(const char *error, ...)
     if (strict_errors)
         FatalError("%s", message_buf);
     else if (!no_warnings)
-        LogWarning("%s", message_buf);
+        epi::LogMessage(epi::kLogLevelWarning, "%s", message_buf);
 }
 
 void DebugOrError(const char *error, ...)
@@ -527,7 +527,7 @@ void DebugOrError(const char *error, ...)
     va_list argptr;
 
     va_start(argptr, error);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), error, argptr);
+    epi::FormatToBufferSizedArgs(message_buf, sizeof(message_buf), error, argptr);
     va_end(argptr);
 
     // I hope nobody is printing strings longer than 4096 chars...
@@ -536,37 +536,7 @@ void DebugOrError(const char *error, ...)
     if (strict_errors)
         FatalError("%s", message_buf);
     else if (!no_warnings)
-        LogDebug("%s", message_buf);
-}
-
-extern FILE *debug_file; // FIXME
-
-void LogDebug(const char *message, ...)
-{
-    // Write into the debug file.
-    //
-    // -ACB- 1999/09/22: From #define to Procedure
-    // -AJA- 2001/02/07: Moved here from platform codes.
-    //
-    if (!debug_file)
-        return;
-
-    char message_buf[4096];
-
-    message_buf[4095] = 0;
-
-    // Print the message into a text string
-    va_list argptr;
-
-    va_start(argptr, message);
-    stbsp_vsnprintf(message_buf, sizeof(message_buf), message, argptr);
-    va_end(argptr);
-
-    // I hope nobody is printing strings longer than 4096 chars...
-    EPI_ASSERT(message_buf[4095] == 0);
-
-    fprintf(debug_file, "%s", message_buf);
-    fflush(debug_file);
+        epi::LogMessage(epi::kLogLevelDebug, "%s", message_buf);
 }
 
 extern FILE *log_file; // FIXME: make file_c and unify with debug_file

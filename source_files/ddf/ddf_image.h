@@ -85,7 +85,7 @@ class ImageDefinition
 
     ImageDataType type_;
 
-    RGBAColor colour_;       // kImageDataColor
+    epi::RGBAColor colour_;  // kImageDataColor
 
     std::string     info_;   // kImageDataPackage, kImageDataFile, kImageDataLump
     LumpImageFormat format_; //

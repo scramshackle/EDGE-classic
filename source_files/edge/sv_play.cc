@@ -32,7 +32,6 @@
 #include "ddf_main.h"
 #include "epi.h"
 #include "epi_str_util.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 
@@ -382,7 +381,7 @@ int SaveGamePlayerGetIndex(Player *elem)
 
 void SaveGamePlayerCreateElems(int num_elems)
 {
-    LogDebug("SaveGamePlayerCreateElems...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SaveGamePlayerCreateElems...\n");
 
     // free existing players (sets all pointers to nullptr)
     DestroyAllPlayers();
@@ -407,7 +406,7 @@ void SaveGamePlayerCreateElems(int num_elems)
         // initialise defaults
 
         p->player_number_ = -1; // checked during finalisation.
-        stbsp_sprintf(p->player_name_, "Player%d", 1 + p->player_number_);
+        epi::FormatToBufferSized(p->player_name_, sizeof(p->player_name_), "Player%d", 1 + p->player_number_);
 
         p->remember_attack_state_[0] = -1;
         p->remember_attack_state_[1] = -1;
@@ -726,7 +725,7 @@ bool SR_PlayerGetState(void *storage, int index)
 
     if (!base)
     {
-        LogWarning("LOADGAME: no such label `%s' for weapon state.\n", base_p);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: no such label `%s' for weapon state.\n", base_p);
 
         offset = 0;
         base   = actual->ready_state_;
@@ -768,7 +767,7 @@ void SR_PlayerPutState(void *storage, int index)
 
     if (s_num < 0 || s_num >= num_states)
     {
-        LogWarning("SAVEGAME: weapon is in invalid state %d\n", s_num);
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: weapon is in invalid state %d\n", s_num);
         s_num = weapondefs[0]->state_grp_[0].first;
     }
 
@@ -787,7 +786,7 @@ void SR_PlayerPutState(void *storage, int index)
 
     if (!actual)
     {
-        LogWarning("SAVEGAME: weapon state %d cannot be found !!\n", s_num);
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: weapon state %d cannot be found !!\n", s_num);
         actual = weapondefs[0];
         s_num  = actual->state_grp_[0].first;
     }

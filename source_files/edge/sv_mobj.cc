@@ -32,7 +32,6 @@
 #include "epi_str_util.h"
 #include "p_mobj.h"
 #include "p_setup.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 
@@ -538,7 +537,7 @@ void SV_ItemqFinaliseElems(void)
         if (cur->spawnpoint.info)
             continue;
 
-        LogWarning("LOADGAME: discarding empty ItemInQue\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: discarding empty ItemInQue\n");
 
         if (next)
             next->previous = cur->previous;
@@ -620,7 +619,7 @@ bool SaveGameMapObjectGetType(void *storage, int index)
     if (!*dest)
     {
         // Note: a missing 'info' field will be fixed up later
-        LogWarning("LOADGAME: no such thing type '%s'\n", name);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: no such thing type '%s'\n", name);
     }
 
     SaveChunkFreeString(name);
@@ -765,7 +764,7 @@ bool SaveGameMapObjectGetState(void *storage, int index)
 
     if (!base)
     {
-        LogWarning("LOADGAME: no such label `%s' for state.\n", base_p);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: no such label `%s' for state.\n", base_p);
         offset = 0;
 
         if (actual->idle_state_)
@@ -829,7 +828,7 @@ void SaveGameMapObjectPutState(void *storage, int index)
     // object has no states ?
     if (mo->info_->state_grp_.empty())
     {
-        LogWarning("SAVEGAME: object [%s] has no states !!\n", mo->info_->name_.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: object [%s] has no states !!\n", mo->info_->name_.c_str());
         SaveChunkPutString(nullptr);
         return;
     }
@@ -839,7 +838,8 @@ void SaveGameMapObjectPutState(void *storage, int index)
 
     if (s_num < 0 || s_num >= num_states)
     {
-        LogWarning("SAVEGAME: object [%s] is in invalid state %d\n", mo->info_->name_.c_str(), s_num);
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: object [%s] is in invalid state %d\n",
+                        mo->info_->name_.c_str(), s_num);
 
         if (mo->info_->idle_state_)
             s_num = mo->info_->idle_state_;
@@ -859,7 +859,8 @@ void SaveGameMapObjectPutState(void *storage, int index)
 
     if (!DDFStateGroupHasState(actual->state_grp_, s_num))
     {
-        LogWarning("SAVEGAME: object [%s] is in AWOL state %d\n", mo->info_->name_.c_str(), s_num);
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: object [%s] is in AWOL state %d\n", mo->info_->name_.c_str(),
+                        s_num);
 
         bool state_found = false;
 
@@ -877,14 +878,14 @@ void SaveGameMapObjectPutState(void *storage, int index)
 
         if (!state_found)
         {
-            LogWarning("-- ARGH: state %d cannot be found !!\n", s_num);
+            epi::LogMessage(epi::kLogLevelWarning, "-- ARGH: state %d cannot be found !!\n", s_num);
             SaveChunkPutString("*:*:1");
             return;
         }
 
         if (actual->name_.empty())
         {
-            LogWarning("-- OOPS: state %d found in unnamed object !!\n", s_num);
+            epi::LogMessage(epi::kLogLevelWarning, "-- OOPS: state %d found in unnamed object !!\n", s_num);
             SaveChunkPutString("*:*:1");
             return;
         }
@@ -898,8 +899,8 @@ void SaveGameMapObjectPutState(void *storage, int index)
         base--;
     }
 
-    stbsp_sprintf(swizzle, "%s:%s:%d", (actual == mo->info_) ? "*" : actual->name_.c_str(),
-                  states[base].label ? states[base].label : "*", 1 + s_num - base);
+    epi::FormatToBufferSized(swizzle, sizeof(swizzle), "%s:%s:%d", (actual == mo->info_) ? "*" : actual->name_.c_str(),
+                             states[base].label ? states[base].label : "*", 1 + s_num - base);
 
     SaveChunkPutString(swizzle);
 }

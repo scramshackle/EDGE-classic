@@ -32,11 +32,13 @@
 
 #include "am_map.h"
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "dm_state.h"
 #include "dstrings.h"
 #include "e_main.h"
 #include "epi.h"
+#include "epi_str_util.h"
 #include "f_interm.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -56,7 +58,6 @@
 #include "r_state.h"
 #include "s_music.h"
 #include "s_sound.h"
-#include "stb_sprintf.h"
 #include "w_model.h"
 #include "w_wad.h"
 
@@ -89,7 +90,7 @@ static void CastSkip(void);
 
 static const Image *finale_text_background;
 static float        finale_text_background_scale = 1.0f;
-static RGBAColor    finale_text_color;
+static epi::RGBAColor finale_text_color;
 
 static Style *finale_level_text_style;
 static Style *finale_cast_style;
@@ -926,7 +927,7 @@ static void BunnyScroll(void)
         laststage = stage;
     }
 
-    stbsp_sprintf(name, "END%i", stage);
+    epi::FormatToBufferSized(name, sizeof(name), "END%i", stage);
 
     p1 = ImageLookup(name);
 
@@ -950,7 +951,7 @@ void FinaleDrawer(void)
 
     case kFinaleStagePicture: {
         const Image *image =
-            ImageLookup(finale->pics_[HMM_MIN((size_t)picture_number, finale->pics_.size() - 1)].c_str());
+            ImageLookup(finale->pics_[epi::Min((size_t)picture_number, finale->pics_.size() - 1)].c_str());
         if (title_scaling.d_) // Fill Border
         {
             HUDStretchImageBlurred(-320, -200, 960, 600, image);

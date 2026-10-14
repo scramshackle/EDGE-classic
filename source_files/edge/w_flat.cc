@@ -137,8 +137,8 @@ static void AddFlatAnimation(AnimationDefinition *anim)
 
         if (file < 0)
         {
-            LogWarning("Missing flat animation: %s-%s not in any wad.\n", anim->start_name_.c_str(),
-                       anim->end_name_.c_str());
+            epi::LogMessage(epi::kLogLevelWarning, "Missing flat animation: %s-%s not in any wad.\n",
+                            anim->start_name_.c_str(), anim->end_name_.c_str());
 
             AddTXAnimation(anim, kImageNamespaceFlat); // Lobo 2024: try plan B
             return;
@@ -317,7 +317,7 @@ void InitializeFlats(void)
 
     std::vector<int> flats;
 
-    LogPrint("InitializeFlats...\n");
+    epi::LogMessage(epi::kLogLevelPrint, "InitializeFlats...\n");
 
     // iterate over each file, creating our big array of flats
 
@@ -337,7 +337,7 @@ void InitializeFlats(void)
 
     if (flats.size() == 0)
     {
-        LogWarning("No flats found! Generating fallback flat!\n");
+        epi::LogMessage(epi::kLogLevelWarning, "No flats found! Generating fallback flat!\n");
         CreateFallbackFlat();
         return;
     }

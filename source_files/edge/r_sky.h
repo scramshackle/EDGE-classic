@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "HandmadeMath.h"
+#include "epi_vector.h"
 #include "im_data.h"
 #include "r_image.h"
 
@@ -65,7 +65,7 @@ void UpdateSkyboxTextures(void);
 
 void SetupSkyMatrices(void);
 void RendererRevertSkyMatrices(void);
-void GetSkyInverseMatrices(HMM_Mat4 &inverse_projection, HMM_Mat4 &inverse_view);
+void GetSkyInverseMatrices(epi::Mat4 &inverse_projection, epi::Mat4 &inverse_view);
 
 GLuint CreateSkyCubemap(ImageData *faces[6], int face_size);
 void   DeleteSkyCubemap(GLuint cubemap);

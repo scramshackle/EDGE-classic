@@ -6,6 +6,7 @@
 #include "e_player.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_windows.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -34,7 +35,7 @@ static int SYS_error(lua_State *L)
 static int SYS_print(lua_State *L)
 {
     const char *s = luaL_checkstring(L, 1);
-    LogPrint("%s\n", s);
+    epi::LogMessage(epi::kLogLevelPrint, "%s\n", s);
     return 0;
 }
 
@@ -43,7 +44,7 @@ static int SYS_print(lua_State *L)
 static int SYS_debug_print(lua_State *L)
 {
     const char *s = luaL_checkstring(L, 1);
-    LogDebug("%s\n", s);
+    epi::LogMessage(epi::kLogLevelDebug, "%s\n", s);
     return 0;
 }
 
@@ -84,7 +85,7 @@ static int SYS_AllocConsole(lua_State *L)
 static int MATH_rint(lua_State *L)
 {
     double val = luaL_checknumber(L, 1);
-    lua_pushinteger(L, RoundToInteger(val));
+    lua_pushinteger(L, epi::RoundToInteger(val));
     return 1;
 }
 

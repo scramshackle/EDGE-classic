@@ -29,6 +29,7 @@
 
 #include "con_gui.h"
 #include "con_main.h"
+#include "dm_colors.h"
 #include "dm_state.h"
 #include "e_input.h"
 #include "e_main.h"
@@ -114,13 +115,13 @@ void HUDStart(void)
     // language.IsValidRef(current_map->description))
     if (current_map->description_ != "") // Lobo 2022: if it's wrong, show it anyway
     {
-        LogPrint("\n");
-        LogPrint("--------------------------------------------------\n");
+        epi::LogMessage(epi::kLogLevelPrint, "\n");
+        epi::LogMessage(epi::kLogLevelPrint, "--------------------------------------------------\n");
 
         ConsoleMessageColor(kRGBAGreen);
 
         string = language[current_map->description_];
-        LogPrint("Entering %s\n", string);
+        epi::LogMessage(epi::kLogLevelPrint, "Entering %s\n", string);
 
         current_map_title = string;
     }

@@ -26,6 +26,7 @@
 #pragma once
 
 #include "ddf_main.h"
+#include "dm_colors.h"
 #include "dm_defs.h"
 #include "m_math.h"
 #include "p_mobj.h"
@@ -42,7 +43,7 @@ class Image;
 // Note: transformed values not buffered locally, like some
 // DOOM-alikes ("wt", "WebView") did.
 // Dasho: Changed to HMM_Vec4
-typedef HMM_Vec4 Vertex;
+typedef epi::Vec4 Vertex;
 
 // Forward of LineDefs, for Sectors.
 struct Line;
@@ -105,15 +106,15 @@ struct RegionProperties
     float drag;
 
     // pushing sector information (normally all zero)
-    HMM_Vec3 push;
+    epi::Vec3 push;
     bool     push_constant = false;
 
-    HMM_Vec3 net_push = {{0, 0, 0}};
+    epi::Vec3 net_push = {0, 0, 0};
 
-    HMM_Vec3 old_push = {{0, 0, 0}};
+    epi::Vec3 old_push = {0, 0, 0};
 
     // sector fog
-    RGBAColor fog_color   = kRGBANoValue;
+    epi::RGBAColor fog_color   = kRGBANoValue;
     float     fog_density = 0;
 };
 
@@ -138,19 +139,19 @@ struct MapSurface
     float translucency;
 
     // texturing matrix (usually identity)
-    HMM_Vec2 x_matrix;
-    HMM_Vec2 y_matrix;
-    BAMAngle rotation = 0;
+    epi::Vec2 x_matrix;
+    epi::Vec2 y_matrix;
+    epi::BAMAngle rotation = 0;
 
     // current offset and scrolling deltas (world coords)
-    HMM_Vec2 offset;
-    HMM_Vec2 old_offset;
-    HMM_Vec2 scroll;
+    epi::Vec2 offset;
+    epi::Vec2 old_offset;
+    epi::Vec2 scroll;
 
-    HMM_Vec2 net_scroll = {{0, 0}};
-    HMM_Vec2 old_scroll = {{0, 0}};
+    epi::Vec2 net_scroll = {0, 0};
+    epi::Vec2 old_scroll = {0, 0};
 
-    HMM_Vec2 base_offset = {{0, 0}};
+    epi::Vec2 base_offset = {0, 0};
     bool     scrolls = false;
 
     // lighting override (as in BOOM).  Usually nullptr.
@@ -273,12 +274,12 @@ struct Sector
     // UDMF vertex slope stuff
     bool     floor_vertex_slope;
     bool     ceiling_vertex_slope;
-    HMM_Vec3 floor_z_vertices[3];
-    HMM_Vec3 ceiling_z_vertices[3];
-    HMM_Vec3 floor_vertex_slope_normal;
-    HMM_Vec3 ceiling_vertex_slope_normal;
-    HMM_Vec2 floor_vertex_slope_high_low;
-    HMM_Vec2 ceiling_vertex_slope_high_low;
+    epi::Vec3 floor_z_vertices[3];
+    epi::Vec3 ceiling_z_vertices[3];
+    epi::Vec3 floor_vertex_slope_normal;
+    epi::Vec3 ceiling_vertex_slope_normal;
+    epi::Vec2 floor_vertex_slope_high_low;
+    epi::Vec2 ceiling_vertex_slope_high_low;
 
     // linked list of extrafloors that this sector controls.  nullptr means
     // that this sector is not a controller.
@@ -469,7 +470,7 @@ struct LineSide
     Vertex *vertex_1;
     Vertex *vertex_2;
 
-    BAMAngle angle;
+    epi::BAMAngle angle;
 
     float length;
 
@@ -484,7 +485,7 @@ struct LineSide
     VertexSectorList *vertex_sectors[2];
 
     MapSurface fog_wall_surface;
-    RGBAColor  fog_wall_color  = kRGBANoValue;
+    epi::RGBAColor fog_wall_color  = kRGBANoValue;
     bool       fog_wall_active = false;
 };
 
@@ -503,9 +504,9 @@ struct SectorAnimation
     struct Sector  *scroll_sector_reference  = nullptr;
     const LineType *scroll_special_reference = nullptr;
     Line           *scroll_line_reference    = nullptr;
-    HMM_Vec2        floor_scroll             = {{0, 0}};
-    HMM_Vec2        ceil_scroll              = {{0, 0}};
-    HMM_Vec3        push                     = {{0, 0, 0}};
+    epi::Vec2       floor_scroll             = {0, 0};
+    epi::Vec2       ceil_scroll              = {0, 0};
+    epi::Vec3       push                     = {0, 0, 0};
     float           last_height              = 0.0f;
 };
 

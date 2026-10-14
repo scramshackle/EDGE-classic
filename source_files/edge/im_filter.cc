@@ -36,8 +36,8 @@
 
 #include "im_filter.h"
 
-#include "HandmadeMath.h"
 #include "epi.h"
+#include "epi_math.h"
 
 struct EPXSource
 {
@@ -56,8 +56,8 @@ struct EPXSource
         }
         else
         {
-            x = HMM_Clamp(0, x, width - 1);
-            y = HMM_Clamp(0, y, height - 1);
+            x = epi::Clamp(x, 0, width - 1);
+            y = epi::Clamp(y, 0, height - 1);
         }
 
         const uint8_t *p     = pixels + ((size_t)y * width + x) * depth;

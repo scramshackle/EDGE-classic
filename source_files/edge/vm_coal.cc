@@ -18,6 +18,7 @@
 
 #include "vm_coal.h"
 
+#include <math.h>
 #include <stdarg.h>
 
 #include "coal.h"
@@ -28,6 +29,7 @@
 #include "epi.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
+#include "epi_math.h"
 #include "epi_str_util.h"
 #include "g_game.h"
 #include "hu_draw.h"
@@ -35,7 +37,6 @@
 #include "m_random.h"
 #include "n_network.h"
 #include "r_modes.h"
-#include "stb_sprintf.h"
 #include "version.h"
 #include "w_wad.h"
 
@@ -49,12 +50,12 @@ void COALPrinter(const char *msg, ...)
     va_list argptr;
 
     va_start(argptr, msg);
-    stbsp_vsnprintf(buffer, sizeof(buffer), msg, argptr);
+    epi::FormatToBufferSizedArgs(buffer, sizeof(buffer), msg, argptr);
     va_end(argptr);
 
     buffer[sizeof(buffer) - 1] = 0;
 
-    LogPrint("COAL: %s", buffer);
+    epi::LogMessage(epi::kLogLevelPrint, "COAL: %s", buffer);
 }
 
 // COALGetFloat/COALGetString/COALGetVector usage:
@@ -162,7 +163,7 @@ static void SYS_print(coal::VM *vm, int argc)
 
     const char *s = vm->AccessParamString(0);
 
-    LogPrint("%s\n", s);
+    epi::LogMessage(epi::kLogLevelPrint, "%s\n", s);
 }
 
 // sys.debug_print(str)
@@ -173,7 +174,7 @@ static void SYS_debug_print(coal::VM *vm, int argc)
 
     const char *s = vm->AccessParamString(0);
 
-    LogDebug("%s\n", s);
+    epi::LogMessage(epi::kLogLevelDebug, "%s\n", s);
 }
 
 // sys.edge_version()
@@ -195,7 +196,7 @@ static void MATH_rint(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(RoundToInteger(val));
+    vm->ReturnFloat(epi::RoundToInteger(val));
 }
 
 // math.floor(val)
@@ -238,7 +239,7 @@ static void MATH_cos(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(cos(val * HMM_PI / 180.0));
+    vm->ReturnFloat(cos(val * epi::kPi / 180.0));
 }
 
 // math.sin(val)
@@ -247,7 +248,7 @@ static void MATH_sin(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(sin(val * HMM_PI / 180.0));
+    vm->ReturnFloat(sin(val * epi::kPi / 180.0));
 }
 
 // math.tan(val)
@@ -256,7 +257,7 @@ static void MATH_tan(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(tan(val * HMM_PI / 180.0));
+    vm->ReturnFloat(tan(val * epi::kPi / 180.0));
 }
 
 // math.acos(val)
@@ -265,7 +266,7 @@ static void MATH_acos(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(acos(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(acos(val) * 180.0 / epi::kPi);
 }
 
 // math.asin(val)
@@ -274,7 +275,7 @@ static void MATH_asin(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(asin(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(asin(val) * 180.0 / epi::kPi);
 }
 
 // math.atan(val)
@@ -283,7 +284,7 @@ static void MATH_atan(coal::VM *vm, int argc)
     EPI_UNUSED(argc);
 
     double val = *vm->AccessParam(0);
-    vm->ReturnFloat(atan(val) * 180.0 / HMM_PI);
+    vm->ReturnFloat(atan(val) * 180.0 / epi::kPi);
 }
 
 // math.atan2(x, y)
@@ -294,7 +295,7 @@ static void MATH_atan2(coal::VM *vm, int argc)
     double x = *vm->AccessParam(0);
     double y = *vm->AccessParam(1);
 
-    vm->ReturnFloat(atan2(y, x) * 180.0 / HMM_PI);
+    vm->ReturnFloat(atan2(y, x) * 180.0 / epi::kPi);
 }
 
 // math.log(val)
@@ -474,7 +475,7 @@ void COALLoadScripts()
         const char *name = info.source.c_str();
         char       *data = (char *)info.data.c_str(); // FIXME make param to CompileFile be a std::string&
 
-        LogPrint("Compiling: %s\n", name);
+        epi::LogMessage(epi::kLogLevelPrint, "Compiling: %s\n", name);
 
         if (!ui_vm->CompileFile(data, name))
             FatalError("Errors compiling %s\nPlease see debug.txt for details.", name);

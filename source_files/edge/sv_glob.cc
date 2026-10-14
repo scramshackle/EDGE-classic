@@ -28,7 +28,7 @@
 #include <stddef.h>
 
 #include "epi.h"
-#include "stb_sprintf.h"
+#include "epi_str_util.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 
@@ -202,7 +202,7 @@ static void SaveGlobalGetImage(const char *info, void *storage)
     }
 
     if (info[1] != ':')
-        LogWarning("SaveGlobalGetImage: invalid image string `%s'\n", info);
+        epi::LogMessage(epi::kLogLevelWarning, "SaveGlobalGetImage: invalid image string `%s'\n", info);
 
     (*dest) = ImageParseSaveString(info[0], info + 2);
 }
@@ -219,7 +219,7 @@ static const char *SaveGlobalPutU64(void *storage)
 
     EPI_ASSERT(storage);
 
-    stbsp_sprintf(buffer, "%" PRIu64, *src);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%" PRIu64, *src);
 
     return SaveChunkCopyString(buffer);
 }
@@ -231,7 +231,7 @@ static const char *SaveGlobalPutInteger(void *storage)
 
     EPI_ASSERT(storage);
 
-    stbsp_sprintf(buffer, "%d", *src);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%d", *src);
 
     return SaveChunkCopyString(buffer);
 }
@@ -255,7 +255,7 @@ static const char *SaveGlobalPutCheckCRC(void *storage)
 
     EPI_ASSERT(storage);
 
-    stbsp_sprintf(buffer, "%d %u", src->count, src->crc);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%d %u", src->count, src->crc);
 
     return SaveChunkCopyString(buffer);
 }
@@ -409,7 +409,7 @@ static bool GlobalReadVariable(SaveGlobals *globs)
     }
     else
     {
-        LogDebug("GlobalReadVariable: unknown global: %s\n", var_name);
+        epi::LogMessage(epi::kLogLevelDebug, "GlobalReadVariable: unknown global: %s\n", var_name);
     }
 
     SaveChunkFreeString(var_name);
@@ -467,7 +467,7 @@ SaveGlobals *SaveGlobalsLoad(void)
         }
 
         // skip chunk
-        LogWarning("LOADGAME: Unknown GLOB chunk [%s]\n", marker);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Unknown GLOB chunk [%s]\n", marker);
 
         if (!SaveSkipReadChunk(marker))
             break;

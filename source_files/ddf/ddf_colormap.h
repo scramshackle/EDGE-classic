@@ -60,9 +60,9 @@ class Colormap
     ColorSpecial special_;
 
     // colours for GL renderer
-    RGBAColor gl_color_;
+    epi::RGBAColor gl_color_;
 
-    RGBAColor font_colour_; // (computed only, not in DDF)
+    epi::RGBAColor font_colour_; // (computed only, not in DDF)
 
     ColormapCache cache_ = {nullptr, 0};
 

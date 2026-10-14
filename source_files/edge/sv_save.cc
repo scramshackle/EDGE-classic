@@ -38,14 +38,14 @@
 
 void BeginSaveGameSave(void)
 {
-    LogDebug("SV_BeginSave...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SV_BeginSave...\n");
 
     ClearAllStaleReferences();
 }
 
 void FinishSaveGameSave(void)
 {
-    LogDebug("SV_FinishSave...\n");
+    epi::LogMessage(epi::kLogLevelDebug, "SV_FinishSave...\n");
 }
 
 void SaveGameStructSave(void *base, SaveStruct *info)

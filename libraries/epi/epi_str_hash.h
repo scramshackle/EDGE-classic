@@ -5,9 +5,12 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include <string>
 #include <string_view>
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
 #include <unordered_map>
 #endif
 
@@ -54,7 +57,7 @@ class StringHash
     /// Construct from a string view.
     StringHash(const std::string_view &str) : value_(Calculate(str.data(), str.length()))
     {
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
         Register(*this, str);
 #endif
     }
@@ -71,23 +74,14 @@ class StringHash
         return StringHash(std::string_view(value));
     }
 
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
     static std::string                                        GetRegistered(StringHash hash);
-    static void                                               RegisterKnownStrings();
+    static void                                               Register(const char *str);
     static const std::unordered_map<StringHash, std::string> &GetHashRegistry();
 #endif
 
     /// Test for equality with another hash.
-    constexpr bool operator==(const StringHash &rhs) const
-    {
-        return value_ == rhs.value_;
-    }
-
-    /// Test for inequality with another hash.
-    constexpr bool operator!=(const StringHash &rhs) const
-    {
-        return value_ != rhs.value_;
-    }
+    constexpr bool operator==(const StringHash &rhs) const = default;
 
     /// Test if less than another hash.
     constexpr bool operator<(const StringHash &rhs) const
@@ -171,32 +165,18 @@ class StringHash
 
     /// Hash value.
     uint32_t value_;
-#ifdef EDGE_EXTRA_CHECKS
+#ifdef EPI_EXTRA_CHECKS
     static std::unordered_map<StringHash, std::string> global_hash_registry_;
     static void                                        Register(StringHash hash, const std::string_view &str);
-    static void                                        Register(const char *str);
 #endif
 };
 
 static_assert(sizeof(StringHash) == sizeof(uint32_t), "Unexpected StringHash size.");
 
-#define EPI_KNOWN_STRINGHASH(v, s)                                                                                     \
-    static constexpr char                                    v##_known_string_[] = s;                                  \
-    static constexpr epi::KnownStringHash<v##_known_string_> v{};
-
-template <const char *known_string> class KnownStringHash : public StringHash
+consteval uint32_t KnownStringHash(std::string_view text)
 {
-  public:
-    constexpr KnownStringHash() : StringHash(known_string)
-    {
-    }
-
-    // implicit conversion so can be used in switch case statements, etc
-    constexpr operator uint32_t() const
-    {
-        return value_;
-    }
-};
+    return CalculateStringHash(text);
+}
 
 } // namespace epi
 template <> struct std::hash<epi::StringHash>

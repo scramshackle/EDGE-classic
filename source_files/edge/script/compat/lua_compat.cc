@@ -3,6 +3,7 @@
 #include "lua_compat.h"
 
 #include "epi_file.h"
+#include "i_system.h"
 #include "w_wad.h"
 
 extern bool GetCOALDetected();
@@ -36,12 +37,12 @@ void LuaLoadScripts()
 {
     if (LuaGetLuaHUDDetected() && GetCOALDetected())
     {
-        LogWarning("Lua and COAL huds detected, selecting Lua hud\n");
+        epi::LogMessage(epi::kLogLevelWarning, "Lua and COAL huds detected, selecting Lua hud\n");
     }
     int top = lua_gettop(global_lua_state);
     for (pending_lua_script_c &info : pending_scripts)
     {
-        LogPrint("Compiling: %s\n", info.source.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Compiling: %s\n", info.source.c_str());
 
         int results = LuaDoFile(global_lua_state, info.source.c_str(), info.data.c_str());
         if (results)

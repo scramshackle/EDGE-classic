@@ -26,7 +26,7 @@
 
 struct AngleRange
 {
-    BAMAngle low, high;
+    epi::BAMAngle low, high;
 
     AngleRange *next;
     AngleRange *previous;
@@ -109,7 +109,7 @@ void OcclusionPop(const OcclusionState *saved)
     occlusion_buffer_tail = (AngleRange *)saved->tail;
 }
 
-static inline AngleRange *GetNewRange(BAMAngle low, BAMAngle high)
+static inline AngleRange *GetNewRange(epi::BAMAngle low, epi::BAMAngle high)
 {
     AngleRange *R;
 
@@ -176,7 +176,7 @@ static inline void RemoveRange(AngleRange *R)
     free_occlusion_range = R;
 }
 
-static void DoSet(BAMAngle low, BAMAngle high)
+static void DoSet(epi::BAMAngle low, epi::BAMAngle high)
 {
     for (AngleRange *AR = occlusion_buffer_head; AR; AR = AR->next)
     {
@@ -198,8 +198,8 @@ static void DoSet(BAMAngle low, BAMAngle high)
         // some subsequent ranges in the list.  When that happens,
         // we must remove them (and adjust the current range).
 
-        AR->low  = HMM_MIN(AR->low, low);
-        AR->high = HMM_MAX(AR->high, high);
+        AR->low  = epi::Min(AR->low, low);
+        AR->high = epi::Max(AR->high, high);
 
 #ifdef EDGE_DEBUG_OCCLUSION
         if (AR->prev)
@@ -209,7 +209,7 @@ static void DoSet(BAMAngle low, BAMAngle high)
 #endif
         while (AR->next && AR->high >= AR->next->low)
         {
-            AR->high = HMM_MAX(AR->high, AR->next->high);
+            AR->high = epi::Max(AR->high, AR->next->high);
 
             RemoveRange(AR->next);
         }
@@ -222,18 +222,18 @@ static void DoSet(BAMAngle low, BAMAngle high)
     LinkInTail(GetNewRange(low, high));
 }
 
-void OcclusionSet(BAMAngle low, BAMAngle high)
+void OcclusionSet(epi::BAMAngle low, epi::BAMAngle high)
 {
     // Set all angles in the given range, i.e. mark them as blocking.
     // The angles are relative to the VIEW angle.
 
-    EPI_ASSERT((BAMAngle)(high - low) < kBAMAngle180);
+    EPI_ASSERT((epi::BAMAngle)(high - low) < epi::kBAMAngle180);
 
     if (low <= high)
         DoSet(low, high);
     else
     {
-        DoSet(low, kBAMAngle360);
+        DoSet(low, epi::kBAMAngle360);
         DoSet(0, high);
     }
 
@@ -242,7 +242,7 @@ void OcclusionSet(BAMAngle low, BAMAngle high)
 #endif
 }
 
-static inline bool DoTest(BAMAngle low, BAMAngle high)
+static inline bool DoTest(epi::BAMAngle low, epi::BAMAngle high)
 {
     for (AngleRange *AR = occlusion_buffer_head; AR; AR = AR->next)
     {
@@ -257,19 +257,18 @@ static inline bool DoTest(BAMAngle low, BAMAngle high)
     return false;
 }
 
-bool OcclusionTest(BAMAngle low, BAMAngle high)
+bool OcclusionTest(epi::BAMAngle low, epi::BAMAngle high)
 {
     // Check whether all angles in the given range are set (i.e. blocked).
     // Returns true if the entire range is blocked, false otherwise.
     // Angles are relative to the VIEW angle.
 
-    EPI_ASSERT((BAMAngle)(high - low) < kBAMAngle180);
-
+    EPI_ASSERT((epi::BAMAngle)(high - low) < epi::kBAMAngle180);
 
     if (low <= high)
         return DoTest(low, high);
     else
-        return DoTest(low, kBAMAngle360) && DoTest(0, high);
+        return DoTest(low, epi::kBAMAngle360) && DoTest(0, high);
 }
 
 //--- editor settings ---

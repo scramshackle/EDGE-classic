@@ -35,288 +35,289 @@
 #include "epi_str_compare.h"
 #include "epi_str_hash.h"
 #include "epi_str_util.h"
+#include "i_system.h"
 
 MapList Maps;
 
 namespace umapinfo
 {
 
-EPI_KNOWN_STRINGHASH(kLevelName, "LEVELNAME")
-EPI_KNOWN_STRINGHASH(kLabel, "LABEL")
-EPI_KNOWN_STRINGHASH(kNext, "NEXT")
-EPI_KNOWN_STRINGHASH(kNextSecret, "NEXTSECRET")
-EPI_KNOWN_STRINGHASH(kLevelPic, "LEVELPIC")
-EPI_KNOWN_STRINGHASH(kSkyTexture, "SKYTEXTURE")
-EPI_KNOWN_STRINGHASH(kMusic, "MUSIC")
-EPI_KNOWN_STRINGHASH(kEndPic, "ENDPIC")
-EPI_KNOWN_STRINGHASH(kEndCast, "ENDCAST")
-EPI_KNOWN_STRINGHASH(kEndBunny, "ENDBUNNY")
-EPI_KNOWN_STRINGHASH(kEndGame, "ENDGAME")
-EPI_KNOWN_STRINGHASH(kExitPic, "EXITPIC")
-EPI_KNOWN_STRINGHASH(kEnterPic, "ENTERPIC")
-EPI_KNOWN_STRINGHASH(kNoIntermission, "NOINTERMISSION")
-EPI_KNOWN_STRINGHASH(kParTime, "PARTIME")
-EPI_KNOWN_STRINGHASH(kIntertext, "INTERTEXT")
-EPI_KNOWN_STRINGHASH(kIntertextSecret, "INTERTEXTSECRET")
-EPI_KNOWN_STRINGHASH(kInterbackdrop, "INTERBACKDROP")
-EPI_KNOWN_STRINGHASH(kIntermusic, "INTERMUSIC")
-EPI_KNOWN_STRINGHASH(kEpisode, "EPISODE")
-EPI_KNOWN_STRINGHASH(kBossAction, "BOSSACTION")
-EPI_KNOWN_STRINGHASH(kAuthor, "AUTHOR")
-EPI_KNOWN_STRINGHASH(kDoomPlayer, "DOOMPLAYER")
-EPI_KNOWN_STRINGHASH(kZombieMan, "ZOMBIEMAN")
-EPI_KNOWN_STRINGHASH(kShotgunGuy, "SHOTGUNGUY")
-EPI_KNOWN_STRINGHASH(kArchvile, "ARCHVILE")
-EPI_KNOWN_STRINGHASH(kArchvileFire, "ARCHVILEFIRE")
-EPI_KNOWN_STRINGHASH(kRevenant, "REVENANT")
-EPI_KNOWN_STRINGHASH(kRevenantTracer, "REVENANTTRACER")
-EPI_KNOWN_STRINGHASH(kRevenantTracerSmoke, "REVENANTTRACERSMOKE")
-EPI_KNOWN_STRINGHASH(kFatso, "FATSO")
-EPI_KNOWN_STRINGHASH(kFatShot, "FATSHOT")
-EPI_KNOWN_STRINGHASH(kChaingunGuy, "CHAINGUNGUY")
-EPI_KNOWN_STRINGHASH(kDoomImp, "DOOMIMP")
-EPI_KNOWN_STRINGHASH(kDemon, "DEMON")
-EPI_KNOWN_STRINGHASH(kSpectre, "SPECTRE")
-EPI_KNOWN_STRINGHASH(kCacodemon, "CACODEMON")
-EPI_KNOWN_STRINGHASH(kBaronOfHell, "BARONOFHELL")
-EPI_KNOWN_STRINGHASH(kBaronBall, "BARONBALL")
-EPI_KNOWN_STRINGHASH(kHellKnight, "HELLKNIGHT")
-EPI_KNOWN_STRINGHASH(kLostSoul, "LOSTSOUL")
-EPI_KNOWN_STRINGHASH(kSpiderMastermind, "SPIDERMASTERMIND")
-EPI_KNOWN_STRINGHASH(kArachnotron, "ARACHNOTRON")
-EPI_KNOWN_STRINGHASH(kCyberdemon, "CYBERDEMON")
-EPI_KNOWN_STRINGHASH(kPainElemental, "PAINELEMENTAL")
-EPI_KNOWN_STRINGHASH(kWolfensteinSS, "WOLFENSTEINSS")
-EPI_KNOWN_STRINGHASH(kCommanderKeen, "COMMANDERKEEN")
-EPI_KNOWN_STRINGHASH(kBossBrain, "BOSSBRAIN")
-EPI_KNOWN_STRINGHASH(kBossEye, "BOSSEYE")
-EPI_KNOWN_STRINGHASH(kBossTarget, "BOSSTARGET")
-EPI_KNOWN_STRINGHASH(kSpawnShot, "SPAWNSHOT")
-EPI_KNOWN_STRINGHASH(kSpawnFire, "SPAWNFIRE")
-EPI_KNOWN_STRINGHASH(kExplosiveBarrel, "EXPLOSIVEBARREL")
-EPI_KNOWN_STRINGHASH(kDoomImpBall, "DOOMIMPBALL")
-EPI_KNOWN_STRINGHASH(kCacodemonBall, "CACODEMONBALL")
-EPI_KNOWN_STRINGHASH(kRocket, "ROCKET")
-EPI_KNOWN_STRINGHASH(kPlasmaBall, "PLASMABALL")
-EPI_KNOWN_STRINGHASH(kBFGBall, "BFGBALL")
-EPI_KNOWN_STRINGHASH(kArachnotronPlasma, "ARACHNOTRONPLASMA")
-EPI_KNOWN_STRINGHASH(kBulletPuff, "BULLETPUFF")
-EPI_KNOWN_STRINGHASH(kBlood, "BLOOD")
-EPI_KNOWN_STRINGHASH(kTeleportFog, "TELEPORTFOG")
-EPI_KNOWN_STRINGHASH(kItemFog, "ITEMFOG")
-EPI_KNOWN_STRINGHASH(kTeleportDest, "TELEPORTDEST")
-EPI_KNOWN_STRINGHASH(kBFGExtra, "BFGEXTRA")
-EPI_KNOWN_STRINGHASH(kGreenArmor, "GREENARMOR")
-EPI_KNOWN_STRINGHASH(kBlueArmor, "BLUEARMOR")
-EPI_KNOWN_STRINGHASH(kHealthBonus, "HEALTHBONUS")
-EPI_KNOWN_STRINGHASH(kArmorBonus, "ARMORBONUS")
-EPI_KNOWN_STRINGHASH(kBlueCard, "BLUECARD")
-EPI_KNOWN_STRINGHASH(kRedCard, "REDCARD")
-EPI_KNOWN_STRINGHASH(kYellowCard, "YELLOWCARD")
-EPI_KNOWN_STRINGHASH(kYellowSkull, "YELLOWSKULL")
-EPI_KNOWN_STRINGHASH(kRedSkull, "REDSKULL")
-EPI_KNOWN_STRINGHASH(kBlueSkull, "BLUESKULL")
-EPI_KNOWN_STRINGHASH(kStimpack, "STIMPACK")
-EPI_KNOWN_STRINGHASH(kMedikit, "MEDIKIT")
-EPI_KNOWN_STRINGHASH(kSoulsphere, "SOULSPHERE")
-EPI_KNOWN_STRINGHASH(kInvulnerabilitySphere, "INVULNERABILITYSPHERE")
-EPI_KNOWN_STRINGHASH(kBerserk, "BERSERK")
-EPI_KNOWN_STRINGHASH(kBlurSphere, "BLURSPHERE")
-EPI_KNOWN_STRINGHASH(kRadSuit, "RADSUIT")
-EPI_KNOWN_STRINGHASH(kAllmap, "ALLMAP")
-EPI_KNOWN_STRINGHASH(kInfrared, "INFRARED")
-EPI_KNOWN_STRINGHASH(kMegasphere, "MEGASPHERE")
-EPI_KNOWN_STRINGHASH(kClip, "CLIP")
-EPI_KNOWN_STRINGHASH(kClipBox, "CLIPBOX")
-EPI_KNOWN_STRINGHASH(kRocketAmmo, "ROCKETAMMO")
-EPI_KNOWN_STRINGHASH(kRocketBox, "ROCKETBOX")
-EPI_KNOWN_STRINGHASH(kCell, "CELL")
-EPI_KNOWN_STRINGHASH(kCellPack, "CELLPACK")
-EPI_KNOWN_STRINGHASH(kShell, "SHELL")
-EPI_KNOWN_STRINGHASH(kShellBox, "SHELLBOX")
-EPI_KNOWN_STRINGHASH(kBackpack, "BACKPACK")
-EPI_KNOWN_STRINGHASH(kBFG9000, "BFG9000")
-EPI_KNOWN_STRINGHASH(kChaingun, "CHAINGUN")
-EPI_KNOWN_STRINGHASH(kChainsaw, "CHAINSAW")
-EPI_KNOWN_STRINGHASH(kRocketLauncher, "ROCKETLAUNCHER")
-EPI_KNOWN_STRINGHASH(kPlasmaRifle, "PLASMARIFLE")
-EPI_KNOWN_STRINGHASH(kShotgun, "SHOTGUN")
-EPI_KNOWN_STRINGHASH(kSuperShotgun, "SUPERSHOTGUN")
-EPI_KNOWN_STRINGHASH(kTechLamp, "TECHLAMP")
-EPI_KNOWN_STRINGHASH(kTechLamp2, "TECHLAMP2")
-EPI_KNOWN_STRINGHASH(kColumn, "COLUMN")
-EPI_KNOWN_STRINGHASH(kTallGreenColumn, "TALLGREENCOLUMN")
-EPI_KNOWN_STRINGHASH(kShortGreenColumn, "SHORTGREENCOLUMN")
-EPI_KNOWN_STRINGHASH(kTallRedColumn, "TALLREDCOLUMN")
-EPI_KNOWN_STRINGHASH(kShortRedColumn, "SHORTREDCOLUMN")
-EPI_KNOWN_STRINGHASH(kSkullColumn, "SKULLCOLUMN")
-EPI_KNOWN_STRINGHASH(kHeartColumn, "HEARTCOLUMN")
-EPI_KNOWN_STRINGHASH(kEvilEye, "EVILEYE")
-EPI_KNOWN_STRINGHASH(kFloatingSkull, "FLOATINGSKULL")
-EPI_KNOWN_STRINGHASH(kTorchTree, "TORCHTREE")
-EPI_KNOWN_STRINGHASH(kBlueTorch, "BLUETORCH")
-EPI_KNOWN_STRINGHASH(kGreenTorch, "GREENTORCH")
-EPI_KNOWN_STRINGHASH(kRedTorch, "REDTORCH")
-EPI_KNOWN_STRINGHASH(kShortBlueTorch, "SHORTBLUETORCH")
-EPI_KNOWN_STRINGHASH(kShortGreenTorch, "SHORTGREENTORCH")
-EPI_KNOWN_STRINGHASH(kShortRedTorch, "SHORTREDTORCH")
-EPI_KNOWN_STRINGHASH(kStalagtite, "STALAGTITE")
-EPI_KNOWN_STRINGHASH(kTechPillar, "TECHPILLAR")
-EPI_KNOWN_STRINGHASH(kCandleStick, "CANDLESTICK")
-EPI_KNOWN_STRINGHASH(kCandelabra, "CANDELABRA")
-EPI_KNOWN_STRINGHASH(kBloodyTwitch, "BLOODYTWITCH")
-EPI_KNOWN_STRINGHASH(kMeat2, "MEAT2")
-EPI_KNOWN_STRINGHASH(kMeat3, "MEAT3")
-EPI_KNOWN_STRINGHASH(kMeat4, "MEAT4")
-EPI_KNOWN_STRINGHASH(kMeat5, "MEAT5")
-EPI_KNOWN_STRINGHASH(kNonsolidMeat2, "NONSOLIDMEAT2")
-EPI_KNOWN_STRINGHASH(kNonsolidMeat4, "NONSOLIDMEAT4")
-EPI_KNOWN_STRINGHASH(kNonsolidMeat3, "NONSOLIDMEAT3")
-EPI_KNOWN_STRINGHASH(kNonsolidMeat5, "NONSOLIDMEAT5")
-EPI_KNOWN_STRINGHASH(kNonsolidTwitch, "NONSOLIDTWITCH")
-EPI_KNOWN_STRINGHASH(kDeadCacodemon, "DEADCACODEMON")
-EPI_KNOWN_STRINGHASH(kDeadMarine, "DEADMARINE")
-EPI_KNOWN_STRINGHASH(kDeadZombieMan, "DEADZOMBIEMAN")
-EPI_KNOWN_STRINGHASH(kDeadDemon, "DEADDEMON")
-EPI_KNOWN_STRINGHASH(kDeadLostSoul, "DEADLOSTSOUL")
-EPI_KNOWN_STRINGHASH(kDeadDoomImp, "DEADDOOMIMP")
-EPI_KNOWN_STRINGHASH(kDeadShotgunGuy, "DEADSHOTGUNGUY")
-EPI_KNOWN_STRINGHASH(kGibbedMarine, "GIBBEDMARINE")
-EPI_KNOWN_STRINGHASH(kGibbedMarineExtra, "GIBBEDMARINEEXTRA")
-EPI_KNOWN_STRINGHASH(kHeadsOnAStick, "HEADSONASTICK")
-EPI_KNOWN_STRINGHASH(kGibs, "GIBS")
-EPI_KNOWN_STRINGHASH(kHeadOnAStick, "HEADONASTICK")
-EPI_KNOWN_STRINGHASH(kHeadCandles, "HEADCANDLES")
-EPI_KNOWN_STRINGHASH(kDeadStick, "DEADSTICK")
-EPI_KNOWN_STRINGHASH(kLiveStick, "LIVESTICK")
-EPI_KNOWN_STRINGHASH(kBigTree, "BIGTREE")
-EPI_KNOWN_STRINGHASH(kBurningBarrel, "BURNINGBARREL")
-EPI_KNOWN_STRINGHASH(kHangNoGuts, "HANGNOGUTS")
-EPI_KNOWN_STRINGHASH(kHangBNoBrain, "HANGBNOBRAIN")
-EPI_KNOWN_STRINGHASH(kHangTLookingDown, "HANGTLOOKINGDOWN")
-EPI_KNOWN_STRINGHASH(kHangTSkull, "HANGTSKULL")
-EPI_KNOWN_STRINGHASH(kHangTLookingUp, "HANGTLOOKINGUP")
-EPI_KNOWN_STRINGHASH(kHangTNoBrain, "HANGTNOBRAIN")
-EPI_KNOWN_STRINGHASH(kColonGibs, "COLONGIBS")
-EPI_KNOWN_STRINGHASH(kSmallBloodPool, "SMALLBLOODPOOL")
-EPI_KNOWN_STRINGHASH(kBrainStem, "BRAINSTEM")
-EPI_KNOWN_STRINGHASH(kPointPusher, "POINTPUSHER")
-EPI_KNOWN_STRINGHASH(kPointPuller, "POINTPULLER")
-EPI_KNOWN_STRINGHASH(kMBFHelperDog, "MBFHELPERDOG")
-EPI_KNOWN_STRINGHASH(kPlasmaBall1, "PLASMABALL1")
-EPI_KNOWN_STRINGHASH(kPlasmaBall2, "PLASMABALL2")
-EPI_KNOWN_STRINGHASH(kEvilSceptre, "EVILSCEPTRE")
-EPI_KNOWN_STRINGHASH(kUnholyBible, "UNHOLYBIBLE")
-EPI_KNOWN_STRINGHASH(kMusicChanger, "MUSICCHANGER")
-EPI_KNOWN_STRINGHASH(kDehActor145, "DEH_ACTOR_145")
-EPI_KNOWN_STRINGHASH(kDehActor146, "DEH_ACTOR_146")
-EPI_KNOWN_STRINGHASH(kDehActor147, "DEH_ACTOR_147")
-EPI_KNOWN_STRINGHASH(kDehActor148, "DEH_ACTOR_148")
-EPI_KNOWN_STRINGHASH(kDehActor149, "DEH_ACTOR_149")
-EPI_KNOWN_STRINGHASH(kDehActor150, "DEH_ACTOR_150")
-EPI_KNOWN_STRINGHASH(kDehActor151, "DEH_ACTOR_151")
-EPI_KNOWN_STRINGHASH(kDehActor152, "DEH_ACTOR_152")
-EPI_KNOWN_STRINGHASH(kDehActor153, "DEH_ACTOR_153")
-EPI_KNOWN_STRINGHASH(kDehActor154, "DEH_ACTOR_154")
-EPI_KNOWN_STRINGHASH(kDehActor155, "DEH_ACTOR_155")
-EPI_KNOWN_STRINGHASH(kDehActor156, "DEH_ACTOR_156")
-EPI_KNOWN_STRINGHASH(kDehActor157, "DEH_ACTOR_157")
-EPI_KNOWN_STRINGHASH(kDehActor158, "DEH_ACTOR_158")
-EPI_KNOWN_STRINGHASH(kDehActor159, "DEH_ACTOR_159")
-EPI_KNOWN_STRINGHASH(kDehActor160, "DEH_ACTOR_160")
-EPI_KNOWN_STRINGHASH(kDehActor161, "DEH_ACTOR_161")
-EPI_KNOWN_STRINGHASH(kDehActor162, "DEH_ACTOR_162")
-EPI_KNOWN_STRINGHASH(kDehActor163, "DEH_ACTOR_163")
-EPI_KNOWN_STRINGHASH(kDehActor164, "DEH_ACTOR_164")
-EPI_KNOWN_STRINGHASH(kDehActor165, "DEH_ACTOR_165")
-EPI_KNOWN_STRINGHASH(kDehActor166, "DEH_ACTOR_166")
-EPI_KNOWN_STRINGHASH(kDehActor167, "DEH_ACTOR_167")
-EPI_KNOWN_STRINGHASH(kDehActor168, "DEH_ACTOR_168")
-EPI_KNOWN_STRINGHASH(kDehActor169, "DEH_ACTOR_169")
-EPI_KNOWN_STRINGHASH(kDehActor170, "DEH_ACTOR_170")
-EPI_KNOWN_STRINGHASH(kDehActor171, "DEH_ACTOR_171")
-EPI_KNOWN_STRINGHASH(kDehActor172, "DEH_ACTOR_172")
-EPI_KNOWN_STRINGHASH(kDehActor173, "DEH_ACTOR_173")
-EPI_KNOWN_STRINGHASH(kDehActor174, "DEH_ACTOR_174")
-EPI_KNOWN_STRINGHASH(kDehActor175, "DEH_ACTOR_175")
-EPI_KNOWN_STRINGHASH(kDehActor176, "DEH_ACTOR_176")
-EPI_KNOWN_STRINGHASH(kDehActor177, "DEH_ACTOR_177")
-EPI_KNOWN_STRINGHASH(kDehActor178, "DEH_ACTOR_178")
-EPI_KNOWN_STRINGHASH(kDehActor179, "DEH_ACTOR_179")
-EPI_KNOWN_STRINGHASH(kDehActor180, "DEH_ACTOR_180")
-EPI_KNOWN_STRINGHASH(kDehActor181, "DEH_ACTOR_181")
-EPI_KNOWN_STRINGHASH(kDehActor182, "DEH_ACTOR_182")
-EPI_KNOWN_STRINGHASH(kDehActor183, "DEH_ACTOR_183")
-EPI_KNOWN_STRINGHASH(kDehActor184, "DEH_ACTOR_184")
-EPI_KNOWN_STRINGHASH(kDehActor185, "DEH_ACTOR_185")
-EPI_KNOWN_STRINGHASH(kDehActor186, "DEH_ACTOR_186")
-EPI_KNOWN_STRINGHASH(kDehActor187, "DEH_ACTOR_187")
-EPI_KNOWN_STRINGHASH(kDehActor188, "DEH_ACTOR_188")
-EPI_KNOWN_STRINGHASH(kDehActor189, "DEH_ACTOR_189")
-EPI_KNOWN_STRINGHASH(kDehActor190, "DEH_ACTOR_190")
-EPI_KNOWN_STRINGHASH(kDehActor191, "DEH_ACTOR_191")
-EPI_KNOWN_STRINGHASH(kDehActor192, "DEH_ACTOR_192")
-EPI_KNOWN_STRINGHASH(kDehActor193, "DEH_ACTOR_193")
-EPI_KNOWN_STRINGHASH(kDehActor194, "DEH_ACTOR_194")
-EPI_KNOWN_STRINGHASH(kDehActor195, "DEH_ACTOR_195")
-EPI_KNOWN_STRINGHASH(kDehActor196, "DEH_ACTOR_196")
-EPI_KNOWN_STRINGHASH(kDehActor197, "DEH_ACTOR_197")
-EPI_KNOWN_STRINGHASH(kDehActor198, "DEH_ACTOR_198")
-EPI_KNOWN_STRINGHASH(kDehActor199, "DEH_ACTOR_199")
-EPI_KNOWN_STRINGHASH(kDehActor200, "DEH_ACTOR_200")
-EPI_KNOWN_STRINGHASH(kDehActor201, "DEH_ACTOR_201")
-EPI_KNOWN_STRINGHASH(kDehActor202, "DEH_ACTOR_202")
-EPI_KNOWN_STRINGHASH(kDehActor203, "DEH_ACTOR_203")
-EPI_KNOWN_STRINGHASH(kDehActor204, "DEH_ACTOR_204")
-EPI_KNOWN_STRINGHASH(kDehActor205, "DEH_ACTOR_205")
-EPI_KNOWN_STRINGHASH(kDehActor206, "DEH_ACTOR_206")
-EPI_KNOWN_STRINGHASH(kDehActor207, "DEH_ACTOR_207")
-EPI_KNOWN_STRINGHASH(kDehActor208, "DEH_ACTOR_208")
-EPI_KNOWN_STRINGHASH(kDehActor209, "DEH_ACTOR_209")
-EPI_KNOWN_STRINGHASH(kDehActor210, "DEH_ACTOR_210")
-EPI_KNOWN_STRINGHASH(kDehActor211, "DEH_ACTOR_211")
-EPI_KNOWN_STRINGHASH(kDehActor212, "DEH_ACTOR_212")
-EPI_KNOWN_STRINGHASH(kDehActor213, "DEH_ACTOR_213")
-EPI_KNOWN_STRINGHASH(kDehActor214, "DEH_ACTOR_214")
-EPI_KNOWN_STRINGHASH(kDehActor215, "DEH_ACTOR_215")
-EPI_KNOWN_STRINGHASH(kDehActor216, "DEH_ACTOR_216")
-EPI_KNOWN_STRINGHASH(kDehActor217, "DEH_ACTOR_217")
-EPI_KNOWN_STRINGHASH(kDehActor218, "DEH_ACTOR_218")
-EPI_KNOWN_STRINGHASH(kDehActor219, "DEH_ACTOR_219")
-EPI_KNOWN_STRINGHASH(kDehActor220, "DEH_ACTOR_220")
-EPI_KNOWN_STRINGHASH(kDehActor221, "DEH_ACTOR_221")
-EPI_KNOWN_STRINGHASH(kDehActor222, "DEH_ACTOR_222")
-EPI_KNOWN_STRINGHASH(kDehActor223, "DEH_ACTOR_223")
-EPI_KNOWN_STRINGHASH(kDehActor224, "DEH_ACTOR_224")
-EPI_KNOWN_STRINGHASH(kDehActor225, "DEH_ACTOR_225")
-EPI_KNOWN_STRINGHASH(kDehActor226, "DEH_ACTOR_226")
-EPI_KNOWN_STRINGHASH(kDehActor227, "DEH_ACTOR_227")
-EPI_KNOWN_STRINGHASH(kDehActor228, "DEH_ACTOR_228")
-EPI_KNOWN_STRINGHASH(kDehActor229, "DEH_ACTOR_229")
-EPI_KNOWN_STRINGHASH(kDehActor230, "DEH_ACTOR_230")
-EPI_KNOWN_STRINGHASH(kDehActor231, "DEH_ACTOR_231")
-EPI_KNOWN_STRINGHASH(kDehActor232, "DEH_ACTOR_232")
-EPI_KNOWN_STRINGHASH(kDehActor233, "DEH_ACTOR_233")
-EPI_KNOWN_STRINGHASH(kDehActor234, "DEH_ACTOR_234")
-EPI_KNOWN_STRINGHASH(kDehActor235, "DEH_ACTOR_235")
-EPI_KNOWN_STRINGHASH(kDehActor236, "DEH_ACTOR_236")
-EPI_KNOWN_STRINGHASH(kDehActor237, "DEH_ACTOR_237")
-EPI_KNOWN_STRINGHASH(kDehActor238, "DEH_ACTOR_238")
-EPI_KNOWN_STRINGHASH(kDehActor239, "DEH_ACTOR_239")
-EPI_KNOWN_STRINGHASH(kDehActor240, "DEH_ACTOR_240")
-EPI_KNOWN_STRINGHASH(kDehActor241, "DEH_ACTOR_241")
-EPI_KNOWN_STRINGHASH(kDehActor242, "DEH_ACTOR_242")
-EPI_KNOWN_STRINGHASH(kDehActor243, "DEH_ACTOR_243")
-EPI_KNOWN_STRINGHASH(kDehActor244, "DEH_ACTOR_244")
-EPI_KNOWN_STRINGHASH(kDehActor245, "DEH_ACTOR_245")
-EPI_KNOWN_STRINGHASH(kDehActor246, "DEH_ACTOR_246")
-EPI_KNOWN_STRINGHASH(kDehActor247, "DEH_ACTOR_247")
-EPI_KNOWN_STRINGHASH(kDehActor248, "DEH_ACTOR_248")
-EPI_KNOWN_STRINGHASH(kDehActor249, "DEH_ACTOR_249")
+constexpr uint32_t kLevelName             = epi::KnownStringHash("LEVELNAME");
+constexpr uint32_t kLabel                 = epi::KnownStringHash("LABEL");
+constexpr uint32_t kNext                  = epi::KnownStringHash("NEXT");
+constexpr uint32_t kNextSecret            = epi::KnownStringHash("NEXTSECRET");
+constexpr uint32_t kLevelPic              = epi::KnownStringHash("LEVELPIC");
+constexpr uint32_t kSkyTexture            = epi::KnownStringHash("SKYTEXTURE");
+constexpr uint32_t kMusic                 = epi::KnownStringHash("MUSIC");
+constexpr uint32_t kEndPic                = epi::KnownStringHash("ENDPIC");
+constexpr uint32_t kEndCast               = epi::KnownStringHash("ENDCAST");
+constexpr uint32_t kEndBunny              = epi::KnownStringHash("ENDBUNNY");
+constexpr uint32_t kEndGame               = epi::KnownStringHash("ENDGAME");
+constexpr uint32_t kExitPic               = epi::KnownStringHash("EXITPIC");
+constexpr uint32_t kEnterPic              = epi::KnownStringHash("ENTERPIC");
+constexpr uint32_t kNoIntermission        = epi::KnownStringHash("NOINTERMISSION");
+constexpr uint32_t kParTime               = epi::KnownStringHash("PARTIME");
+constexpr uint32_t kIntertext             = epi::KnownStringHash("INTERTEXT");
+constexpr uint32_t kIntertextSecret       = epi::KnownStringHash("INTERTEXTSECRET");
+constexpr uint32_t kInterbackdrop         = epi::KnownStringHash("INTERBACKDROP");
+constexpr uint32_t kIntermusic            = epi::KnownStringHash("INTERMUSIC");
+constexpr uint32_t kEpisode               = epi::KnownStringHash("EPISODE");
+constexpr uint32_t kBossAction            = epi::KnownStringHash("BOSSACTION");
+constexpr uint32_t kAuthor                = epi::KnownStringHash("AUTHOR");
+constexpr uint32_t kDoomPlayer            = epi::KnownStringHash("DOOMPLAYER");
+constexpr uint32_t kZombieMan             = epi::KnownStringHash("ZOMBIEMAN");
+constexpr uint32_t kShotgunGuy            = epi::KnownStringHash("SHOTGUNGUY");
+constexpr uint32_t kArchvile              = epi::KnownStringHash("ARCHVILE");
+constexpr uint32_t kArchvileFire          = epi::KnownStringHash("ARCHVILEFIRE");
+constexpr uint32_t kRevenant              = epi::KnownStringHash("REVENANT");
+constexpr uint32_t kRevenantTracer        = epi::KnownStringHash("REVENANTTRACER");
+constexpr uint32_t kRevenantTracerSmoke   = epi::KnownStringHash("REVENANTTRACERSMOKE");
+constexpr uint32_t kFatso                 = epi::KnownStringHash("FATSO");
+constexpr uint32_t kFatShot               = epi::KnownStringHash("FATSHOT");
+constexpr uint32_t kChaingunGuy           = epi::KnownStringHash("CHAINGUNGUY");
+constexpr uint32_t kDoomImp               = epi::KnownStringHash("DOOMIMP");
+constexpr uint32_t kDemon                 = epi::KnownStringHash("DEMON");
+constexpr uint32_t kSpectre               = epi::KnownStringHash("SPECTRE");
+constexpr uint32_t kCacodemon             = epi::KnownStringHash("CACODEMON");
+constexpr uint32_t kBaronOfHell           = epi::KnownStringHash("BARONOFHELL");
+constexpr uint32_t kBaronBall             = epi::KnownStringHash("BARONBALL");
+constexpr uint32_t kHellKnight            = epi::KnownStringHash("HELLKNIGHT");
+constexpr uint32_t kLostSoul              = epi::KnownStringHash("LOSTSOUL");
+constexpr uint32_t kSpiderMastermind      = epi::KnownStringHash("SPIDERMASTERMIND");
+constexpr uint32_t kArachnotron           = epi::KnownStringHash("ARACHNOTRON");
+constexpr uint32_t kCyberdemon            = epi::KnownStringHash("CYBERDEMON");
+constexpr uint32_t kPainElemental         = epi::KnownStringHash("PAINELEMENTAL");
+constexpr uint32_t kWolfensteinSS         = epi::KnownStringHash("WOLFENSTEINSS");
+constexpr uint32_t kCommanderKeen         = epi::KnownStringHash("COMMANDERKEEN");
+constexpr uint32_t kBossBrain             = epi::KnownStringHash("BOSSBRAIN");
+constexpr uint32_t kBossEye               = epi::KnownStringHash("BOSSEYE");
+constexpr uint32_t kBossTarget            = epi::KnownStringHash("BOSSTARGET");
+constexpr uint32_t kSpawnShot             = epi::KnownStringHash("SPAWNSHOT");
+constexpr uint32_t kSpawnFire             = epi::KnownStringHash("SPAWNFIRE");
+constexpr uint32_t kExplosiveBarrel       = epi::KnownStringHash("EXPLOSIVEBARREL");
+constexpr uint32_t kDoomImpBall           = epi::KnownStringHash("DOOMIMPBALL");
+constexpr uint32_t kCacodemonBall         = epi::KnownStringHash("CACODEMONBALL");
+constexpr uint32_t kRocket                = epi::KnownStringHash("ROCKET");
+constexpr uint32_t kPlasmaBall            = epi::KnownStringHash("PLASMABALL");
+constexpr uint32_t kBFGBall               = epi::KnownStringHash("BFGBALL");
+constexpr uint32_t kArachnotronPlasma     = epi::KnownStringHash("ARACHNOTRONPLASMA");
+constexpr uint32_t kBulletPuff            = epi::KnownStringHash("BULLETPUFF");
+constexpr uint32_t kBlood                 = epi::KnownStringHash("BLOOD");
+constexpr uint32_t kTeleportFog           = epi::KnownStringHash("TELEPORTFOG");
+constexpr uint32_t kItemFog               = epi::KnownStringHash("ITEMFOG");
+constexpr uint32_t kTeleportDest          = epi::KnownStringHash("TELEPORTDEST");
+constexpr uint32_t kBFGExtra              = epi::KnownStringHash("BFGEXTRA");
+constexpr uint32_t kGreenArmor            = epi::KnownStringHash("GREENARMOR");
+constexpr uint32_t kBlueArmor             = epi::KnownStringHash("BLUEARMOR");
+constexpr uint32_t kHealthBonus           = epi::KnownStringHash("HEALTHBONUS");
+constexpr uint32_t kArmorBonus            = epi::KnownStringHash("ARMORBONUS");
+constexpr uint32_t kBlueCard              = epi::KnownStringHash("BLUECARD");
+constexpr uint32_t kRedCard               = epi::KnownStringHash("REDCARD");
+constexpr uint32_t kYellowCard            = epi::KnownStringHash("YELLOWCARD");
+constexpr uint32_t kYellowSkull           = epi::KnownStringHash("YELLOWSKULL");
+constexpr uint32_t kRedSkull              = epi::KnownStringHash("REDSKULL");
+constexpr uint32_t kBlueSkull             = epi::KnownStringHash("BLUESKULL");
+constexpr uint32_t kStimpack              = epi::KnownStringHash("STIMPACK");
+constexpr uint32_t kMedikit               = epi::KnownStringHash("MEDIKIT");
+constexpr uint32_t kSoulsphere            = epi::KnownStringHash("SOULSPHERE");
+constexpr uint32_t kInvulnerabilitySphere = epi::KnownStringHash("INVULNERABILITYSPHERE");
+constexpr uint32_t kBerserk               = epi::KnownStringHash("BERSERK");
+constexpr uint32_t kBlurSphere            = epi::KnownStringHash("BLURSPHERE");
+constexpr uint32_t kRadSuit               = epi::KnownStringHash("RADSUIT");
+constexpr uint32_t kAllmap                = epi::KnownStringHash("ALLMAP");
+constexpr uint32_t kInfrared              = epi::KnownStringHash("INFRARED");
+constexpr uint32_t kMegasphere            = epi::KnownStringHash("MEGASPHERE");
+constexpr uint32_t kClip                  = epi::KnownStringHash("CLIP");
+constexpr uint32_t kClipBox               = epi::KnownStringHash("CLIPBOX");
+constexpr uint32_t kRocketAmmo            = epi::KnownStringHash("ROCKETAMMO");
+constexpr uint32_t kRocketBox             = epi::KnownStringHash("ROCKETBOX");
+constexpr uint32_t kCell                  = epi::KnownStringHash("CELL");
+constexpr uint32_t kCellPack              = epi::KnownStringHash("CELLPACK");
+constexpr uint32_t kShell                 = epi::KnownStringHash("SHELL");
+constexpr uint32_t kShellBox              = epi::KnownStringHash("SHELLBOX");
+constexpr uint32_t kBackpack              = epi::KnownStringHash("BACKPACK");
+constexpr uint32_t kBFG9000               = epi::KnownStringHash("BFG9000");
+constexpr uint32_t kChaingun              = epi::KnownStringHash("CHAINGUN");
+constexpr uint32_t kChainsaw              = epi::KnownStringHash("CHAINSAW");
+constexpr uint32_t kRocketLauncher        = epi::KnownStringHash("ROCKETLAUNCHER");
+constexpr uint32_t kPlasmaRifle           = epi::KnownStringHash("PLASMARIFLE");
+constexpr uint32_t kShotgun               = epi::KnownStringHash("SHOTGUN");
+constexpr uint32_t kSuperShotgun          = epi::KnownStringHash("SUPERSHOTGUN");
+constexpr uint32_t kTechLamp              = epi::KnownStringHash("TECHLAMP");
+constexpr uint32_t kTechLamp2             = epi::KnownStringHash("TECHLAMP2");
+constexpr uint32_t kColumn                = epi::KnownStringHash("COLUMN");
+constexpr uint32_t kTallGreenColumn       = epi::KnownStringHash("TALLGREENCOLUMN");
+constexpr uint32_t kShortGreenColumn      = epi::KnownStringHash("SHORTGREENCOLUMN");
+constexpr uint32_t kTallRedColumn         = epi::KnownStringHash("TALLREDCOLUMN");
+constexpr uint32_t kShortRedColumn        = epi::KnownStringHash("SHORTREDCOLUMN");
+constexpr uint32_t kSkullColumn           = epi::KnownStringHash("SKULLCOLUMN");
+constexpr uint32_t kHeartColumn           = epi::KnownStringHash("HEARTCOLUMN");
+constexpr uint32_t kEvilEye               = epi::KnownStringHash("EVILEYE");
+constexpr uint32_t kFloatingSkull         = epi::KnownStringHash("FLOATINGSKULL");
+constexpr uint32_t kTorchTree             = epi::KnownStringHash("TORCHTREE");
+constexpr uint32_t kBlueTorch             = epi::KnownStringHash("BLUETORCH");
+constexpr uint32_t kGreenTorch            = epi::KnownStringHash("GREENTORCH");
+constexpr uint32_t kRedTorch              = epi::KnownStringHash("REDTORCH");
+constexpr uint32_t kShortBlueTorch        = epi::KnownStringHash("SHORTBLUETORCH");
+constexpr uint32_t kShortGreenTorch       = epi::KnownStringHash("SHORTGREENTORCH");
+constexpr uint32_t kShortRedTorch         = epi::KnownStringHash("SHORTREDTORCH");
+constexpr uint32_t kStalagtite            = epi::KnownStringHash("STALAGTITE");
+constexpr uint32_t kTechPillar            = epi::KnownStringHash("TECHPILLAR");
+constexpr uint32_t kCandleStick           = epi::KnownStringHash("CANDLESTICK");
+constexpr uint32_t kCandelabra            = epi::KnownStringHash("CANDELABRA");
+constexpr uint32_t kBloodyTwitch          = epi::KnownStringHash("BLOODYTWITCH");
+constexpr uint32_t kMeat2                 = epi::KnownStringHash("MEAT2");
+constexpr uint32_t kMeat3                 = epi::KnownStringHash("MEAT3");
+constexpr uint32_t kMeat4                 = epi::KnownStringHash("MEAT4");
+constexpr uint32_t kMeat5                 = epi::KnownStringHash("MEAT5");
+constexpr uint32_t kNonsolidMeat2         = epi::KnownStringHash("NONSOLIDMEAT2");
+constexpr uint32_t kNonsolidMeat4         = epi::KnownStringHash("NONSOLIDMEAT4");
+constexpr uint32_t kNonsolidMeat3         = epi::KnownStringHash("NONSOLIDMEAT3");
+constexpr uint32_t kNonsolidMeat5         = epi::KnownStringHash("NONSOLIDMEAT5");
+constexpr uint32_t kNonsolidTwitch        = epi::KnownStringHash("NONSOLIDTWITCH");
+constexpr uint32_t kDeadCacodemon         = epi::KnownStringHash("DEADCACODEMON");
+constexpr uint32_t kDeadMarine            = epi::KnownStringHash("DEADMARINE");
+constexpr uint32_t kDeadZombieMan         = epi::KnownStringHash("DEADZOMBIEMAN");
+constexpr uint32_t kDeadDemon             = epi::KnownStringHash("DEADDEMON");
+constexpr uint32_t kDeadLostSoul          = epi::KnownStringHash("DEADLOSTSOUL");
+constexpr uint32_t kDeadDoomImp           = epi::KnownStringHash("DEADDOOMIMP");
+constexpr uint32_t kDeadShotgunGuy        = epi::KnownStringHash("DEADSHOTGUNGUY");
+constexpr uint32_t kGibbedMarine          = epi::KnownStringHash("GIBBEDMARINE");
+constexpr uint32_t kGibbedMarineExtra     = epi::KnownStringHash("GIBBEDMARINEEXTRA");
+constexpr uint32_t kHeadsOnAStick         = epi::KnownStringHash("HEADSONASTICK");
+constexpr uint32_t kGibs                  = epi::KnownStringHash("GIBS");
+constexpr uint32_t kHeadOnAStick          = epi::KnownStringHash("HEADONASTICK");
+constexpr uint32_t kHeadCandles           = epi::KnownStringHash("HEADCANDLES");
+constexpr uint32_t kDeadStick             = epi::KnownStringHash("DEADSTICK");
+constexpr uint32_t kLiveStick             = epi::KnownStringHash("LIVESTICK");
+constexpr uint32_t kBigTree               = epi::KnownStringHash("BIGTREE");
+constexpr uint32_t kBurningBarrel         = epi::KnownStringHash("BURNINGBARREL");
+constexpr uint32_t kHangNoGuts            = epi::KnownStringHash("HANGNOGUTS");
+constexpr uint32_t kHangBNoBrain          = epi::KnownStringHash("HANGBNOBRAIN");
+constexpr uint32_t kHangTLookingDown      = epi::KnownStringHash("HANGTLOOKINGDOWN");
+constexpr uint32_t kHangTSkull            = epi::KnownStringHash("HANGTSKULL");
+constexpr uint32_t kHangTLookingUp        = epi::KnownStringHash("HANGTLOOKINGUP");
+constexpr uint32_t kHangTNoBrain          = epi::KnownStringHash("HANGTNOBRAIN");
+constexpr uint32_t kColonGibs             = epi::KnownStringHash("COLONGIBS");
+constexpr uint32_t kSmallBloodPool        = epi::KnownStringHash("SMALLBLOODPOOL");
+constexpr uint32_t kBrainStem             = epi::KnownStringHash("BRAINSTEM");
+constexpr uint32_t kPointPusher           = epi::KnownStringHash("POINTPUSHER");
+constexpr uint32_t kPointPuller           = epi::KnownStringHash("POINTPULLER");
+constexpr uint32_t kMBFHelperDog          = epi::KnownStringHash("MBFHELPERDOG");
+constexpr uint32_t kPlasmaBall1           = epi::KnownStringHash("PLASMABALL1");
+constexpr uint32_t kPlasmaBall2           = epi::KnownStringHash("PLASMABALL2");
+constexpr uint32_t kEvilSceptre           = epi::KnownStringHash("EVILSCEPTRE");
+constexpr uint32_t kUnholyBible           = epi::KnownStringHash("UNHOLYBIBLE");
+constexpr uint32_t kMusicChanger          = epi::KnownStringHash("MUSICCHANGER");
+constexpr uint32_t kDehActor145           = epi::KnownStringHash("DEH_ACTOR_145");
+constexpr uint32_t kDehActor146           = epi::KnownStringHash("DEH_ACTOR_146");
+constexpr uint32_t kDehActor147           = epi::KnownStringHash("DEH_ACTOR_147");
+constexpr uint32_t kDehActor148           = epi::KnownStringHash("DEH_ACTOR_148");
+constexpr uint32_t kDehActor149           = epi::KnownStringHash("DEH_ACTOR_149");
+constexpr uint32_t kDehActor150           = epi::KnownStringHash("DEH_ACTOR_150");
+constexpr uint32_t kDehActor151           = epi::KnownStringHash("DEH_ACTOR_151");
+constexpr uint32_t kDehActor152           = epi::KnownStringHash("DEH_ACTOR_152");
+constexpr uint32_t kDehActor153           = epi::KnownStringHash("DEH_ACTOR_153");
+constexpr uint32_t kDehActor154           = epi::KnownStringHash("DEH_ACTOR_154");
+constexpr uint32_t kDehActor155           = epi::KnownStringHash("DEH_ACTOR_155");
+constexpr uint32_t kDehActor156           = epi::KnownStringHash("DEH_ACTOR_156");
+constexpr uint32_t kDehActor157           = epi::KnownStringHash("DEH_ACTOR_157");
+constexpr uint32_t kDehActor158           = epi::KnownStringHash("DEH_ACTOR_158");
+constexpr uint32_t kDehActor159           = epi::KnownStringHash("DEH_ACTOR_159");
+constexpr uint32_t kDehActor160           = epi::KnownStringHash("DEH_ACTOR_160");
+constexpr uint32_t kDehActor161           = epi::KnownStringHash("DEH_ACTOR_161");
+constexpr uint32_t kDehActor162           = epi::KnownStringHash("DEH_ACTOR_162");
+constexpr uint32_t kDehActor163           = epi::KnownStringHash("DEH_ACTOR_163");
+constexpr uint32_t kDehActor164           = epi::KnownStringHash("DEH_ACTOR_164");
+constexpr uint32_t kDehActor165           = epi::KnownStringHash("DEH_ACTOR_165");
+constexpr uint32_t kDehActor166           = epi::KnownStringHash("DEH_ACTOR_166");
+constexpr uint32_t kDehActor167           = epi::KnownStringHash("DEH_ACTOR_167");
+constexpr uint32_t kDehActor168           = epi::KnownStringHash("DEH_ACTOR_168");
+constexpr uint32_t kDehActor169           = epi::KnownStringHash("DEH_ACTOR_169");
+constexpr uint32_t kDehActor170           = epi::KnownStringHash("DEH_ACTOR_170");
+constexpr uint32_t kDehActor171           = epi::KnownStringHash("DEH_ACTOR_171");
+constexpr uint32_t kDehActor172           = epi::KnownStringHash("DEH_ACTOR_172");
+constexpr uint32_t kDehActor173           = epi::KnownStringHash("DEH_ACTOR_173");
+constexpr uint32_t kDehActor174           = epi::KnownStringHash("DEH_ACTOR_174");
+constexpr uint32_t kDehActor175           = epi::KnownStringHash("DEH_ACTOR_175");
+constexpr uint32_t kDehActor176           = epi::KnownStringHash("DEH_ACTOR_176");
+constexpr uint32_t kDehActor177           = epi::KnownStringHash("DEH_ACTOR_177");
+constexpr uint32_t kDehActor178           = epi::KnownStringHash("DEH_ACTOR_178");
+constexpr uint32_t kDehActor179           = epi::KnownStringHash("DEH_ACTOR_179");
+constexpr uint32_t kDehActor180           = epi::KnownStringHash("DEH_ACTOR_180");
+constexpr uint32_t kDehActor181           = epi::KnownStringHash("DEH_ACTOR_181");
+constexpr uint32_t kDehActor182           = epi::KnownStringHash("DEH_ACTOR_182");
+constexpr uint32_t kDehActor183           = epi::KnownStringHash("DEH_ACTOR_183");
+constexpr uint32_t kDehActor184           = epi::KnownStringHash("DEH_ACTOR_184");
+constexpr uint32_t kDehActor185           = epi::KnownStringHash("DEH_ACTOR_185");
+constexpr uint32_t kDehActor186           = epi::KnownStringHash("DEH_ACTOR_186");
+constexpr uint32_t kDehActor187           = epi::KnownStringHash("DEH_ACTOR_187");
+constexpr uint32_t kDehActor188           = epi::KnownStringHash("DEH_ACTOR_188");
+constexpr uint32_t kDehActor189           = epi::KnownStringHash("DEH_ACTOR_189");
+constexpr uint32_t kDehActor190           = epi::KnownStringHash("DEH_ACTOR_190");
+constexpr uint32_t kDehActor191           = epi::KnownStringHash("DEH_ACTOR_191");
+constexpr uint32_t kDehActor192           = epi::KnownStringHash("DEH_ACTOR_192");
+constexpr uint32_t kDehActor193           = epi::KnownStringHash("DEH_ACTOR_193");
+constexpr uint32_t kDehActor194           = epi::KnownStringHash("DEH_ACTOR_194");
+constexpr uint32_t kDehActor195           = epi::KnownStringHash("DEH_ACTOR_195");
+constexpr uint32_t kDehActor196           = epi::KnownStringHash("DEH_ACTOR_196");
+constexpr uint32_t kDehActor197           = epi::KnownStringHash("DEH_ACTOR_197");
+constexpr uint32_t kDehActor198           = epi::KnownStringHash("DEH_ACTOR_198");
+constexpr uint32_t kDehActor199           = epi::KnownStringHash("DEH_ACTOR_199");
+constexpr uint32_t kDehActor200           = epi::KnownStringHash("DEH_ACTOR_200");
+constexpr uint32_t kDehActor201           = epi::KnownStringHash("DEH_ACTOR_201");
+constexpr uint32_t kDehActor202           = epi::KnownStringHash("DEH_ACTOR_202");
+constexpr uint32_t kDehActor203           = epi::KnownStringHash("DEH_ACTOR_203");
+constexpr uint32_t kDehActor204           = epi::KnownStringHash("DEH_ACTOR_204");
+constexpr uint32_t kDehActor205           = epi::KnownStringHash("DEH_ACTOR_205");
+constexpr uint32_t kDehActor206           = epi::KnownStringHash("DEH_ACTOR_206");
+constexpr uint32_t kDehActor207           = epi::KnownStringHash("DEH_ACTOR_207");
+constexpr uint32_t kDehActor208           = epi::KnownStringHash("DEH_ACTOR_208");
+constexpr uint32_t kDehActor209           = epi::KnownStringHash("DEH_ACTOR_209");
+constexpr uint32_t kDehActor210           = epi::KnownStringHash("DEH_ACTOR_210");
+constexpr uint32_t kDehActor211           = epi::KnownStringHash("DEH_ACTOR_211");
+constexpr uint32_t kDehActor212           = epi::KnownStringHash("DEH_ACTOR_212");
+constexpr uint32_t kDehActor213           = epi::KnownStringHash("DEH_ACTOR_213");
+constexpr uint32_t kDehActor214           = epi::KnownStringHash("DEH_ACTOR_214");
+constexpr uint32_t kDehActor215           = epi::KnownStringHash("DEH_ACTOR_215");
+constexpr uint32_t kDehActor216           = epi::KnownStringHash("DEH_ACTOR_216");
+constexpr uint32_t kDehActor217           = epi::KnownStringHash("DEH_ACTOR_217");
+constexpr uint32_t kDehActor218           = epi::KnownStringHash("DEH_ACTOR_218");
+constexpr uint32_t kDehActor219           = epi::KnownStringHash("DEH_ACTOR_219");
+constexpr uint32_t kDehActor220           = epi::KnownStringHash("DEH_ACTOR_220");
+constexpr uint32_t kDehActor221           = epi::KnownStringHash("DEH_ACTOR_221");
+constexpr uint32_t kDehActor222           = epi::KnownStringHash("DEH_ACTOR_222");
+constexpr uint32_t kDehActor223           = epi::KnownStringHash("DEH_ACTOR_223");
+constexpr uint32_t kDehActor224           = epi::KnownStringHash("DEH_ACTOR_224");
+constexpr uint32_t kDehActor225           = epi::KnownStringHash("DEH_ACTOR_225");
+constexpr uint32_t kDehActor226           = epi::KnownStringHash("DEH_ACTOR_226");
+constexpr uint32_t kDehActor227           = epi::KnownStringHash("DEH_ACTOR_227");
+constexpr uint32_t kDehActor228           = epi::KnownStringHash("DEH_ACTOR_228");
+constexpr uint32_t kDehActor229           = epi::KnownStringHash("DEH_ACTOR_229");
+constexpr uint32_t kDehActor230           = epi::KnownStringHash("DEH_ACTOR_230");
+constexpr uint32_t kDehActor231           = epi::KnownStringHash("DEH_ACTOR_231");
+constexpr uint32_t kDehActor232           = epi::KnownStringHash("DEH_ACTOR_232");
+constexpr uint32_t kDehActor233           = epi::KnownStringHash("DEH_ACTOR_233");
+constexpr uint32_t kDehActor234           = epi::KnownStringHash("DEH_ACTOR_234");
+constexpr uint32_t kDehActor235           = epi::KnownStringHash("DEH_ACTOR_235");
+constexpr uint32_t kDehActor236           = epi::KnownStringHash("DEH_ACTOR_236");
+constexpr uint32_t kDehActor237           = epi::KnownStringHash("DEH_ACTOR_237");
+constexpr uint32_t kDehActor238           = epi::KnownStringHash("DEH_ACTOR_238");
+constexpr uint32_t kDehActor239           = epi::KnownStringHash("DEH_ACTOR_239");
+constexpr uint32_t kDehActor240           = epi::KnownStringHash("DEH_ACTOR_240");
+constexpr uint32_t kDehActor241           = epi::KnownStringHash("DEH_ACTOR_241");
+constexpr uint32_t kDehActor242           = epi::KnownStringHash("DEH_ACTOR_242");
+constexpr uint32_t kDehActor243           = epi::KnownStringHash("DEH_ACTOR_243");
+constexpr uint32_t kDehActor244           = epi::KnownStringHash("DEH_ACTOR_244");
+constexpr uint32_t kDehActor245           = epi::KnownStringHash("DEH_ACTOR_245");
+constexpr uint32_t kDehActor246           = epi::KnownStringHash("DEH_ACTOR_246");
+constexpr uint32_t kDehActor247           = epi::KnownStringHash("DEH_ACTOR_247");
+constexpr uint32_t kDehActor248           = epi::KnownStringHash("DEH_ACTOR_248");
+constexpr uint32_t kDehActor249           = epi::KnownStringHash("DEH_ACTOR_249");
 
 } // namespace umapinfo
 
-static std::unordered_map<epi::StringHash, std::pair<int16_t, int16_t>> ActorNames = {
+static std::unordered_map<uint32_t, std::pair<int16_t, int16_t>> ActorNames = {
     {umapinfo::kDoomPlayer, {1, -1}},
     {umapinfo::kZombieMan, {2, 3004}},
     {umapinfo::kShotgunGuy, {3, 9}},
@@ -886,11 +887,11 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
             {
                 int             actor_num = -1;
                 epi::StringHash actor_check(value);
-                if (!ActorNames.count(actor_check))
+                if (!ActorNames.count(actor_check.Value()))
                     FatalError("UMAPINFO: Unknown thing type %s\n", value.c_str());
                 else
                 {
-                    std::pair<int16_t, int16_t> nums = ActorNames[actor_check];
+                    std::pair<int16_t, int16_t> nums = ActorNames[actor_check.Value()];
                     if (nums.second != -1) // DoomEd number exists already
                         actor_num = nums.second;
                     else                   // See if modified by Dehacked, else skip

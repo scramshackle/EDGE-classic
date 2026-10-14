@@ -60,7 +60,6 @@
 #include "s_music.h"
 #include "s_sound.h"
 #include "script/compat/lua_compat.h"
-#include "stb_sprintf.h"
 #include "sv_chunk.h"
 #include "sv_main.h"
 #include "version.h"
@@ -342,7 +341,7 @@ void DoLoadLevel(void)
 
         if (epi::TestFileAccess(fn))
         {
-            LogPrint("Loading HUB...\n");
+            epi::LogMessage(epi::kLogLevelPrint, "Loading HUB...\n");
 
             if (!GameLoadGameFromFile(fn, true))
                 FatalError("LOAD-HUB failed with filename: %s\n", fn.c_str());
@@ -586,7 +585,7 @@ static void RespawnPlayer(Player *p)
 
 static void SpawnInitialPlayers(void)
 {
-    LogDebug("Deathmatch %d\n", deathmatch);
+    epi::LogMessage(epi::kLogLevelDebug, "Deathmatch %d\n", deathmatch);
 
     // spawn the active players
     for (int pnum = 0; pnum < kMaximumPlayers; pnum++)
@@ -668,10 +667,10 @@ void ExitToHub(int map_number, int tag)
     // bit hackish: decided whether to use MAP## or E#M#
     if (current_map->name_[0] == 'E')
     {
-        stbsp_sprintf(name_buf, "E%dM%d", 1 + (map_number / 10), map_number % 10);
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "E%dM%d", 1 + (map_number / 10), map_number % 10);
     }
     else
-        stbsp_sprintf(name_buf, "MAP%02d", map_number);
+        epi::FormatToBufferSized(name_buf, sizeof(name_buf), "MAP%02d", map_number);
 
     ExitToHub(name_buf, tag);
 }
@@ -725,7 +724,7 @@ static void GameDoCompleted(void)
             else
             {
                 // save current map for HUB system
-                LogPrint("Saving HUB...\n");
+                epi::LogMessage(epi::kLogLevelPrint, "Saving HUB...\n");
 
                 // remember avatars of players, so we can remove them
                 // when we return to this level.
@@ -775,7 +774,7 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
 {
     if (!SaveFileOpenRead(filename))
     {
-        LogPrint("LOAD-GAME: cannot open %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "LOAD-GAME: cannot open %s\n", filename.c_str());
         return false;
     }
 
@@ -783,7 +782,7 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
 
     if (!SaveFileVerifyHeader(&version) || !SaveFileVerifyContents())
     {
-        LogPrint("LOAD-GAME: Savegame is corrupt !\n");
+        epi::LogMessage(epi::kLogLevelPrint, "LOAD-GAME: Savegame is corrupt !\n");
         SaveFileCloseRead();
         return false;
     }
@@ -905,7 +904,7 @@ static void GameDoLoadGame(void)
     ForceWipe();
 
     const char *dir_name = SaveSlotName(defer_load_slot);
-    LogDebug("GameDoLoadGame : %s\n", dir_name);
+    epi::LogMessage(epi::kLogLevelDebug, "GameDoLoadGame : %s\n", dir_name);
 
     SaveClearSlot("current");
     SaveCopySlot(dir_name, "current");
@@ -949,7 +948,7 @@ static bool GameSaveGameToFile(const std::string &filename, const char *descript
 
     if (!SaveFileOpenWrite(filename, 0xEC))
     {
-        LogPrint("Unable to create savegame file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelPrint, "Unable to create savegame file: %s\n", filename.c_str());
         return false;
     }
 
@@ -986,8 +985,9 @@ static bool GameSaveGameToFile(const std::string &filename, const char *descript
     timebuf[0] = 0;
 
     if (local_time)
-        stbsp_snprintf(timebuf, sizeof(timebuf), "%02d:%02d  %d-%02d-%02d", local_time->tm_hour, local_time->tm_min,
-                       local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday);
+        epi::FormatToBufferSized(timebuf, sizeof(timebuf), "%02d:%02d  %d-%02d-%02d", local_time->tm_hour,
+                                 local_time->tm_min, local_time->tm_year + 1900, local_time->tm_mon + 1,
+                                 local_time->tm_mday);
 
     globs->description = SaveChunkCopyString(description);
     globs->desc_date   = SaveChunkCopyString(timebuf);

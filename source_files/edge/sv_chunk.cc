@@ -27,6 +27,7 @@
 #include "epi.h"
 #include "epi_crc.h"
 #include "epi_filesystem.h"
+#include "epi_str_util.h"
 #include "i_system.h"
 #include "miniz.h"
 
@@ -113,7 +114,7 @@ int SaveGetError(void)
 
 bool SaveFileOpenRead(const std::string &filename)
 {
-    LogDebug("Opening savegame file (R): %s\n", filename.c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "Opening savegame file (R): %s\n", filename.c_str());
 
     chunk_stack_size = 0;
     last_error       = 0;
@@ -138,7 +139,7 @@ bool SaveFileCloseRead(void)
     fclose(current_file_pointer);
 
     if (last_error)
-        LogWarning("LOADGAME: Error(s) occurred during reading.\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Error(s) occurred during reading.\n");
 
     return true;
 }
@@ -153,7 +154,7 @@ bool SaveFileVerifyHeader(int *version)
 
     if (!CheckMagic())
     {
-        LogWarning("LOADGAME: Bad magic in savegame file\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Bad magic in savegame file\n");
         return false;
     }
 
@@ -168,7 +169,7 @@ bool SaveFileVerifyHeader(int *version)
 
     if (last_error)
     {
-        LogWarning("LOADGAME: Bad header in savegame file\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Bad header in savegame file\n");
         return false;
     }
 
@@ -192,9 +193,10 @@ bool SaveFileVerifyContents(void)
 
         if (!VerifyMarker(start_marker))
         {
-            LogWarning("LOADGAME: Verify failed: Invalid start marker: "
-                       "%02X %02X %02X %02X\n",
-                       start_marker[0], start_marker[1], start_marker[2], start_marker[3]);
+            epi::LogMessage(epi::kLogLevelWarning,
+                            "LOADGAME: Verify failed: Invalid start marker: "
+                            "%02X %02X %02X %02X\n",
+                            start_marker[0], start_marker[1], start_marker[2], start_marker[3]);
             return false;
         }
 
@@ -209,9 +211,10 @@ bool SaveFileVerifyContents(void)
 
         if ((orig_len & 3) != 0 || file_len > (compressBound(orig_len) + 4))
         {
-            LogWarning("LOADGAME: Verify failed: Chunk has bad size: "
-                       "(file=%d orig=%d)\n",
-                       file_len, orig_len);
+            epi::LogMessage(epi::kLogLevelWarning,
+                            "LOADGAME: Verify failed: Chunk has bad size: "
+                            "(file=%d orig=%d)\n",
+                            file_len, orig_len);
             return false;
         }
 
@@ -222,8 +225,8 @@ bool SaveFileVerifyContents(void)
         // run out of data ?
         if (last_error)
         {
-            LogWarning("LOADGAME: Verify failed: Chunk corrupt or "
-                       "File truncated.\n");
+            epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Verify failed: Chunk corrupt or "
+                                                   "File truncated.\n");
             return false;
         }
     }
@@ -231,7 +234,7 @@ bool SaveFileVerifyContents(void)
     // check trailer
     if (!CheckMagic())
     {
-        LogWarning("LOADGAME: Verify failed: Bad trailer.\n");
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Verify failed: Bad trailer.\n");
         return false;
     }
 
@@ -243,7 +246,8 @@ bool SaveFileVerifyContents(void)
 
     if (read_crc != final_crc.GetCRC())
     {
-        LogWarning("LOADGAME: Verify failed: Bad CRC: %08X != %08X\n", current_crc.GetCRC(), read_crc);
+        epi::LogMessage(epi::kLogLevelWarning, "LOADGAME: Verify failed: Bad CRC: %08X != %08X\n", current_crc.GetCRC(),
+                        read_crc);
         return false;
     }
 
@@ -278,7 +282,7 @@ uint8_t SaveChunkGetByte(void)
         {
             static int position = 0;
             position++;
-            LogDebug("%08X: %02X \n", ftell(current_file_pointer), c);
+            epi::LogMessage(epi::kLogLevelDebug, "%08X: %02X \n", ftell(current_file_pointer), c);
             //			LogDebug("0.%02X%s", result, ((position %
             // 10)==0) ?
             //"\n" : " ");
@@ -306,7 +310,8 @@ uint8_t SaveChunkGetByte(void)
     {
         static int position = 0;
         position++;
-        LogDebug("%d.%02X%s", chunk_stack_size, result, ((position % 10) == 0) ? "\n" : " ");
+        epi::LogMessage(epi::kLogLevelDebug, "%d.%02X%s", chunk_stack_size, result,
+                        ((position % 10) == 0) ? "\n" : " ");
     }
 #endif
 
@@ -455,7 +460,7 @@ bool SaveSkipReadChunk(const char *id)
 
 bool SaveFileOpenWrite(const std::string &filename, int version)
 {
-    LogDebug("Opening savegame file (W): %s\n", filename.c_str());
+    epi::LogMessage(epi::kLogLevelDebug, "Opening savegame file (W): %s\n", filename.c_str());
 
     chunk_stack_size = 0;
     last_error       = 0;
@@ -466,7 +471,7 @@ bool SaveFileOpenWrite(const std::string &filename, int version)
 
     if (!current_file_pointer)
     {
-        LogWarning("SAVEGAME: Couldn't open file: %s\n", filename.c_str());
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: Couldn't open file: %s\n", filename.c_str());
         return false;
     }
 
@@ -496,7 +501,7 @@ bool SaveFileCloseWrite(void)
     SaveChunkPutInteger(final_crc.GetCRC());
 
     if (last_error)
-        LogWarning("SAVEGAME: Error(s) occurred during writing.\n");
+        epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: Error(s) occurred during writing.\n");
 
     fclose(current_file_pointer);
 
@@ -569,7 +574,8 @@ bool SavePopWriteChunk(void)
         if (res != Z_OK || (int)out_len >= len)
         {
 #if (EDGE_DEBUG_SAVE_CHUNK_COMPRESS)
-            LogDebug("WriteChunk UNCOMPRESSED (res %d != %d, out_len %d >= %d)\n", res, Z_OK, (int)out_len, len);
+            epi::LogMessage(epi::kLogLevelDebug, "WriteChunk UNCOMPRESSED (res %d != %d, out_len %d >= %d)\n", res,
+                            Z_OK, (int)out_len, len);
 #endif
             // compression failed, so write uncompressed
             memcpy(out_buf, cur->start, len);
@@ -578,7 +584,8 @@ bool SavePopWriteChunk(void)
 #if (EDGE_DEBUG_SAVE_CHUNK_COMPRESS)
         else
         {
-            LogDebug("WriteChunk compress (res %d == %d, out_len %d < %d)\n", res, Z_OK, (int)out_len, len);
+            epi::LogMessage(epi::kLogLevelDebug, "WriteChunk compress (res %d == %d, out_len %d < %d)\n", res, Z_OK,
+                            (int)out_len, len);
         }
 #endif
 
@@ -622,7 +629,7 @@ void SaveChunkPutByte(uint8_t value)
     {
         static int position = 0;
         position++;
-        LogDebug("%d.%02x%s", chunk_stack_size, value, ((position % 10) == 0) ? "\n" : " ");
+        epi::LogMessage(epi::kLogLevelDebug, "%d.%02x%s", chunk_stack_size, value, ((position % 10) == 0) ? "\n" : " ");
     }
 #endif
 
@@ -636,7 +643,7 @@ void SaveChunkPutByte(uint8_t value)
 
         if (ferror(current_file_pointer))
         {
-            LogWarning("SAVEGAME: Write error occurred !\n");
+            epi::LogMessage(epi::kLogLevelWarning, "SAVEGAME: Write error occurred !\n");
             last_error = 3;
             return;
         }
@@ -713,14 +720,14 @@ uint32_t SaveChunkGetInteger(void)
 //  ANGLES
 //
 
-void SaveChunkPutAngle(BAMAngle value)
+void SaveChunkPutAngle(epi::BAMAngle value)
 {
     SaveChunkPutInteger((uint32_t)value);
 }
 
-BAMAngle SaveChunkGetAngle(void)
+epi::BAMAngle SaveChunkGetAngle(void)
 {
-    return (BAMAngle)SaveChunkGetInteger();
+    return (epi::BAMAngle)SaveChunkGetInteger();
 }
 
 //----------------------------------------------------------------------------

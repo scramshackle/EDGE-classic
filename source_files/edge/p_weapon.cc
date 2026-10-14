@@ -460,7 +460,7 @@ static void BringUpWeapon(Player *p)
 
     if (p->zoom_field_of_view_ > 0)
     {
-        if (info->zoom_fov_ < int(kBAMAngle360))
+        if (info->zoom_fov_ < int(epi::kBAMAngle360))
             p->zoom_field_of_view_ = info->zoom_fov_;
         else
             p->zoom_field_of_view_ = 0;
@@ -909,16 +909,16 @@ static void BobWeapon(Player *p, WeaponDefinition *info)
 
     PlayerSprite *psp = &p->player_sprites_[p->action_player_sprite_];
 
-    float new_sx = p->map_object_->momentum_.Z ? psp->screen_x : 0;
-    float new_sy = p->map_object_->momentum_.Z ? psp->screen_y : 0;
+    float new_sx = p->map_object_->momentum_.z ? psp->screen_x : 0;
+    float new_sy = p->map_object_->momentum_.z ? psp->screen_y : 0;
 
     // bob the weapon based on movement speed
     if (p->powers_[kPowerTypeJetpack] <= 0) // Don't bob when using jetpack
     {
-        BAMAngle angle = (128 * (erraticism.d_ ? p->erraticism_bob_ticker_++ : level_time_elapsed)) << 19;
+        epi::BAMAngle angle = (128 * (erraticism.d_ ? p->erraticism_bob_ticker_++ : level_time_elapsed)) << 19;
         new_sx         = p->bob_factor_ * info->swaying_ * epi::BAMCos(angle);
 
-        angle &= (kBAMAngle180 - 1);
+        angle &= (epi::kBAMAngle180 - 1);
         new_sy = p->bob_factor_ * info->bobbing_ * epi::BAMSin(angle);
     }
 
@@ -2007,7 +2007,7 @@ void A_WeaponTransSet(MapObject *mo)
     if (psp->state && psp->state->action_par)
     {
         value = ((float *)psp->state->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     psp->visibility = psp->target_visibility = value;
@@ -2023,7 +2023,7 @@ void A_WeaponTransFade(MapObject *mo)
     if (psp->state && psp->state->action_par)
     {
         value = ((float *)psp->state->action_par)[0];
-        value = HMM_MAX(0.0f, HMM_MIN(1.0f, value));
+        value = epi::Max(0.0f, epi::Min(1.0f, value));
     }
 
     psp->target_visibility = value;
@@ -2175,7 +2175,7 @@ void A_WeaponZoom(MapObject *mo)
         if (!(p->ready_weapon_ < 0 || p->pending_weapon_ >= 0))
             fov = p->weapons_[p->ready_weapon_].info->zoom_fov_;
 
-        if (fov == int(kBAMAngle360))
+        if (fov == int(epi::kBAMAngle360))
             fov = 0;
     }
 
@@ -2196,8 +2196,8 @@ void WA_MoveFwd(MapObject *mo)
         float dx = epi::BAMCos(mo->angle_);
         float dy = epi::BAMSin(mo->angle_);
 
-        mo->momentum_.X += dx * amount;
-        mo->momentum_.Y += dy * amount;
+        mo->momentum_.x += dx * amount;
+        mo->momentum_.y += dy * amount;
     }
 }
 
@@ -2212,11 +2212,11 @@ void WA_MoveRight(MapObject *mo)
     {
         float amount = *(float *)st->action_par;
 
-        float dx = epi::BAMCos(mo->angle_ - kBAMAngle90);
-        float dy = epi::BAMSin(mo->angle_ - kBAMAngle90);
+        float dx = epi::BAMCos(mo->angle_ - epi::kBAMAngle90);
+        float dy = epi::BAMSin(mo->angle_ - epi::kBAMAngle90);
 
-        mo->momentum_.X += dx * amount;
-        mo->momentum_.Y += dy * amount;
+        mo->momentum_.x += dx * amount;
+        mo->momentum_.y += dy * amount;
     }
 }
 
@@ -2228,7 +2228,7 @@ void WA_MoveUp(MapObject *mo)
     const State *st = psp->state;
 
     if (st && st->action_par)
-        mo->momentum_.Z += *(float *)st->action_par;
+        mo->momentum_.z += *(float *)st->action_par;
 }
 
 void WA_TurnDir(MapObject *mo)
@@ -2239,7 +2239,7 @@ void WA_TurnDir(MapObject *mo)
     const State *st = psp->state;
 
     if (st && st->action_par)
-        mo->angle_ += *(BAMAngle *)st->action_par;
+        mo->angle_ += *(epi::BAMAngle *)st->action_par;
 }
 
 void WA_TurnRandom(MapObject *mo)

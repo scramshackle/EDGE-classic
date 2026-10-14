@@ -168,10 +168,10 @@ class MapDefinition
     float      sky_scroll_y_;
 
     Colormap *indoor_fog_cmap_;
-    RGBAColor indoor_fog_color_;
+    epi::RGBAColor indoor_fog_color_;
     float     indoor_fog_density_;
     Colormap *outdoor_fog_cmap_;
-    RGBAColor outdoor_fog_color_;
+    epi::RGBAColor outdoor_fog_color_;
     float     outdoor_fog_density_;
 
   private:
