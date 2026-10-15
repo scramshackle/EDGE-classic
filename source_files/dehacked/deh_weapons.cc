@@ -77,7 +77,7 @@ bool weapon_modified[kTotalWeapons];
 
 void weapons::Init()
 {
-    EPI_CLEAR_MEMORY(weapon_modified, bool, 9);
+    epi::ClearMemory(weapon_modified, 9);
 }
 
 void weapons::Shutdown()

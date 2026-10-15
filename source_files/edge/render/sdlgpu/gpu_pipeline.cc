@@ -146,10 +146,10 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     bool sprite = (shader_kind == kGpuPipelineShaderSprite || shader_kind == kGpuPipelineShaderSpriteOit);
 
     SDL_GPUVertexBufferDescription buffer_description[6];
-    EPI_CLEAR_MEMORY(buffer_description, SDL_GPUVertexBufferDescription, 6);
+    epi::ClearMemory(buffer_description, 6);
 
     SDL_GPUVertexAttribute attributes[6];
-    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 6);
+    epi::ClearMemory(attributes, 6);
 
     uint32_t buffer_count    = 1;
     uint32_t attribute_count = 3;
@@ -253,7 +253,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     }
 
     SDL_GPUColorTargetDescription color_target[2];
-    EPI_CLEAR_MEMORY(color_target, SDL_GPUColorTargetDescription, 2);
+    epi::ClearMemory(color_target, 2);
 
     color_target[0].format = pipeline_color_format;
 
@@ -283,7 +283,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     }
 
     SDL_GPUGraphicsPipelineCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUGraphicsPipelineCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     if (shader_kind == kGpuPipelineShaderOit)
     {
@@ -365,7 +365,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     if (stencil_flags)
     {
         SDL_GPUStencilOpState stencil_state;
-        EPI_CLEAR_MEMORY(&stencil_state, SDL_GPUStencilOpState, 1);
+        epi::ClearMemory(&stencil_state, 1);
 
         stencil_state.compare_op =
             (pipeline_flags & kGpuPipelineStencilTest) ? SDL_GPU_COMPAREOP_EQUAL : SDL_GPU_COMPAREOP_ALWAYS;
@@ -415,14 +415,14 @@ SDL_GPUGraphicsPipeline *GetMoviePipeline(void)
         FatalError("GpuPipeline: movie shader creation failed\n");
 
     SDL_GPUVertexBufferDescription buffer_description;
-    EPI_CLEAR_MEMORY(&buffer_description, SDL_GPUVertexBufferDescription, 1);
+    epi::ClearMemory(&buffer_description, 1);
 
     buffer_description.slot       = 0;
     buffer_description.pitch      = (uint32_t)sizeof(RendererVertex);
     buffer_description.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
     SDL_GPUVertexAttribute attributes[3];
-    EPI_CLEAR_MEMORY(attributes, SDL_GPUVertexAttribute, 3);
+    epi::ClearMemory(attributes, 3);
 
     attributes[0].location    = kGpuAttributePosition;
     attributes[0].buffer_slot = 0;
@@ -440,11 +440,11 @@ SDL_GPUGraphicsPipeline *GetMoviePipeline(void)
     attributes[2].offset      = (uint32_t)offsetof(RendererVertex, rgba);
 
     SDL_GPUColorTargetDescription color_target;
-    EPI_CLEAR_MEMORY(&color_target, SDL_GPUColorTargetDescription, 1);
+    epi::ClearMemory(&color_target, 1);
     color_target.format = pipeline_color_format;
 
     SDL_GPUGraphicsPipelineCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUGraphicsPipelineCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.vertex_shader   = MovieVertexShader();
     info.fragment_shader = MovieFragmentShader();

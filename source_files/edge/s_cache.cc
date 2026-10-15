@@ -62,7 +62,7 @@ static void LoadSilence(SoundData *buf)
     buf->frequency_ = sound_device_frequency;
     buf->Allocate(length);
 
-    EPI_CLEAR_MEMORY(buf->data_, float, length * 2);
+    epi::ClearMemory(buf->data_, length * 2);
 }
 static bool LoadDoom(SoundData *buf, const uint8_t *lump, int length)
 {

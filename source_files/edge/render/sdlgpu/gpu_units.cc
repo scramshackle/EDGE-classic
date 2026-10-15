@@ -211,19 +211,19 @@ void FinishUnitBatch(void)
     RenderCurrentUnits();
 }
 
-uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
+uint32_t CreateStaticVertexBuffer(std::span<const RendererVertex> vertices)
 {
-    return gpu_immediate.CreateStaticBuffer(vertices, count, count);
+    return gpu_immediate.CreateStaticBuffer(vertices, (int)vertices.size());
 }
 
-uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity)
+uint32_t CreateStaticVertexBufferWithCapacity(std::span<const RendererVertex> vertices, int capacity)
 {
-    return gpu_immediate.CreateStaticBuffer(vertices, count, capacity);
+    return gpu_immediate.CreateStaticBuffer(vertices, capacity);
 }
 
-void UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+void UpdateStaticVertexBuffer(uint32_t handle, int first, std::span<const RendererVertex> vertices)
 {
-    gpu_immediate.UpdateStaticBuffer(handle, first, vertices, count);
+    gpu_immediate.UpdateStaticBuffer(handle, first, vertices);
 }
 
 void FlushStaticVertexUploads(void)
@@ -290,25 +290,25 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     current_render_unit++;
 }
 
-uint32_t CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity)
+uint32_t CreateSpriteInstanceBuffer(std::span<const SpriteInstance> instances, int capacity)
 {
-    if (!instances || count <= 0)
+    if (instances.empty())
         return 0;
 
-    if (capacity < count)
-        capacity = count;
+    if (capacity < (int)instances.size())
+        capacity = (int)instances.size();
 
-    return (uint32_t)gpu_immediate.CreateStaticBytes(instances, (size_t)count * sizeof(SpriteInstance),
-                                                 (size_t)capacity * sizeof(SpriteInstance));
+    return (uint32_t)gpu_immediate.CreateStaticBytes(instances.data(), instances.size_bytes(),
+                                                     (size_t)capacity * sizeof(SpriteInstance));
 }
 
-void UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count)
+void UpdateSpriteInstanceBuffer(uint32_t handle, int first, std::span<const SpriteInstance> instances)
 {
-    if (!instances || count <= 0 || first < 0)
+    if (instances.empty() || first < 0)
         return;
 
-    gpu_immediate.UpdateStaticBytes(handle, (size_t)first * sizeof(SpriteInstance), instances,
-                                (size_t)count * sizeof(SpriteInstance));
+    gpu_immediate.UpdateStaticBytes(handle, (size_t)first * sizeof(SpriteInstance), instances.data(),
+                                    instances.size_bytes());
 }
 
 SpriteInstance *ReserveSpriteInstances(int count, int *first)

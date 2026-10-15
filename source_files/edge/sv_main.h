@@ -97,10 +97,22 @@ struct SaveField
 };
 
 // NOTE: requires an instantiated dummy struct for "base"
-#define EDGE_SAVE_FIELD(base, field, name, num, fkind, fsize, fname, getter, putter)                                   \
+#define EDGE_SAVE_FIELD(base, field, save_name, num, fkind, fsize, fname, getter, putter)                              \
     {                                                                                                                  \
-        (const char *)&base.field, name, num, {fkind, fsize, fname}, getter, putter, nullptr                           \
+        .offset_pointer = (const char *)&base.field, .field_name = save_name, .count = num,                            \
+        .type = {.kind = fkind, .size = fsize, .name = fname}, .field_get = getter, .field_put = putter,               \
+        .known_field = nullptr,                                                                                        \
     }
+
+constexpr SaveField kSaveFieldTerminator = {
+    .offset_pointer = nullptr,
+    .field_name     = nullptr,
+    .count          = 0,
+    .type           = {.kind = kSaveFieldInvalid, .size = 0, .name = nullptr},
+    .field_get      = nullptr,
+    .field_put      = nullptr,
+    .known_field    = nullptr,
+};
 
 // This describes a single structure
 struct SaveStruct

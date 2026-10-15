@@ -173,8 +173,10 @@ void SoundSpatializer::Update(const SpatialListener &listener, const epi::Vec3 &
     SetGains(gains);
 }
 
-void SoundSpatializer::Process(float *frames, int frame_count)
+void SoundSpatializer::Process(std::span<float> frames)
 {
+    int frame_count = (int)(frames.size() / kSpatialChannels);
+
     if (frame_count <= 0)
         return;
 
@@ -190,7 +192,7 @@ void SoundSpatializer::Process(float *frames, int frame_count)
         float a = (float)smooth_time_ / (float)spatial_gain_smooth_frames;
         float d = 1.0f / (float)spatial_gain_smooth_frames;
 
-        float *output = frames;
+        float *output = frames.data();
 
         for (int i = 0; i < interpolated; i++)
         {
@@ -211,7 +213,7 @@ void SoundSpatializer::Process(float *frames, int frame_count)
             smooth_time_ = spatial_gain_smooth_frames;
     }
 
-    float *output = frames + interpolated * kSpatialChannels;
+    float *output = frames.data() + interpolated * kSpatialChannels;
 
     for (int i = interpolated; i < frame_count; i++)
     {

@@ -2357,7 +2357,7 @@ MapObject *AimLineAttack(MapObject *t1, epi::BAMAngle angle, float distance, flo
     float x2 = t1->x + distance * epi::BAMCos(angle);
     float y2 = t1->y + distance * epi::BAMSin(angle);
 
-    EPI_CLEAR_MEMORY(&aim_check, ShootAttempt, 1);
+    epi::ClearMemory(&aim_check, 1);
 
     if (t1->info_)
         aim_check.start_z = t1->z + t1->height_ * t1->info_->shotheight_;
@@ -2399,7 +2399,7 @@ void LineAttack(MapObject *t1, epi::BAMAngle angle, float distance, float slope,
     float x2 = t1->x + distance * epi::BAMCos(angle);
     float y2 = t1->y + distance * epi::BAMSin(angle);
 
-    EPI_CLEAR_MEMORY(&shoot_check, ShootAttempt, 1);
+    epi::ClearMemory(&shoot_check, 1);
 
     if (t1->info_)
         shoot_check.start_z = t1->z + t1->height_ * t1->info_->shotheight_;
@@ -2454,7 +2454,7 @@ MapObject *GetMapTargetAimInfo(MapObject *source, epi::BAMAngle angle, float dis
 {
     float x2, y2;
 
-    EPI_CLEAR_MEMORY(&aim_check, ShootAttempt, 1);
+    epi::ClearMemory(&aim_check, 1);
 
     aim_check.source = source;
     aim_check.forced = false;
@@ -2503,7 +2503,7 @@ MapObject *DoMapTargetAutoAim(MapObject *source, epi::BAMAngle angle, float dist
         return nullptr;
     }
 
-    EPI_CLEAR_MEMORY(&aim_check, ShootAttempt, 1);
+    epi::ClearMemory(&aim_check, 1);
 
     aim_check.source = source;
     aim_check.forced = force_aim;

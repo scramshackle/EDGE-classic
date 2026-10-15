@@ -35,7 +35,6 @@
 
 #include "dm_format.h"
 #include "e_main.h"
-#include "e_search.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_filesystem.h"
@@ -330,7 +329,7 @@ static void FillSpriteFrames(int file)
                     continue;
                 }
 
-                if (epi::StringCompareMax(sprname, lumpname, spr_len) != 0)
+                if (epi::StringPrefixCompare(lumpname, sprname) != 0)
                     continue;
 
                 // we have a match
@@ -372,7 +371,7 @@ static void FillSpriteFrames(int file)
                         continue;
                     }
 
-                    if (epi::StringCompareMax(sprname, spritebase, spr_len) != 0)
+                    if (epi::StringPrefixCompare(spritebase, sprname) != 0)
                         continue;
 
                     // we have a match
@@ -425,7 +424,7 @@ static void FillSpriteFramesUser()
                 continue;
             }
 
-            if (epi::StringCompareMax(sprname, img_name, spr_len) != 0)
+            if (epi::StringPrefixCompare(img_name, sprname) != 0)
                 continue;
 
             // Fix offsets if Doom formatted
@@ -557,6 +556,11 @@ static void CheckSpriteFrames(SpriteDefinition *def)
     }
 }
 
+static bool SpriteDefinitionNameLess(const SpriteDefinition *a, const SpriteDefinition *b)
+{
+    return epi::StringCompare(a->name_, b->name_) < 0;
+}
+
 //
 // InitializeSprites
 //
@@ -646,9 +650,7 @@ void InitializeSprites(void)
     for (int n = 0; n < sprite_map_length; n++)
         sprite_map[n] = sprites[n + 1];
 
-#define EDGE_CMP(a, b) (epi::StringCompare(a->name_, b->name_) < 0)
-    EDGE_QSORT(SpriteDefinition *, sprite_map, sprite_map_length, 10);
-#undef EDGE_CMP
+    std::stable_sort(sprite_map, sprite_map + sprite_map_length, SpriteDefinitionNameLess);
 
     // iterate over each file.  Order is important, we must go from
     // newest wad to oldest, so that new sprites override the old ones.
@@ -751,7 +753,7 @@ void PrecacheSprites(void)
     EPI_ASSERT(sprite_count > 1);
 
     uint8_t *sprite_present = new uint8_t[sprite_count];
-    EPI_CLEAR_MEMORY(sprite_present, uint8_t, sprite_count);
+    epi::ClearMemory(sprite_present, sprite_count);
 
     for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
     {

@@ -173,7 +173,7 @@ void music::MarkEntry(int num)
         return;
 
     // already have a modified entry?
-    if (S_music.count(num))
+    if (S_music.contains(num))
         return;
 
     MusicInfo *entry = new MusicInfo;

@@ -80,20 +80,20 @@ void UnlockSoundMixer(void)
         SDL_UnlockAudioStream(sound_device_stream);
 }
 
-void ProcessVacuumEffect(float *frames, int frame_count)
+void ProcessVacuumEffect(std::span<float> frames)
 {
-    vacuum_filter.Process(frames, frame_count);
+    vacuum_filter.Process(frames);
 }
 
-void ProcessUnderwaterEffect(float *frames, int frame_count)
+void ProcessUnderwaterEffect(std::span<float> frames)
 {
-    underwater_delay.Process(frames, frame_count);
-    underwater_filter.Process(frames, frame_count);
+    underwater_delay.Process(frames);
+    underwater_filter.Process(frames);
 }
 
-void ProcessReverbEffect(float *frames, int frame_count)
+void ProcessReverbEffect(std::span<float> frames)
 {
-    reverb_effect.Process(frames, frame_count);
+    reverb_effect.Process(frames);
 }
 
 static void SDLCALL SoundDeviceCallback(void *userdata, SDL_AudioStream *stream, int additional_amount,
@@ -114,7 +114,7 @@ static void SDLCALL SoundDeviceCallback(void *userdata, SDL_AudioStream *stream,
     if (sound_device_scratch.size() < (size_t)(frames * kSpatialChannels))
         sound_device_scratch.resize((size_t)frames * kSpatialChannels);
 
-    MixSoundEffects(sound_device_scratch.data(), frames);
+    MixSoundEffects({sound_device_scratch.data(), (size_t)frames * kSpatialChannels});
 
     SDL_PutAudioStreamData(stream, sound_device_scratch.data(), frames * frame_bytes);
 }
@@ -326,7 +326,7 @@ void StartupMusic(void)
             if (!sbd[i].is_dir)
             {
                 std::string filename = epi::GetFilename(sbd[i].name);
-                if (!available_soundbanks.count(filename))
+                if (!available_soundbanks.contains(filename))
                     available_soundbanks.emplace(filename);
             }
         }
@@ -345,7 +345,7 @@ void StartupMusic(void)
                 if (!sbd[i].is_dir)
                 {
                     std::string filename = epi::GetFilename(sbd[i].name);
-                    if (!available_soundbanks.count(filename))
+                    if (!available_soundbanks.contains(filename))
                         available_soundbanks.emplace(filename);
                 }
             }

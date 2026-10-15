@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <span>
+
 #include "ddf_types.h"
 #include "i_defs_gl.h"
 #include "r_units.h"
@@ -140,12 +142,11 @@ class AbstractShader
         EPI_UNUSED(glow_set);
     }
 
-    virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
+    virtual void WorldBaked(GLuint shape, std::span<const RendererVertex> source, GLuint tex, float alpha,
                             int *pass_var, BlendingMode blending, int glow_set)
     {
         EPI_UNUSED(shape);
         EPI_UNUSED(source);
-        EPI_UNUSED(num_vert);
         EPI_UNUSED(tex);
         EPI_UNUSED(alpha);
         EPI_UNUSED(pass_var);

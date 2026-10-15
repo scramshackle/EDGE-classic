@@ -236,9 +236,9 @@ void ClosePackFile(DataFile *df)
     df->pack_ = nullptr;
 }
 
-int FindStemInPack(PackFile *pack, epi::StringHash name_hash)
+bool FindStemInPack(PackFile *pack, epi::StringHash name_hash)
 {
-    return pack->search_files_.count(name_hash);
+    return pack->search_files_.contains(name_hash);
 }
 
 //----------------------------------------------------------------------------

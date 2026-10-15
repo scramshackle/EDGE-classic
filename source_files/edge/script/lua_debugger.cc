@@ -22,8 +22,6 @@
 
 #include "lua_debugger.h"
 
-#include <assert.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -60,7 +58,7 @@ void dbg_setup(lua_State *lua, const char *name, const char *globalName, lua_CFu
 {
     // Check that the module name was not already defined.
     lua_getfield(lua, LUA_REGISTRYINDEX, MODULE_NAME);
-    assert(lua_isnil(lua, -1) || strcmp(name, luaL_checkstring(lua, -1)));
+    EPI_ASSERT(lua_isnil(lua, -1) || strcmp(name, luaL_checkstring(lua, -1)));
     lua_pop(lua, 1);
 
     // Push the module name into the registry.

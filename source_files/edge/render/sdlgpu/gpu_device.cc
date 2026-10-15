@@ -58,7 +58,7 @@ bool GpuDevice::Init(SDL_Window *window)
         FatalError("SDL_GPU: no depth-stencil format is supported by this device\n");
 
     SDL_GPUTextureCreateInfo pair_info;
-    EPI_CLEAR_MEMORY(&pair_info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&pair_info, 1);
 
     pair_info.type                 = SDL_GPU_TEXTURETYPE_2D;
     pair_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -194,7 +194,7 @@ bool GpuDevice::CreateFrameTextures(int32_t width, int32_t height)
     }
 
     SDL_GPUTextureCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.type                 = SDL_GPU_TEXTURETYPE_2D;
     info.format               = swapchain_format_;
@@ -356,7 +356,7 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
     world_height_ = 0;
 
     SDL_GPUTextureCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.type                 = SDL_GPU_TEXTURETYPE_2D;
     info.format               = swapchain_format_;
@@ -438,7 +438,7 @@ void GpuDevice::BlitWorldToMain(const GpuBlitRectangle &source, const GpuBlitRec
     EndPass();
 
     SDL_GPUBlitInfo blit;
-    EPI_CLEAR_MEMORY(&blit, SDL_GPUBlitInfo, 1);
+    epi::ClearMemory(&blit, 1);
 
     blit.source.texture = world_color_texture_;
     blit.source.x       = (uint32_t)source.x;
@@ -496,7 +496,7 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     current_target_ = target;
 
     SDL_GPUColorTargetInfo color_target[2];
-    EPI_CLEAR_MEMORY(color_target, SDL_GPUColorTargetInfo, 2);
+    epi::ClearMemory(color_target, 2);
 
     if (target == kGpuPassTargetOit)
         color_target[0].texture = oit_accumulation_texture_;
@@ -536,7 +536,7 @@ void GpuDevice::BeginPass(GpuLoadOperation color_load, GpuLoadOperation depth_lo
     }
 
     SDL_GPUDepthStencilTargetInfo depth_target;
-    EPI_CLEAR_MEMORY(&depth_target, SDL_GPUDepthStencilTargetInfo, 1);
+    epi::ClearMemory(&depth_target, 1);
 
     depth_target.texture = (target == kGpuPassTargetWorld || target == kGpuPassTargetOit) ? world_depth_texture_
                                                                                           : depth_texture_;
@@ -605,7 +605,7 @@ void GpuDevice::PairColorClear(void)
         return;
 
     SDL_GPUColorTargetInfo pair_target;
-    EPI_CLEAR_MEMORY(&pair_target, SDL_GPUColorTargetInfo, 1);
+    epi::ClearMemory(&pair_target, 1);
 
     pair_target.texture  = clear_pair_texture_;
     pair_target.load_op  = SDL_GPU_LOADOP_CLEAR;
@@ -661,7 +661,7 @@ void GpuDevice::SubmitFrame()
     if (swapchain_texture_ && main_texture_ == color_texture_ && color_texture_)
     {
         SDL_GPUBlitInfo blit;
-        EPI_CLEAR_MEMORY(&blit, SDL_GPUBlitInfo, 1);
+        epi::ClearMemory(&blit, 1);
 
         blit.source.texture = color_texture_;
         blit.source.w       = (uint32_t)target_width_;
@@ -719,7 +719,7 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
     if (!download_buffer_)
     {
         SDL_GPUTransferBufferCreateInfo transfer_info;
-        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+        epi::ClearMemory(&transfer_info, 1);
 
         transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
         transfer_info.size  = bytes;
@@ -753,7 +753,7 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     SDL_GPUTextureRegion source;
-    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureRegion, 1);
+    epi::ClearMemory(&source, 1);
 
     source.texture = color_texture_;
     source.x       = (uint32_t)x;
@@ -763,7 +763,7 @@ bool GpuDevice::ReadColorRegion(int32_t x, int32_t y, int32_t width, int32_t hei
     source.d       = 1;
 
     SDL_GPUTextureTransferInfo destination;
-    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureTransferInfo, 1);
+    epi::ClearMemory(&destination, 1);
 
     destination.transfer_buffer = download_buffer_;
     destination.pixels_per_row  = (uint32_t)width;

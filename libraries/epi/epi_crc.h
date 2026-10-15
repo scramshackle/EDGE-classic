@@ -24,6 +24,8 @@
 
 #include <stdint.h>
 
+#include <span>
+
 namespace epi
 {
 
@@ -59,7 +61,7 @@ class CRC32
     CRC32 &operator+=(uint32_t value);
     CRC32 &operator+=(float value);
 
-    CRC32 &AddBlock(const uint8_t *data, int len);
+    CRC32 &AddBlock(std::span<const uint8_t> data);
     CRC32 &AddCString(const char *str);
 
     void Reset(void)

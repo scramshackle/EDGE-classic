@@ -208,32 +208,32 @@ static SaveField sv_fields_mobj[] = {
     //   lastlookup: being reset to zero won't hurt.
     //   ...
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_mobj = {
-    nullptr,                         // link in list
-    "mobj_t",                        // structure name
-    "mobj",                          // start marker
-    sv_fields_mobj,                  // field descriptions
-    (const char *)&dummy_map_object, // dummy base
-    true,                            // define_me
-    nullptr                          // pointer to known struct
+    .next        = nullptr,        // link in list
+    .struct_name = "mobj_t",       // structure name
+    .marker      = "mobj",         // start marker
+    .fields      = sv_fields_mobj, // field descriptions
+    .dummy_base  = (const char *)&dummy_map_object,
+    .define_me   = true,
+    .counterpart = nullptr,        // pointer to known struct
 };
 
 SaveArray sv_array_mobj = {
-    nullptr,                        // link in list
-    "mobjs",                        // array name
-    &sv_struct_mobj,                // array type
-    true,                           // define_me
-    true,                           // allow_hub
+    .next       = nullptr,         // link in list
+    .array_name = "mobjs",
+    .sdef       = &sv_struct_mobj, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SaveGameMapObjectCountElems,    // count routine
-    SaveGameMapObjectFindByIndex,   // index routine
-    SaveGameMapObjectCreateElems,   // creation routine
-    SaveGameMapObjectFinaliseElems, // finalisation routine
+    .count_elems    = SaveGameMapObjectCountElems,    // count routine
+    .get_elem       = SaveGameMapObjectFindByIndex,   // index routine
+    .create_elems   = SaveGameMapObjectCreateElems,   // creation routine
+    .finalise_elems = SaveGameMapObjectFinaliseElems, // finalisation routine
 
-    nullptr,                        // pointer to known array
-    0                               // loaded size
+    .counterpart = nullptr,                           // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -259,16 +259,16 @@ static SaveField sv_fields_spawnpoint[] = {
     EDGE_SAVE_FIELD(dummy_spawn_point, flags, "tag", 1, kSaveFieldNumeric, 4, nullptr, SaveGameGetInteger,
                     SaveGamePutInteger),
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_spawnpoint = {
-    nullptr,                          // link in list
-    "spawnpoint_t",                   // structure name
-    "spwn",                           // start marker
-    sv_fields_spawnpoint,             // field descriptions
-    (const char *)&dummy_spawn_point, // dummy base
-    true,                             // define_me
-    nullptr                           // pointer to known struct
+    .next        = nullptr,              // link in list
+    .struct_name = "spawnpoint_t",       // structure name
+    .marker      = "spwn",               // start marker
+    .fields      = sv_fields_spawnpoint, // field descriptions
+    .dummy_base  = (const char *)&dummy_spawn_point,
+    .define_me   = true,
+    .counterpart = nullptr,              // pointer to known struct
 };
 
 //----------------------------------------------------------------------------
@@ -286,32 +286,32 @@ static SaveField sv_fields_iteminque[] = {
     // NOT HERE:
     //   next,prev: links are regenerated.
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_iteminque = {
-    nullptr,                         // link in list
-    "iteminque_t",                   // structure name
-    "itmq",                          // start marker
-    sv_fields_iteminque,             // field descriptions
-    (const char *)&dummy_queue_item, // dummy base
-    true,                            // define_me
-    nullptr                          // pointer to known struct
+    .next        = nullptr,             // link in list
+    .struct_name = "iteminque_t",       // structure name
+    .marker      = "itmq",              // start marker
+    .fields      = sv_fields_iteminque, // field descriptions
+    .dummy_base  = (const char *)&dummy_queue_item,
+    .define_me   = true,
+    .counterpart = nullptr,             // pointer to known struct
 };
 
 SaveArray sv_array_iteminque = {
-    nullptr,               // link in list
-    "itemquehead",         // array name
-    &sv_struct_iteminque,  // array type
-    true,                  // define_me
-    true,                  // allow_hub
+    .next       = nullptr,              // link in list
+    .array_name = "itemquehead",
+    .sdef       = &sv_struct_iteminque, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_ItemqCountElems,    // count routine
-    SV_ItemqFindByIndex,   // index routine
-    SV_ItemqCreateElems,   // creation routine
-    SV_ItemqFinaliseElems, // finalisation routine
+    .count_elems    = SV_ItemqCountElems,    // count routine
+    .get_elem       = SV_ItemqFindByIndex,   // index routine
+    .create_elems   = SV_ItemqCreateElems,   // creation routine
+    .finalise_elems = SV_ItemqFinaliseElems, // finalisation routine
 
-    nullptr,               // pointer to known array
-    0                      // loaded size
+    .counterpart = nullptr,                  // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------

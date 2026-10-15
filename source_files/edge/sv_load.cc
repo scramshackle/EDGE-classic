@@ -265,7 +265,7 @@ static bool SV_LoadSTRU(void)
 {
     SaveStruct *S = new SaveStruct;
 
-    EPI_CLEAR_MEMORY(S, SaveStruct, 1);
+    epi::ClearMemory(S, 1);
 
     int numfields = SaveChunkGetInteger();
 
@@ -289,7 +289,7 @@ static bool SV_LoadSTRU(void)
 
     S->fields = new SaveField[numfields + 1];
 
-    EPI_CLEAR_MEMORY(S->fields, SaveField, numfields + 1);
+    epi::ClearMemory(S->fields, numfields + 1);
 
     //
     // -- now load in all the fields --
@@ -330,7 +330,7 @@ static bool SV_LoadARRY(void)
 {
     SaveArray *A = new SaveArray;
 
-    EPI_CLEAR_MEMORY(A, SaveArray, 1);
+    epi::ClearMemory(A, 1);
 
     A->loaded_size = SaveChunkGetInteger();
 

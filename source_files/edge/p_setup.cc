@@ -132,7 +132,7 @@ static std::unordered_map<epi::StringHash, MUSINFOMapping> musinfo_tracks;
 static void GetMUSINFOTracksForLevel(void)
 {
     epi::StringHash ref(current_map->name_);
-    if (musinfo_tracks.count(ref) && musinfo_tracks[ref].processed)
+    if (musinfo_tracks.contains(ref) && musinfo_tracks[ref].processed)
         return;
     int      raw_length  = 0;
     uint8_t *raw_musinfo = OpenPackOrLumpInMemory("MUSINFO", {".txt"}, &raw_length);
@@ -143,7 +143,7 @@ static void GetMUSINFOTracksForLevel(void)
     memcpy(musinfo.data(), raw_musinfo, raw_length);
     delete[] raw_musinfo;
     epi::Scanner lex(musinfo);
-    if (!musinfo_tracks.count(ref))
+    if (!musinfo_tracks.contains(ref))
         musinfo_tracks.try_emplace(ref, MUSINFOMapping{});
     for (;;)
     {
@@ -364,10 +364,10 @@ static void LoadSectors(int lump)
         FatalError("Bad WAD: level %s contains 0 sectors.\n", current_map->lump_.c_str());
 
     level_sectors = new Sector[total_level_sectors];
-    EPI_CLEAR_MEMORY(level_sectors, Sector, total_level_sectors);
+    epi::ClearMemory(level_sectors, total_level_sectors);
 
     data = LoadLumpIntoMemory(lump);
-    map_sectors_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
+    map_sectors_crc.AddBlock({(const uint8_t *)data, (size_t)GetLumpLength(lump)});
     CheckDoom2Map05Bug((uint8_t *)data, GetLumpLength(lump)); // Lobo: 2023
     ms = (const RawSector *)data;
     ss = level_sectors;
@@ -479,7 +479,7 @@ static void UnknownThingWarning(int type, float x, float y)
 {
     int count = 0;
 
-    if (unknown_thing_map.find(type) != unknown_thing_map.end())
+    if (unknown_thing_map.contains(type))
         count = unknown_thing_map[type];
 
     if (count < 2)
@@ -646,7 +646,7 @@ static void LoadThings(int lump)
         FatalError("Bad WAD: level %s contains 0 things.\n", current_map->lump_.c_str());
 
     data = LoadLumpIntoMemory(lump);
-    map_things_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
+    map_things_crc.AddBlock({(const uint8_t *)data, (size_t)GetLumpLength(lump)});
     CheckEvilutionBug((uint8_t *)data, GetLumpLength(lump));
     // -AJA- 2004/11/04: check the options in all things to see whether
     // we can use new option flags or not.  Same old wads put 1 bits in
@@ -698,7 +698,7 @@ static void LoadThings(int lump)
 
                 if (objtype->number_ == 14100) // Default for level
                     mus_number = current_map->music_;
-                else if (musinfo_tracks[current_map->name_].mappings.count(objtype->number_ - 14100))
+                else if (musinfo_tracks[current_map->name_].mappings.contains(objtype->number_ - 14100))
                     mus_number = musinfo_tracks[current_map->name_].mappings[objtype->number_ - 14100];
                 // Track found; make ad-hoc RTS script for music changing
                 if (mus_number != -1)
@@ -835,12 +835,12 @@ static void LoadLineDefs(int lump)
 
     level_lines = new Line[total_level_lines];
 
-    EPI_CLEAR_MEMORY(level_lines, Line, total_level_lines);
+    epi::ClearMemory(level_lines, total_level_lines);
 
     temp_line_sides = new int[total_level_lines * 2];
 
     const uint8_t *data = LoadLumpIntoMemory(lump);
-    map_lines_crc.AddBlock((const uint8_t *)data, GetLumpLength(lump));
+    map_lines_crc.AddBlock({(const uint8_t *)data, (size_t)GetLumpLength(lump)});
 
     std::unordered_map<int, std::vector<int>> sector_tag_map;
     for (int t = 0; t < total_level_sectors; t++)
@@ -1357,7 +1357,7 @@ static void LoadUDMFSideDefs()
     epi::LogMessage(epi::kLogLevelDebug, "LoadUDMFSectors: parsing TEXTMAP\n");
 
     level_sides = new Side[total_level_sides];
-    EPI_CLEAR_MEMORY(level_sides, Side, total_level_sides);
+    epi::ClearMemory(level_sides, total_level_sides);
 
     int nummapsides = 0;
 
@@ -1987,7 +1987,7 @@ static void LoadUDMFThings()
 
                     if (objtype->number_ == 14100) // Default for level
                         mus_number = current_map->music_;
-                    else if (musinfo_tracks[current_map->name_].mappings.count(objtype->number_ - 14100))
+                    else if (musinfo_tracks[current_map->name_].mappings.contains(objtype->number_ - 14100))
                     {
                         mus_number = musinfo_tracks[current_map->name_].mappings[objtype->number_ - 14100];
                     }
@@ -2151,9 +2151,9 @@ static void LoadUDMFCounts()
     // initialize arrays
     level_vertexes = new Vertex[total_level_vertexes];
     level_sectors  = new Sector[total_level_sectors];
-    EPI_CLEAR_MEMORY(level_sectors, Sector, total_level_sectors);
+    epi::ClearMemory(level_sectors, total_level_sectors);
     level_lines = new Line[total_level_lines];
-    EPI_CLEAR_MEMORY(level_lines, Line, total_level_lines);
+    epi::ClearMemory(level_lines, total_level_lines);
     level_line_alphas = new float[total_level_lines];
     temp_line_sides   = new int[total_level_lines * 2];
 }
@@ -2230,7 +2230,7 @@ static void LoadSideDefs(int lump)
 
     level_sides = new Side[total_level_sides];
 
-    EPI_CLEAR_MEMORY(level_sides, Side, total_level_sides);
+    epi::ClearMemory(level_sides, total_level_sides);
 
     data = LoadLumpIntoMemory(lump);
 
@@ -2306,7 +2306,7 @@ static void SetupExtrafloors(void)
 
     level_extrafloors = new Extrafloor[total_level_extrafloors];
 
-    EPI_CLEAR_MEMORY(level_extrafloors, Extrafloor, total_level_extrafloors);
+    epi::ClearMemory(level_extrafloors, total_level_extrafloors);
 
     for (i = 0, ss = level_sectors; i < total_level_sectors; i++, ss++)
     {
@@ -2401,7 +2401,7 @@ static void SetupVertGaps(void)
 
     level_vertical_gaps = new VerticalGap[total_level_vertical_gaps];
 
-    EPI_CLEAR_MEMORY(level_vertical_gaps, VerticalGap, total_level_vertical_gaps);
+    epi::ClearMemory(level_vertical_gaps, total_level_vertical_gaps);
 
     for (i = 0, cur_gap = level_vertical_gaps; i < total_level_lines; i++)
     {
@@ -2716,7 +2716,7 @@ static void CreateLineSides(void)
 {
     level_line_sides = new LineSide[total_level_lines * 2];
 
-    EPI_CLEAR_MEMORY(level_line_sides, LineSide, total_level_lines * 2);
+    epi::ClearMemory(level_line_sides, total_level_lines * 2);
 
     for (int i = 0; i < total_level_lines; i++)
     {
@@ -2782,7 +2782,7 @@ static void CreateVertexSeclists(void)
     // step 1: determine number of linedef branches at each vertex
     int *branches = new int[total_level_vertexes];
 
-    EPI_CLEAR_MEMORY(branches, int, total_level_vertexes);
+    epi::ClearMemory(branches, total_level_vertexes);
 
     int i;
 
@@ -2821,7 +2821,7 @@ static void CreateVertexSeclists(void)
     // step 3: create a vertex_seclist for those multi-branches
     level_vertex_sector_lists = new VertexSectorList[num_triples];
 
-    EPI_CLEAR_MEMORY(level_vertex_sector_lists, VertexSectorList, num_triples);
+    epi::ClearMemory(level_vertex_sector_lists, num_triples);
 
     epi::LogMessage(epi::kLogLevelDebug, "Created %d seclists from %d vertices (%1.1f%%)\n", num_triples,
                     total_level_vertexes, num_triples * 100 / (float)total_level_vertexes);

@@ -28,6 +28,7 @@
 #include <SDL3/SDL_audio.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <vector>
 
 #include "con_var.h"
@@ -67,10 +68,10 @@ class AbstractMusicPlayer
 
     virtual int StreamIntoBuffer(void *buffer, int frames) = 0;
 
-    SDL_AudioStream *stream_;
-    int              stream_frame_bytes_;
-    bool             stream_paused_;
-    bool             stream_ended_;
+    SDL_AudioStream  *stream_;
+    int               stream_frame_bytes_;
+    bool              stream_paused_;
+    std::atomic<bool> stream_ended_;
 
   private:
     static void SDLCALL StreamCallback(void *userdata, SDL_AudioStream *stream, int additional_amount,

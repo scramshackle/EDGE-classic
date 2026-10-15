@@ -25,6 +25,7 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <iterator>
 #include <vector>
 
 #include "con_main.h"
@@ -1440,7 +1441,7 @@ void ConsoleStart(void)
 static char *GetHumanSize(uint32_t bytes, char *hrbytes)
 {
     const char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
-    char        length   = sizeof(suffix) / sizeof(suffix[0]);
+    char        length   = (char)std::size(suffix);
     int         i;
 
     for (i = 0; i < length; i++)

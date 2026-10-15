@@ -35,7 +35,6 @@
 #include "ddf_anim.h"
 #include "dm_defs.h"
 #include "dm_state.h"
-#include "e_search.h"
 #include "epi.h"
 #include "m_argv.h"
 #include "m_misc.h"
@@ -437,9 +436,7 @@ static void PrecacheTextures(void)
 
     // Sort the images, so we can ignore the duplicates
 
-#define EDGE_CMP(a, b) (a < b)
-    EDGE_QSORT(const Image *, images, count, 10);
-#undef EDGE_CMP
+    std::sort(images, images + count);
 
     for (int i = 0; i < count; i++)
     {

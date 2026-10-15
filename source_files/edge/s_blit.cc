@@ -27,6 +27,7 @@
 
 #include <string.h>
 
+#include <atomic>
 #include <vector>
 
 #include "con_var.h"
@@ -66,6 +67,8 @@ SpatialListener spatial_listener;
 static std::vector<float> mix_bus[kTotalSoundBuses];
 static std::vector<float> mix_scratch;
 
+static std::atomic<float> mix_master_volume;
+
 SoundChannel::SoundChannel() : state_(kChannelEmpty), data_(nullptr), definition_(nullptr), position_(nullptr)
 {
     Reset();
@@ -99,6 +102,8 @@ void InitializeSoundChannels(int total)
 {
     total_channels = total;
 
+    mix_master_volume = sound_effect_volume.f_ * 0.5f;
+
     for (int i = 0; i < total_channels; i++)
         mix_channels[i] = new SoundChannel();
 }
@@ -117,7 +122,7 @@ void FreeSoundChannels(void)
         delete chan;
     }
 
-    EPI_CLEAR_MEMORY(mix_channels, SoundChannel *, total_channels);
+    epi::ClearMemory(mix_channels, total_channels);
 
     total_channels = 0;
 
@@ -134,6 +139,8 @@ void KillSoundChannel(int k)
 
 void UpdateSounds(MapObject *listener, epi::BAMAngle angle)
 {
+    mix_master_volume = sound_effect_volume.f_ * 0.5f;
+
     LockSoundMixer();
 
     listen_x = listener ? listener->x : 0;
@@ -238,9 +245,11 @@ static int RenderChannel(SoundChannel *chan, float *destination, int frames)
     return written;
 }
 
-void MixSoundEffects(float *output, int frames)
+void MixSoundEffects(std::span<float> output)
 {
-    memset(output, 0, (size_t)frames * 2 * sizeof(float));
+    int frames = (int)(output.size() / kSpatialChannels);
+
+    memset(output.data(), 0, output.size_bytes());
 
     if (frames <= 0)
         return;
@@ -273,7 +282,7 @@ void MixSoundEffects(float *output, int frames)
             continue;
         }
 
-        chan->spatializer_.Process(mix_scratch.data(), frames);
+        chan->spatializer_.Process({mix_scratch.data(), needed});
 
         float *bus = mix_bus[chan->bus_].data();
 
@@ -298,11 +307,11 @@ void MixSoundEffects(float *output, int frames)
             memset(mix_bus[b].data(), 0, needed * sizeof(float));
     }
 
-    ProcessVacuumEffect(mix_bus[kSoundBusVacuum].data(), frames);
-    ProcessUnderwaterEffect(mix_bus[kSoundBusUnderwater].data(), frames);
-    ProcessReverbEffect(mix_bus[kSoundBusReverb].data(), frames);
+    ProcessVacuumEffect({mix_bus[kSoundBusVacuum].data(), needed});
+    ProcessUnderwaterEffect({mix_bus[kSoundBusUnderwater].data(), needed});
+    ProcessReverbEffect({mix_bus[kSoundBusReverb].data(), needed});
 
-    float master = sound_effect_volume.f_ * 0.5f;
+    float master = mix_master_volume;
 
     if (bus_used[kSoundBusDry])
     {

@@ -51,7 +51,7 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
         return false;
 
     SDL_GPUTextureCreateInfo texture_info;
-    EPI_CLEAR_MEMORY(&texture_info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&texture_info, 1);
 
     texture_info.type                 = SDL_GPU_TEXTURETYPE_2D;
     texture_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -72,7 +72,7 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     }
 
     SDL_GPUSamplerCreateInfo sampler_info;
-    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(&sampler_info, 1);
 
     sampler_info.min_filter     = SDL_GPU_FILTER_NEAREST;
     sampler_info.mag_filter     = SDL_GPU_FILTER_NEAREST;
@@ -91,7 +91,7 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = 4;
@@ -135,11 +135,11 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     SDL_GPUTextureTransferInfo source;
-    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+    epi::ClearMemory(&source, 1);
     source.transfer_buffer = transfer;
 
     SDL_GPUTextureRegion destination;
-    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+    epi::ClearMemory(&destination, 1);
     destination.texture = default_texture_;
     destination.w       = 1;
     destination.h       = 1;
@@ -157,7 +157,7 @@ bool GpuImmediate::Init(SDL_GPUDevice *device)
     current_sampler_[0] = default_sampler_;
     current_sampler_[1] = default_sampler_;
 
-    EPI_CLEAR_MEMORY(&current_fragment_parameters_, GpuFragmentParameters, 1);
+    epi::ClearMemory(&current_fragment_parameters_, 1);
 
     for (int32_t i = 0; i < kGpuMatrixModeTotal; i++)
     {
@@ -174,7 +174,7 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
     size_t fan_bytes  = (size_t)kGpuFanIndexTotal * sizeof(uint16_t);
 
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = SDL_GPU_BUFFERUSAGE_INDEX;
     buffer_info.size  = (uint32_t)quad_bytes;
@@ -191,7 +191,7 @@ bool GpuImmediate::CreateIndexBuffers(SDL_GPUDevice *device)
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)(quad_bytes + fan_bytes);
@@ -407,7 +407,7 @@ void GpuImmediate::BeginFrame()
 
     current_matrix_mode_ = kGpuMatrixModeModelView;
 
-    EPI_CLEAR_MEMORY(&current_fragment_parameters_, GpuFragmentParameters, 1);
+    epi::ClearMemory(&current_fragment_parameters_, 1);
 
     vertex_parameters_dirty_   = true;
     fragment_parameters_dirty_ = true;
@@ -630,17 +630,15 @@ void GpuImmediate::SetLineMode(bool enabled)
 static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBufferUsageFlags usage, const void *data,
                                               size_t bytes, const char *what);
 
-
-uint32_t GpuImmediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
+uint32_t GpuImmediate::CreateStaticBuffer(std::span<const RendererVertex> vertices, int capacity)
 {
-    if (!vertices || count <= 0)
+    if (vertices.empty())
         return 0;
 
-    if (capacity < count)
-        capacity = count;
+    if (capacity < (int)vertices.size())
+        capacity = (int)vertices.size();
 
-    return CreateStaticBytes(vertices, (size_t)count * sizeof(RendererVertex),
-                             (size_t)capacity * sizeof(RendererVertex));
+    return CreateStaticBytes(vertices.data(), vertices.size_bytes(), (size_t)capacity * sizeof(RendererVertex));
 }
 
 uint32_t GpuImmediate::CreateStaticBytes(const void *data, size_t bytes, size_t capacity)
@@ -660,7 +658,7 @@ uint32_t GpuImmediate::CreateStaticBytes(const void *data, size_t bytes, size_t 
     else
     {
         SDL_GPUBufferCreateInfo buffer_info;
-        EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+        epi::ClearMemory(&buffer_info, 1);
 
         buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
         buffer_info.size  = (uint32_t)capacity;
@@ -688,12 +686,12 @@ uint32_t GpuImmediate::CreateStaticBytes(const void *data, size_t bytes, size_t 
     return (uint32_t)static_buffers_.size();
 }
 
-void GpuImmediate::UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+void GpuImmediate::UpdateStaticBuffer(uint32_t handle, int first, std::span<const RendererVertex> vertices)
 {
-    if (!vertices || count <= 0 || first < 0)
+    if (vertices.empty() || first < 0)
         return;
 
-    UpdateStaticBytes(handle, (size_t)first * sizeof(RendererVertex), vertices, (size_t)count * sizeof(RendererVertex));
+    UpdateStaticBytes(handle, (size_t)first * sizeof(RendererVertex), vertices.data(), vertices.size_bytes());
 }
 
 void GpuImmediate::UpdateStaticBytes(uint32_t handle, size_t offset, const void *data, size_t bytes)
@@ -741,7 +739,7 @@ bool GpuImmediate::RecordFrameStaticUploads()
         size_t capacity = epi::Max(bytes, epi::Max(static_transfer_capacity_ * 2, (size_t)65536));
 
         SDL_GPUTransferBufferCreateInfo transfer_info;
-        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+        epi::ClearMemory(&transfer_info, 1);
 
         transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         transfer_info.size  = (uint32_t)capacity;
@@ -803,7 +801,7 @@ void GpuImmediate::FlushStaticUploads()
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)static_upload_data_.size();
@@ -981,7 +979,7 @@ int32_t GpuImmediate::SpriteLightTableIndex(const SpriteLightTable *light_table)
     if (light_table)
         table = *light_table;
     else
-        EPI_CLEAR_MEMORY(&table, SpriteLightTable, 1);
+        epi::ClearMemory(&table, 1);
 
     sprite_light_tables_.push_back(table);
     sprite_light_table_sources_.push_back(light_table);
@@ -1726,7 +1724,7 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
                                               size_t bytes, const char *what)
 {
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = usage;
     buffer_info.size  = (uint32_t)bytes;
@@ -1741,7 +1739,7 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)bytes;
@@ -1804,23 +1802,23 @@ static SDL_GPUBuffer *CreateStaticModelBuffer(SDL_GPUDevice *device, SDL_GPUBuff
     return buffer;
 }
 
-uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count)
+uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices)
 {
-    if (!device_ || !data.frame_positions || !data.texture_coordinates || !indices)
+    if (!device_ || !data.frame_positions || !data.texture_coordinates || indices.empty())
         return 0;
 
-    if (data.vertex_count <= 0 || data.frame_count <= 0 || index_count <= 0)
+    if (data.vertex_count <= 0 || data.frame_count <= 0)
         return 0;
 
     GpuModelMesh mesh;
-    EPI_CLEAR_MEMORY(&mesh, GpuModelMesh, 1);
+    epi::ClearMemory(&mesh, 1);
 
     mesh.vertex_count = data.vertex_count;
     mesh.frame_count  = data.frame_count;
 
     size_t position_bytes = (size_t)data.vertex_count * (size_t)data.frame_count * 3 * sizeof(float);
     size_t texture_bytes  = (size_t)data.vertex_count * 2 * sizeof(float);
-    size_t index_bytes    = (size_t)index_count * sizeof(uint16_t);
+    size_t index_bytes    = indices.size_bytes();
 
     mesh.position_buffer = CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_VERTEX, data.frame_positions,
                                                    position_bytes, "model positions");
@@ -1834,7 +1832,7 @@ uint32_t GpuImmediate::CreateModelMesh(const ModelMeshData &data, const uint16_t
                                                              data.texture_coordinates, texture_bytes, "model texcoords");
 
     mesh.index_buffer =
-        CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_INDEX, indices, index_bytes, "model indices");
+        CreateStaticModelBuffer(device_, SDL_GPU_BUFFERUSAGE_INDEX, indices.data(), index_bytes, "model indices");
 
     if (!mesh.position_buffer || !mesh.normal_buffer || !mesh.texture_coordinate_buffer || !mesh.index_buffer)
     {
@@ -1870,7 +1868,7 @@ void GpuImmediate::DeleteModelMesh(uint32_t handle)
     if (mesh->index_buffer)
         SDL_ReleaseGPUBuffer(device_, mesh->index_buffer);
 
-    EPI_CLEAR_MEMORY(mesh, GpuModelMesh, 1);
+    epi::ClearMemory(mesh, 1);
 }
 
 void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVertexParameters &vertex_parameters,
@@ -1934,11 +1932,12 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     commands_.push_back(command);
 }
 
-
-void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_count, const uint16_t *indices,
-                               int32_t index_count)
+void GpuImmediate::DrawIndexed(std::span<const RendererVertex> vertices, std::span<const uint16_t> indices)
 {
-    if (!vertices || !indices || vertex_count <= 0 || index_count < 3)
+    int32_t vertex_count = (int32_t)vertices.size();
+    int32_t index_count  = (int32_t)indices.size();
+
+    if (vertex_count <= 0 || index_count < 3)
         return;
 
     if (vertex_count > 65536)
@@ -1951,7 +1950,7 @@ void GpuImmediate::DrawIndexed(const RendererVertex *vertices, int32_t vertex_co
 
     RendererVertex *destination = ReserveVertices(vertex_count);
 
-    memcpy(destination, vertices, (size_t)vertex_count * sizeof(RendererVertex));
+    memcpy(destination, vertices.data(), vertices.size_bytes());
 
     int32_t vertex_parameters   = CurrentVertexParameters();
     int32_t fragment_parameters = CurrentFragmentParameters();
@@ -2019,7 +2018,7 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
     vertex_buffer_capacity_ = 0;
 
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
     buffer_info.size  = (uint32_t)capacity;
@@ -2035,7 +2034,7 @@ bool GpuImmediate::EnsureVertexCapacity(size_t bytes)
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)capacity;
@@ -2077,7 +2076,7 @@ bool GpuImmediate::EnsureSpriteCapacity(size_t bytes)
     sprite_buffer_capacity_ = 0;
 
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
     buffer_info.size  = (uint32_t)capacity;
@@ -2093,7 +2092,7 @@ bool GpuImmediate::EnsureSpriteCapacity(size_t bytes)
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)capacity;
@@ -2263,7 +2262,7 @@ bool GpuImmediate::EnsureIndexCapacity(size_t bytes)
         SDL_ReleaseGPUTransferBuffer(device_, dynamic_index_transfer_buffer_);
 
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = SDL_GPU_BUFFERUSAGE_INDEX;
     buffer_info.size  = (uint32_t)capacity;
@@ -2271,7 +2270,7 @@ bool GpuImmediate::EnsureIndexCapacity(size_t bytes)
     dynamic_index_buffer_ = SDL_CreateGPUBuffer(device_, &buffer_info);
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)capacity;

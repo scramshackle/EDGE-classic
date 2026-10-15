@@ -42,14 +42,17 @@ static bool ModelMeshPointsMatch(const ModelMeshVertex &a, const ModelMeshVertex
     return a.vert_idx == b.vert_idx && epi::AlmostEquals(a.skin_s, b.skin_s) && epi::AlmostEquals(a.skin_t, b.skin_t);
 }
 
-void ModelMeshBuild(ModelMesh &mesh, const ModelMeshVertex *points, int total_points, const int *triangle_points,
-                    int total_triangles, int vertices_per_frame)
+void ModelMeshBuild(ModelMesh &mesh, std::span<const ModelMeshVertex> points, std::span<const int> triangle_points,
+                    int vertices_per_frame)
 {
     mesh.vertices_.clear();
     mesh.indices_.clear();
     mesh.submeshes_.clear();
 
-    if (!points || !triangle_points || total_triangles <= 0 || vertices_per_frame <= 0)
+    int total_points    = (int)points.size();
+    int total_triangles = (int)(triangle_points.size() / 3);
+
+    if (points.empty() || total_triangles <= 0 || vertices_per_frame <= 0)
         return;
 
     mesh.vertices_.reserve((size_t)total_points);

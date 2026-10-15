@@ -477,7 +477,7 @@ void frames::MarkState(int st_num)
         return;
 
     // already have a modified entry?
-    if (new_states.count(st_num))
+    if (new_states.contains(st_num))
         return;
 
     State *entry       = new State;
@@ -506,7 +506,7 @@ const State *frames::NewStateElseOld(int st_num)
     if (st_num < 0)
         return nullptr;
 
-    if (new_states.count(st_num))
+    if (new_states.contains(st_num))
         return new_states[st_num];
 
     if (st_num < kTotalMBFStates)
@@ -582,7 +582,7 @@ bool frames::DependRangeWasModified(int low, int high)
         high = new_states.rbegin()->first;
 
     for (int i = low; i <= high; i++)
-        if (new_states.count(i))
+        if (new_states.contains(i))
             return true;
 
     return false;
@@ -693,7 +693,7 @@ bool frames::SpreadGroupPass(bool alt_jumps)
         if (st == nullptr)
             continue;
 
-        if (group_for_state.find(i) == group_for_state.end())
+        if (!group_for_state.contains(i))
             continue;
 
         char       group = group_for_state[i];
@@ -736,7 +736,7 @@ bool frames::SpreadGroupPass(bool alt_jumps)
             continue;
 
         // require next state to have no group yet
-        if (group_for_state.find(next) != group_for_state.end())
+        if (group_for_state.contains(next))
             continue;
 
         G.states.push_back(next);
@@ -758,7 +758,7 @@ bool frames::SpreadGroupPass(bool alt_jumps)
         if (st == nullptr)
             continue;
 
-        if (group_for_state.find(iter->first) == group_for_state.end())
+        if (!group_for_state.contains(iter->first))
             continue;
 
         char       group = group_for_state[iter->first];
@@ -801,7 +801,7 @@ bool frames::SpreadGroupPass(bool alt_jumps)
             continue;
 
         // require next state to have no group yet
-        if (group_for_state.find(next) != group_for_state.end())
+        if (group_for_state.contains(next))
             continue;
 
         G.states.push_back(next);
@@ -1013,7 +1013,7 @@ const char *frames::RedirectorName(int next_st)
 
     // this shouldn't happen since OutputGroup() only visits states
     // which we collected/processed as a group.
-    if (group_for_state.find(next_st) == group_for_state.end())
+    if (!group_for_state.contains(next_st))
     {
         epi::LogMessage(epi::kLogLevelDebug, "Dehacked: Warning - Redirection to state %d FAILED\n", next_st);
         return "IDLE";

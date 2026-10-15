@@ -549,7 +549,7 @@ static bool ScriptCheckBossTrigger(ScriptOnDeathParameter *cond)
     // scan the remaining mobjs to see if all bosses are dead
     for (mo = map_object_list_head; mo != nullptr; mo = mo->next_)
     {
-        if (seen_monsters.count(cond->cached_info) == 0)
+        if (!seen_monsters.contains(cond->cached_info))
             return false; // Never on map?
 
         if (mo->info_ == cond->cached_info && mo->health_ > 0)

@@ -76,7 +76,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
         return false;
 
     SDL_GPUTextureCreateInfo texture_info;
-    EPI_CLEAR_MEMORY(&texture_info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&texture_info, 1);
 
     texture_info.type                 = SDL_GPU_TEXTURETYPE_2D;
     texture_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -106,7 +106,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
     if (total_bytes)
     {
         SDL_GPUTransferBufferCreateInfo transfer_info;
-        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+        epi::ClearMemory(&transfer_info, 1);
 
         transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         transfer_info.size  = (uint32_t)total_bytes;
@@ -165,7 +165,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
                 continue;
 
             SDL_GPUTextureTransferInfo source;
-            EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+            epi::ClearMemory(&source, 1);
 
             source.transfer_buffer = transfer;
             source.offset          = (uint32_t)offset;
@@ -173,7 +173,7 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
             source.rows_per_layer  = (uint32_t)levels[i].height;
 
             SDL_GPUTextureRegion destination;
-            EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+            epi::ClearMemory(&destination, 1);
 
             destination.texture   = texture;
             destination.mip_level = (uint32_t)i;
@@ -231,7 +231,7 @@ const GpuImage *GetDefaultGpuCubemap(SDL_GPUDevice *device)
             return existing;
     }
 
-    static const uint8_t kBlackPixel[4] = {0, 0, 0, 255};
+    static constexpr uint8_t kBlackPixel[4] = {0, 0, 0, 255};
 
     GpuImageLevel faces[6];
 
@@ -259,7 +259,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
     DeleteGpuImage(id);
 
     SDL_GPUSamplerCreateInfo sampler_info;
-    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(&sampler_info, 1);
 
     sampler_info.min_filter     = SDL_GPU_FILTER_LINEAR;
     sampler_info.mag_filter     = SDL_GPU_FILTER_LINEAR;
@@ -274,7 +274,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
         return false;
 
     SDL_GPUTextureCreateInfo texture_info;
-    EPI_CLEAR_MEMORY(&texture_info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&texture_info, 1);
 
     texture_info.type                 = SDL_GPU_TEXTURETYPE_CUBE;
     texture_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -296,7 +296,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
     size_t face_bytes = (size_t)faces[0].width * (size_t)faces[0].height * kGpuImagePixelSize;
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)(face_bytes * 6);
@@ -345,7 +345,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
     for (int face = 0; face < 6; face++)
     {
         SDL_GPUTextureTransferInfo source;
-        EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+        epi::ClearMemory(&source, 1);
 
         source.transfer_buffer = transfer;
         source.offset          = (uint32_t)(face_bytes * (size_t)face);
@@ -353,7 +353,7 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
         source.rows_per_layer  = (uint32_t)faces[0].height;
 
         SDL_GPUTextureRegion destination;
-        EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+        epi::ClearMemory(&destination, 1);
 
         destination.texture = texture;
         destination.layer   = (uint32_t)face;
@@ -398,7 +398,7 @@ const GpuImage *GetDefaultGpuVolume(SDL_GPUDevice *device)
             return existing;
     }
 
-    static const uint8_t kBlackPixel[4] = {0, 0, 0, 255};
+    static constexpr uint8_t kBlackPixel[4] = {0, 0, 0, 255};
 
     if (default_volume_id == 0)
         default_volume_id = AllocateGpuCubemapId();
@@ -417,7 +417,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
     DeleteGpuImage(id);
 
     SDL_GPUSamplerCreateInfo sampler_info;
-    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(&sampler_info, 1);
 
     sampler_info.min_filter     = SDL_GPU_FILTER_LINEAR;
     sampler_info.mag_filter     = SDL_GPU_FILTER_LINEAR;
@@ -432,7 +432,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
         return false;
 
     SDL_GPUTextureCreateInfo texture_info;
-    EPI_CLEAR_MEMORY(&texture_info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&texture_info, 1);
 
     texture_info.type                 = SDL_GPU_TEXTURETYPE_3D;
     texture_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -454,7 +454,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
     size_t volume_bytes = (size_t)size * (size_t)size * (size_t)size * kGpuImagePixelSize;
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)volume_bytes;
@@ -496,7 +496,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     SDL_GPUTextureTransferInfo source;
-    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+    epi::ClearMemory(&source, 1);
 
     source.transfer_buffer = transfer;
     source.offset          = 0;
@@ -504,7 +504,7 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
     source.rows_per_layer  = (uint32_t)size;
 
     SDL_GPUTextureRegion destination;
-    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+    epi::ClearMemory(&destination, 1);
 
     destination.texture = texture;
     destination.w       = (uint32_t)size;
@@ -562,7 +562,7 @@ bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t hei
     if (!image->update_buffer)
     {
         SDL_GPUTransferBufferCreateInfo transfer_info;
-        EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+        epi::ClearMemory(&transfer_info, 1);
 
         transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         transfer_info.size  = (uint32_t)bytes;
@@ -601,14 +601,14 @@ bool UpdateGpuImage(SDL_GPUDevice *device, GLuint id, int32_t width, int32_t hei
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     SDL_GPUTextureTransferInfo source;
-    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+    epi::ClearMemory(&source, 1);
 
     source.transfer_buffer = image->update_buffer;
     source.pixels_per_row  = (uint32_t)width;
     source.rows_per_layer  = (uint32_t)height;
 
     SDL_GPUTextureRegion destination;
-    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+    epi::ClearMemory(&destination, 1);
 
     destination.texture = image->texture;
     destination.w       = (uint32_t)width;
@@ -643,7 +643,7 @@ bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y
     size_t bytes = (size_t)width * (size_t)height * kGpuImagePixelSize;
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)bytes;
@@ -682,14 +682,14 @@ bool UpdateGpuImageRegion(SDL_GPUDevice *device, GLuint id, int32_t x, int32_t y
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     SDL_GPUTextureTransferInfo source;
-    EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+    epi::ClearMemory(&source, 1);
 
     source.transfer_buffer = transfer;
     source.pixels_per_row  = (uint32_t)width;
     source.rows_per_layer  = (uint32_t)height;
 
     SDL_GPUTextureRegion destination;
-    EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+    epi::ClearMemory(&destination, 1);
 
     destination.texture = image->texture;
     destination.x       = (uint32_t)x;
@@ -784,7 +784,7 @@ bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *
     ForgetGpuExternalImage(device, id);
 
     SDL_GPUSamplerCreateInfo sampler_info;
-    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(&sampler_info, 1);
 
     sampler_info.min_filter     = SDL_GPU_FILTER_NEAREST;
     sampler_info.mag_filter     = SDL_GPU_FILTER_NEAREST;
@@ -794,7 +794,7 @@ bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *
     sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
 
     GpuImage image;
-    EPI_CLEAR_MEMORY(&image, GpuImage, 1);
+    epi::ClearMemory(&image, 1);
 
     image.texture  = texture;
     image.sampler  = SDL_CreateGPUSampler(device, &sampler_info);

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include <span>
 #include <vector>
 
 #include "epi_vector.h"
@@ -42,8 +43,8 @@ class ModelMesh
     }
 };
 
-void ModelMeshBuild(ModelMesh &mesh, const ModelMeshVertex *points, int total_points, const int *triangle_points,
-                    int total_triangles, int vertices_per_frame);
+void ModelMeshBuild(ModelMesh &mesh, std::span<const ModelMeshVertex> points, std::span<const int> triangle_points,
+                    int vertices_per_frame);
 
 epi::Mat4 ModelBuildTransform(float xy_scale, float z_scale, float bias, const epi::Vec2 &mouselook_x_matrix,
                               const epi::Vec2 &mouselook_z_matrix, const epi::Vec2 &rotation_x_matrix,

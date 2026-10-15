@@ -120,7 +120,7 @@ void CollectOverlays()
             if (!ovd[i].is_dir)
             {
                 std::string filename = epi::GetStem(ovd[i].name);
-                if (!available_overlays.count(filename))
+                if (!available_overlays.contains(filename))
                 {
                     epi::File *ovimg_file = epi::FileOpen(ovd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
                     if (ovimg_file)
@@ -150,7 +150,7 @@ void CollectOverlays()
             if (!ovd[i].is_dir)
             {
                 std::string filename = epi::GetStem(ovd[i].name);
-                if (!available_overlays.count(filename))
+                if (!available_overlays.contains(filename))
                 {
                     epi::File *ovimg_file = epi::FileOpen(ovd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
                     if (ovimg_file)
@@ -187,7 +187,7 @@ void CollectOverlays()
                 if (!ovd[i].is_dir)
                 {
                     std::string filename = epi::GetStem(ovd[i].name);
-                    if (!available_overlays.count(filename))
+                    if (!available_overlays.contains(filename))
                     {
                         epi::File *ovimg_file =
                             epi::FileOpen(ovd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
@@ -218,7 +218,7 @@ void CollectOverlays()
                 if (!ovd[i].is_dir)
                 {
                     std::string filename = epi::GetStem(ovd[i].name);
-                    if (!available_overlays.count(filename))
+                    if (!available_overlays.contains(filename))
                     {
                         epi::File *ovimg_file =
                             epi::FileOpen(ovd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
@@ -239,7 +239,7 @@ void CollectOverlays()
     }
 
     // Check for previously saved overlay CVAR; revert if not present anymore
-    if (!available_overlays.count(video_overlay.s_))
+    if (!available_overlays.contains(video_overlay.s_))
     {
         video_overlay = "None";
     }

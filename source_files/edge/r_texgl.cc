@@ -23,7 +23,6 @@
 #include <unordered_map>
 
 #include "e_main.h"
-#include "e_search.h"
 #include "epi.h"
 #include "epi_math.h"
 #include "i_defs_gl.h"

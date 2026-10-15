@@ -64,7 +64,7 @@ class LanguageChoice
 
     bool HasEntry(epi::StringHash refhash) const
     {
-        return refs.find(refhash) != refs.end();
+        return refs.contains(refhash);
     }
 
     void AddEntry(std::string_view refname, const char *value)

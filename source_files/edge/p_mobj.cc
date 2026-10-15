@@ -54,6 +54,7 @@
 #include <math.h>
 
 #include <list>
+#include <new>
 
 #include "con_main.h"
 #include "dm_defs.h"

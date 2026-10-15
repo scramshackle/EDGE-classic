@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include <span>
 #include <vector>
 
 #include "epi_vector.h"
@@ -82,23 +83,23 @@ class Gles2Immediate
 
     void SetLineMode(bool enabled);
 
-    void UploadBatch(const RendererVertex *vertices, int32_t count);
+    void UploadBatch(std::span<const RendererVertex> vertices);
 
     void InvalidateBatch();
 
     void Draw(GLuint shape, const RendererVertex *vertices, int32_t base, int32_t count);
 
-    void UploadMergedIndices(const uint16_t *indices, int32_t count);
+    void UploadMergedIndices(std::span<const uint16_t> indices);
 
     void DrawMerged(int32_t index_offset, int32_t index_count);
 
     void DrawMergedWithoutMatrices(int32_t index_offset, int32_t index_count);
 
-    void UploadModelIndices(const uint16_t *indices, int32_t count);
+    void UploadModelIndices(std::span<const uint16_t> indices);
 
     void DrawModelIndexed(int32_t index_offset, int32_t index_count);
 
-    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count);
+    uint32_t CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices);
 
     void DeleteModelMesh(uint32_t handle);
 
@@ -196,8 +197,8 @@ class Gles2Immediate
     void BindVertexAttributesFrom(GLuint buffer);
 
   public:
-    GLuint CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity);
-    void   UpdateStaticBuffer(GLuint buffer, int first, const RendererVertex *vertices, int count);
+    GLuint CreateStaticBuffer(std::span<const RendererVertex> vertices, int capacity);
+    void   UpdateStaticBuffer(GLuint buffer, int first, std::span<const RendererVertex> vertices);
     void   DeleteStaticBuffer(GLuint buffer);
     void   DrawStatic(GLuint buffer, GLuint shape, int first, int count);
 

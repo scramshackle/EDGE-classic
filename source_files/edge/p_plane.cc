@@ -23,7 +23,7 @@
 //
 //----------------------------------------------------------------------------
 
-#include <algorithm>
+#include <vector>
 
 #include "dm_defs.h"
 #include "dm_format.h"
@@ -1705,13 +1705,7 @@ void RunActivePlanes(void)
     }
 
     if (removed_plane)
-    {
-        std::vector<PlaneMover *>::iterator ENDP;
-
-        ENDP = std::remove(active_planes.begin(), active_planes.end(), (PlaneMover *)nullptr);
-
-        active_planes.erase(ENDP, active_planes.end());
-    }
+        std::erase(active_planes, (PlaneMover *)nullptr);
 }
 
 void RunActiveSliders(void)
@@ -1739,13 +1733,7 @@ void RunActiveSliders(void)
     }
 
     if (removed_slider)
-    {
-        std::vector<SlidingDoorMover *>::iterator ENDP;
-
-        ENDP = std::remove(active_sliders.begin(), active_sliders.end(), (SlidingDoorMover *)nullptr);
-
-        active_sliders.erase(ENDP, active_sliders.end());
-    }
+        std::erase(active_sliders, (SlidingDoorMover *)nullptr);
 }
 
 //--- editor settings ---

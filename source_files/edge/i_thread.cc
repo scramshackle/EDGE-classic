@@ -76,9 +76,6 @@ void UnlockSystemMutex(SystemMutex *mutex)
     SDL_UnlockMutex((SDL_Mutex *)mutex);
 }
 
-static_assert(sizeof(SystemAtomicU32) == sizeof(SDL_AtomicU32), "SystemAtomicU32 size");
-static_assert(alignof(SystemAtomicU32) == alignof(SDL_AtomicU32), "SystemAtomicU32 alignment");
-
 SystemCondition *CreateSystemCondition(void)
 {
     return (SystemCondition *)SDL_CreateCondition();
@@ -114,25 +111,6 @@ bool WaitSystemConditionTimeout(SystemCondition *condition, SystemMutex *mutex, 
         return false;
 
     return SDL_WaitConditionTimeout((SDL_Condition *)condition, (SDL_Mutex *)mutex, timeout_ms);
-}
-
-void SetAtomicU32(SystemAtomicU32 *atomic, uint32_t value)
-{
-    SDL_SetAtomicU32((SDL_AtomicU32 *)atomic, value);
-}
-
-uint32_t GetAtomicU32(SystemAtomicU32 *atomic)
-{
-    return SDL_GetAtomicU32((SDL_AtomicU32 *)atomic);
-}
-
-uint32_t AddAtomicU32(SystemAtomicU32 *atomic, int32_t delta)
-{
-#if (SDL_MINOR_VERSION < 4)
-    return (uint32_t)SDL_AddAtomicInt((SDL_AtomicInt *)atomic, delta);
-#else
-    return SDL_AddAtomicU32((SDL_AtomicU32 *)atomic, (Uint32)delta);
-#endif
 }
 
 int TotalSystemCPUs(void)

@@ -110,7 +110,7 @@ foreach(SHADER_NAME IN LISTS SHADER_NAMES)
 
     file(REMOVE "${EXPANDED_FILE}")
 
-    string(APPEND GENERATED_HEADER "static const char ${SYMBOL}[] =\n")
+    string(APPEND GENERATED_HEADER "constexpr char ${SYMBOL}[] =\n")
 
     foreach(LINE IN LISTS STAGE_LINES)
       string(REPLACE "\\" "\\\\" LINE "${LINE}")

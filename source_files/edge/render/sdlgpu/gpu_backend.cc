@@ -124,7 +124,7 @@ class GpuRenderBackend : public RenderBackend
         if (!gpu_immediate.Init(gpu_device.Handle()))
             FatalError("SDL_GPU: failed to initialise the immediate recorder.\n");
 
-        EPI_CLEAR_MEMORY(world_state_, WorldState, kRenderWorldMax);
+        epi::ClearMemory(world_state_, kRenderWorldMax);
 
         GpuCreateLightBuffers();
 
@@ -192,7 +192,7 @@ class GpuRenderBackend : public RenderBackend
 
         gpu_immediate.BeginFrame();
 
-        EPI_CLEAR_MEMORY(world_state_, WorldState, kRenderWorldMax);
+        epi::ClearMemory(world_state_, kRenderWorldMax);
 
         world_state_index_ = kGpuWorldStateInvalid;
 
@@ -411,7 +411,7 @@ class GpuRenderBackend : public RenderBackend
 
         RendererVertex quad[4];
 
-        EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+        epi::ClearMemory(quad, 4);
 
         for (int32_t i = 0; i < 4; i++)
             quad[i].rgba = kRGBAWhite;
@@ -503,7 +503,7 @@ class GpuRenderBackend : public RenderBackend
 
     void GetFrameStats(FrameStats &stats)
     {
-        EPI_CLEAR_MEMORY(&stats, FrameStats, 1);
+        epi::ClearMemory(&stats, 1);
 
         stats.num_apply_pipeline_ = gpu_immediate.PipelineBindCount();
         stats.num_apply_bindings_ = gpu_immediate.BindingCount();

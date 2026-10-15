@@ -29,6 +29,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <bit>
 #include <unordered_map>
 #include <vector>
 
@@ -370,8 +371,7 @@ static void MD2BuildMesh(MD2Model *md)
         points[(size_t)p].skin_t   = md->points_[p].skin_t;
     }
 
-    ModelMeshBuild(md->mesh_, points.data(), md->total_points_, triangle_points.data(),
-                   (int)(triangle_points.size() / 3), md->vertices_per_frame_);
+    ModelMeshBuild(md->mesh_, points, triangle_points, md->vertices_per_frame_);
 
     epi::LogMessage(epi::kLogLevelDebug, "  mesh: %d vertices, %d indices, %d submeshes\n", md->mesh_.TotalVertices(),
                     md->mesh_.TotalIndices(), (int)md->mesh_.submeshes_.size());
@@ -431,7 +431,7 @@ static void MD2UploadMesh(MD2Model *md)
     data.frame_count         = md->total_frames_;
     data.vertex_count        = vertex_count;
 
-    mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_.data(), mesh.TotalIndices());
+    mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_);
 
     epi::LogMessage(epi::kLogLevelDebug, "  mesh gpu handle: %u\n", mesh.gpu_handle_);
 }
@@ -548,10 +548,8 @@ MD2Model *MD2Load(epi::File *f, float &radius)
 
         for (; count > 0; count--, point++, i += 3)
         {
-            float *f_ptr = (float *)&glcmds[i];
-
-            point->skin_s   = f_ptr[0];
-            point->skin_t   = 1.0 - f_ptr[1];
+            point->skin_s   = std::bit_cast<float>(glcmds[i]);
+            point->skin_t   = 1.0 - std::bit_cast<float>(glcmds[i + 1]);
             point->vert_idx = glcmds[i + 2];
 
             EPI_ASSERT(point->vert_idx >= 0);
@@ -746,8 +744,7 @@ static void MD3CreateNormalMap(void)
 MD2Model *MD3Load(epi::File *f, float &radius)
 {
     radius = 1;
-    int    i;
-    float *ff;
+    int i;
 
     if (!md3_normal_map_built)
         MD3CreateNormalMap();
@@ -808,10 +805,8 @@ MD2Model *MD3Load(epi::File *f, float &radius)
         texc.s = epi::AlignedLittleEndianU32(texc.s);
         texc.t = epi::AlignedLittleEndianU32(texc.t);
 
-        ff                  = (float *)&texc.s;
-        temp_TEXC[i].skin_s = *ff;
-        ff                  = (float *)&texc.t;
-        temp_TEXC[i].skin_t = 1.0f - *ff;
+        temp_TEXC[i].skin_s = std::bit_cast<float>(texc.s);
+        temp_TEXC[i].skin_t = 1.0f - std::bit_cast<float>(texc.t);
 
         temp_TEXC[i].vert_idx = i;
     }
@@ -1344,13 +1339,13 @@ void MD2RenderModel2D(MD2Model *md, const Image *skin_img, int frame, float x, f
 
     render_state->SetPipeline(0);
 
-    render_state->SetModelIndices(mesh.indices_.data(), mesh.TotalIndices());
+    render_state->SetModelIndices(mesh.indices_);
 
     for (size_t s = 0; s < mesh.submeshes_.size(); s++)
     {
         const ModelMeshSubmesh &submesh = mesh.submeshes_[s];
 
-        render_state->SetVertexArrays(model_vertices.data() + submesh.first_vertex, submesh.vertex_count);
+        render_state->SetVertexArrays({model_vertices.data() + submesh.first_vertex, (size_t)submesh.vertex_count});
         render_state->SetColorLookup(ColorLookupForColormap(info->palremap_));
         render_state->DrawModelIndexed(submesh.first_index, submesh.index_count);
         render_state->SetColorLookup(0);

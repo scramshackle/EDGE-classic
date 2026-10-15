@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kMovieVertexShaderSamplerCount = 0;
-static const uint32_t kMovieVertexShaderUniformBufferCount = 1;
-static const uint32_t kMovieVertexShaderStorageBufferCount = 0;
+constexpr uint32_t kMovieVertexShaderSamplerCount = 0;
+constexpr uint32_t kMovieVertexShaderUniformBufferCount = 1;
+constexpr uint32_t kMovieVertexShaderStorageBufferCount = 0;
 
-static const uint32_t kMovieVertexShaderSpirv[] = {
+constexpr uint32_t kMovieVertexShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000002b, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000a000f, 0x00000000,
@@ -67,11 +67,11 @@ static const uint32_t kMovieVertexShaderSpirv[] = {
     0x00000029, 0x000100fd, 0x00010038,
 };
 
-static const uint32_t kMovieFragmentShaderSamplerCount = 3;
-static const uint32_t kMovieFragmentShaderUniformBufferCount = 1;
-static const uint32_t kMovieFragmentShaderStorageBufferCount = 0;
+constexpr uint32_t kMovieFragmentShaderSamplerCount = 3;
+constexpr uint32_t kMovieFragmentShaderUniformBufferCount = 1;
+constexpr uint32_t kMovieFragmentShaderStorageBufferCount = 0;
 
-static const uint32_t kMovieFragmentShaderSpirv[] = {
+constexpr uint32_t kMovieFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000004c, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x0007000f, 0x00000004,

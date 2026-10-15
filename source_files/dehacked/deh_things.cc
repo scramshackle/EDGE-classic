@@ -590,7 +590,7 @@ void things::MarkThing(int mt_num)
     }
     else
     {
-        EPI_CLEAR_MEMORY(entry, DehackedMapObjectDefinition, 1);
+        epi::ClearMemory(entry, 1);
 
         entry->name      = "X"; // only needed to differentiate from an attack
         entry->doomednum = -1;

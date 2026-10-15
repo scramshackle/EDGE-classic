@@ -1361,7 +1361,7 @@ DehackedResult LoadNormal(void)
 {
     char idstr[32];
 
-    EPI_CLEAR_MEMORY(idstr, char, 32);
+    epi::ClearMemory(idstr, 32);
 
     pat_buf->Read(idstr, 24);
 
@@ -1372,7 +1372,7 @@ DehackedResult LoadNormal(void)
         return kDehackedConversionParseError;
     }
 
-    EPI_CLEAR_MEMORY(idstr, char, 4);
+    epi::ClearMemory(idstr, 4);
 
     pat_buf->Read(idstr, 3);
 

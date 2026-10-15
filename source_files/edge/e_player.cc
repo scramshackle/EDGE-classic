@@ -95,7 +95,7 @@ void ClearPlayerStarts(void)
 
 void ClearBodyQueue(void)
 {
-    EPI_CLEAR_MEMORY(body_queue, MapObject *, 50);
+    epi::ClearMemory(body_queue, 50);
 
     body_queue_size = 0;
 }
@@ -172,9 +172,9 @@ void Player::Reborn()
     map_object_ = nullptr;
     health_     = 0;
 
-    EPI_CLEAR_MEMORY(armours_, float, 5);
-    EPI_CLEAR_MEMORY(armour_types_, const MapObjectDefinition *, 5);
-    EPI_CLEAR_MEMORY(powers_, float, 16);
+    epi::ClearMemory(armours_, 5);
+    epi::ClearMemory(armour_types_, 5);
+    epi::ClearMemory(powers_, 16);
 
     keep_powers_  = 0;
     total_armour_ = 0;
@@ -183,11 +183,11 @@ void Player::Reborn()
     ready_weapon_   = KWeaponSelectionNone;
     pending_weapon_ = KWeaponSelectionNoChange;
 
-    EPI_CLEAR_MEMORY(weapons_, PlayerWeapon, 64);
-    EPI_CLEAR_MEMORY(available_weapons_, int, 10);
-    EPI_CLEAR_MEMORY(ammo_, PlayerStock, 99);
-    EPI_CLEAR_MEMORY(inventory_, PlayerStock, 99);
-    EPI_CLEAR_MEMORY(counters_, PlayerStock, 99);
+    epi::ClearMemory(weapons_, 64);
+    epi::ClearMemory(available_weapons_, 10);
+    epi::ClearMemory(ammo_, 99);
+    epi::ClearMemory(inventory_, 99);
+    epi::ClearMemory(counters_, 99);
 
     for (int w = 0; w <= 9; w++)
         key_choices_[w] = KWeaponSelectionNone;
@@ -209,7 +209,7 @@ void Player::Reborn()
     effect_colourmap_ = nullptr;
     effect_left_      = 0;
 
-    EPI_CLEAR_MEMORY(player_sprites_, PlayerSprite, 4);
+    epi::ClearMemory(player_sprites_, 4);
 
     jump_wait_    = 0;
     idle_wait_    = 0;

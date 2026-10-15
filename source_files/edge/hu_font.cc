@@ -128,7 +128,7 @@ PatchFont::PatchFont(FontDefinition *definition)
     EPI_ASSERT(total >= 1);
 
     images = new const Image *[total];
-    EPI_CLEAR_MEMORY(images, const Image *, total);
+    epi::ClearMemory(images, total);
 
     // Atlas Stuff
     std::unordered_map<int, ImageData *> patch_data;
@@ -209,9 +209,9 @@ PatchFont::PatchFont(FontDefinition *definition)
     // missing image (if present)
     for (int ch = 0; ch < 256; ch++)
     {
-        if (!patch_data.count(kCP437UnicodeValues[(uint8_t)ch]))
+        if (!patch_data.contains(kCP437UnicodeValues[(uint8_t)ch]))
         {
-            if ('a' <= ch && ch <= 'z' && patch_data.count(kCP437UnicodeValues[(uint8_t)(epi::ToUpperASCII(ch))]))
+            if ('a' <= ch && ch <= 'z' && patch_data.contains(kCP437UnicodeValues[(uint8_t)(epi::ToUpperASCII(ch))]))
                 patch_data.try_emplace(kCP437UnicodeValues[(uint8_t)ch],
                                        patch_data.at(kCP437UnicodeValues[(uint8_t)(epi::ToUpperASCII(ch))]));
             else if (missing_imdata)
@@ -255,11 +255,11 @@ PatchFont::PatchFont(FontDefinition *definition)
 
     ImageAtlasRectangle Nom;
 
-    if (patch_font_cache_.atlas_rectangles.count(kCP437UnicodeValues[(uint8_t)('M')]))
+    if (patch_font_cache_.atlas_rectangles.contains(kCP437UnicodeValues[(uint8_t)('M')]))
         Nom = patch_font_cache_.atlas_rectangles.at(kCP437UnicodeValues[(uint8_t)('M')]);
-    else if (patch_font_cache_.atlas_rectangles.count(kCP437UnicodeValues[(uint8_t)('m')]))
+    else if (patch_font_cache_.atlas_rectangles.contains(kCP437UnicodeValues[(uint8_t)('m')]))
         Nom = patch_font_cache_.atlas_rectangles.at(kCP437UnicodeValues[(uint8_t)('m')]);
-    else if (patch_font_cache_.atlas_rectangles.count(kCP437UnicodeValues[(uint8_t)('0')]))
+    else if (patch_font_cache_.atlas_rectangles.contains(kCP437UnicodeValues[(uint8_t)('0')]))
         Nom = patch_font_cache_.atlas_rectangles.at(kCP437UnicodeValues[(uint8_t)('0')]);
     else // backup plan: just use first patch found
         Nom = patch_font_cache_.atlas_rectangles.begin()->second;
@@ -284,20 +284,20 @@ TTFFont::TTFFont(FontDefinition *definition)
     definition_      = definition;
     truetype_info_   = nullptr;
     truetype_buffer_ = nullptr;
-    EPI_CLEAR_MEMORY(truetype_atlas_, stbtt_pack_range *, 3);
-    EPI_CLEAR_MEMORY(truetype_kerning_scale_, float, 3);
-    EPI_CLEAR_MEMORY(truetype_reference_yshift_, float, 3);
-    EPI_CLEAR_MEMORY(truetype_texture_id_, unsigned int, 3);
+    epi::ClearMemory(truetype_atlas_, 3);
+    epi::ClearMemory(truetype_kerning_scale_, 3);
+    epi::ClearMemory(truetype_reference_yshift_, 3);
+    epi::ClearMemory(truetype_texture_id_, 3);
 
     if (definition_->truetype_name_.empty())
     {
         FatalError("LoadFontTTF: No TTF file/lump name provided for font %s!", definition_->name_.c_str());
     }
 
-    if (hud_fonts.ttf_buffers.count(definition_->truetype_name_))
+    if (hud_fonts.ttf_buffers.contains(definition_->truetype_name_))
         truetype_buffer_ = hud_fonts.ttf_buffers[definition_->truetype_name_];
 
-    if (hud_fonts.ttf_infos.count(definition_->truetype_name_))
+    if (hud_fonts.ttf_infos.contains(definition_->truetype_name_))
         truetype_info_ = hud_fonts.ttf_infos[definition_->truetype_name_];
 
     if (!truetype_buffer_)
@@ -527,12 +527,12 @@ bool PatchFont::HasChar(char ch) const
     if (ch == ' ')
         return false;
     else
-        return patch_font_cache_.atlas_rectangles.count(kCP437UnicodeValues[(uint8_t)ch]) != 0;
+        return patch_font_cache_.atlas_rectangles.contains(kCP437UnicodeValues[(uint8_t)ch]);
 }
 
 bool TTFFont::HasChar(char ch) const
 {
-    return truetype_glyph_map_.find((uint8_t)ch) != truetype_glyph_map_.end();
+    return truetype_glyph_map_.contains((uint8_t)ch);
 }
 
 float ImageFont::CharRatio(char ch)
@@ -559,7 +559,7 @@ float PatchFont::CharWidth(char ch)
     if (ch == ' ')
         return patch_font_cache_.width * 3 / 5 + spacing_;
 
-    if (!patch_font_cache_.atlas_rectangles.count(kCP437UnicodeValues[(uint8_t)ch]))
+    if (!patch_font_cache_.atlas_rectangles.contains(kCP437UnicodeValues[(uint8_t)ch]))
         return kDummyCharacterWidth;
 
     ImageAtlasRectangle rect = patch_font_cache_.atlas_rectangles.at(kCP437UnicodeValues[(uint8_t)ch]);

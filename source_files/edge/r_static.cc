@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stddef.h>
 
+#include <iterator>
 #include <unordered_map>
 #include <vector>
 
@@ -237,7 +238,7 @@ static void AddCaptureDependency(const Sector *sec)
             return;
     }
 
-    if (capture_dependency_count >= (int)(sizeof(capture_dependencies) / sizeof(capture_dependencies[0])))
+    if (capture_dependency_count >= (int)std::size(capture_dependencies))
         return;
 
     capture_dependencies[capture_dependency_count++] = index;
@@ -884,7 +885,7 @@ bool StaticMeshCoversFlat(const Sector *sec, int face_dir, const Extrafloor *pla
         if (!BuildRegionFlatKey(sec, face_dir, plane_ef, key, &hash_key))
             return false;
 
-        return region_surface_baked.find(hash_key) != region_surface_baked.end();
+        return region_surface_baked.contains(hash_key);
     }
 
     size_t slot = ((size_t)(sec - level_sectors) * 2 + (face_dir > 0 ? 0 : 1)) * kHeightKeyTotal + (size_t)key;
@@ -1196,7 +1197,7 @@ bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, con
         if (!BuildRegionWallKey(line_side, part, region_ef, surface_ef, key, &hash_key))
             return false;
 
-        return region_surface_baked.find(hash_key) != region_surface_baked.end();
+        return region_surface_baked.contains(hash_key);
     }
 
     size_t slot = ((size_t)(line_side - level_line_sides) * 3 + (size_t)part) * kHeightKeyTotal + (size_t)key;
@@ -1336,8 +1337,10 @@ static float StaticLightRow(int light, int adjust)
     return (floorf((float)lit / 4.0f) + 0.5f) / 64.0f;
 }
 
-void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count)
+void StaticCaptureVertices(GLuint shape, std::span<const RendererVertex> verts)
 {
+    int count = (int)verts.size();
+
     if (capture_batch < 0 || count < 3)
         return;
 
@@ -1776,7 +1779,7 @@ static void UploadStaticBatch(StaticBatch &batch)
 
         int capacity = epi::Max(total + total / 2, 4096);
 
-        batch.gpu_handle   = CreateStaticVertexBufferWithCapacity(batch.vertices.data(), total, capacity);
+        batch.gpu_handle   = CreateStaticVertexBufferWithCapacity(batch.vertices, capacity);
         batch.gpu_capacity = batch.gpu_handle ? capacity : 0;
         batch.gpu_count    = batch.gpu_handle ? total : 0;
         batch.dirty_low    = INT_MAX;
@@ -1789,8 +1792,8 @@ static void UploadStaticBatch(StaticBatch &batch)
     {
         EDGE_ZoneScopedN("StaticMesh append");
 
-        UpdateStaticVertexBuffer(batch.gpu_handle, batch.gpu_count, batch.vertices.data() + batch.gpu_count,
-                                 total - batch.gpu_count);
+        UpdateStaticVertexBuffer(batch.gpu_handle, batch.gpu_count,
+                                 {batch.vertices.data() + batch.gpu_count, (size_t)(total - batch.gpu_count)});
 
         batch.gpu_count = total;
     }
@@ -1803,7 +1806,7 @@ static void UploadStaticBatch(StaticBatch &batch)
         int high = epi::Min(batch.dirty_high, batch.gpu_count);
 
         if (high > low)
-            UpdateStaticVertexBuffer(batch.gpu_handle, low, batch.vertices.data() + low, high - low);
+            UpdateStaticVertexBuffer(batch.gpu_handle, low, {batch.vertices.data() + low, (size_t)(high - low)});
 
         batch.dirty_low  = INT_MAX;
         batch.dirty_high = -1;
@@ -1978,8 +1981,8 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
             {
                 int count = epi::Min((int)kMaximumStaticRun, run.count - offset);
 
-                shader->WorldBaked(GL_TRIANGLES, batch.vertices.data() + run.start + offset, count, tex_id, 1.0f,
-                                   &pass, blending, glow_set);
+                shader->WorldBaked(GL_TRIANGLES, {batch.vertices.data() + run.start + offset, (size_t)count}, tex_id,
+                                   1.0f, &pass, blending, glow_set);
             }
         }
     }

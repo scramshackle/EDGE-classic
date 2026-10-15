@@ -32,7 +32,7 @@ namespace coal
 
 MemoryBlockGroup::MemoryBlockGroup() : pos_(0)
 {
-    EPI_CLEAR_MEMORY(blocks_, MemoryBlock *, 256);
+    epi::ClearMemory(blocks_, 256);
 }
 
 MemoryBlockGroup::~MemoryBlockGroup()
@@ -149,7 +149,7 @@ int MemoryBlockGroup::TotalMemory() const
 
 MemoryManager::MemoryManager() : pos_(0)
 {
-    EPI_CLEAR_MEMORY(groups_, MemoryBlockGroup *, 256);
+    epi::ClearMemory(groups_, 256);
 }
 
 MemoryManager::~MemoryManager()

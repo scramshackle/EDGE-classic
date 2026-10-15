@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include <span>
+
 #include "epi_vector.h"
 
 constexpr int   kSpatialChannels             = 2;
@@ -46,7 +48,7 @@ class SoundSpatializer
     void Update(const SpatialListener &listener, const epi::Vec3 &emitter, float minimum_distance,
                 float maximum_distance, float volume);
 
-    void Process(float *frames, int frame_count);
+    void Process(std::span<float> frames);
 
   private:
     float CurrentGain(int channel) const;

@@ -665,7 +665,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kNext: {
-            EPI_CLEAR_MEMORY(val->next_map, char, 9);
+            epi::ClearMemory(val->next_map, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Mapname for \"next\" over 8 characters!\n");
@@ -673,7 +673,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kNextSecret: {
-            EPI_CLEAR_MEMORY(val->nextsecret, char, 9);
+            epi::ClearMemory(val->nextsecret, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Mapname for \"nextsecret\" over 8 "
@@ -682,7 +682,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kLevelPic: {
-            EPI_CLEAR_MEMORY(val->levelpic, char, 9);
+            epi::ClearMemory(val->levelpic, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"levelpic\" over 8 "
@@ -691,7 +691,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kSkyTexture: {
-            EPI_CLEAR_MEMORY(val->skytexture, char, 9);
+            epi::ClearMemory(val->skytexture, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"skytexture\" over 8 "
@@ -700,7 +700,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kMusic: {
-            EPI_CLEAR_MEMORY(val->music, char, 9);
+            epi::ClearMemory(val->music, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"music\" over 8 characters!\n");
@@ -708,7 +708,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kEndPic: {
-            EPI_CLEAR_MEMORY(val->endpic, char, 9);
+            epi::ClearMemory(val->endpic, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"endpic\" over 8 characters!\n");
@@ -725,7 +725,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
             val->endgame = lex.state_.boolean;
             break;
         case umapinfo::kExitPic: {
-            EPI_CLEAR_MEMORY(val->exitpic, char, 9);
+            epi::ClearMemory(val->exitpic, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"exitpic\" over 8 characters!\n");
@@ -733,7 +733,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kEnterPic: {
-            EPI_CLEAR_MEMORY(val->enterpic, char, 9);
+            epi::ClearMemory(val->enterpic, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"enterpic\" over 8 "
@@ -776,7 +776,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kInterbackdrop: {
-            EPI_CLEAR_MEMORY(val->interbackdrop, char, 9);
+            epi::ClearMemory(val->interbackdrop, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"interbackdrop\" over 8 "
@@ -785,7 +785,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
         }
         break;
         case umapinfo::kIntermusic: {
-            EPI_CLEAR_MEMORY(val->intermusic, char, 9);
+            epi::ClearMemory(val->intermusic, 9);
             value = lex.state_.string;
             if (value.size() > 8)
                 FatalError("UMAPINFO: Entry for \"intermusic\" over 8 "
@@ -887,7 +887,7 @@ static void ParseUMAPINFOEntry(epi::Scanner &lex, MapEntry *val)
             {
                 int             actor_num = -1;
                 epi::StringHash actor_check(value);
-                if (!ActorNames.count(actor_check.Value()))
+                if (!ActorNames.contains(actor_check.Value()))
                     FatalError("UMAPINFO: Unknown thing type %s\n", value.c_str());
                 else
                 {
@@ -992,7 +992,7 @@ void ParseUMAPINFO(const std::string &buffer)
 
         unsigned int i = 0;
         MapEntry     parsed;
-        EPI_CLEAR_MEMORY(&parsed, MapEntry, 1);
+        epi::ClearMemory(&parsed, 1);
         parsed.mapname = (char *)calloc(lex.state_.string.size() + 1, sizeof(char));
         epi::CStringCopyMax(parsed.mapname, lex.state_.string.data(), lex.state_.string.size());
 

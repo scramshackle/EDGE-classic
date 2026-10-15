@@ -1,6 +1,6 @@
 #pragma once
 
-static const char kMovieVertexSource[] =
+constexpr char kMovieVertexSource[] =
     "attribute vec3 a_position;\n"
     "attribute vec4 a_texture_coordinates;\n"
     "\n"
@@ -17,7 +17,7 @@ static const char kMovieVertexSource[] =
     "}\n"
     ;
 
-static const char kMovieFragmentSource[] =
+constexpr char kMovieFragmentSource[] =
     "uniform sampler2D u_texture_y;\n"
     "uniform sampler2D u_texture_cb;\n"
     "uniform sampler2D u_texture_cr;\n"

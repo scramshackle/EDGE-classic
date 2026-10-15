@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <span>
 #include <vector>
 
 constexpr int kMaximumEffectChannels = 2;
@@ -31,7 +32,7 @@ class LowPassEffect
 
     bool Setup(int frequency, int channels, float cutoff);
     void Shutdown(void);
-    void Process(float *frames, int frame_count);
+    void Process(std::span<float> frames);
 
   private:
     float b0_;
@@ -53,7 +54,7 @@ class DelayEffect
 
     bool Setup(int frequency, int channels, float delay_seconds, float decay);
     void Shutdown(void);
-    void Process(float *frames, int frame_count);
+    void Process(std::span<float> frames);
 
   private:
     std::vector<float> buffer_;
@@ -95,7 +96,7 @@ class ReverbEffect
     void SetParameter(int index, float value);
     void SetParameters(const float *values);
 
-    void Process(float *frames, int frame_count);
+    void Process(std::span<float> frames);
 
   private:
     void ApplyParameters(void);

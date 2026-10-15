@@ -30,6 +30,8 @@
 
 #include <math.h>
 
+#include <new>
+
 #include "am_map.h"
 #include "dm_defs.h"
 #include "dm_format.h"

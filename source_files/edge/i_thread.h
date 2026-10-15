@@ -18,16 +18,9 @@
 
 #pragma once
 
-#include <stdint.h>
-
 struct SystemThread;
 struct SystemMutex;
 struct SystemCondition;
-
-struct SystemAtomicU32
-{
-    uint32_t value;
-};
 
 typedef int (*SystemThreadFunction)(void *data);
 
@@ -52,12 +45,6 @@ void SignalSystemCondition(SystemCondition *condition);
 void WaitSystemCondition(SystemCondition *condition, SystemMutex *mutex);
 
 bool WaitSystemConditionTimeout(SystemCondition *condition, SystemMutex *mutex, int timeout_ms);
-
-void SetAtomicU32(SystemAtomicU32 *atomic, uint32_t value);
-
-uint32_t GetAtomicU32(SystemAtomicU32 *atomic);
-
-uint32_t AddAtomicU32(SystemAtomicU32 *atomic, int32_t delta);
 
 int TotalSystemCPUs(void);
 

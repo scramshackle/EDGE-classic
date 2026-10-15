@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 
 #include "r_backend.h"
@@ -137,5 +138,5 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
                         Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
                         float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
                         const epi::Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef);
-void StaticCaptureVertices(GLuint shape, const RendererVertex *verts, int count);
+void StaticCaptureVertices(GLuint shape, std::span<const RendererVertex> verts);
 void StaticCaptureEnd(void);

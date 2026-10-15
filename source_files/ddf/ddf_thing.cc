@@ -907,7 +907,7 @@ void DDFMobjCleanUp(void)
             {
                 if (B->type == kBenefitTypeWeapon)
                 {
-                    if (weapondefs.deh_ammo_replacements.count(B->sub.weap))
+                    if (weapondefs.deh_ammo_replacements.contains(B->sub.weap))
                     {
                         if (B->sub.weap->ammo_[0] == weapondefs.deh_ammo_replacements[B->sub.weap]->sub.type)
                         {
@@ -2382,7 +2382,7 @@ bool DDFMainParseCondition(const char *info, ConditionCheck *cond)
     cond->cond_type = kConditionCheckTypeNone;
     cond->amount    = 1;
 
-    EPI_CLEAR_MEMORY(&cond->sub, ConditionCheck::SubType, 1);
+    epi::ClearMemory(&cond->sub, 1);
 
     pos = strchr(info, '(');
 
@@ -2868,7 +2868,7 @@ void MapObjectDefinition::DLightCompatibility(void)
 
 MapObjectDefinitionContainer::MapObjectDefinitionContainer()
 {
-    EPI_CLEAR_MEMORY(lookup_cache_, MapObjectDefinition *, kLookupCacheSize);
+    epi::ClearMemory(lookup_cache_, kLookupCacheSize);
 }
 
 MapObjectDefinitionContainer::~MapObjectDefinitionContainer()

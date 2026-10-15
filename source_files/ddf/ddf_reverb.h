@@ -51,7 +51,7 @@ class ReverbDefinition final
         if (verb_hash == epi::StringHash::kEmpty)
             return nullptr;
 
-        if (reverb_defs_.find(verb_hash) != reverb_defs_.end())
+        if (reverb_defs_.contains(verb_hash))
             return reverb_defs_[verb_hash];
         else
             return nullptr;

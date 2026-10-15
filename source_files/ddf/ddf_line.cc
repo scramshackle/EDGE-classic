@@ -34,6 +34,8 @@
 #include <limits.h>
 #include <string.h>
 
+#include <iterator>
+
 #include "ddf_local.h"
 #include "dm_colors.h"
 #include "epi_math.h"
@@ -500,7 +502,7 @@ void DDFLineGetSecurity(const char *info, void *storage)
         return;
     }
 
-    for (int i = sizeof(s_keys) / sizeof(s_keys[0]); i--;)
+    for (int i = (int)std::size(s_keys); i--;)
     {
         if (DDFCompareName(info, s_keys[i].s) == 0)
         {
@@ -525,7 +527,7 @@ void DDFLineGetTrigType(const char *info, void *storage)
 {
     LineTrigger *var = (LineTrigger *)storage;
 
-    for (int i = sizeof(s_trigger) / sizeof(s_trigger[0]); i--;)
+    for (int i = (int)std::size(s_trigger); i--;)
     {
         if (DDFCompareName(info, s_trigger[i].s) == 0)
         {
@@ -546,7 +548,7 @@ void DDFLineGetActivators(const char *info, void *storage)
 {
     TriggerActivator *var = (TriggerActivator *)storage;
 
-    for (int i = sizeof(s_activators) / sizeof(s_activators[0]); i--;)
+    for (int i = (int)std::size(s_activators); i--;)
     {
         if (DDFCompareName(info, s_activators[i].s) == 0)
         {
@@ -1741,7 +1743,7 @@ void LineTypeContainer::Reset()
         line = nullptr;
     }
     clear();
-    EPI_CLEAR_MEMORY(lookup_cache_, LineType *, kLookupCacheSize);
+    epi::ClearMemory(lookup_cache_, kLookupCacheSize);
 }
 
 //--- editor settings ---

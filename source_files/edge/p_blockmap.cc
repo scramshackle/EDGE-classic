@@ -100,7 +100,7 @@ void CreateThingBlockmap(void)
 {
     blockmap_things = new MapObject *[blockmap_width * blockmap_height];
 
-    EPI_CLEAR_MEMORY(blockmap_things, MapObject *, blockmap_width * blockmap_height);
+    epi::ClearMemory(blockmap_things, blockmap_width * blockmap_height);
 
     // compute size of dynamic light blockmap
     dynamic_light_blockmap_width  = (blockmap_width * kBlockmapUnitSize + kLightmapUnitSize - 1) / kLightmapUnitSize;
@@ -111,8 +111,7 @@ void CreateThingBlockmap(void)
 
     dynamic_light_blockmap_things = new MapObject *[dynamic_light_blockmap_width * dynamic_light_blockmap_height];
 
-    EPI_CLEAR_MEMORY(dynamic_light_blockmap_things, MapObject *,
-                     dynamic_light_blockmap_width * dynamic_light_blockmap_height);
+    epi::ClearMemory(dynamic_light_blockmap_things, dynamic_light_blockmap_width * dynamic_light_blockmap_height);
 }
 
 void DestroyBlockmap(void)
@@ -1464,7 +1463,7 @@ void GenerateBlockmap(int min_x, int min_y, int max_x, int max_y)
 
     blockmap_lines = new std::list<Line *> *[btotal];
 
-    EPI_CLEAR_MEMORY(blockmap_lines, std::list<Line *> *, btotal);
+    epi::ClearMemory(blockmap_lines, btotal);
 }
 
 //--- editor settings ---

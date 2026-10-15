@@ -19,7 +19,10 @@
 #pragma once
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
+
+#include <type_traits>
 
 #if defined(__MINGW32__)
 #define EPI_PRINTF_FORMAT(format_index, first_argument)                                                                \
@@ -46,14 +49,17 @@ void SetLogHandler(void (*handler)(LogLevel level, const char *format, va_list a
 [[noreturn]] void FatalError(const char *error, ...) EPI_PRINTF_FORMAT(1, 2);
 void              LogMessage(LogLevel level, const char *format, ...) EPI_PRINTF_FORMAT(2, 3);
 
+template <typename T> inline void ClearMemory(T *pointer, size_t count)
+{
+    static_assert(std::is_trivially_copyable_v<T>);
+    memset((void *)pointer, 0, count * sizeof(T));
+}
+
 } // namespace epi
 
 // Assertion macro
 #define EPI_ASSERT(cond)                                                                                               \
     ((cond) ? (void)0 : epi::FatalError("Assertion '%s' failed (%s:%d).\n", #cond, __FILE__, __LINE__))
-
-// Clears memory to zero.
-#define EPI_CLEAR_MEMORY(ptr, type, num) memset((void *)(ptr), ((ptr) - ((type *)(ptr))), (num) * sizeof(type))
 
 // Used for params/variables that we know are unused but still need to exist
 #define EPI_UNUSED(x) (void)x
