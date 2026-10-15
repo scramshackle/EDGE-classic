@@ -112,32 +112,32 @@ static SaveField sv_fields_button[] = {
 
     // FIXME: off_sound
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_button = {
-    nullptr,                     // link in list
-    "button_t",                  // structure name
-    "butn",                      // start marker
-    sv_fields_button,            // field descriptions
-    (const char *)&dummy_button, // dummy base
-    true,                        // define_me
-    nullptr                      // pointer to known struct
+    .next        = nullptr,          // link in list
+    .struct_name = "button_t",       // structure name
+    .marker      = "butn",           // start marker
+    .fields      = sv_fields_button, // field descriptions
+    .dummy_base  = (const char *)&dummy_button,
+    .define_me   = true,
+    .counterpart = nullptr,          // pointer to known struct
 };
 
 SaveArray sv_array_button = {
-    nullptr,                // link in list
-    "buttonlist",           // array name
-    &sv_struct_button,      // array type
-    true,                   // define_me
-    true,                   // allow_hub
+    .next       = nullptr,           // link in list
+    .array_name = "buttonlist",
+    .sdef       = &sv_struct_button, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_ButtonCountElems,    // count routine
-    SV_ButtonFindByIndex,   // index routine
-    SV_ButtonCreateElems,   // creation routine
-    SV_ButtonFinaliseElems, // finalisation routine
+    .count_elems    = SV_ButtonCountElems,    // count routine
+    .get_elem       = SV_ButtonFindByIndex,   // index routine
+    .create_elems   = SV_ButtonCreateElems,   // creation routine
+    .finalise_elems = SV_ButtonFinaliseElems, // finalisation routine
 
-    nullptr,                // pointer to known array
-    0                       // loaded size
+    .counterpart = nullptr,                   // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -164,32 +164,32 @@ static SaveField sv_fields_light[] = {
     // NOT HERE:
     //   - prev & next: automatically regenerated
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_light = {
-    nullptr,                    // link in list
-    "light_t",                  // structure name
-    "lite",                     // start marker
-    sv_fields_light,            // field descriptions
-    (const char *)&dummy_light, // dummy base
-    true,                       // define_me
-    nullptr                     // pointer to known struct
+    .next        = nullptr,         // link in list
+    .struct_name = "light_t",       // structure name
+    .marker      = "lite",          // start marker
+    .fields      = sv_fields_light, // field descriptions
+    .dummy_base  = (const char *)&dummy_light,
+    .define_me   = true,
+    .counterpart = nullptr,         // pointer to known struct
 };
 
 SaveArray sv_array_light = {
-    nullptr,               // link in list
-    "lights",              // array name
-    &sv_struct_light,      // array type
-    true,                  // define_me
-    true,                  // allow_hub
+    .next       = nullptr,          // link in list
+    .array_name = "lights",
+    .sdef       = &sv_struct_light, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_LightCountElems,    // count routine
-    SV_LightFindByIndex,   // index routine
-    SV_LightCreateElems,   // creation routine
-    SV_LightFinaliseElems, // finalisation routine
+    .count_elems    = SV_LightCountElems,    // count routine
+    .get_elem       = SV_LightFindByIndex,   // index routine
+    .create_elems   = SV_LightCreateElems,   // creation routine
+    .finalise_elems = SV_LightFinaliseElems, // finalisation routine
 
-    nullptr,               // pointer to known array
-    0                      // loaded size
+    .counterpart = nullptr,                  // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -234,32 +234,32 @@ static SaveField sv_fields_trigger[] = {
     //   - sound: can be recomputed.
     //   - last_con_message: doesn't matter.
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_trigger = {
-    nullptr,                      // link in list
-    "rad_trigger_t",              // structure name
-    "trig",                       // start marker
-    sv_fields_trigger,            // field descriptions
-    (const char *)&dummy_trigger, // dummy base
-    true,                         // define_me
-    nullptr                       // pointer to known struct
+    .next        = nullptr,           // link in list
+    .struct_name = "rad_trigger_t",   // structure name
+    .marker      = "trig",            // start marker
+    .fields      = sv_fields_trigger, // field descriptions
+    .dummy_base  = (const char *)&dummy_trigger,
+    .define_me   = true,
+    .counterpart = nullptr,           // pointer to known struct
 };
 
 SaveArray sv_array_trigger = {
-    nullptr,                 // link in list
-    "r_triggers",            // array name
-    &sv_struct_trigger,      // array type
-    true,                    // define_me
-    true,                    // allow_hub
+    .next       = nullptr,            // link in list
+    .array_name = "r_triggers",
+    .sdef       = &sv_struct_trigger, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_TriggerCountElems,    // count routine
-    SV_TriggerFindByIndex,   // index routine
-    SV_TriggerCreateElems,   // creation routine
-    SV_TriggerFinaliseElems, // finalisation routine
+    .count_elems    = SV_TriggerCountElems,    // count routine
+    .get_elem       = SV_TriggerFindByIndex,   // index routine
+    .create_elems   = SV_TriggerCreateElems,   // creation routine
+    .finalise_elems = SV_TriggerFinaliseElems, // finalisation routine
 
-    nullptr,                 // pointer to known array
-    0                        // loaded size
+    .counterpart = nullptr,                    // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -300,32 +300,32 @@ static SaveField sv_fields_drawtip[] = {
     //    hu_*: these are regenerated on next display
     //    p.color_name: only serves to generate 'color' field
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_drawtip = {
-    nullptr,                       // link in list
-    "drawtip_t",                   // structure name
-    "dtip",                        // start marker
-    sv_fields_drawtip,             // field descriptions
-    (const char *)&dummy_draw_tip, // dummy base
-    true,                          // define_me
-    nullptr                        // pointer to known struct
+    .next        = nullptr,           // link in list
+    .struct_name = "drawtip_t",       // structure name
+    .marker      = "dtip",            // start marker
+    .fields      = sv_fields_drawtip, // field descriptions
+    .dummy_base  = (const char *)&dummy_draw_tip,
+    .define_me   = true,
+    .counterpart = nullptr,           // pointer to known struct
 };
 
 SaveArray sv_array_drawtip = {
-    nullptr,             // link in list
-    "tip_slots",         // array name
-    &sv_struct_drawtip,  // array type
-    true,                // define_me
-    true,                // allow_hub
+    .next       = nullptr,            // link in list
+    .array_name = "tip_slots",
+    .sdef       = &sv_struct_drawtip, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_TipCountElems,    // count routine
-    SV_TipFindByIndex,   // index routine
-    SV_TipCreateElems,   // creation routine
-    SV_TipFinaliseElems, // finalisation routine
+    .count_elems    = SV_TipCountElems,    // count routine
+    .get_elem       = SV_TipFindByIndex,   // index routine
+    .create_elems   = SV_TipCreateElems,   // creation routine
+    .finalise_elems = SV_TipFinaliseElems, // finalisation routine
 
-    nullptr,             // pointer to known array
-    0                    // loaded size
+    .counterpart = nullptr,                // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -372,32 +372,32 @@ static SaveField sv_fields_plane_move[] = {
     EDGE_SAVE_FIELD(dummy_plane_mover, new_image, "new_image", 1, kSaveFieldString, 0, nullptr, SaveGameLevelGetImage,
                     SaveGameLevelPutImage),
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_plane_move = {
-    nullptr,                          // link in list
-    "plane_move_t",                   // structure name
-    "pmov",                           // start marker
-    sv_fields_plane_move,             // field descriptions
-    (const char *)&dummy_plane_mover, // dummy base
-    true,                             // define_me
-    nullptr                           // pointer to known struct
+    .next        = nullptr,              // link in list
+    .struct_name = "plane_move_t",       // structure name
+    .marker      = "pmov",               // start marker
+    .fields      = sv_fields_plane_move, // field descriptions
+    .dummy_base  = (const char *)&dummy_plane_mover,
+    .define_me   = true,
+    .counterpart = nullptr,              // pointer to known struct
 };
 
 SaveArray sv_array_plane_move = {
-    nullptr,                   // link in list
-    "plane_movers",            // array name (virtual list)
-    &sv_struct_plane_move,     // array type
-    true,                      // define_me
-    true,                      // allow_hub
+    .next       = nullptr,               // link in list
+    .array_name = "plane_movers",        // array name (virtual list)
+    .sdef       = &sv_struct_plane_move, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_PlaneMoveCountElems,    // count routine
-    SV_PlaneMoveFindByIndex,   // index routine
-    SV_PlaneMoveCreateElems,   // creation routine
-    SV_PlaneMoveFinaliseElems, // finalisation routine
+    .count_elems    = SV_PlaneMoveCountElems,    // count routine
+    .get_elem       = SV_PlaneMoveFindByIndex,   // index routine
+    .create_elems   = SV_PlaneMoveCreateElems,   // creation routine
+    .finalise_elems = SV_PlaneMoveFinaliseElems, // finalisation routine
 
-    nullptr,                   // pointer to known array
-    0                          // loaded size
+    .counterpart = nullptr,                      // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -428,32 +428,32 @@ static SaveField sv_fields_slider_move[] = {
     // NOT HERE:
     //   - line_length (can recreate)
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_slider_move = {
-    nullptr,                     // link in list
-    "slider_move_t",             // structure name
-    "pmov",                      // start marker
-    sv_fields_slider_move,       // field descriptions
-    (const char *)&dummy_slider, // dummy base
-    true,                        // define_me
-    nullptr                      // pointer to known struct
+    .next        = nullptr,               // link in list
+    .struct_name = "slider_move_t",       // structure name
+    .marker      = "pmov",                // start marker
+    .fields      = sv_fields_slider_move, // field descriptions
+    .dummy_base  = (const char *)&dummy_slider,
+    .define_me   = true,
+    .counterpart = nullptr,               // pointer to known struct
 };
 
 SaveArray sv_array_slider_move = {
-    nullptr,                    // link in list
-    "active_sliders",           // array name (virtual list)
-    &sv_struct_slider_move,     // array type
-    true,                       // define_me
-    true,                       // allow_hub
+    .next       = nullptr,                // link in list
+    .array_name = "active_sliders",       // array name (virtual list)
+    .sdef       = &sv_struct_slider_move, // array type
+    .define_me  = true,
+    .allow_hub  = true,
 
-    SV_SliderMoveCountElems,    // count routine
-    SV_SliderMoveFindByIndex,   // index routine
-    SV_SliderMoveCreateElems,   // creation routine
-    SV_SliderMoveFinaliseElems, // finalisation routine
+    .count_elems    = SV_SliderMoveCountElems,    // count routine
+    .get_elem       = SV_SliderMoveFindByIndex,   // index routine
+    .create_elems   = SV_SliderMoveCreateElems,   // creation routine
+    .finalise_elems = SV_SliderMoveFinaliseElems, // finalisation routine
 
-    nullptr,                    // pointer to known array
-    0                           // loaded size
+    .counterpart = nullptr,                       // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -500,7 +500,7 @@ void SV_ButtonCreateElems(int num_elems)
     {
         Button *b = new Button;
 
-        EPI_CLEAR_MEMORY(b, Button, 1);
+        epi::ClearMemory(b, 1);
 
         active_buttons.push_back(b);
     }
@@ -729,7 +729,7 @@ void SV_PlaneMoveCreateElems(int num_elems)
     {
         PlaneMover *pmov = new PlaneMover;
 
-        EPI_CLEAR_MEMORY(pmov, PlaneMover, 1);
+        epi::ClearMemory(pmov, 1);
 
         // link it in
         AddActivePlane(pmov);
@@ -787,7 +787,7 @@ void SV_SliderMoveCreateElems(int num_elems)
     {
         SlidingDoorMover *smov = new SlidingDoorMover;
 
-        EPI_CLEAR_MEMORY(smov, SlidingDoorMover, 1);
+        epi::ClearMemory(smov, 1);
 
         // link it in
         AddActiveSlider(smov);

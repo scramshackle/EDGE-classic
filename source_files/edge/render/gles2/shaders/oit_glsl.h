@@ -1,6 +1,6 @@
 #pragma once
 
-static const char kOitVertexSource[] =
+constexpr char kOitVertexSource[] =
     "attribute vec3 a_position;\n"
     "attribute vec4 a_texture_coordinates;\n"
     "\n"
@@ -14,7 +14,7 @@ static const char kOitVertexSource[] =
     "}\n"
     ;
 
-static const char kOitFragmentSource[] =
+constexpr char kOitFragmentSource[] =
     "uniform sampler2D u_accumulation;\n"
     "uniform sampler2D u_revealage;\n"
     "\n"

@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kSpriteVertexShaderSamplerCount = 0;
-static const uint32_t kSpriteVertexShaderUniformBufferCount = 2;
-static const uint32_t kSpriteVertexShaderStorageBufferCount = 0;
+constexpr uint32_t kSpriteVertexShaderSamplerCount = 0;
+constexpr uint32_t kSpriteVertexShaderUniformBufferCount = 2;
+constexpr uint32_t kSpriteVertexShaderStorageBufferCount = 0;
 
-static const uint32_t kSpriteVertexShaderSpirv[] = {
+constexpr uint32_t kSpriteVertexShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000011c, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x0010000f, 0x00000000,

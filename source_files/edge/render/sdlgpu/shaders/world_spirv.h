@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kWorldVertexShaderSamplerCount = 0;
-static const uint32_t kWorldVertexShaderUniformBufferCount = 1;
-static const uint32_t kWorldVertexShaderStorageBufferCount = 0;
+constexpr uint32_t kWorldVertexShaderSamplerCount = 0;
+constexpr uint32_t kWorldVertexShaderUniformBufferCount = 1;
+constexpr uint32_t kWorldVertexShaderStorageBufferCount = 0;
 
-static const uint32_t kWorldVertexShaderSpirv[] = {
+constexpr uint32_t kWorldVertexShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000008e, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000c000f, 0x00000000,
@@ -184,11 +184,11 @@ static const uint32_t kWorldVertexShaderSpirv[] = {
     0x00000002, 0x0003003e, 0x0000008b, 0x0000008d, 0x000100fd, 0x00010038,
 };
 
-static const uint32_t kWorldFragmentShaderSamplerCount = 4;
-static const uint32_t kWorldFragmentShaderUniformBufferCount = 1;
-static const uint32_t kWorldFragmentShaderStorageBufferCount = 3;
+constexpr uint32_t kWorldFragmentShaderSamplerCount = 4;
+constexpr uint32_t kWorldFragmentShaderUniformBufferCount = 1;
+constexpr uint32_t kWorldFragmentShaderStorageBufferCount = 3;
 
-static const uint32_t kWorldFragmentShaderSpirv[] = {
+constexpr uint32_t kWorldFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x000005a1, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000a000f, 0x00000004,

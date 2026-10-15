@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kWorldOitFragmentShaderSamplerCount = 4;
-static const uint32_t kWorldOitFragmentShaderUniformBufferCount = 1;
-static const uint32_t kWorldOitFragmentShaderStorageBufferCount = 3;
+constexpr uint32_t kWorldOitFragmentShaderSamplerCount = 4;
+constexpr uint32_t kWorldOitFragmentShaderUniformBufferCount = 1;
+constexpr uint32_t kWorldOitFragmentShaderStorageBufferCount = 3;
 
-static const uint32_t kWorldOitFragmentShaderSpirv[] = {
+constexpr uint32_t kWorldOitFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x000005e9, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000b000f, 0x00000004,

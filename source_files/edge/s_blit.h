@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <span>
+
 #include "con_var.h"
 #include "ddf_types.h"
 #include "p_mobj.h"
@@ -101,7 +103,7 @@ void KillSoundChannel(int k);
 
 void UpdateSounds(MapObject *listener, epi::BAMAngle angle);
 
-void MixSoundEffects(float *output, int frames);
+void MixSoundEffects(std::span<float> output);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

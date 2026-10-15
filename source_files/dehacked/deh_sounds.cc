@@ -306,7 +306,7 @@ void sounds::MarkSound(int num)
         return;
 
     // already have a modified entry?
-    if (S_sfx.count(num))
+    if (S_sfx.contains(num))
         return;
 
     SoundEffectInfo *entry = new SoundEffectInfo;
@@ -405,7 +405,7 @@ std::string sounds::GetEdgeSfxName(int sound_id)
     // we get here for sounds with no original name (only possible
     // for DSDehacked / MBF21).  check if modified name is empty too.
 
-    if (!S_sfx.count(sound_id))
+    if (!S_sfx.contains(sound_id))
         return name;
 
     const SoundEffectInfo *mod = S_sfx[sound_id];

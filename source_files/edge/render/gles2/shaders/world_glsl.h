@@ -1,6 +1,6 @@
 #pragma once
 
-static const char kWorldVertexSource[] =
+constexpr char kWorldVertexSource[] =
     "uniform mat4 u_model_view_projection;\n"
     "uniform mat4 u_model_view;\n"
     "\n"
@@ -130,7 +130,7 @@ static const char kWorldVertexSource[] =
     "}\n"
     ;
 
-static const char kWorldFragmentSource[] =
+constexpr char kWorldFragmentSource[] =
     "const float kFogLinear = 1.0;\n"
     "const float kLog2      = 1.442695;\n"
     "\n"

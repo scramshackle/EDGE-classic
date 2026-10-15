@@ -63,7 +63,7 @@ void ammo::Init()
     pickups[2] = 20;
     pickups[3] = 1;
 
-    EPI_CLEAR_MEMORY(ammo_modified, bool, 4);
+    epi::ClearMemory(ammo_modified, 4);
 }
 
 void ammo::Shutdown()

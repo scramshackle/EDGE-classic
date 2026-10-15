@@ -66,7 +66,7 @@ static bool EnsureBuffer(SDL_GPUBuffer **buffer, SDL_GPUTransferBuffer **transfe
     }
 
     SDL_GPUBufferCreateInfo buffer_info;
-    EPI_CLEAR_MEMORY(&buffer_info, SDL_GPUBufferCreateInfo, 1);
+    epi::ClearMemory(&buffer_info, 1);
 
     buffer_info.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
     buffer_info.size  = (uint32_t)wanted;
@@ -80,7 +80,7 @@ static bool EnsureBuffer(SDL_GPUBuffer **buffer, SDL_GPUTransferBuffer **transfe
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)wanted;

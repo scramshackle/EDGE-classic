@@ -54,7 +54,7 @@ bool StartupMIDI(void)
     epi::LogMessage(epi::kLogLevelPrint, "Initializing MIDI...\n");
 
     // Check for presence of previous CVAR value's file
-    if (!available_soundbanks.count(midi_soundbank.s_))
+    if (!available_soundbanks.contains(midi_soundbank.s_))
     {
         epi::LogMessage(epi::kLogLevelWarning,
                         "MIDI: Cannot find previously used soundbank %s, falling back to "

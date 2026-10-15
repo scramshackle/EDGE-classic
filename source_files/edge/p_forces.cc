@@ -163,7 +163,7 @@ static Force *NewForce(void)
 {
     Force *f = new Force;
 
-    EPI_CLEAR_MEMORY(f, Force, 1);
+    epi::ClearMemory(f, 1);
 
     active_forces.push_back(f);
     return f;

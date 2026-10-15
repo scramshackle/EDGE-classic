@@ -37,6033 +37,6033 @@ namespace dehacked
 DehackedMapObjectDefinition mobjinfo[kTotalDehackedMapObjectTypesPortCompatibility] = {
     // MT_PLAYER
     {
-        "OUR_HERO",                                                           // name
-        -1,                                                                   // doomednum
-        kS_PLAY,                                                              // spawnstate
-        100,                                                                  // spawnhealth
-        kS_PLAY_RUN1,                                                         // seestate
-        ksfx_None,                                                            // seesound
-        0,                                                                    // reactiontime
-        ksfx_None,                                                            // attacksound
-        kS_PLAY_PAIN,                                                         // painstate
-        255,                                                                  // painchance
-        ksfx_plpain,                                                          // painsound
-        kS_NULL,                                                              // meleestate
-        kS_PLAY_ATK1,                                                         // missilestate
-        kS_PLAY_DIE1,                                                         // deathstate
-        kS_PLAY_XDIE1,                                                        // xdeathstate
-        ksfx_pldeth,                                                          // deathsound
-        0,                                                                    // speed
-        16 * kFracUnit,                                                       // radius
-        56 * kFracUnit,                                                       // height
-        100,                                                                  // mass
-        0,                                                                    // damage
-        ksfx_None,                                                            // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_DROPOFF | kMF_PICKUP | kMF_NOTDMATCH, // flags
-        0,                                                                    // MBF21 flags
-        -2,                                                                   // Infighting group
-        -2,                                                                   // Projectile group
-        -2,                                                                   // Splash group
-        ksfx_None,                                                            // Rip sound
-        0,                                                                    // Fast speed
-        0,                                                                    // Melee range
-        0,                                                                    // Gib health
-        -1,                                                                   // Dropped item
-        0,                                                                    // Pickup width
-        0,                                                                    // Projectile pass height
-        0,                                                                    // Fullbright
-        0,                                                                    // Blood color
-        kS_NULL                                                               // raisestate
+        .name                   = "OUR_HERO",
+        .doomednum              = -1,
+        .spawnstate             = kS_PLAY,
+        .spawnhealth            = 100,
+        .seestate               = kS_PLAY_RUN1,
+        .seesound               = ksfx_None,
+        .reactiontime           = 0,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_PLAY_PAIN,
+        .painchance             = 255,
+        .painsound              = ksfx_plpain,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_PLAY_ATK1,
+        .deathstate             = kS_PLAY_DIE1,
+        .xdeathstate            = kS_PLAY_XDIE1,
+        .deathsound             = ksfx_pldeth,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_DROPOFF | kMF_PICKUP | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_POSSESSED
     {
-        "ZOMBIEMAN",                               // name
-        3004,                                      // doomednum
-        kS_POSS_STND,                              // spawnstate
-        20,                                        // spawnhealth
-        kS_POSS_RUN1,                              // seestate
-        ksfx_posit1,                               // seesound
-        8,                                         // reactiontime
-        ksfx_pistol,                               // attacksound
-        kS_POSS_PAIN,                              // painstate
-        200,                                       // painchance
-        ksfx_popain,                               // painsound
-        0,                                         // meleestate
-        kS_POSS_ATK1,                              // missilestate
-        kS_POSS_DIE1,                              // deathstate
-        kS_POSS_XDIE1,                             // xdeathstate
-        ksfx_podth1,                               // deathsound
-        8,                                         // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_posact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_POSS_RAISE1                             // raisestate
+        .name                   = "ZOMBIEMAN",
+        .doomednum              = 3004,
+        .spawnstate             = kS_POSS_STND,
+        .spawnhealth            = 20,
+        .seestate               = kS_POSS_RUN1,
+        .seesound               = ksfx_posit1,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_pistol,
+        .painstate              = kS_POSS_PAIN,
+        .painchance             = 200,
+        .painsound              = ksfx_popain,
+        .meleestate             = 0,
+        .missilestate           = kS_POSS_ATK1,
+        .deathstate             = kS_POSS_DIE1,
+        .xdeathstate            = kS_POSS_XDIE1,
+        .deathsound             = ksfx_podth1,
+        .speed                  = 8,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_posact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_POSS_RAISE1,
     },
 
     // MT_SHOTGUY
     {
-        "SHOTGUN_GUY",                             // name
-        9,                                         // doomednum
-        kS_SPOS_STND,                              // spawnstate
-        30,                                        // spawnhealth
-        kS_SPOS_RUN1,                              // seestate
-        ksfx_posit2,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_SPOS_PAIN,                              // painstate
-        170,                                       // painchance
-        ksfx_popain,                               // painsound
-        0,                                         // meleestate
-        kS_SPOS_ATK1,                              // missilestate
-        kS_SPOS_DIE1,                              // deathstate
-        kS_SPOS_XDIE1,                             // xdeathstate
-        ksfx_podth2,                               // deathsound
-        8,                                         // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_posact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_SPOS_RAISE1                             // raisestate
+        .name                   = "SHOTGUN_GUY",
+        .doomednum              = 9,
+        .spawnstate             = kS_SPOS_STND,
+        .spawnhealth            = 30,
+        .seestate               = kS_SPOS_RUN1,
+        .seesound               = ksfx_posit2,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_SPOS_PAIN,
+        .painchance             = 170,
+        .painsound              = ksfx_popain,
+        .meleestate             = 0,
+        .missilestate           = kS_SPOS_ATK1,
+        .deathstate             = kS_SPOS_DIE1,
+        .xdeathstate            = kS_SPOS_XDIE1,
+        .deathsound             = ksfx_podth2,
+        .speed                  = 8,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_posact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_SPOS_RAISE1,
     },
 
     // MT_VILE
     {
-        "ARCHVILE",                                // name
-        64,                                        // doomednum
-        kS_VILE_STND,                              // spawnstate
-        700,                                       // spawnhealth
-        kS_VILE_RUN1,                              // seestate
-        ksfx_vilsit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_VILE_PAIN,                              // painstate
-        10,                                        // painchance
-        ksfx_vipain,                               // painsound
-        0,                                         // meleestate
-        kS_VILE_ATK1,                              // missilestate
-        kS_VILE_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_vildth,                               // deathsound
-        15,                                        // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        500,                                       // mass
-        0,                                         // damage
-        ksfx_vilact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_NULL                                    // raisestate
+        .name                   = "ARCHVILE",
+        .doomednum              = 64,
+        .spawnstate             = kS_VILE_STND,
+        .spawnhealth            = 700,
+        .seestate               = kS_VILE_RUN1,
+        .seesound               = ksfx_vilsit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_VILE_PAIN,
+        .painchance             = 10,
+        .painsound              = ksfx_vipain,
+        .meleestate             = 0,
+        .missilestate           = kS_VILE_ATK1,
+        .deathstate             = kS_VILE_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_vildth,
+        .speed                  = 15,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 500,
+        .damage                 = 0,
+        .activesound            = ksfx_vilact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_FIRE
     {
-        "*ARCHVILE_FIRE",               // (attack) name
-        -1,                             // doomednum
-        kS_FIRE1,                       // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "*ARCHVILE_FIRE", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_FIRE1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_UNDEAD
     {
-        "REVENANT",                                // name
-        66,                                        // doomednum
-        kS_SKEL_STND,                              // spawnstate
-        300,                                       // spawnhealth
-        kS_SKEL_RUN1,                              // seestate
-        ksfx_skesit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_SKEL_PAIN,                              // painstate
-        100,                                       // painchance
-        ksfx_popain,                               // painsound
-        kS_SKEL_FIST1,                             // meleestate
-        kS_SKEL_MISS1,                             // missilestate
-        kS_SKEL_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_skedth,                               // deathsound
-        10,                                        // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        500,                                       // mass
-        0,                                         // damage
-        ksfx_skeact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_SKEL_RAISE1                             // raisestate
+        .name                   = "REVENANT",
+        .doomednum              = 66,
+        .spawnstate             = kS_SKEL_STND,
+        .spawnhealth            = 300,
+        .seestate               = kS_SKEL_RUN1,
+        .seesound               = ksfx_skesit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_SKEL_PAIN,
+        .painchance             = 100,
+        .painsound              = ksfx_popain,
+        .meleestate             = kS_SKEL_FIST1,
+        .missilestate           = kS_SKEL_MISS1,
+        .deathstate             = kS_SKEL_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_skedth,
+        .speed                  = 10,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 500,
+        .damage                 = 0,
+        .activesound            = ksfx_skeact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_SKEL_RAISE1,
     },
 
     // MT_TRACER
     {
-        "*REVENANT_MISSILE",                                        // (attack) name
-        -1,                                                         // doomednum
-        kS_TRACER,                                                  // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_skeatk,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_TRACEEXP1,                                               // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_barexp,                                                // deathsound
-        10 * kFracUnit,                                             // speed
-        11 * kFracUnit,                                             // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        10,                                                         // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*REVENANT_MISSILE", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_TRACER,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_skeatk,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_TRACEEXP1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_barexp,
+        .speed                  = 10 * kFracUnit,
+        .radius                 = 11 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 10,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SMOKE
     {
-        "SMOKE",                        // name
-        -1,                             // doomednum
-        kS_SMOKE1,                      // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "SMOKE",
+        .doomednum              = -1,
+        .spawnstate             = kS_SMOKE1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_FATSO
     {
-        "MANCUBUS",                                // name
-        67,                                        // doomednum
-        kS_FATT_STND,                              // spawnstate
-        600,                                       // spawnhealth
-        kS_FATT_RUN1,                              // seestate
-        ksfx_mansit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_FATT_PAIN,                              // painstate
-        80,                                        // painchance
-        ksfx_mnpain,                               // painsound
-        0,                                         // meleestate
-        kS_FATT_ATK1,                              // missilestate
-        kS_FATT_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_mandth,                               // deathsound
-        8,                                         // speed
-        48 * kFracUnit,                            // radius
-        64 * kFracUnit,                            // height
-        1000,                                      // mass
-        0,                                         // damage
-        ksfx_posact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        kMBF21_MAP07BOSS1,                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_FATT_RAISE1                             // raisestate
+        .name                   = "MANCUBUS",
+        .doomednum              = 67,
+        .spawnstate             = kS_FATT_STND,
+        .spawnhealth            = 600,
+        .seestate               = kS_FATT_RUN1,
+        .seesound               = ksfx_mansit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_FATT_PAIN,
+        .painchance             = 80,
+        .painsound              = ksfx_mnpain,
+        .meleestate             = 0,
+        .missilestate           = kS_FATT_ATK1,
+        .deathstate             = kS_FATT_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_mandth,
+        .speed                  = 8,
+        .radius                 = 48 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 1000,
+        .damage                 = 0,
+        .activesound            = ksfx_posact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = kMBF21_MAP07BOSS1,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_FATT_RAISE1,
     },
 
     // MT_FATSHOT
     {
-        "*MANCUBUS_FIREBALL",                                       // (attack) name
-        -1,                                                         // doomednum
-        kS_FATSHOT1,                                                // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_firsht,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_FATSHOTX1,                                               // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        20 * kFracUnit,                                             // speed
-        6 * kFracUnit,                                              // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        8,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*MANCUBUS_FIREBALL", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_FATSHOT1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_firsht,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_FATSHOTX1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 20 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 8,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_CHAINGUY
     {
-        "HEAVY_WEAPON_DUDE",                       // name
-        65,                                        // doomednum
-        kS_CPOS_STND,                              // spawnstate
-        70,                                        // spawnhealth
-        kS_CPOS_RUN1,                              // seestate
-        ksfx_posit2,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_CPOS_PAIN,                              // painstate
-        170,                                       // painchance
-        ksfx_popain,                               // painsound
-        0,                                         // meleestate
-        kS_CPOS_ATK1,                              // missilestate
-        kS_CPOS_DIE1,                              // deathstate
-        kS_CPOS_XDIE1,                             // xdeathstate
-        ksfx_podth2,                               // deathsound
-        8,                                         // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_posact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_CPOS_RAISE1                             // raisestate
+        .name                   = "HEAVY_WEAPON_DUDE",
+        .doomednum              = 65,
+        .spawnstate             = kS_CPOS_STND,
+        .spawnhealth            = 70,
+        .seestate               = kS_CPOS_RUN1,
+        .seesound               = ksfx_posit2,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_CPOS_PAIN,
+        .painchance             = 170,
+        .painsound              = ksfx_popain,
+        .meleestate             = 0,
+        .missilestate           = kS_CPOS_ATK1,
+        .deathstate             = kS_CPOS_DIE1,
+        .xdeathstate            = kS_CPOS_XDIE1,
+        .deathsound             = ksfx_podth2,
+        .speed                  = 8,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_posact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_CPOS_RAISE1,
     },
 
     // MT_TROOP
     {
-        "IMP",                                     // name
-        3001,                                      // doomednum
-        kS_TROO_STND,                              // spawnstate
-        60,                                        // spawnhealth
-        kS_TROO_RUN1,                              // seestate
-        ksfx_bgsit1,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_TROO_PAIN,                              // painstate
-        200,                                       // painchance
-        ksfx_popain,                               // painsound
-        kS_TROO_ATK1,                              // meleestate
-        kS_TROO_ATK1,                              // missilestate
-        kS_TROO_DIE1,                              // deathstate
-        kS_TROO_XDIE1,                             // xdeathstate
-        ksfx_bgdth1,                               // deathsound
-        8,                                         // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_bgact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_TROO_RAISE1                             // raisestate
+        .name                   = "IMP",
+        .doomednum              = 3001,
+        .spawnstate             = kS_TROO_STND,
+        .spawnhealth            = 60,
+        .seestate               = kS_TROO_RUN1,
+        .seesound               = ksfx_bgsit1,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_TROO_PAIN,
+        .painchance             = 200,
+        .painsound              = ksfx_popain,
+        .meleestate             = kS_TROO_ATK1,
+        .missilestate           = kS_TROO_ATK1,
+        .deathstate             = kS_TROO_DIE1,
+        .xdeathstate            = kS_TROO_XDIE1,
+        .deathsound             = ksfx_bgdth1,
+        .speed                  = 8,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_bgact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_TROO_RAISE1,
     },
 
     // MT_SERGEANT
     {
-        "DEMON",                                   // name
-        3002,                                      // doomednum
-        kS_SARG_STND,                              // spawnstate
-        150,                                       // spawnhealth
-        kS_SARG_RUN1,                              // seestate
-        ksfx_sgtsit,                               // seesound
-        8,                                         // reactiontime
-        ksfx_sgtatk,                               // attacksound
-        kS_SARG_PAIN,                              // painstate
-        180,                                       // painchance
-        ksfx_dmpain,                               // painsound
-        kS_SARG_ATK1,                              // meleestate
-        0,                                         // missilestate
-        kS_SARG_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_sgtdth,                               // deathsound
-        10,                                        // speed
-        30 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        400,                                       // mass
-        0,                                         // damage
-        ksfx_dmact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_SARG_RAISE1                             // raisestate
+        .name                   = "DEMON",
+        .doomednum              = 3002,
+        .spawnstate             = kS_SARG_STND,
+        .spawnhealth            = 150,
+        .seestate               = kS_SARG_RUN1,
+        .seesound               = ksfx_sgtsit,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_sgtatk,
+        .painstate              = kS_SARG_PAIN,
+        .painchance             = 180,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = kS_SARG_ATK1,
+        .missilestate           = 0,
+        .deathstate             = kS_SARG_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_sgtdth,
+        .speed                  = 10,
+        .radius                 = 30 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 400,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_SARG_RAISE1,
     },
 
     // MT_SHADOWS
     {
-        "SPECTRE",                                              // name
-        58,                                                     // doomednum
-        kS_SARG_STND,                                           // spawnstate
-        150,                                                    // spawnhealth
-        kS_SARG_RUN1,                                           // seestate
-        ksfx_sgtsit,                                            // seesound
-        8,                                                      // reactiontime
-        ksfx_sgtatk,                                            // attacksound
-        kS_SARG_PAIN,                                           // painstate
-        180,                                                    // painchance
-        ksfx_dmpain,                                            // painsound
-        kS_SARG_ATK1,                                           // meleestate
-        0,                                                      // missilestate
-        kS_SARG_DIE1,                                           // deathstate
-        kS_NULL,                                                // xdeathstate
-        ksfx_sgtdth,                                            // deathsound
-        10,                                                     // speed
-        30 * kFracUnit,                                         // radius
-        56 * kFracUnit,                                         // height
-        400,                                                    // mass
-        0,                                                      // damage
-        ksfx_dmact,                                             // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_SHADOW | kMF_COUNTKILL, // flags
-        0,                                                      // MBF21 flags
-        -2,                                                     // Infighting group
-        -2,                                                     // Projectile group
-        -2,                                                     // Splash group
-        ksfx_None,                                              // Rip sound
-        0,                                                      // Fast speed
-        0,                                                      // Melee range
-        0,                                                      // Gib health
-        -1,                                                     // Dropped item
-        0,                                                      // Pickup width
-        0,                                                      // Projectile pass height
-        0,                                                      // Fullbright
-        0,                                                      // Blood color
-        kS_SARG_RAISE1                                          // raisestate
+        .name                   = "SPECTRE",
+        .doomednum              = 58,
+        .spawnstate             = kS_SARG_STND,
+        .spawnhealth            = 150,
+        .seestate               = kS_SARG_RUN1,
+        .seesound               = ksfx_sgtsit,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_sgtatk,
+        .painstate              = kS_SARG_PAIN,
+        .painchance             = 180,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = kS_SARG_ATK1,
+        .missilestate           = 0,
+        .deathstate             = kS_SARG_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_sgtdth,
+        .speed                  = 10,
+        .radius                 = 30 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 400,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_SHADOW | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_SARG_RAISE1,
     },
 
     // MT_HEAD
     {
-        "CACODEMON",                                                           // name
-        3005,                                                                  // doomednum
-        kS_HEAD_STND,                                                          // spawnstate
-        400,                                                                   // spawnhealth
-        kS_HEAD_RUN1,                                                          // seestate
-        ksfx_cacsit,                                                           // seesound
-        8,                                                                     // reactiontime
-        0,                                                                     // attacksound
-        kS_HEAD_PAIN,                                                          // painstate
-        128,                                                                   // painchance
-        ksfx_dmpain,                                                           // painsound
-        0,                                                                     // meleestate
-        kS_HEAD_ATK1,                                                          // missilestate
-        kS_HEAD_DIE1,                                                          // deathstate
-        kS_NULL,                                                               // xdeathstate
-        ksfx_cacdth,                                                           // deathsound
-        8,                                                                     // speed
-        31 * kFracUnit,                                                        // radius
-        56 * kFracUnit,                                                        // height
-        400,                                                                   // mass
-        0,                                                                     // damage
-        ksfx_dmact,                                                            // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY | kMF_COUNTKILL, // flags
-        0,                                                                     // MBF21 flags
-        -2,                                                                    // Infighting group
-        -2,                                                                    // Projectile group
-        -2,                                                                    // Splash group
-        ksfx_None,                                                             // Rip sound
-        0,                                                                     // Fast speed
-        0,                                                                     // Melee range
-        0,                                                                     // Gib health
-        -1,                                                                    // Dropped item
-        0,                                                                     // Pickup width
-        0,                                                                     // Projectile pass height
-        0,                                                                     // Fullbright
-        0,                                                                     // Blood color
-        kS_HEAD_RAISE1                                                         // raisestate
+        .name                   = "CACODEMON",
+        .doomednum              = 3005,
+        .spawnstate             = kS_HEAD_STND,
+        .spawnhealth            = 400,
+        .seestate               = kS_HEAD_RUN1,
+        .seesound               = ksfx_cacsit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_HEAD_PAIN,
+        .painchance             = 128,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = 0,
+        .missilestate           = kS_HEAD_ATK1,
+        .deathstate             = kS_HEAD_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_cacdth,
+        .speed                  = 8,
+        .radius                 = 31 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 400,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_HEAD_RAISE1,
     },
 
     // MT_BRUISER
     {
-        "BARON_OF_HELL",                           // name
-        3003,                                      // doomednum
-        kS_BOSS_STND,                              // spawnstate
-        1000,                                      // spawnhealth
-        kS_BOSS_RUN1,                              // seestate
-        ksfx_brssit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_BOSS_PAIN,                              // painstate
-        50,                                        // painchance
-        ksfx_dmpain,                               // painsound
-        kS_BOSS_ATK1,                              // meleestate
-        kS_BOSS_ATK1,                              // missilestate
-        kS_BOSS_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_brsdth,                               // deathsound
-        8,                                         // speed
-        24 * kFracUnit,                            // radius
-        64 * kFracUnit,                            // height
-        1000,                                      // mass
-        0,                                         // damage
-        ksfx_dmact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        kMBF21_E1M8BOSS,                           // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_BOSS_RAISE1                             // raisestate
+        .name                   = "BARON_OF_HELL",
+        .doomednum              = 3003,
+        .spawnstate             = kS_BOSS_STND,
+        .spawnhealth            = 1000,
+        .seestate               = kS_BOSS_RUN1,
+        .seesound               = ksfx_brssit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_BOSS_PAIN,
+        .painchance             = 50,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = kS_BOSS_ATK1,
+        .missilestate           = kS_BOSS_ATK1,
+        .deathstate             = kS_BOSS_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_brsdth,
+        .speed                  = 8,
+        .radius                 = 24 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 1000,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = kMBF21_E1M8BOSS,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_BOSS_RAISE1,
     },
 
     // MT_BRUISERSHOT
     {
-        "*BARON_FIREBALL",                                          // (attack) name
-        -1,                                                         // doomednum
-        kS_BRBALL1,                                                 // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_firsht,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_BRBALLX1,                                                // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        15 * kFracUnit,                                             // speed
-        6 * kFracUnit,                                              // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        8,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*BARON_FIREBALL", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_BRBALL1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_firsht,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_BRBALLX1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 15 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 8,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_KNIGHT
     {
-        "HELL_KNIGHT",                             // name
-        69,                                        // doomednum
-        kS_BOS2_STND,                              // spawnstate
-        500,                                       // spawnhealth
-        kS_BOS2_RUN1,                              // seestate
-        ksfx_kntsit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_BOS2_PAIN,                              // painstate
-        50,                                        // painchance
-        ksfx_dmpain,                               // painsound
-        kS_BOS2_ATK1,                              // meleestate
-        kS_BOS2_ATK1,                              // missilestate
-        kS_BOS2_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_kntdth,                               // deathsound
-        8,                                         // speed
-        24 * kFracUnit,                            // radius
-        64 * kFracUnit,                            // height
-        1000,                                      // mass
-        0,                                         // damage
-        ksfx_dmact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_BOS2_RAISE1                             // raisestate
+        .name                   = "HELL_KNIGHT",
+        .doomednum              = 69,
+        .spawnstate             = kS_BOS2_STND,
+        .spawnhealth            = 500,
+        .seestate               = kS_BOS2_RUN1,
+        .seesound               = ksfx_kntsit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_BOS2_PAIN,
+        .painchance             = 50,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = kS_BOS2_ATK1,
+        .missilestate           = kS_BOS2_ATK1,
+        .deathstate             = kS_BOS2_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_kntdth,
+        .speed                  = 8,
+        .radius                 = 24 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 1000,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_BOS2_RAISE1,
     },
 
     // MT_SKULL
     {
-        "LOST_SOUL",                                           // name
-        3006,                                                  // doomednum
-        kS_SKULL_STND,                                         // spawnstate
-        100,                                                   // spawnhealth
-        kS_SKULL_RUN1,                                         // seestate
-        0,                                                     // seesound
-        8,                                                     // reactiontime
-        ksfx_sklatk,                                           // attacksound
-        kS_SKULL_PAIN,                                         // painstate
-        256,                                                   // painchance
-        ksfx_dmpain,                                           // painsound
-        0,                                                     // meleestate
-        kS_SKULL_ATK1,                                         // missilestate
-        kS_SKULL_DIE1,                                         // deathstate
-        kS_NULL,                                               // xdeathstate
-        ksfx_firxpl,                                           // deathsound
-        8,                                                     // speed
-        16 * kFracUnit,                                        // radius
-        56 * kFracUnit,                                        // height
-        50,                                                    // mass
-        3,                                                     // damage
-        ksfx_dmact,                                            // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY, // flags
-        0,                                                     // MBF21 flags
-        -2,                                                    // Infighting group
-        -2,                                                    // Projectile group
-        -2,                                                    // Splash group
-        ksfx_None,                                             // Rip sound
-        0,                                                     // Fast speed
-        0,                                                     // Melee range
-        0,                                                     // Gib health
-        -1,                                                    // Dropped item
-        0,                                                     // Pickup width
-        0,                                                     // Projectile pass height
-        0,                                                     // Fullbright
-        0,                                                     // Blood color
-        kS_NULL                                                // raisestate
+        .name                   = "LOST_SOUL",
+        .doomednum              = 3006,
+        .spawnstate             = kS_SKULL_STND,
+        .spawnhealth            = 100,
+        .seestate               = kS_SKULL_RUN1,
+        .seesound               = 0,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_sklatk,
+        .painstate              = kS_SKULL_PAIN,
+        .painchance             = 256,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = 0,
+        .missilestate           = kS_SKULL_ATK1,
+        .deathstate             = kS_SKULL_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 8,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 50,
+        .damage                 = 3,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SPIDER
     {
-        "THE_SPIDER_MASTERMIND",                   // name
-        7,                                         // doomednum
-        kS_SPID_STND,                              // spawnstate
-        3000,                                      // spawnhealth
-        kS_SPID_RUN1,                              // seestate
-        ksfx_spisit,                               // seesound
-        8,                                         // reactiontime
-        ksfx_shotgn,                               // attacksound
-        kS_SPID_PAIN,                              // painstate
-        40,                                        // painchance
-        ksfx_dmpain,                               // painsound
-        0,                                         // meleestate
-        kS_SPID_ATK1,                              // missilestate
-        kS_SPID_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_spidth,                               // deathsound
-        12,                                        // speed
-        128 * kFracUnit,                           // radius
-        100 * kFracUnit,                           // height
-        1000,                                      // mass
-        0,                                         // damage
-        ksfx_dmact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        kMBF21_E3M8BOSS | kMBF21_E4M8BOSS,         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_NULL                                    // raisestate
+        .name                   = "THE_SPIDER_MASTERMIND",
+        .doomednum              = 7,
+        .spawnstate             = kS_SPID_STND,
+        .spawnhealth            = 3000,
+        .seestate               = kS_SPID_RUN1,
+        .seesound               = ksfx_spisit,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_shotgn,
+        .painstate              = kS_SPID_PAIN,
+        .painchance             = 40,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = 0,
+        .missilestate           = kS_SPID_ATK1,
+        .deathstate             = kS_SPID_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_spidth,
+        .speed                  = 12,
+        .radius                 = 128 * kFracUnit,
+        .height                 = 100 * kFracUnit,
+        .mass                   = 1000,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = kMBF21_E3M8BOSS | kMBF21_E4M8BOSS,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BABY
     {
-        "ARACHNOTRON",                             // name
-        68,                                        // doomednum
-        kS_BSPI_STND,                              // spawnstate
-        500,                                       // spawnhealth
-        kS_BSPI_SIGHT,                             // seestate
-        ksfx_bspsit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_BSPI_PAIN,                              // painstate
-        128,                                       // painchance
-        ksfx_dmpain,                               // painsound
-        0,                                         // meleestate
-        kS_BSPI_ATK1,                              // missilestate
-        kS_BSPI_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_bspdth,                               // deathsound
-        12,                                        // speed
-        64 * kFracUnit,                            // radius
-        64 * kFracUnit,                            // height
-        600,                                       // mass
-        0,                                         // damage
-        ksfx_bspact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        kMBF21_MAP07BOSS2,                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_BSPI_RAISE1                             // raisestate
+        .name                   = "ARACHNOTRON",
+        .doomednum              = 68,
+        .spawnstate             = kS_BSPI_STND,
+        .spawnhealth            = 500,
+        .seestate               = kS_BSPI_SIGHT,
+        .seesound               = ksfx_bspsit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_BSPI_PAIN,
+        .painchance             = 128,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = 0,
+        .missilestate           = kS_BSPI_ATK1,
+        .deathstate             = kS_BSPI_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_bspdth,
+        .speed                  = 12,
+        .radius                 = 64 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 600,
+        .damage                 = 0,
+        .activesound            = ksfx_bspact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = kMBF21_MAP07BOSS2,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_BSPI_RAISE1,
     },
 
     // MT_CYBORG
     {
-        "THE_CYBERDEMON",                          // name
-        16,                                        // doomednum
-        kS_CYBER_STND,                             // spawnstate
-        4000,                                      // spawnhealth
-        kS_CYBER_RUN1,                             // seestate
-        ksfx_cybsit,                               // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_CYBER_PAIN,                             // painstate
-        20,                                        // painchance
-        ksfx_dmpain,                               // painsound
-        0,                                         // meleestate
-        kS_CYBER_ATK1,                             // missilestate
-        kS_CYBER_DIE1,                             // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_cybdth,                               // deathsound
-        16,                                        // speed
-        40 * kFracUnit,                            // radius
-        110 * kFracUnit,                           // height
-        1000,                                      // mass
-        0,                                         // damage
-        ksfx_dmact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        kMBF21_E2M8BOSS | kMBF21_E4M6BOSS,         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_NULL                                    // raisestate
+        .name                   = "THE_CYBERDEMON",
+        .doomednum              = 16,
+        .spawnstate             = kS_CYBER_STND,
+        .spawnhealth            = 4000,
+        .seestate               = kS_CYBER_RUN1,
+        .seesound               = ksfx_cybsit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_CYBER_PAIN,
+        .painchance             = 20,
+        .painsound              = ksfx_dmpain,
+        .meleestate             = 0,
+        .missilestate           = kS_CYBER_ATK1,
+        .deathstate             = kS_CYBER_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_cybdth,
+        .speed                  = 16,
+        .radius                 = 40 * kFracUnit,
+        .height                 = 110 * kFracUnit,
+        .mass                   = 1000,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = kMBF21_E2M8BOSS | kMBF21_E4M6BOSS,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_PAIN
     {
-        "PAIN_ELEMENTAL",                                                      // name
-        71,                                                                    // doomednum
-        kS_PAIN_STND,                                                          // spawnstate
-        400,                                                                   // spawnhealth
-        kS_PAIN_RUN1,                                                          // seestate
-        ksfx_pesit,                                                            // seesound
-        8,                                                                     // reactiontime
-        0,                                                                     // attacksound
-        kS_PAIN_PAIN,                                                          // painstate
-        128,                                                                   // painchance
-        ksfx_pepain,                                                           // painsound
-        0,                                                                     // meleestate
-        kS_PAIN_ATK1,                                                          // missilestate
-        kS_PAIN_DIE1,                                                          // deathstate
-        kS_NULL,                                                               // xdeathstate
-        ksfx_pedth,                                                            // deathsound
-        8,                                                                     // speed
-        31 * kFracUnit,                                                        // radius
-        56 * kFracUnit,                                                        // height
-        400,                                                                   // mass
-        0,                                                                     // damage
-        ksfx_dmact,                                                            // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY | kMF_COUNTKILL, // flags
-        0,                                                                     // MBF21 flags
-        -2,                                                                    // Infighting group
-        -2,                                                                    // Projectile group
-        -2,                                                                    // Splash group
-        ksfx_None,                                                             // Rip sound
-        0,                                                                     // Fast speed
-        0,                                                                     // Melee range
-        0,                                                                     // Gib health
-        -1,                                                                    // Dropped item
-        0,                                                                     // Pickup width
-        0,                                                                     // Projectile pass height
-        0,                                                                     // Fullbright
-        0,                                                                     // Blood color
-        kS_PAIN_RAISE1                                                         // raisestate
+        .name                   = "PAIN_ELEMENTAL",
+        .doomednum              = 71,
+        .spawnstate             = kS_PAIN_STND,
+        .spawnhealth            = 400,
+        .seestate               = kS_PAIN_RUN1,
+        .seesound               = ksfx_pesit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_PAIN_PAIN,
+        .painchance             = 128,
+        .painsound              = ksfx_pepain,
+        .meleestate             = 0,
+        .missilestate           = kS_PAIN_ATK1,
+        .deathstate             = kS_PAIN_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_pedth,
+        .speed                  = 8,
+        .radius                 = 31 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 400,
+        .damage                 = 0,
+        .activesound            = ksfx_dmact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_FLOAT | kMF_NOGRAVITY | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_PAIN_RAISE1,
     },
 
     // MT_WOLFSS
     {
-        "WOLFENSTEIN_SS",                          // name
-        84,                                        // doomednum
-        kS_SSWV_STND,                              // spawnstate
-        50,                                        // spawnhealth
-        kS_SSWV_RUN1,                              // seestate
-        ksfx_sssit,                                // seesound
-        8,                                         // reactiontime
-        0,                                         // attacksound
-        kS_SSWV_PAIN,                              // painstate
-        170,                                       // painchance
-        ksfx_popain,                               // painsound
-        0,                                         // meleestate
-        kS_SSWV_ATK1,                              // missilestate
-        kS_SSWV_DIE1,                              // deathstate
-        kS_SSWV_XDIE1,                             // xdeathstate
-        ksfx_ssdth,                                // deathsound
-        8,                                         // speed
-        20 * kFracUnit,                            // radius
-        56 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_posact,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_SSWV_RAISE1                             // raisestate
+        .name                   = "WOLFENSTEIN_SS",
+        .doomednum              = 84,
+        .spawnstate             = kS_SSWV_STND,
+        .spawnhealth            = 50,
+        .seestate               = kS_SSWV_RUN1,
+        .seesound               = ksfx_sssit,
+        .reactiontime           = 8,
+        .attacksound            = 0,
+        .painstate              = kS_SSWV_PAIN,
+        .painchance             = 170,
+        .painsound              = ksfx_popain,
+        .meleestate             = 0,
+        .missilestate           = kS_SSWV_ATK1,
+        .deathstate             = kS_SSWV_DIE1,
+        .xdeathstate            = kS_SSWV_XDIE1,
+        .deathsound             = ksfx_ssdth,
+        .speed                  = 8,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 56 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_posact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_SSWV_RAISE1,
     },
 
     // MT_KEEN
     {
-        "COMMANDER_KEEN",                                                             // name
-        72,                                                                           // doomednum
-        kS_KEENSTND,                                                                  // spawnstate
-        100,                                                                          // spawnhealth
-        kS_NULL,                                                                      // seestate
-        ksfx_None,                                                                    // seesound
-        8,                                                                            // reactiontime
-        ksfx_None,                                                                    // attacksound
-        kS_KEENPAIN,                                                                  // painstate
-        256,                                                                          // painchance
-        ksfx_keenpn,                                                                  // painsound
-        kS_NULL,                                                                      // meleestate
-        kS_NULL,                                                                      // missilestate
-        kS_COMMKEEN,                                                                  // deathstate
-        kS_NULL,                                                                      // xdeathstate
-        ksfx_keendt,                                                                  // deathsound
-        0,                                                                            // speed
-        16 * kFracUnit,                                                               // radius
-        72 * kFracUnit,                                                               // height
-        10000000,                                                                     // mass
-        0,                                                                            // damage
-        ksfx_None,                                                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                                                            // MBF21 flags
-        -2,                                                                           // Infighting group
-        -2,                                                                           // Projectile group
-        -2,                                                                           // Splash group
-        ksfx_None,                                                                    // Rip sound
-        0,                                                                            // Fast speed
-        0,                                                                            // Melee range
-        0,                                                                            // Gib health
-        -1,                                                                           // Dropped item
-        0,                                                                            // Pickup width
-        0,                                                                            // Projectile pass height
-        0,                                                                            // Fullbright
-        0,                                                                            // Blood color
-        kS_NULL                                                                       // raisestate
+        .name                   = "COMMANDER_KEEN",
+        .doomednum              = 72,
+        .spawnstate             = kS_KEENSTND,
+        .spawnhealth            = 100,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_KEENPAIN,
+        .painchance             = 256,
+        .painsound              = ksfx_keenpn,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_COMMKEEN,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_keendt,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 72 * kFracUnit,
+        .mass                   = 10000000,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BOSSBRAIN
     {
-        "BOSS_BRAIN",              // name
-        88,                        // doomednum
-        kS_BRAIN,                  // spawnstate
-        250,                       // spawnhealth
-        kS_NULL,                   // seestate
-        ksfx_None,                 // seesound
-        8,                         // reactiontime
-        ksfx_None,                 // attacksound
-        kS_BRAIN_PAIN,             // painstate
-        255,                       // painchance
-        ksfx_bospn,                // painsound
-        kS_NULL,                   // meleestate
-        kS_NULL,                   // missilestate
-        kS_BRAIN_DIE1,             // deathstate
-        kS_NULL,                   // xdeathstate
-        ksfx_bosdth,               // deathsound
-        0,                         // speed
-        16 * kFracUnit,            // radius
-        16 * kFracUnit,            // height
-        10000000,                  // mass
-        0,                         // damage
-        ksfx_None,                 // activesound
-        kMF_SOLID | kMF_SHOOTABLE, // flags
-        0,                         // MBF21 flags
-        -2,                        // Infighting group
-        -2,                        // Projectile group
-        -2,                        // Splash group
-        ksfx_None,                 // Rip sound
-        0,                         // Fast speed
-        0,                         // Melee range
-        0,                         // Gib health
-        -1,                        // Dropped item
-        0,                         // Pickup width
-        0,                         // Projectile pass height
-        0,                         // Fullbright
-        0,                         // Blood color
-        kS_NULL                    // raisestate
+        .name                   = "BOSS_BRAIN",
+        .doomednum              = 88,
+        .spawnstate             = kS_BRAIN,
+        .spawnhealth            = 250,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_BRAIN_PAIN,
+        .painchance             = 255,
+        .painsound              = ksfx_bospn,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_BRAIN_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_bosdth,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 10000000,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BOSSSPIT
     {
-        "BRAIN_SHOOTER",               // name
-        89,                            // doomednum
-        kS_BRAINEYE,                   // spawnstate
-        1000,                          // spawnhealth
-        kS_BRAINEYESEE,                // seestate
-        ksfx_None,                     // seesound
-        8,                             // reactiontime
-        ksfx_None,                     // attacksound
-        kS_NULL,                       // painstate
-        0,                             // painchance
-        ksfx_None,                     // painsound
-        kS_NULL,                       // meleestate
-        kS_NULL,                       // missilestate
-        kS_NULL,                       // deathstate
-        kS_NULL,                       // xdeathstate
-        ksfx_None,                     // deathsound
-        0,                             // speed
-        20 * kFracUnit,                // radius
-        32 * kFracUnit,                // height
-        100,                           // mass
-        0,                             // damage
-        ksfx_None,                     // activesound
-        kMF_NOBLOCKMAP | kMF_NOSECTOR, // flags
-        0,                             // MBF21 flags
-        -2,                            // Infighting group
-        -2,                            // Projectile group
-        -2,                            // Splash group
-        ksfx_None,                     // Rip sound
-        0,                             // Fast speed
-        0,                             // Melee range
-        0,                             // Gib health
-        -1,                            // Dropped item
-        0,                             // Pickup width
-        0,                             // Projectile pass height
-        0,                             // Fullbright
-        0,                             // Blood color
-        kS_NULL                        // raisestate
+        .name                   = "BRAIN_SHOOTER",
+        .doomednum              = 89,
+        .spawnstate             = kS_BRAINEYE,
+        .spawnhealth            = 1000,
+        .seestate               = kS_BRAINEYESEE,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 32 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOSECTOR,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BOSSTARGET
     {
-        "BRAIN_SPAWNSPOT",             // name
-        87,                            // doomednum
-        kS_NULL,                       // spawnstate
-        1000,                          // spawnhealth
-        kS_NULL,                       // seestate
-        ksfx_None,                     // seesound
-        8,                             // reactiontime
-        ksfx_None,                     // attacksound
-        kS_NULL,                       // painstate
-        0,                             // painchance
-        ksfx_None,                     // painsound
-        kS_NULL,                       // meleestate
-        kS_NULL,                       // missilestate
-        kS_NULL,                       // deathstate
-        kS_NULL,                       // xdeathstate
-        ksfx_None,                     // deathsound
-        0,                             // speed
-        20 * kFracUnit,                // radius
-        32 * kFracUnit,                // height
-        100,                           // mass
-        0,                             // damage
-        ksfx_None,                     // activesound
-        kMF_NOBLOCKMAP | kMF_NOSECTOR, // flags
-        0,                             // MBF21 flags
-        -2,                            // Infighting group
-        -2,                            // Projectile group
-        -2,                            // Splash group
-        ksfx_None,                     // Rip sound
-        0,                             // Fast speed
-        0,                             // Melee range
-        0,                             // Gib health
-        -1,                            // Dropped item
-        0,                             // Pickup width
-        0,                             // Projectile pass height
-        0,                             // Fullbright
-        0,                             // Blood color
-        kS_NULL                        // raisestate
+        .name                   = "BRAIN_SPAWNSPOT",
+        .doomednum              = 87,
+        .spawnstate             = kS_NULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 32 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOSECTOR,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SPAWNSHOT
     {
-        "*BRAIN_CUBE",                                                           // (attack) name
-        -1,                                                                      // doomednum
-        kS_SPAWN1,                                                               // spawnstate
-        1000,                                                                    // spawnhealth
-        kS_NULL,                                                                 // seestate
-        ksfx_bospit,                                                             // seesound
-        8,                                                                       // reactiontime
-        ksfx_None,                                                               // attacksound
-        kS_NULL,                                                                 // painstate
-        0,                                                                       // painchance
-        ksfx_None,                                                               // painsound
-        kS_NULL,                                                                 // meleestate
-        kS_NULL,                                                                 // missilestate
-        kS_NULL,                                                                 // deathstate
-        kS_NULL,                                                                 // xdeathstate
-        ksfx_firxpl,                                                             // deathsound
-        10 * kFracUnit,                                                          // speed
-        6 * kFracUnit,                                                           // radius
-        32 * kFracUnit,                                                          // height
-        100,                                                                     // mass
-        3,                                                                       // damage
-        ksfx_None,                                                               // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY | kMF_NOCLIP, // flags
-        0,                                                                       // MBF21 flags
-        -2,                                                                      // Infighting group
-        -2,                                                                      // Projectile group
-        -2,                                                                      // Splash group
-        ksfx_None,                                                               // Rip sound
-        0,                                                                       // Fast speed
-        0,                                                                       // Melee range
-        0,                                                                       // Gib health
-        -1,                                                                      // Dropped item
-        0,                                                                       // Pickup width
-        0,                                                                       // Projectile pass height
-        0,                                                                       // Fullbright
-        0,                                                                       // Blood color
-        kS_NULL                                                                  // raisestate
+        .name                   = "*BRAIN_CUBE", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_SPAWN1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_bospit,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 10 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 32 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 3,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY | kMF_NOCLIP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SPAWNFIRE
     {
-        "*SPAWNFIRE",                   // name
-        -1,                             // doomednum
-        kS_SPAWNFIRE1,                  // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "*SPAWNFIRE",
+        .doomednum              = -1,
+        .spawnstate             = kS_SPAWNFIRE1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BARREL
     {
-        "BARREL",                                // name
-        2035,                                    // doomednum
-        kS_BAR1,                                 // spawnstate
-        20,                                      // spawnhealth
-        kS_NULL,                                 // seestate
-        ksfx_None,                               // seesound
-        8,                                       // reactiontime
-        ksfx_None,                               // attacksound
-        kS_NULL,                                 // painstate
-        0,                                       // painchance
-        ksfx_None,                               // painsound
-        kS_NULL,                                 // meleestate
-        kS_NULL,                                 // missilestate
-        kS_BEXP,                                 // deathstate
-        kS_NULL,                                 // xdeathstate
-        ksfx_barexp,                             // deathsound
-        0,                                       // speed
-        10 * kFracUnit,                          // radius
-        42 * kFracUnit,                          // height
-        100,                                     // mass
-        0,                                       // damage
-        ksfx_None,                               // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_NOBLOOD, // flags
-        0,                                       // MBF21 flags
-        -2,                                      // Infighting group
-        -2,                                      // Projectile group
-        -2,                                      // Splash group
-        ksfx_None,                               // Rip sound
-        0,                                       // Fast speed
-        0,                                       // Melee range
-        0,                                       // Gib health
-        -1,                                      // Dropped item
-        0,                                       // Pickup width
-        0,                                       // Projectile pass height
-        0,                                       // Fullbright
-        0,                                       // Blood color
-        kS_NULL                                  // raisestate
+        .name                   = "BARREL",
+        .doomednum              = 2035,
+        .spawnstate             = kS_BAR1,
+        .spawnhealth            = 20,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_BEXP,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_barexp,
+        .speed                  = 0,
+        .radius                 = 10 * kFracUnit,
+        .height                 = 42 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_NOBLOOD,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_TROOPSHOT
     {
-        "*IMP_FIREBALL",                                            // (attack) name
-        -1,                                                         // doomednum
-        kS_TBALL1,                                                  // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_firsht,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_TBALLX1,                                                 // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        10 * kFracUnit,                                             // speed
-        6 * kFracUnit,                                              // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        3,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*IMP_FIREBALL", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_TBALL1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_firsht,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_TBALLX1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 10 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 3,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_HEADSHOT
     {
-        "*CACO_FIREBALL",                                           // (attack) name
-        -1,                                                         // doomednum
-        kS_RBALL1,                                                  // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_firsht,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_RBALLX1,                                                 // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        10 * kFracUnit,                                             // speed
-        6 * kFracUnit,                                              // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        5,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*CACO_FIREBALL", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_RBALL1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_firsht,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_RBALLX1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 10 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 5,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_ROCKET
     {
-        "*CYBERDEMON_MISSILE",                                      // (attack) name
-        -1,                                                         // doomednum
-        kS_ROCKET,                                                  // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_rlaunc,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_EXPLODE1,                                                // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_barexp,                                                // deathsound
-        20 * kFracUnit,                                             // speed
-        11 * kFracUnit,                                             // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        20,                                                         // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*CYBERDEMON_MISSILE", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_ROCKET,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_rlaunc,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_EXPLODE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_barexp,
+        .speed                  = 20 * kFracUnit,
+        .radius                 = 11 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 20,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_PLASMA
     {
-        "*PLAYER_PLASMA",                                           // (attack) name
-        -1,                                                         // doomednum
-        kS_PLASBALL,                                                // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_plasma,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_PLASEXP,                                                 // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        25 * kFracUnit,                                             // speed
-        13 * kFracUnit,                                             // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        5,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*PLAYER_PLASMA", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_PLASBALL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_plasma,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_PLASEXP,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 25 * kFracUnit,
+        .radius                 = 13 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 5,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BFG
     {
-        "*PLAYER_BFG9000",                                          // (attack) name
-        -1,                                                         // doomednum
-        kS_BFGSHOT,                                                 // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        0,                                                          // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_BFGLAND,                                                 // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_rxplod,                                                // deathsound
-        25 * kFracUnit,                                             // speed
-        13 * kFracUnit,                                             // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        100,                                                        // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*PLAYER_BFG9000", // (attack) name
+        .doomednum              = -1,
+        .spawnstate             = kS_BFGSHOT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = 0,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_BFGLAND,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_rxplod,
+        .speed                  = 25 * kFracUnit,
+        .radius                 = 13 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 100,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_ARACHPLAZ
     {
-        "*ARACHNOTRON_PLASMA",                                      // name
-        -1,                                                         // doomednum
-        kS_ARACH_PLAZ,                                              // spawnstate
-        1000,                                                       // spawnhealth
-        kS_NULL,                                                    // seestate
-        ksfx_plasma,                                                // seesound
-        8,                                                          // reactiontime
-        ksfx_None,                                                  // attacksound
-        kS_NULL,                                                    // painstate
-        0,                                                          // painchance
-        ksfx_None,                                                  // painsound
-        kS_NULL,                                                    // meleestate
-        kS_NULL,                                                    // missilestate
-        kS_ARACH_PLEX,                                              // deathstate
-        kS_NULL,                                                    // xdeathstate
-        ksfx_firxpl,                                                // deathsound
-        25 * kFracUnit,                                             // speed
-        13 * kFracUnit,                                             // radius
-        8 * kFracUnit,                                              // height
-        100,                                                        // mass
-        5,                                                          // damage
-        ksfx_None,                                                  // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-        0,                                                          // MBF21 flags
-        -2,                                                         // Infighting group
-        -2,                                                         // Projectile group
-        -2,                                                         // Splash group
-        ksfx_None,                                                  // Rip sound
-        0,                                                          // Fast speed
-        0,                                                          // Melee range
-        0,                                                          // Gib health
-        -1,                                                         // Dropped item
-        0,                                                          // Pickup width
-        0,                                                          // Projectile pass height
-        0,                                                          // Fullbright
-        0,                                                          // Blood color
-        kS_NULL                                                     // raisestate
+        .name                   = "*ARACHNOTRON_PLASMA",
+        .doomednum              = -1,
+        .spawnstate             = kS_ARACH_PLAZ,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_plasma,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_ARACH_PLEX,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 25 * kFracUnit,
+        .radius                 = 13 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 5,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_PUFF
     {
-        "PUFF",                         // name
-        -1,                             // doomednum
-        kS_PUFF1,                       // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "PUFF",
+        .doomednum              = -1,
+        .spawnstate             = kS_PUFF1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BLOOD
     {
-        "BLOOD",        // name
-        -1,             // doomednum
-        kS_BLOOD1,      // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_NOBLOCKMAP, // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BLOOD",
+        .doomednum              = -1,
+        .spawnstate             = kS_BLOOD1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_TFOG
     {
-        "TELEPORT_FOG",                 // name
-        -1,                             // doomednum
-        kS_TFOG,                        // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "TELEPORT_FOG",
+        .doomednum              = -1,
+        .spawnstate             = kS_TFOG,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_IFOG
     {
-        "RESPAWN_FOG",                  // name
-        -1,                             // doomednum
-        kS_IFOG,                        // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "RESPAWN_FOG",
+        .doomednum              = -1,
+        .spawnstate             = kS_IFOG,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_TELEPORTMAN
     {
-        "TELEPORT_FLASH",              // name
-        14,                            // doomednum
-        kS_NULL,                       // spawnstate
-        1000,                          // spawnhealth
-        kS_NULL,                       // seestate
-        ksfx_None,                     // seesound
-        8,                             // reactiontime
-        ksfx_None,                     // attacksound
-        kS_NULL,                       // painstate
-        0,                             // painchance
-        ksfx_None,                     // painsound
-        kS_NULL,                       // meleestate
-        kS_NULL,                       // missilestate
-        kS_NULL,                       // deathstate
-        kS_NULL,                       // xdeathstate
-        ksfx_None,                     // deathsound
-        0,                             // speed
-        20 * kFracUnit,                // radius
-        16 * kFracUnit,                // height
-        100,                           // mass
-        0,                             // damage
-        ksfx_None,                     // activesound
-        kMF_NOBLOCKMAP | kMF_NOSECTOR, // flags
-        0,                             // MBF21 flags
-        -2,                            // Infighting group
-        -2,                            // Projectile group
-        -2,                            // Splash group
-        ksfx_None,                     // Rip sound
-        0,                             // Fast speed
-        0,                             // Melee range
-        0,                             // Gib health
-        -1,                            // Dropped item
-        0,                             // Pickup width
-        0,                             // Projectile pass height
-        0,                             // Fullbright
-        0,                             // Blood color
-        kS_NULL                        // raisestate
+        .name                   = "TELEPORT_FLASH",
+        .doomednum              = 14,
+        .spawnstate             = kS_NULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOSECTOR,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_EXTRABFG
     {
-        "*BFG9000_SPRAY",               // name
-        -1,                             // doomednum
-        kS_BFGEXP,                      // spawnstate
-        1000,                           // spawnhealth
-        kS_NULL,                        // seestate
-        ksfx_None,                      // seesound
-        8,                              // reactiontime
-        ksfx_None,                      // attacksound
-        kS_NULL,                        // painstate
-        0,                              // painchance
-        ksfx_None,                      // painsound
-        kS_NULL,                        // meleestate
-        kS_NULL,                        // missilestate
-        kS_NULL,                        // deathstate
-        kS_NULL,                        // xdeathstate
-        ksfx_None,                      // deathsound
-        0,                              // speed
-        20 * kFracUnit,                 // radius
-        16 * kFracUnit,                 // height
-        100,                            // mass
-        0,                              // damage
-        ksfx_None,                      // activesound
-        kMF_NOBLOCKMAP | kMF_NOGRAVITY, // flags
-        0,                              // MBF21 flags
-        -2,                             // Infighting group
-        -2,                             // Projectile group
-        -2,                             // Splash group
-        ksfx_None,                      // Rip sound
-        0,                              // Fast speed
-        0,                              // Melee range
-        0,                              // Gib health
-        -1,                             // Dropped item
-        0,                              // Pickup width
-        0,                              // Projectile pass height
-        0,                              // Fullbright
-        0,                              // Blood color
-        kS_NULL                         // raisestate
+        .name                   = "*BFG9000_SPRAY",
+        .doomednum              = -1,
+        .spawnstate             = kS_BFGEXP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC0
     {
-        "GREEN_ARMOUR", // name
-        2018,           // doomednum
-        kS_ARM1,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "GREEN_ARMOUR",
+        .doomednum              = 2018,
+        .spawnstate             = kS_ARM1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC1
     {
-        "BLUE_ARMOUR",  // name
-        2019,           // doomednum
-        kS_ARM2,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BLUE_ARMOUR",
+        .doomednum              = 2019,
+        .spawnstate             = kS_ARM2,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC2
     {
-        "HEALTH_POTION",             // name
-        2014,                        // doomednum
-        kS_BON1,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "HEALTH_POTION",
+        .doomednum              = 2014,
+        .spawnstate             = kS_BON1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC3
     {
-        "ARMOUR_HELMET",             // name
-        2015,                        // doomednum
-        kS_BON2,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "ARMOUR_HELMET",
+        .doomednum              = 2015,
+        .spawnstate             = kS_BON2,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC4
     {
-        "BLUE_KEY",                  // name
-        5,                           // doomednum
-        kS_BKEY,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BLUE_KEY",
+        .doomednum              = 5,
+        .spawnstate             = kS_BKEY,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC5
     {
-        "RED_KEY",                   // name
-        13,                          // doomednum
-        kS_RKEY,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "RED_KEY",
+        .doomednum              = 13,
+        .spawnstate             = kS_RKEY,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC6
     {
-        "YELLOW_KEY",                // name
-        6,                           // doomednum
-        kS_YKEY,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "YELLOW_KEY",
+        .doomednum              = 6,
+        .spawnstate             = kS_YKEY,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC7
     {
-        "YELLOW_SKULLKEY",           // name
-        39,                          // doomednum
-        kS_YSKULL,                   // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "YELLOW_SKULLKEY",
+        .doomednum              = 39,
+        .spawnstate             = kS_YSKULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC8
     {
-        "RED_SKULLKEY",              // name
-        38,                          // doomednum
-        kS_RSKULL,                   // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "RED_SKULLKEY",
+        .doomednum              = 38,
+        .spawnstate             = kS_RSKULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC9
     {
-        "BLUE_SKULLKEY",             // name
-        40,                          // doomednum
-        kS_BSKULL,                   // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_NOTDMATCH, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BLUE_SKULLKEY",
+        .doomednum              = 40,
+        .spawnstate             = kS_BSKULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_NOTDMATCH,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC10
     {
-        "STIMPACK",     // name
-        2011,           // doomednum
-        kS_STIM,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "STIMPACK",
+        .doomednum              = 2011,
+        .spawnstate             = kS_STIM,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC11
     {
-        "MEDIKIT",      // name
-        2012,           // doomednum
-        kS_MEDI,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "MEDIKIT",
+        .doomednum              = 2012,
+        .spawnstate             = kS_MEDI,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC12
     {
-        "SOULSPHERE",                // name
-        2013,                        // doomednum
-        kS_SOUL,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "SOULSPHERE",
+        .doomednum              = 2013,
+        .spawnstate             = kS_SOUL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_INV
     {
-        "INVULNERABILITY_SPHERE",    // name
-        2022,                        // doomednum
-        kS_PINV,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "INVULNERABILITY_SPHERE",
+        .doomednum              = 2022,
+        .spawnstate             = kS_PINV,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC13
     {
-        "BERSERKER",                 // name
-        2023,                        // doomednum
-        kS_PSTR,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BERSERKER",
+        .doomednum              = 2023,
+        .spawnstate             = kS_PSTR,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_INS
     {
-        "BLURSPHERE",                // name
-        2024,                        // doomednum
-        kS_PINS,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BLURSPHERE",
+        .doomednum              = 2024,
+        .spawnstate             = kS_PINS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC14
     {
-        "RADIATION_SUIT", // name
-        2025,             // doomednum
-        kS_SUIT,          // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        20 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SPECIAL,      // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "RADIATION_SUIT",
+        .doomednum              = 2025,
+        .spawnstate             = kS_SUIT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC15
     {
-        "AUTOMAP",                   // name
-        2026,                        // doomednum
-        kS_PMAP,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "AUTOMAP",
+        .doomednum              = 2026,
+        .spawnstate             = kS_PMAP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC16
     {
-        "LIGHT_SPECS",               // name
-        2045,                        // doomednum
-        kS_PVIS,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "LIGHT_SPECS",
+        .doomednum              = 2045,
+        .spawnstate             = kS_PVIS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MEGA
     {
-        "MEGASPHERE",                // name
-        83,                          // doomednum
-        kS_MEGA,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        kS_NULL,                     // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "MEGASPHERE",
+        .doomednum              = 83,
+        .spawnstate             = kS_MEGA,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_CLIP
     {
-        "CLIP",         // name
-        2007,           // doomednum
-        kS_CLIP,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CLIP",
+        .doomednum              = 2007,
+        .spawnstate             = kS_CLIP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC17
     {
-        "BOX_OF_BULLETS", // name
-        2048,             // doomednum
-        kS_AMMO,          // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        20 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SPECIAL,      // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "BOX_OF_BULLETS",
+        .doomednum              = 2048,
+        .spawnstate             = kS_AMMO,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC18
     {
-        "ROCKET",       // name
-        2010,           // doomednum
-        kS_ROCK,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "ROCKET",
+        .doomednum              = 2010,
+        .spawnstate             = kS_ROCK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC19
     {
-        "BOX_OF_ROCKETS", // name
-        2046,             // doomednum
-        kS_BROK,          // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        20 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SPECIAL,      // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "BOX_OF_ROCKETS",
+        .doomednum              = 2046,
+        .spawnstate             = kS_BROK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC20
     {
-        "CELLS",        // name
-        2047,           // doomednum
-        kS_CELL,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CELLS",
+        .doomednum              = 2047,
+        .spawnstate             = kS_CELL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC21
     {
-        "CELL_PACK",    // name
-        17,             // doomednum
-        kS_CELP,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CELL_PACK",
+        .doomednum              = 17,
+        .spawnstate             = kS_CELP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC22
     {
-        "SHELLS",       // name
-        2008,           // doomednum
-        kS_SHEL,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "SHELLS",
+        .doomednum              = 2008,
+        .spawnstate             = kS_SHEL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC23
     {
-        "BOX_OF_SHELLS", // name
-        2049,            // doomednum
-        kS_SBOX,         // spawnstate
-        1000,            // spawnhealth
-        kS_NULL,         // seestate
-        ksfx_None,       // seesound
-        8,               // reactiontime
-        ksfx_None,       // attacksound
-        kS_NULL,         // painstate
-        0,               // painchance
-        ksfx_None,       // painsound
-        kS_NULL,         // meleestate
-        kS_NULL,         // missilestate
-        kS_NULL,         // deathstate
-        kS_NULL,         // xdeathstate
-        ksfx_None,       // deathsound
-        0,               // speed
-        20 * kFracUnit,  // radius
-        16 * kFracUnit,  // height
-        100,             // mass
-        0,               // damage
-        ksfx_None,       // activesound
-        kMF_SPECIAL,     // flags
-        0,               // MBF21 flags
-        -2,              // Infighting group
-        -2,              // Projectile group
-        -2,              // Splash group
-        ksfx_None,       // Rip sound
-        0,               // Fast speed
-        0,               // Melee range
-        0,               // Gib health
-        -1,              // Dropped item
-        0,               // Pickup width
-        0,               // Projectile pass height
-        0,               // Fullbright
-        0,               // Blood color
-        kS_NULL          // raisestate
+        .name                   = "BOX_OF_SHELLS",
+        .doomednum              = 2049,
+        .spawnstate             = kS_SBOX,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC24
     {
-        "BACKPACK",     // name
-        8,              // doomednum
-        kS_BPAK,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BACKPACK",
+        .doomednum              = 8,
+        .spawnstate             = kS_BPAK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC25
     {
-        "BFG",          // name
-        2006,           // doomednum
-        kS_BFUG,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BFG",
+        .doomednum              = 2006,
+        .spawnstate             = kS_BFUG,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_CHAINGUN
     {
-        "CHAINGUN",     // name
-        2002,           // doomednum
-        kS_MGUN,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CHAINGUN",
+        .doomednum              = 2002,
+        .spawnstate             = kS_MGUN,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC26
     {
-        "CHAINSAW",     // name
-        2005,           // doomednum
-        kS_CSAW,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CHAINSAW",
+        .doomednum              = 2005,
+        .spawnstate             = kS_CSAW,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC27
     {
-        "MISSILE_LAUNCHER", // name
-        2003,               // doomednum
-        kS_LAUN,            // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        20 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SPECIAL,        // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "MISSILE_LAUNCHER",
+        .doomednum              = 2003,
+        .spawnstate             = kS_LAUN,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC28
     {
-        "PLASMA_RIFLE", // name
-        2004,           // doomednum
-        kS_PLAS,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "PLASMA_RIFLE",
+        .doomednum              = 2004,
+        .spawnstate             = kS_PLAS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SHOTGUN
     {
-        "SHOTGUN",      // name
-        2001,           // doomednum
-        kS_SHOT,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SPECIAL,    // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "SHOTGUN",
+        .doomednum              = 2001,
+        .spawnstate             = kS_SHOT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SUPERSHOTGUN
     {
-        "SUPER_SHOTGUN", // name
-        82,              // doomednum
-        kS_SHOT2,        // spawnstate
-        1000,            // spawnhealth
-        kS_NULL,         // seestate
-        ksfx_None,       // seesound
-        8,               // reactiontime
-        ksfx_None,       // attacksound
-        kS_NULL,         // painstate
-        0,               // painchance
-        ksfx_None,       // painsound
-        kS_NULL,         // meleestate
-        kS_NULL,         // missilestate
-        kS_NULL,         // deathstate
-        kS_NULL,         // xdeathstate
-        ksfx_None,       // deathsound
-        0,               // speed
-        20 * kFracUnit,  // radius
-        16 * kFracUnit,  // height
-        100,             // mass
-        0,               // damage
-        ksfx_None,       // activesound
-        kMF_SPECIAL,     // flags
-        0,               // MBF21 flags
-        -2,              // Infighting group
-        -2,              // Projectile group
-        -2,              // Splash group
-        ksfx_None,       // Rip sound
-        0,               // Fast speed
-        0,               // Melee range
-        0,               // Gib health
-        -1,              // Dropped item
-        0,               // Pickup width
-        0,               // Projectile pass height
-        0,               // Fullbright
-        0,               // Blood color
-        kS_NULL          // raisestate
+        .name                   = "SUPER_SHOTGUN",
+        .doomednum              = 82,
+        .spawnstate             = kS_SHOT2,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC29
     {
-        "TALL_TECH_LAMP", // name
-        85,               // doomednum
-        kS_TECHLAMP,      // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        16 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SOLID,        // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "TALL_TECH_LAMP",
+        .doomednum              = 85,
+        .spawnstate             = kS_TECHLAMP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC30
     {
-        "SMALL_TECH_LAMP", // name
-        86,                // doomednum
-        kS_TECH2LAMP,      // spawnstate
-        1000,              // spawnhealth
-        kS_NULL,           // seestate
-        ksfx_None,         // seesound
-        8,                 // reactiontime
-        ksfx_None,         // attacksound
-        kS_NULL,           // painstate
-        0,                 // painchance
-        ksfx_None,         // painsound
-        kS_NULL,           // meleestate
-        kS_NULL,           // missilestate
-        kS_NULL,           // deathstate
-        kS_NULL,           // xdeathstate
-        ksfx_None,         // deathsound
-        0,                 // speed
-        16 * kFracUnit,    // radius
-        16 * kFracUnit,    // height
-        100,               // mass
-        0,                 // damage
-        ksfx_None,         // activesound
-        kMF_SOLID,         // flags
-        0,                 // MBF21 flags
-        -2,                // Infighting group
-        -2,                // Projectile group
-        -2,                // Splash group
-        ksfx_None,         // Rip sound
-        0,                 // Fast speed
-        0,                 // Melee range
-        0,                 // Gib health
-        -1,                // Dropped item
-        0,                 // Pickup width
-        0,                 // Projectile pass height
-        0,                 // Fullbright
-        0,                 // Blood color
-        kS_NULL            // raisestate
+        .name                   = "SMALL_TECH_LAMP",
+        .doomednum              = 86,
+        .spawnstate             = kS_TECH2LAMP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC31
     {
-        "SMALL_BOLLARD_LAMP", // name
-        2028,                 // doomednum
-        kS_COLU,              // spawnstate
-        1000,                 // spawnhealth
-        kS_NULL,              // seestate
-        ksfx_None,            // seesound
-        8,                    // reactiontime
-        ksfx_None,            // attacksound
-        kS_NULL,              // painstate
-        0,                    // painchance
-        ksfx_None,            // painsound
-        kS_NULL,              // meleestate
-        kS_NULL,              // missilestate
-        kS_NULL,              // deathstate
-        kS_NULL,              // xdeathstate
-        ksfx_None,            // deathsound
-        0,                    // speed
-        16 * kFracUnit,       // radius
-        16 * kFracUnit,       // height
-        100,                  // mass
-        0,                    // damage
-        ksfx_None,            // activesound
-        kMF_SOLID,            // flags
-        0,                    // MBF21 flags
-        -2,                   // Infighting group
-        -2,                   // Projectile group
-        -2,                   // Splash group
-        ksfx_None,            // Rip sound
-        0,                    // Fast speed
-        0,                    // Melee range
-        0,                    // Gib health
-        -1,                   // Dropped item
-        0,                    // Pickup width
-        0,                    // Projectile pass height
-        0,                    // Fullbright
-        0,                    // Blood color
-        kS_NULL               // raisestate
+        .name                   = "SMALL_BOLLARD_LAMP",
+        .doomednum              = 2028,
+        .spawnstate             = kS_COLU,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC32
     {
-        "TALL_GREEN_COLUMN", // name
-        30,                  // doomednum
-        kS_TALLGRNCOL,       // spawnstate
-        1000,                // spawnhealth
-        kS_NULL,             // seestate
-        ksfx_None,           // seesound
-        8,                   // reactiontime
-        ksfx_None,           // attacksound
-        kS_NULL,             // painstate
-        0,                   // painchance
-        ksfx_None,           // painsound
-        kS_NULL,             // meleestate
-        kS_NULL,             // missilestate
-        kS_NULL,             // deathstate
-        kS_NULL,             // xdeathstate
-        ksfx_None,           // deathsound
-        0,                   // speed
-        16 * kFracUnit,      // radius
-        16 * kFracUnit,      // height
-        100,                 // mass
-        0,                   // damage
-        ksfx_None,           // activesound
-        kMF_SOLID,           // flags
-        0,                   // MBF21 flags
-        -2,                  // Infighting group
-        -2,                  // Projectile group
-        -2,                  // Splash group
-        ksfx_None,           // Rip sound
-        0,                   // Fast speed
-        0,                   // Melee range
-        0,                   // Gib health
-        -1,                  // Dropped item
-        0,                   // Pickup width
-        0,                   // Projectile pass height
-        0,                   // Fullbright
-        0,                   // Blood color
-        kS_NULL              // raisestate
+        .name                   = "TALL_GREEN_COLUMN",
+        .doomednum              = 30,
+        .spawnstate             = kS_TALLGRNCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC33
     {
-        "SHORT_GREEN_COLUMN", // name
-        31,                   // doomednum
-        kS_SHRTGRNCOL,        // spawnstate
-        1000,                 // spawnhealth
-        kS_NULL,              // seestate
-        ksfx_None,            // seesound
-        8,                    // reactiontime
-        ksfx_None,            // attacksound
-        kS_NULL,              // painstate
-        0,                    // painchance
-        ksfx_None,            // painsound
-        kS_NULL,              // meleestate
-        kS_NULL,              // missilestate
-        kS_NULL,              // deathstate
-        kS_NULL,              // xdeathstate
-        ksfx_None,            // deathsound
-        0,                    // speed
-        16 * kFracUnit,       // radius
-        16 * kFracUnit,       // height
-        100,                  // mass
-        0,                    // damage
-        ksfx_None,            // activesound
-        kMF_SOLID,            // flags
-        0,                    // MBF21 flags
-        -2,                   // Infighting group
-        -2,                   // Projectile group
-        -2,                   // Splash group
-        ksfx_None,            // Rip sound
-        0,                    // Fast speed
-        0,                    // Melee range
-        0,                    // Gib health
-        -1,                   // Dropped item
-        0,                    // Pickup width
-        0,                    // Projectile pass height
-        0,                    // Fullbright
-        0,                    // Blood color
-        kS_NULL               // raisestate
+        .name                   = "SHORT_GREEN_COLUMN",
+        .doomednum              = 31,
+        .spawnstate             = kS_SHRTGRNCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC34
     {
-        "TALL_RED_COLUMN", // name
-        32,                // doomednum
-        kS_TALLREDCOL,     // spawnstate
-        1000,              // spawnhealth
-        kS_NULL,           // seestate
-        ksfx_None,         // seesound
-        8,                 // reactiontime
-        ksfx_None,         // attacksound
-        kS_NULL,           // painstate
-        0,                 // painchance
-        ksfx_None,         // painsound
-        kS_NULL,           // meleestate
-        kS_NULL,           // missilestate
-        kS_NULL,           // deathstate
-        kS_NULL,           // xdeathstate
-        ksfx_None,         // deathsound
-        0,                 // speed
-        16 * kFracUnit,    // radius
-        16 * kFracUnit,    // height
-        100,               // mass
-        0,                 // damage
-        ksfx_None,         // activesound
-        kMF_SOLID,         // flags
-        0,                 // MBF21 flags
-        -2,                // Infighting group
-        -2,                // Projectile group
-        -2,                // Splash group
-        ksfx_None,         // Rip sound
-        0,                 // Fast speed
-        0,                 // Melee range
-        0,                 // Gib health
-        -1,                // Dropped item
-        0,                 // Pickup width
-        0,                 // Projectile pass height
-        0,                 // Fullbright
-        0,                 // Blood color
-        kS_NULL            // raisestate
+        .name                   = "TALL_RED_COLUMN",
+        .doomednum              = 32,
+        .spawnstate             = kS_TALLREDCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC35
     {
-        "SHORT_RED_COLUMN", // name
-        33,                 // doomednum
-        kS_SHRTREDCOL,      // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        16 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SOLID,          // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "SHORT_RED_COLUMN",
+        .doomednum              = 33,
+        .spawnstate             = kS_SHRTREDCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC36
     {
-        "SKULL_ON_COLUMN", // name
-        37,                // doomednum
-        kS_SKULLCOL,       // spawnstate
-        1000,              // spawnhealth
-        kS_NULL,           // seestate
-        ksfx_None,         // seesound
-        8,                 // reactiontime
-        ksfx_None,         // attacksound
-        kS_NULL,           // painstate
-        0,                 // painchance
-        ksfx_None,         // painsound
-        kS_NULL,           // meleestate
-        kS_NULL,           // missilestate
-        kS_NULL,           // deathstate
-        kS_NULL,           // xdeathstate
-        ksfx_None,         // deathsound
-        0,                 // speed
-        16 * kFracUnit,    // radius
-        16 * kFracUnit,    // height
-        100,               // mass
-        0,                 // damage
-        ksfx_None,         // activesound
-        kMF_SOLID,         // flags
-        0,                 // MBF21 flags
-        -2,                // Infighting group
-        -2,                // Projectile group
-        -2,                // Splash group
-        ksfx_None,         // Rip sound
-        0,                 // Fast speed
-        0,                 // Melee range
-        0,                 // Gib health
-        -1,                // Dropped item
-        0,                 // Pickup width
-        0,                 // Projectile pass height
-        0,                 // Fullbright
-        0,                 // Blood color
-        kS_NULL            // raisestate
+        .name                   = "SKULL_ON_COLUMN",
+        .doomednum              = 37,
+        .spawnstate             = kS_SKULLCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC37
     {
-        "BEATING_HEART_COLUMN", // name
-        36,                     // doomednum
-        kS_HEARTCOL,            // spawnstate
-        1000,                   // spawnhealth
-        kS_NULL,                // seestate
-        ksfx_None,              // seesound
-        8,                      // reactiontime
-        ksfx_None,              // attacksound
-        kS_NULL,                // painstate
-        0,                      // painchance
-        ksfx_None,              // painsound
-        kS_NULL,                // meleestate
-        kS_NULL,                // missilestate
-        kS_NULL,                // deathstate
-        kS_NULL,                // xdeathstate
-        ksfx_None,              // deathsound
-        0,                      // speed
-        16 * kFracUnit,         // radius
-        16 * kFracUnit,         // height
-        100,                    // mass
-        0,                      // damage
-        ksfx_None,              // activesound
-        kMF_SOLID,              // flags
-        0,                      // MBF21 flags
-        -2,                     // Infighting group
-        -2,                     // Projectile group
-        -2,                     // Splash group
-        ksfx_None,              // Rip sound
-        0,                      // Fast speed
-        0,                      // Melee range
-        0,                      // Gib health
-        -1,                     // Dropped item
-        0,                      // Pickup width
-        0,                      // Projectile pass height
-        0,                      // Fullbright
-        0,                      // Blood color
-        kS_NULL                 // raisestate
+        .name                   = "BEATING_HEART_COLUMN",
+        .doomednum              = 36,
+        .spawnstate             = kS_HEARTCOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC38
     {
-        "EYE_SYMBOL",   // name
-        41,             // doomednum
-        kS_EVILEYE,     // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "EYE_SYMBOL",
+        .doomednum              = 41,
+        .spawnstate             = kS_EVILEYE,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC39
     {
-        "FLOATING_SKULLROCK", // name
-        42,                   // doomednum
-        kS_FLOATSKULL,        // spawnstate
-        1000,                 // spawnhealth
-        kS_NULL,              // seestate
-        ksfx_None,            // seesound
-        8,                    // reactiontime
-        ksfx_None,            // attacksound
-        kS_NULL,              // painstate
-        0,                    // painchance
-        ksfx_None,            // painsound
-        kS_NULL,              // meleestate
-        kS_NULL,              // missilestate
-        kS_NULL,              // deathstate
-        kS_NULL,              // xdeathstate
-        ksfx_None,            // deathsound
-        0,                    // speed
-        16 * kFracUnit,       // radius
-        16 * kFracUnit,       // height
-        100,                  // mass
-        0,                    // damage
-        ksfx_None,            // activesound
-        kMF_SOLID,            // flags
-        0,                    // MBF21 flags
-        -2,                   // Infighting group
-        -2,                   // Projectile group
-        -2,                   // Splash group
-        ksfx_None,            // Rip sound
-        0,                    // Fast speed
-        0,                    // Melee range
-        0,                    // Gib health
-        -1,                   // Dropped item
-        0,                    // Pickup width
-        0,                    // Projectile pass height
-        0,                    // Fullbright
-        0,                    // Blood color
-        kS_NULL               // raisestate
+        .name                   = "FLOATING_SKULLROCK",
+        .doomednum              = 42,
+        .spawnstate             = kS_FLOATSKULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC40
     {
-        "TORCHED_TREE", // name
-        43,             // doomednum
-        kS_TORCHTREE,   // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "TORCHED_TREE",
+        .doomednum              = 43,
+        .spawnstate             = kS_TORCHTREE,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC41
     {
-        "BRONZE_BLUE_TORCH", // name
-        44,                  // doomednum
-        kS_BLUETORCH,        // spawnstate
-        1000,                // spawnhealth
-        kS_NULL,             // seestate
-        ksfx_None,           // seesound
-        8,                   // reactiontime
-        ksfx_None,           // attacksound
-        kS_NULL,             // painstate
-        0,                   // painchance
-        ksfx_None,           // painsound
-        kS_NULL,             // meleestate
-        kS_NULL,             // missilestate
-        kS_NULL,             // deathstate
-        kS_NULL,             // xdeathstate
-        ksfx_None,           // deathsound
-        0,                   // speed
-        16 * kFracUnit,      // radius
-        16 * kFracUnit,      // height
-        100,                 // mass
-        0,                   // damage
-        ksfx_None,           // activesound
-        kMF_SOLID,           // flags
-        0,                   // MBF21 flags
-        -2,                  // Infighting group
-        -2,                  // Projectile group
-        -2,                  // Splash group
-        ksfx_None,           // Rip sound
-        0,                   // Fast speed
-        0,                   // Melee range
-        0,                   // Gib health
-        -1,                  // Dropped item
-        0,                   // Pickup width
-        0,                   // Projectile pass height
-        0,                   // Fullbright
-        0,                   // Blood color
-        kS_NULL              // raisestate
+        .name                   = "BRONZE_BLUE_TORCH",
+        .doomednum              = 44,
+        .spawnstate             = kS_BLUETORCH,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC42
     {
-        "BRONZE_GREEN_TORCH", // name
-        45,                   // doomednum
-        kS_GREENTORCH,        // spawnstate
-        1000,                 // spawnhealth
-        kS_NULL,              // seestate
-        ksfx_None,            // seesound
-        8,                    // reactiontime
-        ksfx_None,            // attacksound
-        kS_NULL,              // painstate
-        0,                    // painchance
-        ksfx_None,            // painsound
-        kS_NULL,              // meleestate
-        kS_NULL,              // missilestate
-        kS_NULL,              // deathstate
-        kS_NULL,              // xdeathstate
-        ksfx_None,            // deathsound
-        0,                    // speed
-        16 * kFracUnit,       // radius
-        16 * kFracUnit,       // height
-        100,                  // mass
-        0,                    // damage
-        ksfx_None,            // activesound
-        kMF_SOLID,            // flags
-        0,                    // MBF21 flags
-        -2,                   // Infighting group
-        -2,                   // Projectile group
-        -2,                   // Splash group
-        ksfx_None,            // Rip sound
-        0,                    // Fast speed
-        0,                    // Melee range
-        0,                    // Gib health
-        -1,                   // Dropped item
-        0,                    // Pickup width
-        0,                    // Projectile pass height
-        0,                    // Fullbright
-        0,                    // Blood color
-        kS_NULL               // raisestate
+        .name                   = "BRONZE_GREEN_TORCH",
+        .doomednum              = 45,
+        .spawnstate             = kS_GREENTORCH,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC43
     {
-        "BRONZE_RED_TORCH", // name
-        46,                 // doomednum
-        kS_REDTORCH,        // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        16 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SOLID,          // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "BRONZE_RED_TORCH",
+        .doomednum              = 46,
+        .spawnstate             = kS_REDTORCH,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC44
     {
-        "WOODEN_BLUE_TORCH", // name
-        55,                  // doomednum
-        kS_BTORCHSHRT,       // spawnstate
-        1000,                // spawnhealth
-        kS_NULL,             // seestate
-        ksfx_None,           // seesound
-        8,                   // reactiontime
-        ksfx_None,           // attacksound
-        kS_NULL,             // painstate
-        0,                   // painchance
-        ksfx_None,           // painsound
-        kS_NULL,             // meleestate
-        kS_NULL,             // missilestate
-        kS_NULL,             // deathstate
-        kS_NULL,             // xdeathstate
-        ksfx_None,           // deathsound
-        0,                   // speed
-        16 * kFracUnit,      // radius
-        16 * kFracUnit,      // height
-        100,                 // mass
-        0,                   // damage
-        ksfx_None,           // activesound
-        kMF_SOLID,           // flags
-        0,                   // MBF21 flags
-        -2,                  // Infighting group
-        -2,                  // Projectile group
-        -2,                  // Splash group
-        ksfx_None,           // Rip sound
-        0,                   // Fast speed
-        0,                   // Melee range
-        0,                   // Gib health
-        -1,                  // Dropped item
-        0,                   // Pickup width
-        0,                   // Projectile pass height
-        0,                   // Fullbright
-        0,                   // Blood color
-        kS_NULL              // raisestate
+        .name                   = "WOODEN_BLUE_TORCH",
+        .doomednum              = 55,
+        .spawnstate             = kS_BTORCHSHRT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC45
     {
-        "WOODEN_GREEN_TORCH", // name
-        56,                   // doomednum
-        kS_GTORCHSHRT,        // spawnstate
-        1000,                 // spawnhealth
-        kS_NULL,              // seestate
-        ksfx_None,            // seesound
-        8,                    // reactiontime
-        ksfx_None,            // attacksound
-        kS_NULL,              // painstate
-        0,                    // painchance
-        ksfx_None,            // painsound
-        kS_NULL,              // meleestate
-        kS_NULL,              // missilestate
-        kS_NULL,              // deathstate
-        kS_NULL,              // xdeathstate
-        ksfx_None,            // deathsound
-        0,                    // speed
-        16 * kFracUnit,       // radius
-        16 * kFracUnit,       // height
-        100,                  // mass
-        0,                    // damage
-        ksfx_None,            // activesound
-        kMF_SOLID,            // flags
-        0,                    // MBF21 flags
-        -2,                   // Infighting group
-        -2,                   // Projectile group
-        -2,                   // Splash group
-        ksfx_None,            // Rip sound
-        0,                    // Fast speed
-        0,                    // Melee range
-        0,                    // Gib health
-        -1,                   // Dropped item
-        0,                    // Pickup width
-        0,                    // Projectile pass height
-        0,                    // Fullbright
-        0,                    // Blood color
-        kS_NULL               // raisestate
+        .name                   = "WOODEN_GREEN_TORCH",
+        .doomednum              = 56,
+        .spawnstate             = kS_GTORCHSHRT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC46
     {
-        "WOODEN_RED_TORCH", // name
-        57,                 // doomednum
-        kS_RTORCHSHRT,      // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        16 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SOLID,          // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "WOODEN_RED_TORCH",
+        .doomednum              = 57,
+        .spawnstate             = kS_RTORCHSHRT,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC47
     {
-        "SPIKY_STUMP",  // name
-        47,             // doomednum
-        kS_STALAGTITE,  // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "SPIKY_STUMP",
+        .doomednum              = 47,
+        .spawnstate             = kS_STALAGTITE,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC48
     {
-        "TECHNOCOLUMN", // name
-        48,             // doomednum
-        kS_TECHPILLAR,  // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "TECHNOCOLUMN",
+        .doomednum              = 48,
+        .spawnstate             = kS_TECHPILLAR,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC49
     {
-        "BLACK_CANDLE", // name
-        34,             // doomednum
-        kS_CANDLESTIK,  // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        0,              // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BLACK_CANDLE",
+        .doomednum              = 34,
+        .spawnstate             = kS_CANDLESTIK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC50
     {
-        "CANDELABRA",   // name
-        35,             // doomednum
-        kS_CANDELABRA,  // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "CANDELABRA",
+        .doomednum              = 35,
+        .spawnstate             = kS_CANDELABRA,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC51
     {
-        "TWITCHING_BLOKE_I",                          // name
-        49,                                           // doomednum
-        kS_BLOODYTWITCH,                              // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        68 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "TWITCHING_BLOKE_I",
+        .doomednum              = 49,
+        .spawnstate             = kS_BLOODYTWITCH,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 68 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC52
     {
-        "HANGING_DEAD_BLOKE_I",                       // name
-        50,                                           // doomednum
-        kS_MEAT2,                                     // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        84 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_I",
+        .doomednum              = 50,
+        .spawnstate             = kS_MEAT2,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 84 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC53
     {
-        "HANGING_DEAD_BLOKE_II",                      // name
-        51,                                           // doomednum
-        kS_MEAT3,                                     // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        84 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_II",
+        .doomednum              = 51,
+        .spawnstate             = kS_MEAT3,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 84 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC54
     {
-        "HANGING_DEAD_BLOKE_III",                     // name
-        52,                                           // doomednum
-        kS_MEAT4,                                     // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        68 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_III",
+        .doomednum              = 52,
+        .spawnstate             = kS_MEAT4,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 68 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC55
     {
-        "HANGING_DEAD_BLOKE_IV",                      // name
-        53,                                           // doomednum
-        kS_MEAT5,                                     // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        52 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_IV",
+        .doomednum              = 53,
+        .spawnstate             = kS_MEAT5,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 52 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC56
     {
-        "HANGING_DEAD_BLOKE_V",           // name
-        59,                               // doomednum
-        kS_MEAT2,                         // spawnstate
-        1000,                             // spawnhealth
-        kS_NULL,                          // seestate
-        ksfx_None,                        // seesound
-        8,                                // reactiontime
-        ksfx_None,                        // attacksound
-        kS_NULL,                          // painstate
-        0,                                // painchance
-        ksfx_None,                        // painsound
-        kS_NULL,                          // meleestate
-        kS_NULL,                          // missilestate
-        kS_NULL,                          // deathstate
-        kS_NULL,                          // xdeathstate
-        ksfx_None,                        // deathsound
-        0,                                // speed
-        20 * kFracUnit,                   // radius
-        84 * kFracUnit,                   // height
-        100,                              // mass
-        0,                                // damage
-        ksfx_None,                        // activesound
-        kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                // MBF21 flags
-        -2,                               // Infighting group
-        -2,                               // Projectile group
-        -2,                               // Splash group
-        ksfx_None,                        // Rip sound
-        0,                                // Fast speed
-        0,                                // Melee range
-        0,                                // Gib health
-        -1,                               // Dropped item
-        0,                                // Pickup width
-        0,                                // Projectile pass height
-        0,                                // Fullbright
-        0,                                // Blood color
-        kS_NULL                           // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_V",
+        .doomednum              = 59,
+        .spawnstate             = kS_MEAT2,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 84 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC57
     {
-        "HANGING_DEAD_BLOKE_VI",          // name
-        60,                               // doomednum
-        kS_MEAT4,                         // spawnstate
-        1000,                             // spawnhealth
-        kS_NULL,                          // seestate
-        ksfx_None,                        // seesound
-        8,                                // reactiontime
-        ksfx_None,                        // attacksound
-        kS_NULL,                          // painstate
-        0,                                // painchance
-        ksfx_None,                        // painsound
-        kS_NULL,                          // meleestate
-        kS_NULL,                          // missilestate
-        kS_NULL,                          // deathstate
-        kS_NULL,                          // xdeathstate
-        ksfx_None,                        // deathsound
-        0,                                // speed
-        20 * kFracUnit,                   // radius
-        68 * kFracUnit,                   // height
-        100,                              // mass
-        0,                                // damage
-        ksfx_None,                        // activesound
-        kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                // MBF21 flags
-        -2,                               // Infighting group
-        -2,                               // Projectile group
-        -2,                               // Splash group
-        ksfx_None,                        // Rip sound
-        0,                                // Fast speed
-        0,                                // Melee range
-        0,                                // Gib health
-        -1,                               // Dropped item
-        0,                                // Pickup width
-        0,                                // Projectile pass height
-        0,                                // Fullbright
-        0,                                // Blood color
-        kS_NULL                           // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_VI",
+        .doomednum              = 60,
+        .spawnstate             = kS_MEAT4,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 68 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC58
     {
-        "HANGING_DEAD_BLOKE_VII",         // name
-        61,                               // doomednum
-        kS_MEAT3,                         // spawnstate
-        1000,                             // spawnhealth
-        kS_NULL,                          // seestate
-        ksfx_None,                        // seesound
-        8,                                // reactiontime
-        ksfx_None,                        // attacksound
-        kS_NULL,                          // painstate
-        0,                                // painchance
-        ksfx_None,                        // painsound
-        kS_NULL,                          // meleestate
-        kS_NULL,                          // missilestate
-        kS_NULL,                          // deathstate
-        kS_NULL,                          // xdeathstate
-        ksfx_None,                        // deathsound
-        0,                                // speed
-        20 * kFracUnit,                   // radius
-        52 * kFracUnit,                   // height
-        100,                              // mass
-        0,                                // damage
-        ksfx_None,                        // activesound
-        kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                // MBF21 flags
-        -2,                               // Infighting group
-        -2,                               // Projectile group
-        -2,                               // Splash group
-        ksfx_None,                        // Rip sound
-        0,                                // Fast speed
-        0,                                // Melee range
-        0,                                // Gib health
-        -1,                               // Dropped item
-        0,                                // Pickup width
-        0,                                // Projectile pass height
-        0,                                // Fullbright
-        0,                                // Blood color
-        kS_NULL                           // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_VII",
+        .doomednum              = 61,
+        .spawnstate             = kS_MEAT3,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 52 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC59
     {
-        "HANGING_DEAD_BLOKE_VIII",        // name
-        62,                               // doomednum
-        kS_MEAT5,                         // spawnstate
-        1000,                             // spawnhealth
-        kS_NULL,                          // seestate
-        ksfx_None,                        // seesound
-        8,                                // reactiontime
-        ksfx_None,                        // attacksound
-        kS_NULL,                          // painstate
-        0,                                // painchance
-        ksfx_None,                        // painsound
-        kS_NULL,                          // meleestate
-        kS_NULL,                          // missilestate
-        kS_NULL,                          // deathstate
-        kS_NULL,                          // xdeathstate
-        ksfx_None,                        // deathsound
-        0,                                // speed
-        20 * kFracUnit,                   // radius
-        52 * kFracUnit,                   // height
-        100,                              // mass
-        0,                                // damage
-        ksfx_None,                        // activesound
-        kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                // MBF21 flags
-        -2,                               // Infighting group
-        -2,                               // Projectile group
-        -2,                               // Splash group
-        ksfx_None,                        // Rip sound
-        0,                                // Fast speed
-        0,                                // Melee range
-        0,                                // Gib health
-        -1,                               // Dropped item
-        0,                                // Pickup width
-        0,                                // Projectile pass height
-        0,                                // Fullbright
-        0,                                // Blood color
-        kS_NULL                           // raisestate
+        .name                   = "HANGING_DEAD_BLOKE_VIII",
+        .doomednum              = 62,
+        .spawnstate             = kS_MEAT5,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 52 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC60
     {
-        "TWITCHING_BLOKE_II",             // name
-        63,                               // doomednum
-        kS_BLOODYTWITCH,                  // spawnstate
-        1000,                             // spawnhealth
-        kS_NULL,                          // seestate
-        ksfx_None,                        // seesound
-        8,                                // reactiontime
-        ksfx_None,                        // attacksound
-        kS_NULL,                          // painstate
-        0,                                // painchance
-        ksfx_None,                        // painsound
-        kS_NULL,                          // meleestate
-        kS_NULL,                          // missilestate
-        kS_NULL,                          // deathstate
-        kS_NULL,                          // xdeathstate
-        ksfx_None,                        // deathsound
-        0,                                // speed
-        20 * kFracUnit,                   // radius
-        68 * kFracUnit,                   // height
-        100,                              // mass
-        0,                                // damage
-        ksfx_None,                        // activesound
-        kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                // MBF21 flags
-        -2,                               // Infighting group
-        -2,                               // Projectile group
-        -2,                               // Splash group
-        ksfx_None,                        // Rip sound
-        0,                                // Fast speed
-        0,                                // Melee range
-        0,                                // Gib health
-        -1,                               // Dropped item
-        0,                                // Pickup width
-        0,                                // Projectile pass height
-        0,                                // Fullbright
-        0,                                // Blood color
-        kS_NULL                           // raisestate
+        .name                   = "TWITCHING_BLOKE_II",
+        .doomednum              = 63,
+        .spawnstate             = kS_BLOODYTWITCH,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 68 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC61
     {
-        "DEAD_CACODEMON", // name
-        22,               // doomednum
-        kS_HEAD_DIE6,     // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        20 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        0,                // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "DEAD_CACODEMON",
+        .doomednum              = 22,
+        .spawnstate             = kS_HEAD_DIE6,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC62
     {
-        "DEAD_PLAYER",  // name
-        15,             // doomednum
-        kS_PLAY_DIE7,   // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        0,              // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "DEAD_PLAYER",
+        .doomednum              = 15,
+        .spawnstate             = kS_PLAY_DIE7,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC63
     {
-        "DEAD_FORMER_HUMAN", // name
-        18,                  // doomednum
-        kS_POSS_DIE5,        // spawnstate
-        1000,                // spawnhealth
-        kS_NULL,             // seestate
-        ksfx_None,           // seesound
-        8,                   // reactiontime
-        ksfx_None,           // attacksound
-        kS_NULL,             // painstate
-        0,                   // painchance
-        ksfx_None,           // painsound
-        kS_NULL,             // meleestate
-        kS_NULL,             // missilestate
-        kS_NULL,             // deathstate
-        kS_NULL,             // xdeathstate
-        ksfx_None,           // deathsound
-        0,                   // speed
-        20 * kFracUnit,      // radius
-        16 * kFracUnit,      // height
-        100,                 // mass
-        0,                   // damage
-        ksfx_None,           // activesound
-        0,                   // flags
-        0,                   // MBF21 flags
-        -2,                  // Infighting group
-        -2,                  // Projectile group
-        -2,                  // Splash group
-        ksfx_None,           // Rip sound
-        0,                   // Fast speed
-        0,                   // Melee range
-        0,                   // Gib health
-        -1,                  // Dropped item
-        0,                   // Pickup width
-        0,                   // Projectile pass height
-        0,                   // Fullbright
-        0,                   // Blood color
-        kS_NULL              // raisestate
+        .name                   = "DEAD_FORMER_HUMAN",
+        .doomednum              = 18,
+        .spawnstate             = kS_POSS_DIE5,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC64
     {
-        "DEAD_DEMON",   // name
-        21,             // doomednum
-        kS_SARG_DIE6,   // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        0,              // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "DEAD_DEMON",
+        .doomednum              = 21,
+        .spawnstate             = kS_SARG_DIE6,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC65
     {
-        "DEAD_LOSTSOUL", // name
-        23,              // doomednum
-        kS_SKULL_DIE6,   // spawnstate
-        1000,            // spawnhealth
-        kS_NULL,         // seestate
-        ksfx_None,       // seesound
-        8,               // reactiontime
-        ksfx_None,       // attacksound
-        kS_NULL,         // painstate
-        0,               // painchance
-        ksfx_None,       // painsound
-        kS_NULL,         // meleestate
-        kS_NULL,         // missilestate
-        kS_NULL,         // deathstate
-        kS_NULL,         // xdeathstate
-        ksfx_None,       // deathsound
-        0,               // speed
-        20 * kFracUnit,  // radius
-        16 * kFracUnit,  // height
-        100,             // mass
-        0,               // damage
-        ksfx_None,       // activesound
-        0,               // flags
-        0,               // MBF21 flags
-        -2,              // Infighting group
-        -2,              // Projectile group
-        -2,              // Splash group
-        ksfx_None,       // Rip sound
-        0,               // Fast speed
-        0,               // Melee range
-        0,               // Gib health
-        -1,              // Dropped item
-        0,               // Pickup width
-        0,               // Projectile pass height
-        0,               // Fullbright
-        0,               // Blood color
-        kS_NULL          // raisestate
+        .name                   = "DEAD_LOSTSOUL",
+        .doomednum              = 23,
+        .spawnstate             = kS_SKULL_DIE6,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC66
     {
-        "DEAD_IMP",     // name
-        20,             // doomednum
-        kS_TROO_DIE5,   // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        0,              // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "DEAD_IMP",
+        .doomednum              = 20,
+        .spawnstate             = kS_TROO_DIE5,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC67
     {
-        "DEAD_FORMER_SARG", // name
-        19,                 // doomednum
-        kS_SPOS_DIE5,       // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        20 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        0,                  // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "DEAD_FORMER_SARG",
+        .doomednum              = 19,
+        .spawnstate             = kS_SPOS_DIE5,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC68
     {
-        "DEAD_GIBBER_PLAYER1", // name
-        10,                    // doomednum
-        kS_PLAY_XDIE9,         // spawnstate
-        1000,                  // spawnhealth
-        kS_NULL,               // seestate
-        ksfx_None,             // seesound
-        8,                     // reactiontime
-        ksfx_None,             // attacksound
-        kS_NULL,               // painstate
-        0,                     // painchance
-        ksfx_None,             // painsound
-        kS_NULL,               // meleestate
-        kS_NULL,               // missilestate
-        kS_NULL,               // deathstate
-        kS_NULL,               // xdeathstate
-        ksfx_None,             // deathsound
-        0,                     // speed
-        20 * kFracUnit,        // radius
-        16 * kFracUnit,        // height
-        100,                   // mass
-        0,                     // damage
-        ksfx_None,             // activesound
-        0,                     // flags
-        0,                     // MBF21 flags
-        -2,                    // Infighting group
-        -2,                    // Projectile group
-        -2,                    // Splash group
-        ksfx_None,             // Rip sound
-        0,                     // Fast speed
-        0,                     // Melee range
-        0,                     // Gib health
-        -1,                    // Dropped item
-        0,                     // Pickup width
-        0,                     // Projectile pass height
-        0,                     // Fullbright
-        0,                     // Blood color
-        kS_NULL                // raisestate
+        .name                   = "DEAD_GIBBER_PLAYER1",
+        .doomednum              = 10,
+        .spawnstate             = kS_PLAY_XDIE9,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC69
     {
-        "DEAD_GIBBED_PLAYER2", // name
-        12,                    // doomednum
-        kS_PLAY_XDIE9,         // spawnstate
-        1000,                  // spawnhealth
-        kS_NULL,               // seestate
-        ksfx_None,             // seesound
-        8,                     // reactiontime
-        ksfx_None,             // attacksound
-        kS_NULL,               // painstate
-        0,                     // painchance
-        ksfx_None,             // painsound
-        kS_NULL,               // meleestate
-        kS_NULL,               // missilestate
-        kS_NULL,               // deathstate
-        kS_NULL,               // xdeathstate
-        ksfx_None,             // deathsound
-        0,                     // speed
-        20 * kFracUnit,        // radius
-        16 * kFracUnit,        // height
-        100,                   // mass
-        0,                     // damage
-        ksfx_None,             // activesound
-        0,                     // flags
-        0,                     // MBF21 flags
-        -2,                    // Infighting group
-        -2,                    // Projectile group
-        -2,                    // Splash group
-        ksfx_None,             // Rip sound
-        0,                     // Fast speed
-        0,                     // Melee range
-        0,                     // Gib health
-        -1,                    // Dropped item
-        0,                     // Pickup width
-        0,                     // Projectile pass height
-        0,                     // Fullbright
-        0,                     // Blood color
-        kS_NULL                // raisestate
+        .name                   = "DEAD_GIBBED_PLAYER2",
+        .doomednum              = 12,
+        .spawnstate             = kS_PLAY_XDIE9,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC70
     {
-        "HEADS_ON_A_STICK", // name
-        28,                 // doomednum
-        kS_HEADSONSTICK,    // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        16 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SOLID,          // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "HEADS_ON_A_STICK",
+        .doomednum              = 28,
+        .spawnstate             = kS_HEADSONSTICK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC71
     {
-        "POOL_OF_BLOOD", // name
-        24,              // doomednum
-        kS_GIBS,         // spawnstate
-        1000,            // spawnhealth
-        kS_NULL,         // seestate
-        ksfx_None,       // seesound
-        8,               // reactiontime
-        ksfx_None,       // attacksound
-        kS_NULL,         // painstate
-        0,               // painchance
-        ksfx_None,       // painsound
-        kS_NULL,         // meleestate
-        kS_NULL,         // missilestate
-        kS_NULL,         // deathstate
-        kS_NULL,         // xdeathstate
-        ksfx_None,       // deathsound
-        0,               // speed
-        20 * kFracUnit,  // radius
-        16 * kFracUnit,  // height
-        100,             // mass
-        0,               // damage
-        ksfx_None,       // activesound
-        0,               // flags
-        0,               // MBF21 flags
-        -2,              // Infighting group
-        -2,              // Projectile group
-        -2,              // Splash group
-        ksfx_None,       // Rip sound
-        0,               // Fast speed
-        0,               // Melee range
-        0,               // Gib health
-        -1,              // Dropped item
-        0,               // Pickup width
-        0,               // Projectile pass height
-        0,               // Fullbright
-        0,               // Blood color
-        kS_NULL          // raisestate
+        .name                   = "POOL_OF_BLOOD",
+        .doomednum              = 24,
+        .spawnstate             = kS_GIBS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = 0,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC72
     {
-        "SKULL_ON_A_STICK", // name
-        27,                 // doomednum
-        kS_HEADONASTICK,    // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        16 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_SOLID,          // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "SKULL_ON_A_STICK",
+        .doomednum              = 27,
+        .spawnstate             = kS_HEADONASTICK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC73
     {
-        "SKULL_CENTREPIECE", // name
-        29,                  // doomednum
-        kS_HEADCANDLES,      // spawnstate
-        1000,                // spawnhealth
-        kS_NULL,             // seestate
-        ksfx_None,           // seesound
-        8,                   // reactiontime
-        ksfx_None,           // attacksound
-        kS_NULL,             // painstate
-        0,                   // painchance
-        ksfx_None,           // painsound
-        kS_NULL,             // meleestate
-        kS_NULL,             // missilestate
-        kS_NULL,             // deathstate
-        kS_NULL,             // xdeathstate
-        ksfx_None,           // deathsound
-        0,                   // speed
-        16 * kFracUnit,      // radius
-        16 * kFracUnit,      // height
-        100,                 // mass
-        0,                   // damage
-        ksfx_None,           // activesound
-        kMF_SOLID,           // flags
-        0,                   // MBF21 flags
-        -2,                  // Infighting group
-        -2,                  // Projectile group
-        -2,                  // Splash group
-        ksfx_None,           // Rip sound
-        0,                   // Fast speed
-        0,                   // Melee range
-        0,                   // Gib health
-        -1,                  // Dropped item
-        0,                   // Pickup width
-        0,                   // Projectile pass height
-        0,                   // Fullbright
-        0,                   // Blood color
-        kS_NULL              // raisestate
+        .name                   = "SKULL_CENTREPIECE",
+        .doomednum              = 29,
+        .spawnstate             = kS_HEADCANDLES,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC74
     {
-        "SKEWERED_BLOKE", // name
-        25,               // doomednum
-        kS_DEADSTICK,     // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        16 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SOLID,        // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "SKEWERED_BLOKE",
+        .doomednum              = 25,
+        .spawnstate             = kS_DEADSTICK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC75
     {
-        "DYING_SKEWERED_BLOKE", // name
-        26,                     // doomednum
-        kS_LIVESTICK,           // spawnstate
-        1000,                   // spawnhealth
-        kS_NULL,                // seestate
-        ksfx_None,              // seesound
-        8,                      // reactiontime
-        ksfx_None,              // attacksound
-        kS_NULL,                // painstate
-        0,                      // painchance
-        ksfx_None,              // painsound
-        kS_NULL,                // meleestate
-        kS_NULL,                // missilestate
-        kS_NULL,                // deathstate
-        kS_NULL,                // xdeathstate
-        ksfx_None,              // deathsound
-        0,                      // speed
-        16 * kFracUnit,         // radius
-        16 * kFracUnit,         // height
-        100,                    // mass
-        0,                      // damage
-        ksfx_None,              // activesound
-        kMF_SOLID,              // flags
-        0,                      // MBF21 flags
-        -2,                     // Infighting group
-        -2,                     // Projectile group
-        -2,                     // Splash group
-        ksfx_None,              // Rip sound
-        0,                      // Fast speed
-        0,                      // Melee range
-        0,                      // Gib health
-        -1,                     // Dropped item
-        0,                      // Pickup width
-        0,                      // Projectile pass height
-        0,                      // Fullbright
-        0,                      // Blood color
-        kS_NULL                 // raisestate
+        .name                   = "DYING_SKEWERED_BLOKE",
+        .doomednum              = 26,
+        .spawnstate             = kS_LIVESTICK,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC76
     {
-        "BIG_TREE",     // name
-        54,             // doomednum
-        kS_BIGTREE,     // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        32 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_SOLID,      // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BIG_TREE",
+        .doomednum              = 54,
+        .spawnstate             = kS_BIGTREE,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 32 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC77
     {
-        "BURNING_BARREL", // name
-        70,               // doomednum
-        kS_BBAR1,         // spawnstate
-        1000,             // spawnhealth
-        kS_NULL,          // seestate
-        ksfx_None,        // seesound
-        8,                // reactiontime
-        ksfx_None,        // attacksound
-        kS_NULL,          // painstate
-        0,                // painchance
-        ksfx_None,        // painsound
-        kS_NULL,          // meleestate
-        kS_NULL,          // missilestate
-        kS_NULL,          // deathstate
-        kS_NULL,          // xdeathstate
-        ksfx_None,        // deathsound
-        0,                // speed
-        16 * kFracUnit,   // radius
-        16 * kFracUnit,   // height
-        100,              // mass
-        0,                // damage
-        ksfx_None,        // activesound
-        kMF_SOLID,        // flags
-        0,                // MBF21 flags
-        -2,               // Infighting group
-        -2,               // Projectile group
-        -2,               // Splash group
-        ksfx_None,        // Rip sound
-        0,                // Fast speed
-        0,                // Melee range
-        0,                // Gib health
-        -1,               // Dropped item
-        0,                // Pickup width
-        0,                // Projectile pass height
-        0,                // Fullbright
-        0,                // Blood color
-        kS_NULL           // raisestate
+        .name                   = "BURNING_BARREL",
+        .doomednum              = 70,
+        .spawnstate             = kS_BBAR1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC78
     {
-        "GUTTED_HUNG_BLOKE_I",                        // name
-        73,                                           // doomednum
-        kS_HANGNOGUTS,                                // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        88 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_HUNG_BLOKE_I",
+        .doomednum              = 73,
+        .spawnstate             = kS_HANGNOGUTS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 88 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC79
     {
-        "GUTTED_HUNG_BLOKE_II",                       // name
-        74,                                           // doomednum
-        kS_HANGBNOBRAIN,                              // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        88 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_HUNG_BLOKE_II",
+        .doomednum              = 74,
+        .spawnstate             = kS_HANGBNOBRAIN,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 88 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC80
     {
-        "GUTTED_TORSO_I",                             // name
-        75,                                           // doomednum
-        kS_HANGTLOOKDN,                               // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        64 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_TORSO_I",
+        .doomednum              = 75,
+        .spawnstate             = kS_HANGTLOOKDN,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC81
     {
-        "GUTTED_TORSO_II",                            // name
-        76,                                           // doomednum
-        kS_HANGTSKULL,                                // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        64 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_TORSO_II",
+        .doomednum              = 76,
+        .spawnstate             = kS_HANGTSKULL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC82
     {
-        "GUTTED_TORSO_III",                           // name
-        77,                                           // doomednum
-        kS_HANGTLOOKUP,                               // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        64 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_TORSO_III",
+        .doomednum              = 77,
+        .spawnstate             = kS_HANGTLOOKUP,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC83
     {
-        "GUTTED_TORSO_IV",                            // name
-        78,                                           // doomednum
-        kS_HANGTNOBRAIN,                              // spawnstate
-        1000,                                         // spawnhealth
-        kS_NULL,                                      // seestate
-        ksfx_None,                                    // seesound
-        8,                                            // reactiontime
-        ksfx_None,                                    // attacksound
-        kS_NULL,                                      // painstate
-        0,                                            // painchance
-        ksfx_None,                                    // painsound
-        kS_NULL,                                      // meleestate
-        kS_NULL,                                      // missilestate
-        kS_NULL,                                      // deathstate
-        kS_NULL,                                      // xdeathstate
-        ksfx_None,                                    // deathsound
-        0,                                            // speed
-        16 * kFracUnit,                               // radius
-        64 * kFracUnit,                               // height
-        100,                                          // mass
-        0,                                            // damage
-        ksfx_None,                                    // activesound
-        kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY, // flags
-        0,                                            // MBF21 flags
-        -2,                                           // Infighting group
-        -2,                                           // Projectile group
-        -2,                                           // Splash group
-        ksfx_None,                                    // Rip sound
-        0,                                            // Fast speed
-        0,                                            // Melee range
-        0,                                            // Gib health
-        -1,                                           // Dropped item
-        0,                                            // Pickup width
-        0,                                            // Projectile pass height
-        0,                                            // Fullbright
-        0,                                            // Blood color
-        kS_NULL                                       // raisestate
+        .name                   = "GUTTED_TORSO_IV",
+        .doomednum              = 78,
+        .spawnstate             = kS_HANGTNOBRAIN,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16 * kFracUnit,
+        .height                 = 64 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SOLID | kMF_SPAWNCEILING | kMF_NOGRAVITY,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC84
     {
-        "POOL_OF_BLOOD_I", // name
-        79,                // doomednum
-        kS_COLONGIBS,      // spawnstate
-        1000,              // spawnhealth
-        kS_NULL,           // seestate
-        ksfx_None,         // seesound
-        8,                 // reactiontime
-        ksfx_None,         // attacksound
-        kS_NULL,           // painstate
-        0,                 // painchance
-        ksfx_None,         // painsound
-        kS_NULL,           // meleestate
-        kS_NULL,           // missilestate
-        kS_NULL,           // deathstate
-        kS_NULL,           // xdeathstate
-        ksfx_None,         // deathsound
-        0,                 // speed
-        20 * kFracUnit,    // radius
-        16 * kFracUnit,    // height
-        100,               // mass
-        0,                 // damage
-        ksfx_None,         // activesound
-        kMF_NOBLOCKMAP,    // flags
-        0,                 // MBF21 flags
-        -2,                // Infighting group
-        -2,                // Projectile group
-        -2,                // Splash group
-        ksfx_None,         // Rip sound
-        0,                 // Fast speed
-        0,                 // Melee range
-        0,                 // Gib health
-        -1,                // Dropped item
-        0,                 // Pickup width
-        0,                 // Projectile pass height
-        0,                 // Fullbright
-        0,                 // Blood color
-        kS_NULL            // raisestate
+        .name                   = "POOL_OF_BLOOD_I",
+        .doomednum              = 79,
+        .spawnstate             = kS_COLONGIBS,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC85
     {
-        "POOL_OF_BLOOD_II", // name
-        80,                 // doomednum
-        kS_SMALLPOOL,       // spawnstate
-        1000,               // spawnhealth
-        kS_NULL,            // seestate
-        ksfx_None,          // seesound
-        8,                  // reactiontime
-        ksfx_None,          // attacksound
-        kS_NULL,            // painstate
-        0,                  // painchance
-        ksfx_None,          // painsound
-        kS_NULL,            // meleestate
-        kS_NULL,            // missilestate
-        kS_NULL,            // deathstate
-        kS_NULL,            // xdeathstate
-        ksfx_None,          // deathsound
-        0,                  // speed
-        20 * kFracUnit,     // radius
-        16 * kFracUnit,     // height
-        100,                // mass
-        0,                  // damage
-        ksfx_None,          // activesound
-        kMF_NOBLOCKMAP,     // flags
-        0,                  // MBF21 flags
-        -2,                 // Infighting group
-        -2,                 // Projectile group
-        -2,                 // Splash group
-        ksfx_None,          // Rip sound
-        0,                  // Fast speed
-        0,                  // Melee range
-        0,                  // Gib health
-        -1,                 // Dropped item
-        0,                  // Pickup width
-        0,                  // Projectile pass height
-        0,                  // Fullbright
-        0,                  // Blood color
-        kS_NULL             // raisestate
+        .name                   = "POOL_OF_BLOOD_II",
+        .doomednum              = 80,
+        .spawnstate             = kS_SMALLPOOL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MISC86
     {
-        "BRAINSTEM",    // name
-        81,             // doomednum
-        kS_BRAINSTEM,   // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        20 * kFracUnit, // radius
-        16 * kFracUnit, // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_NOBLOCKMAP, // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "BRAINSTEM",
+        .doomednum              = 81,
+        .spawnstate             = kS_BRAINSTEM,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // ============= BOOM and MBF things =============
 
     // MT_PUSH
     {
-        "POINT_PUSHER", // name
-        5001,           // doomednum
-        kS_TNT1,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        kFracUnit / 8,  // radius   /* MOD */
-        kFracUnit / 8,  // height   /* MOD */
-        10,             // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_NOBLOCKMAP, // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "POINT_PUSHER",
+        .doomednum              = 5001,
+        .spawnstate             = kS_TNT1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = kFracUnit / 8, // radius   /* MOD */
+        .height                 = kFracUnit / 8, // height   /* MOD */
+        .mass                   = 10,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_PULL
     {
-        "POINT_PULLER", // name
-        5002,           // doomednum
-        kS_TNT1,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        kS_NULL,        // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        kFracUnit / 8,  // radius   /* MOD */
-        kFracUnit / 8,  // height   /* MOD */
-        10,             // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_NOBLOCKMAP, // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "POINT_PULLER",
+        .doomednum              = 5002,
+        .spawnstate             = kS_TNT1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = kS_NULL,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = kFracUnit / 8, // radius   /* MOD */
+        .height                 = kFracUnit / 8, // height   /* MOD */
+        .mass                   = 10,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // Marine's best friend :)      // killough 7/19/98
 
     // MT_DOGS
     {
-        "DOG",                                     // name
-        888,                                       // doomednum
-        kS_DOGS_STND,                              // spawnstate
-        500,                                       // spawnhealth
-        kS_DOGS_RUN1,                              // seestate
-        ksfx_dgsit,                                // seesound
-        8,                                         // reactiontime
-        ksfx_dgatk,                                // attacksound
-        kS_DOGS_PAIN,                              // painstate
-        180,                                       // painchance
-        ksfx_dgpain,                               // painsound
-        kS_DOGS_ATK1,                              // meleestate
-        0,                                         // missilestate
-        kS_DOGS_DIE1,                              // deathstate
-        kS_NULL,                                   // xdeathstate
-        ksfx_dgdth,                                // deathsound
-        10,                                        // speed
-        12 * kFracUnit,                            // radius
-        28 * kFracUnit,                            // height
-        100,                                       // mass
-        0,                                         // damage
-        ksfx_dgact,                                // activesound
-        kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL, // flags
-        0,                                         // MBF21 flags
-        -2,                                        // Infighting group
-        -2,                                        // Projectile group
-        -2,                                        // Splash group
-        ksfx_None,                                 // Rip sound
-        0,                                         // Fast speed
-        0,                                         // Melee range
-        0,                                         // Gib health
-        -1,                                        // Dropped item
-        0,                                         // Pickup width
-        0,                                         // Projectile pass height
-        0,                                         // Fullbright
-        0,                                         // Blood color
-        kS_DOGS_RAISE1                             // raisestate
+        .name                   = "DOG",
+        .doomednum              = 888,
+        .spawnstate             = kS_DOGS_STND,
+        .spawnhealth            = 500,
+        .seestate               = kS_DOGS_RUN1,
+        .seesound               = ksfx_dgsit,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_dgatk,
+        .painstate              = kS_DOGS_PAIN,
+        .painchance             = 180,
+        .painsound              = ksfx_dgpain,
+        .meleestate             = kS_DOGS_ATK1,
+        .missilestate           = 0,
+        .deathstate             = kS_DOGS_DIE1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_dgdth,
+        .speed                  = 10,
+        .radius                 = 12 * kFracUnit,
+        .height                 = 28 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_dgact,
+        .flags                  = kMF_SOLID | kMF_SHOOTABLE | kMF_COUNTKILL,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_DOGS_RAISE1,
     },
 
     // MT_PLASMA1
     {
-        "BETA_PLASMA_1",                                          // name
-        -1,                                                       // doomednum
-        kS_PLS1BALL,                                              // spawnstate
-        1000,                                                     // spawnhealth
-        kS_NULL,                                                  // seestate
-        ksfx_plasma,                                              // seesound
-        8,                                                        // reactiontime
-        ksfx_None,                                                // attacksound
-        kS_NULL,                                                  // painstate
-        0,                                                        // painchance
-        ksfx_None,                                                // painsound
-        kS_NULL,                                                  // meleestate
-        0,                                                        // missilestate
-        kS_PLS1EXP,                                               // deathstate
-        kS_NULL,                                                  // xdeathstate
-        ksfx_firxpl,                                              // deathsound
-        25 * kFracUnit,                                           // speed
-        13 * kFracUnit,                                           // radius
-        8 * kFracUnit,                                            // height
-        100,                                                      // mass
-        4,                                                        // damage
-        ksfx_None,                                                // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_BOUNCES, // flags
-        0,                                                        // MBF21 flags
-        -2,                                                       // Infighting group
-        -2,                                                       // Projectile group
-        -2,                                                       // Splash group
-        ksfx_None,                                                // Rip sound
-        0,                                                        // Fast speed
-        0,                                                        // Melee range
-        0,                                                        // Gib health
-        -1,                                                       // Dropped item
-        0,                                                        // Pickup width
-        0,                                                        // Projectile pass height
-        0,                                                        // Fullbright
-        0,                                                        // Blood color
-        kS_NULL                                                   // raisestate
+        .name                   = "BETA_PLASMA_1",
+        .doomednum              = -1,
+        .spawnstate             = kS_PLS1BALL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_plasma,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_PLS1EXP,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 25 * kFracUnit,
+        .radius                 = 13 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 4,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_BOUNCES,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_PLASMA2
     {
-        "BETA_PLASMA_2",                                          // name
-        -1,                                                       // doomednum
-        kS_PLS2BALL,                                              // spawnstate
-        1000,                                                     // spawnhealth
-        kS_NULL,                                                  // seestate
-        ksfx_plasma,                                              // seesound
-        8,                                                        // reactiontime
-        ksfx_None,                                                // attacksound
-        kS_NULL,                                                  // painstate
-        0,                                                        // painchance
-        ksfx_None,                                                // painsound
-        kS_NULL,                                                  // meleestate
-        0,                                                        // missilestate
-        kS_PLS2BALLX1,                                            // deathstate
-        kS_NULL,                                                  // xdeathstate
-        ksfx_firxpl,                                              // deathsound
-        25 * kFracUnit,                                           // speed
-        6 * kFracUnit,                                            // radius
-        8 * kFracUnit,                                            // height
-        100,                                                      // mass
-        4,                                                        // damage
-        ksfx_None,                                                // activesound
-        kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_BOUNCES, // flags
-        0,                                                        // MBF21 flags
-        -2,                                                       // Infighting group
-        -2,                                                       // Projectile group
-        -2,                                                       // Splash group
-        ksfx_None,                                                // Rip sound
-        0,                                                        // Fast speed
-        0,                                                        // Melee range
-        0,                                                        // Gib health
-        -1,                                                       // Dropped item
-        0,                                                        // Pickup width
-        0,                                                        // Projectile pass height
-        0,                                                        // Fullbright
-        0,                                                        // Blood color
-        kS_NULL                                                   // raisestate
+        .name                   = "BETA_PLASMA_2",
+        .doomednum              = -1,
+        .spawnstate             = kS_PLS2BALL,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_plasma,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_PLS2BALLX1,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_firxpl,
+        .speed                  = 25 * kFracUnit,
+        .radius                 = 6 * kFracUnit,
+        .height                 = 8 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 4,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_BOUNCES,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_SCEPTRE
     {
-        "BETA_SCEPTRE",              // name
-        2016,                        // doomednum
-        kS_BON3,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        0,                           // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        10 * kFracUnit,              // radius
-        16 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BETA_SCEPTRE",
+        .doomednum              = 2016,
+        .spawnstate             = kS_BON3,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 10 * kFracUnit,
+        .height                 = 16 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_BIBLE
     {
-        "BETA_BIBLE",                // name
-        2017,                        // doomednum
-        kS_BON4,                     // spawnstate
-        1000,                        // spawnhealth
-        kS_NULL,                     // seestate
-        ksfx_None,                   // seesound
-        8,                           // reactiontime
-        ksfx_None,                   // attacksound
-        kS_NULL,                     // painstate
-        0,                           // painchance
-        ksfx_None,                   // painsound
-        kS_NULL,                     // meleestate
-        0,                           // missilestate
-        kS_NULL,                     // deathstate
-        kS_NULL,                     // xdeathstate
-        ksfx_None,                   // deathsound
-        0,                           // speed
-        20 * kFracUnit,              // radius
-        10 * kFracUnit,              // height
-        100,                         // mass
-        0,                           // damage
-        ksfx_None,                   // activesound
-        kMF_SPECIAL | kMF_COUNTITEM, // flags
-        0,                           // MBF21 flags
-        -2,                          // Infighting group
-        -2,                          // Projectile group
-        -2,                          // Splash group
-        ksfx_None,                   // Rip sound
-        0,                           // Fast speed
-        0,                           // Melee range
-        0,                           // Gib health
-        -1,                          // Dropped item
-        0,                           // Pickup width
-        0,                           // Projectile pass height
-        0,                           // Fullbright
-        0,                           // Blood color
-        kS_NULL                      // raisestate
+        .name                   = "BETA_BIBLE",
+        .doomednum              = 2017,
+        .spawnstate             = kS_BON4,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 20 * kFracUnit,
+        .height                 = 10 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_SPECIAL | kMF_COUNTITEM,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_MUSICSOURCE
     {
-        "MUSIC_SOURCE", // name
-        14164,          // doomednum ....not sure what to put here yet - Dasho
-        kS_TNT1,        // spawnstate
-        1000,           // spawnhealth
-        kS_NULL,        // seestate
-        ksfx_None,      // seesound
-        8,              // reactiontime
-        ksfx_None,      // attacksound
-        kS_NULL,        // painstate
-        0,              // painchance
-        ksfx_None,      // painsound
-        kS_NULL,        // meleestate
-        0,              // missilestate
-        kS_NULL,        // deathstate
-        kS_NULL,        // xdeathstate
-        ksfx_None,      // deathsound
-        0,              // speed
-        16,             // radius
-        16,             // height
-        100,            // mass
-        0,              // damage
-        ksfx_None,      // activesound
-        kMF_NOBLOCKMAP, // flags
-        0,              // MBF21 flags
-        -2,             // Infighting group
-        -2,             // Projectile group
-        -2,             // Splash group
-        ksfx_None,      // Rip sound
-        0,              // Fast speed
-        0,              // Melee range
-        0,              // Gib health
-        -1,             // Dropped item
-        0,              // Pickup width
-        0,              // Projectile pass height
-        0,              // Fullbright
-        0,              // Blood color
-        kS_NULL         // raisestate
+        .name                   = "MUSIC_SOURCE",
+        .doomednum              = 14164, // doomednum ....not sure what to put here yet - Dasho
+        .spawnstate             = kS_TNT1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 16,
+        .height                 = 16,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 
     // MT_GIBDTH
     {
-        "GIB_DEATH",                  // name
-        -1,                           // doomednum
-        kS_TNT1,                      // spawnstate
-        1000,                         // spawnhealth
-        kS_NULL,                      // seestate
-        ksfx_None,                    // seesound
-        8,                            // reactiontime
-        ksfx_None,                    // attacksound
-        kS_NULL,                      // painstate
-        0,                            // painchance
-        ksfx_None,                    // painsound
-        kS_NULL,                      // meleestate
-        0,                            // missilestate
-        kS_NULL,                      // deathstate
-        kS_NULL,                      // xdeathstate
-        ksfx_None,                    // deathsound
-        0,                            // speed
-        4 * kFracUnit,                // radius
-        4 * kFracUnit,                // height
-        100,                          // mass
-        0,                            // damage
-        ksfx_None,                    // activesound
-        kMF_NOBLOCKMAP | kMF_DROPOFF, // flags
-        0,                            // MBF21 flags
-        -2,                           // Infighting group
-        -2,                           // Projectile group
-        -2,                           // Splash group
-        ksfx_None,                    // Rip sound
-        0,                            // Fast speed
-        0,                            // Melee range
-        0,                            // Gib health
-        -1,                           // Dropped item
-        0,                            // Pickup width
-        0,                            // Projectile pass height
-        0,                            // Fullbright
-        0,                            // Blood color
-        kS_NULL                       // raisestate
+        .name                   = "GIB_DEATH",
+        .doomednum              = -1,
+        .spawnstate             = kS_TNT1,
+        .spawnhealth            = 1000,
+        .seestate               = kS_NULL,
+        .seesound               = ksfx_None,
+        .reactiontime           = 8,
+        .attacksound            = ksfx_None,
+        .painstate              = kS_NULL,
+        .painchance             = 0,
+        .painsound              = ksfx_None,
+        .meleestate             = kS_NULL,
+        .missilestate           = 0,
+        .deathstate             = kS_NULL,
+        .xdeathstate            = kS_NULL,
+        .deathsound             = ksfx_None,
+        .speed                  = 0,
+        .radius                 = 4 * kFracUnit,
+        .height                 = 4 * kFracUnit,
+        .mass                   = 100,
+        .damage                 = 0,
+        .activesound            = ksfx_None,
+        .flags                  = kMF_NOBLOCKMAP | kMF_DROPOFF,
+        .mbf21_flags            = 0,
+        .infight_group          = -2, // Infighting group
+        .proj_group             = -2, // Projectile group
+        .splash_group           = -2,
+        .rip_sound              = ksfx_None,
+        .fast_speed             = 0,
+        .melee_range            = 0,
+        .gib_health             = 0,
+        .dropped_item           = -1,
+        .pickup_width           = 0,
+        .projectile_pass_height = 0,
+        .fullbright             = 0,
+        .blood_color            = 0,
+        .raisestate             = kS_NULL,
     },
 };
 
 DehackedMapObjectDefinition brain_explode_mobj = {
-    "BRAIN_DEATH_MISSILE",                                      // name
-    -1,                                                         // doomednum
-    kS_BRAINEXPLODE1,                                           // spawnstate
-    1000,                                                       // spawnhealth
-    kS_NULL,                                                    // seestate
-    ksfx_rlaunc,                                                // seesound
-    8,                                                          // reactiontime
-    ksfx_None,                                                  // attacksound
-    kS_NULL,                                                    // painstate
-    0,                                                          // painchance
-    ksfx_None,                                                  // painsound
-    kS_NULL,                                                    // meleestate
-    kS_NULL,                                                    // missilestate
-    kS_NULL,                                                    // deathstate
-    kS_NULL,                                                    // xdeathstate
-    ksfx_barexp,                                                // deathsound
-    20 * kFracUnit,                                             // speed
-    11 * kFracUnit,                                             // radius
-    8 * kFracUnit,                                              // height
-    100,                                                        // mass
-    128,                                                        // damage
-    ksfx_None,                                                  // activesound
-    kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY, // flags
-    0,                                                          // MBF21 flags
-    -2,                                                         // Infighting group
-    -2,                                                         // Projectile group
-    -2,                                                         // Splash group
-    ksfx_None,                                                  // Rip sound
-    0,                                                          // Fast speed
-    0,                                                          // Melee range
-    0,                                                          // Gib health
-    -1,                                                         // Dropped item
-    0,                                                          // Pickup width
-    0,                                                          // Projectile pass height
-    0,                                                          // Fullbright
-    0,                                                          // Blood color
-    kS_NULL                                                     // raisestate
+    .name                   = "BRAIN_DEATH_MISSILE",
+    .doomednum              = -1,
+    .spawnstate             = kS_BRAINEXPLODE1,
+    .spawnhealth            = 1000,
+    .seestate               = kS_NULL,
+    .seesound               = ksfx_rlaunc,
+    .reactiontime           = 8,
+    .attacksound            = ksfx_None,
+    .painstate              = kS_NULL,
+    .painchance             = 0,
+    .painsound              = ksfx_None,
+    .meleestate             = kS_NULL,
+    .missilestate           = kS_NULL,
+    .deathstate             = kS_NULL,
+    .xdeathstate            = kS_NULL,
+    .deathsound             = ksfx_barexp,
+    .speed                  = 20 * kFracUnit,
+    .radius                 = 11 * kFracUnit,
+    .height                 = 8 * kFracUnit,
+    .mass                   = 100,
+    .damage                 = 128,
+    .activesound            = ksfx_None,
+    .flags                  = kMF_NOBLOCKMAP | kMF_MISSILE | kMF_DROPOFF | kMF_NOGRAVITY,
+    .mbf21_flags            = 0,
+    .infight_group          = -2, // Infighting group
+    .proj_group             = -2, // Projectile group
+    .splash_group           = -2,
+    .rip_sound              = ksfx_None,
+    .fast_speed             = 0,
+    .melee_range            = 0,
+    .gib_health             = 0,
+    .dropped_item           = -1,
+    .pickup_width           = 0,
+    .projectile_pass_height = 0,
+    .fullbright             = 0,
+    .blood_color            = 0,
+    .raisestate             = kS_NULL,
 };
 
 } // namespace dehacked

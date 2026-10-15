@@ -23,7 +23,6 @@
 //   + implement ReadWADS and ReadVIEW.
 //
 
-#include <inttypes.h>
 #include <limits.h>
 #include <stddef.h>
 
@@ -158,7 +157,7 @@ static void SaveGlobalGetLevelFlags(const char *info, void *storage)
 
     flags = strtol(info, nullptr, 0);
 
-    EPI_CLEAR_MEMORY(dest, GameFlags, 1);
+    epi::ClearMemory(dest, 1);
 
     dest->jump               = (flags & kMapFlagJumping) ? true : false;
     dest->crouch             = (flags & kMapFlagCrouching) ? true : false;
@@ -219,7 +218,7 @@ static const char *SaveGlobalPutU64(void *storage)
 
     EPI_ASSERT(storage);
 
-    epi::FormatToBufferSized(buffer, sizeof(buffer), "%" PRIu64, *src);
+    epi::FormatToBufferSized(buffer, sizeof(buffer), "%llu", (unsigned long long)*src);
 
     return SaveChunkCopyString(buffer);
 }
@@ -345,7 +344,7 @@ SaveGlobals *SaveGlobalsNew(void)
 
     globs = new SaveGlobals;
 
-    EPI_CLEAR_MEMORY(globs, SaveGlobals, 1);
+    epi::ClearMemory(globs, 1);
 
     globs->exit_time = INT_MAX;
 

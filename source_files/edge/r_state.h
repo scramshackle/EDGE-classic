@@ -27,6 +27,7 @@
 
 #include <string.h>
 
+#include <span>
 #include <unordered_map>
 
 // Need data structure definitions.
@@ -222,17 +223,17 @@ class RenderState
 
     virtual void SetPipeline(uint32_t flags) = 0;
 
-    virtual void SetVertexArrays(const RendererVertex *vertices, int count) = 0;
+    virtual void SetVertexArrays(std::span<const RendererVertex> vertices) = 0;
 
     virtual void DrawVertexArray(GLuint shape, int first, int count) = 0;
 
-    virtual void SetModelIndices(const uint16_t *indices, int count) = 0;
+    virtual void SetModelIndices(std::span<const uint16_t> indices) = 0;
 
     virtual void DrawModelIndexed(int index_first, int index_count) = 0;
 
     virtual void SetColorLookup(int slot) = 0;
 
-    virtual uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count) = 0;
+    virtual uint32_t CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices) = 0;
 
     virtual void DeleteModelMesh(uint32_t handle) = 0;
 

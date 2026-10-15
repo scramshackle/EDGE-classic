@@ -29,7 +29,7 @@ epi::File *OpenPackFile(PackFile *pack, const std::string &name);
 epi::File *OpenPackMatch(PackFile *pack, const std::string &name, const std::vector<std::string> &extensions);
 
 // Equivalent to IsLumpInPwad....doesn't care or check filetype itself
-int FindStemInPack(PackFile *pack, epi::StringHash name_hash);
+bool FindStemInPack(PackFile *pack, epi::StringHash name_hash);
 
 // Checks if exact filename is found in a pack; used to help load order
 // determination

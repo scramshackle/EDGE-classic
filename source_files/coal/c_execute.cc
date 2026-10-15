@@ -23,7 +23,6 @@
 //
 //----------------------------------------------------------------------
 
-#include <errno.h>
 #include <float.h>
 #include <math.h>
 #include <stdarg.h>

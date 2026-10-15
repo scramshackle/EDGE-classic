@@ -21,6 +21,7 @@
 #include <SDL3/SDL_audio.h>
 
 #include <set>
+#include <span>
 #include <string>
 
 #include "con_var.h"
@@ -43,6 +44,6 @@ void ApplyPendingSoundDeviceFormatChange(void);
 void LockSoundMixer(void);
 void UnlockSoundMixer(void);
 
-void ProcessVacuumEffect(float *frames, int frame_count);
-void ProcessUnderwaterEffect(float *frames, int frame_count);
-void ProcessReverbEffect(float *frames, int frame_count);
+void ProcessVacuumEffect(std::span<float> frames);
+void ProcessUnderwaterEffect(std::span<float> frames);
+void ProcessReverbEffect(std::span<float> frames);

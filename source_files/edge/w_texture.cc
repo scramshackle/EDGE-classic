@@ -23,9 +23,10 @@
 
 #include "w_texture.h"
 
+#include <algorithm>
+
 #include "dm_format.h"
 #include "e_main.h"
-#include "e_search.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_str_compare.h"
@@ -394,6 +395,13 @@ static void InstallTextureLumpsStrife(int file, const WadTextureResource *WT)
     delete[] patchlookup;
 }
 
+static bool TextureDefinitionNameFileLess(const TextureDefinition *a, const TextureDefinition *b)
+{
+    int name_compare = strcmp(a->name, b->name);
+
+    return name_compare < 0 || (name_compare == 0 && a->file < b->file);
+}
+
 //
 // InitializeTextures
 //
@@ -472,9 +480,7 @@ void InitializeTextures(void)
 
     numtextures = cur - textures;
 
-#define EDGE_CMP(a, b) (strcmp(a->name, b->name) < 0 || (strcmp(a->name, b->name) == 0 && a->file < b->file))
-    EDGE_QSORT(TextureDefinition *, textures, numtextures, 10);
-#undef EDGE_CMP
+    std::stable_sort(textures, textures + numtextures, TextureDefinitionNameFileLess);
 
     // remove duplicate names.  Because the QSORT took newness into
     // account, only the last entry in a run of identically named

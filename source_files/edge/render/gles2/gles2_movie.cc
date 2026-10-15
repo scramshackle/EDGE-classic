@@ -88,7 +88,7 @@ void MovieDrawFrame(float x1, float y1, float x2, float y2, float luma_scale_x, 
 
     RendererVertex quad[4];
 
-    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+    epi::ClearMemory(quad, 4);
 
     quad[0].position               = {x1, y1, 0.0f};
     quad[0].texture_coordinates[0] = {0.0f, 0.0f};

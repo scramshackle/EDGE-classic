@@ -751,7 +751,7 @@ void AddExtraFloor(Sector *sec, Line *line)
     newbie = sec->extrafloor_first + sec->extrafloor_used;
     sec->extrafloor_used++;
 
-    EPI_CLEAR_MEMORY(newbie, Extrafloor, 1);
+    epi::ClearMemory(newbie, 1);
 
     bottom = &ctrl->floor;
     top    = (ef_info->type_ & kExtraFloorTypeThick) ? &ctrl->ceiling : bottom;

@@ -247,10 +247,7 @@ void UpdateButtons(void)
                 }
             }
 
-
-            
-
-            EPI_CLEAR_MEMORY(b, Button, 1);
+            epi::ClearMemory(b, 1);
         }
     }
 }

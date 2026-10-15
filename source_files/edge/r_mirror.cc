@@ -53,7 +53,7 @@ static void DrawMirrorAperturePolygon(const DrawMirror *mir, bool push_to_far_pl
     float z2 = ld->front_sector->interpolated_ceiling_height;
 
     RendererVertex quad[4];
-    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+    epi::ClearMemory(quad, 4);
 
     quad[0].position = {x1, y1, z1};
     quad[1].position = {x1, y1, z2};
@@ -79,7 +79,7 @@ static void DrawMirrorAperturePolygon(const DrawMirror *mir, bool push_to_far_pl
         quad[v].rgba = kRGBABlack;
 
     render_state->SetPipeline(0);
-    render_state->SetVertexArrays(quad, 4);
+    render_state->SetVertexArrays(quad);
     render_state->DrawVertexArray(GL_QUADS, 0, 4);
 }
 

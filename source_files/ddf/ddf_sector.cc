@@ -589,7 +589,7 @@ void SectorTypeContainer::Reset()
         sec = nullptr;
     }
     clear();
-    EPI_CLEAR_MEMORY(lookup_cache_, SectorType *, kLookupCacheSize);
+    epi::ClearMemory(lookup_cache_, kLookupCacheSize);
 }
 
 //--- editor settings ---

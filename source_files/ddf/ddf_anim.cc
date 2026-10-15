@@ -270,8 +270,8 @@ void DDFConvertAnimatedLump(const uint8_t *data, int size)
         char first[9];
 
         // Clear to zeroes to prevent garbage from being added
-        EPI_CLEAR_MEMORY(last, char, 9);
-        EPI_CLEAR_MEMORY(first, char, 9);
+        epi::ClearMemory(last, 9);
+        epi::ClearMemory(first, 9);
 
         // make sure names are NUL-terminated
         memcpy(last, data + 1, 8);

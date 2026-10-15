@@ -990,7 +990,7 @@ static void ScriptParseTag(std::vector<const char *> &pars)
 
     if (this_script->tag[1] != 0)
     {
-        if (parsed_string_tags.find(this_script->tag[1]) != parsed_string_tags.end())
+        if (parsed_string_tags.contains(this_script->tag[1]))
             ScriptError("Script already has a tag: '%s'\n", parsed_string_tags[this_script->tag[1]].c_str());
         else
             ScriptError("Script already has a tag: '%d'\n", this_script->tag[1]);

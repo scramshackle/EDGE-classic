@@ -27,20 +27,20 @@
 #include "p_action.h"
 
 static const State template_state = {
-    0,       // sprite ref
-    0,       // frame ref
-    0,       // bright
-    0,       // flags
-    -1,      // tics
+    .sprite = 0, // sprite ref
+    .frame  = 0, // frame ref
+    .bright = 0,
+    .flags  = 0,
+    .tics   = -1,
 
-    nullptr, // model_frame
-    nullptr, // label
-    nullptr, // routine
-    nullptr, // parameter
-    0,       // rts_tag_type
+    .model_frame  = nullptr,
+    .label        = nullptr,
+    .action       = nullptr, // routine
+    .action_par   = nullptr, // parameter
+    .rts_tag_type = 0,
 
-    0,       // next state ref
-    -1       // jump state ref
+    .nextstate = 0,          // next state ref
+    .jumpstate = -1,         // jump state ref
 };
 
 State *states = nullptr;
@@ -545,7 +545,7 @@ void DDFStateReadState(const char *info, const char *label, std::vector<StateRan
         std::vector<std::string> flags = epi::SeparatedStringVector(stateinfo[5], '+');
         for (const std::string &flag : flags)
         {
-            if (frame_flags.count(flag))
+            if (frame_flags.contains(flag))
             {
                 cur->flags |= frame_flags.at(flag);
             }

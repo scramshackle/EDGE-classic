@@ -215,19 +215,19 @@ void FinishUnitBatch(void)
     RenderCurrentUnits();
 }
 
-uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count)
+uint32_t CreateStaticVertexBuffer(std::span<const RendererVertex> vertices)
 {
-    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, count);
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, (int)vertices.size());
 }
 
-uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity)
+uint32_t CreateStaticVertexBufferWithCapacity(std::span<const RendererVertex> vertices, int capacity)
 {
-    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, count, capacity);
+    return (uint32_t)gles2_immediate.CreateStaticBuffer(vertices, capacity);
 }
 
-void UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count)
+void UpdateStaticVertexBuffer(uint32_t handle, int first, std::span<const RendererVertex> vertices)
 {
-    gles2_immediate.UpdateStaticBuffer((GLuint)handle, first, vertices, count);
+    gles2_immediate.UpdateStaticBuffer((GLuint)handle, first, vertices);
 }
 
 void FlushStaticVertexUploads(void)
@@ -296,25 +296,25 @@ void AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GL
     current_render_unit++;
 }
 
-uint32_t CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity)
+uint32_t CreateSpriteInstanceBuffer(std::span<const SpriteInstance> instances, int capacity)
 {
-    if (!instances || count <= 0)
+    if (instances.empty())
         return 0;
 
-    if (capacity < count)
-        capacity = count;
+    if (capacity < (int)instances.size())
+        capacity = (int)instances.size();
 
-    return (uint32_t)gles2_immediate.CreateStaticBytes(instances, (size_t)count * sizeof(SpriteInstance),
-                                                 (size_t)capacity * sizeof(SpriteInstance));
+    return (uint32_t)gles2_immediate.CreateStaticBytes(instances.data(), instances.size_bytes(),
+                                                       (size_t)capacity * sizeof(SpriteInstance));
 }
 
-void UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count)
+void UpdateSpriteInstanceBuffer(uint32_t handle, int first, std::span<const SpriteInstance> instances)
 {
-    if (!instances || count <= 0 || first < 0)
+    if (instances.empty() || first < 0)
         return;
 
-    gles2_immediate.UpdateStaticBytes((GLuint)handle, (size_t)first * sizeof(SpriteInstance), instances,
-                                (size_t)count * sizeof(SpriteInstance));
+    gles2_immediate.UpdateStaticBytes((GLuint)handle, (size_t)first * sizeof(SpriteInstance), instances.data(),
+                                      instances.size_bytes());
 }
 
 SpriteInstance *ReserveSpriteInstances(int count, int *first)
@@ -872,7 +872,7 @@ void RenderCurrentUnits(void)
     }
 
     if (merged_index_total > 0)
-        gles2_immediate.UploadMergedIndices(merged_indices, merged_index_total);
+        gles2_immediate.UploadMergedIndices({merged_indices, (size_t)merged_index_total});
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
 
@@ -916,7 +916,7 @@ void RenderCurrentUnits(void)
     else
         render_state->Disable(GL_FOG);
 
-    render_state->SetVertexArrays(local_verts, current_render_vert);
+    render_state->SetVertexArrays({local_verts, (size_t)current_render_vert});
 
     bool    ambient_scissor_enabled = render_state->ScissorTestEnabled();
     GLint   ambient_scissor_x       = 0;

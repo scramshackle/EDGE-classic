@@ -445,7 +445,7 @@ int JoystickGetAxis(int n) // n begins at 0
 
 static void I_OpenJoystick(SDL_JoystickID id)
 {
-    EPI_ASSERT(attached_joysticks.find(id) != attached_joysticks.end());
+    EPI_ASSERT(attached_joysticks.contains(id));
 
     joystick_info = SDL_OpenJoystick(id);
     if (!joystick_info)

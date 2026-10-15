@@ -21,7 +21,7 @@
 #include <math.h>
 
 #include <algorithm>
-#include <forward_list>
+#include <vector>
 
 #include "bot_think.h"
 #include "con_main.h"
@@ -195,6 +195,8 @@ class nav_area_c
     int   parent = -1;    // parent nav_area_c / subsector_t
     float G      = 0;     // cost of this node (from start node)
     float H      = 0;     // estimated cost to reach end node
+
+    int open_serial = 0;
 
     nav_area_c(int _id) : id(_id)
     {
@@ -491,32 +493,45 @@ static float BotEstimateH(int id)
     return time * 1.25f;
 }
 
+struct BotOpenEntry
+{
+    float total_cost;
+    int   area_id;
+    int   serial;
+};
+
+static std::vector<BotOpenEntry> nav_open_heap;
+
+static bool BotOpenEntryWorse(const BotOpenEntry &a, const BotOpenEntry &b)
+{
+    if (a.total_cost > b.total_cost)
+        return true;
+
+    if (b.total_cost > a.total_cost)
+        return false;
+
+    return a.area_id > b.area_id;
+}
+
 static int BotLowestOpenF()
 {
     // return index of the nav_area_c which is in the OPEN set and has the
     // lowest F value, where F = G + H.  returns -1 if OPEN set is empty.
 
-    // this is a brute force search -- consider OPTIMISING it...
-
-    int   result = -1;
-    float best_F = 9e18;
-
-    for (int i = 0; i < (int)nav_areas.size(); i++)
+    while (!nav_open_heap.empty())
     {
-        const nav_area_c &area = nav_areas[i];
+        BotOpenEntry entry = nav_open_heap.front();
 
-        if (area.open)
-        {
-            float F = area.G + area.H;
-            if (F < best_F)
-            {
-                best_F = F;
-                result = i;
-            }
-        }
+        std::pop_heap(nav_open_heap.begin(), nav_open_heap.end(), BotOpenEntryWorse);
+        nav_open_heap.pop_back();
+
+        const nav_area_c &area = nav_areas[entry.area_id];
+
+        if (area.open && area.open_serial == entry.serial)
+            return entry.area_id;
     }
 
-    return result;
+    return -1;
 }
 
 static void BotTryOpenArea(int idx, int parent, float cost)
@@ -531,6 +546,11 @@ static void BotTryOpenArea(int idx, int parent, float cost)
 
         if (epi::AlmostEquals(area.H, 0.0f))
             area.H = BotEstimateH(idx);
+
+        area.open_serial++;
+
+        nav_open_heap.push_back(BotOpenEntry{area.G + area.H, idx, area.open_serial});
+        std::push_heap(nav_open_heap.begin(), nav_open_heap.end(), BotOpenEntryWorse);
     }
 }
 
@@ -562,17 +582,19 @@ static BotPath *BotStorePath(Position start, int start_id, Position finish, int 
     }
 
     // use a list to put the subsectors into the correct order
-    std::forward_list<int> subsec_list;
+    std::vector<int> subsec_list;
 
     for (int cur_id = finish_id;;)
     {
-        subsec_list.push_front(cur_id);
+        subsec_list.push_back(cur_id);
 
         if (cur_id == start_id)
             break;
 
         cur_id = nav_areas[cur_id].parent;
     }
+
+    std::reverse(subsec_list.begin(), subsec_list.end());
 
     // visit each pair of subsectors in order...
     int prev_id = -1;
@@ -651,6 +673,8 @@ BotPath *BotFindPath(const Position *start, const Position *finish, int flags)
         area.H      = 0.0;
         area.parent = -1;
     }
+
+    nav_open_heap.clear();
 
     BotTryOpenArea(start_id, -1, 0);
 
@@ -744,6 +768,8 @@ BotPath *BotFindThing(DeathBot *bot, float radius, MapObject *&best)
         area.H      = 1.0; // a constant gives a Djikstra search
         area.parent = -1;
     }
+
+    nav_open_heap.clear();
 
     BotTryOpenArea(start_id, -1, 0);
 

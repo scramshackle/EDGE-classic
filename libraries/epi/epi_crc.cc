@@ -44,19 +44,22 @@ CRC32 &CRC32::operator+=(uint8_t data)
     return *this;
 }
 
-CRC32 &CRC32::AddBlock(const uint8_t *data, int len)
+CRC32 &CRC32::AddBlock(std::span<const uint8_t> data)
 {
     uint32_t s1 = crc_ & 0xFFFF;
     uint32_t s2 = (crc_ >> 16) & 0xFFFF;
+
+    const uint8_t *cursor = data.data();
+    int            len    = (int)data.size();
 
     while (len > 0)
     {
         int block_size = (len < kAdlerMaxBlockSize) ? len : kAdlerMaxBlockSize;
         len -= block_size;
 
-        for (; block_size > 0; data++, block_size--)
+        for (; block_size > 0; cursor++, block_size--)
         {
-            s1 += *data;
+            s1 += *cursor;
             s2 += s1;
         }
 

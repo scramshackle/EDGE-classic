@@ -151,7 +151,7 @@ void ComputeSkyHeights(void)
 
     SectorSkyRing *rings = new SectorSkyRing[total_level_sectors];
 
-    EPI_CLEAR_MEMORY(rings, SectorSkyRing, total_level_sectors);
+    epi::ClearMemory(rings, total_level_sectors);
 
     for (i = 0, sec = level_sectors; i < total_level_sectors; i++, sec++)
     {
@@ -1173,8 +1173,7 @@ static void EmitSkyGeometry(const SkySection &section, GLuint texture, BlendingM
             if (resident.gpu_handle)
                 DeleteStaticVertexBuffer(resident.gpu_handle);
 
-            resident.gpu_handle =
-                CreateStaticVertexBuffer(resident.resident_vertices.data(), (int)resident.resident_vertices.size());
+            resident.gpu_handle = CreateStaticVertexBuffer(resident.resident_vertices);
             resident.gpu_dirty  = false;
         }
 
@@ -1773,8 +1772,8 @@ static void BuildSkyCubemap(FakeSkybox *info)
         info->cubemap = 0;
     }
 
-    static const int kCubeFaceOrder[6] = {kSkyboxEast,  kSkyboxWest,  kSkyboxBottom,
-                                          kSkyboxTop,   kSkyboxNorth, kSkyboxSouth};
+    static constexpr int kCubeFaceOrder[6] = {kSkyboxEast, kSkyboxWest,  kSkyboxBottom,
+                                              kSkyboxTop,  kSkyboxNorth, kSkyboxSouth};
 
     ImageData *faces[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 

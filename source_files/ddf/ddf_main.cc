@@ -1133,7 +1133,8 @@ bool DDFMainParseField(const DDFCommandList *commands, const char *field, const 
             int len = strlen(name);
             EPI_ASSERT(len > 0);
 
-            if (strncmp(field, name, len) == 0 && field[len] == '.' && epi::IsAlphanumericASCII(field[len + 1]))
+            if (epi::StringPrefixCompare(field, name) == 0 && field[len] == '.' &&
+                epi::IsAlphanumericASCII(field[len + 1]))
             {
                 // recursively parse the sub-field
                 return DDFMainParseField(commands[i].sub_comms, field + len + 1, contents,

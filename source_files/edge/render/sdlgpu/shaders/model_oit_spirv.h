@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kModelOitFragmentShaderSamplerCount = 2;
-static const uint32_t kModelOitFragmentShaderUniformBufferCount = 1;
-static const uint32_t kModelOitFragmentShaderStorageBufferCount = 3;
+constexpr uint32_t kModelOitFragmentShaderSamplerCount = 2;
+constexpr uint32_t kModelOitFragmentShaderUniformBufferCount = 1;
+constexpr uint32_t kModelOitFragmentShaderStorageBufferCount = 3;
 
-static const uint32_t kModelOitFragmentShaderSpirv[] = {
+constexpr uint32_t kModelOitFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x0000024b, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000c000f, 0x00000004,

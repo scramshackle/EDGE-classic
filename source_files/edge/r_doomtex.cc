@@ -36,7 +36,6 @@
 #include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
-#include "e_search.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_file.h"

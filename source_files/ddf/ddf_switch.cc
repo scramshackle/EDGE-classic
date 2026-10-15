@@ -238,8 +238,8 @@ void DDFConvertSwitchesLump(const uint8_t *data, int size)
         char on_name[9];
 
         // clear to zeroes to prevent garbage being passed to DDF
-        EPI_CLEAR_MEMORY(off_name, char, 9);
-        EPI_CLEAR_MEMORY(on_name, char, 9);
+        epi::ClearMemory(off_name, 9);
+        epi::ClearMemory(on_name, 9);
 
         // make sure names are NUL-terminated
         memcpy(off_name, data + 0, 8);

@@ -115,7 +115,7 @@ static int FindBestRGBMatch(int r, int g, int b)
 
 void InitializePalette(void)
 {
-    EPI_CLEAR_MEMORY(&playpal_data[0][0][0], uint8_t, 14 * 256 * 3);
+    epi::ClearMemory(&playpal_data[0][0][0], 14 * 256 * 3);
 
     int t, i;
 
@@ -803,7 +803,7 @@ class ColormapShader : public AbstractShader
                 TextureCoordinates(dest, 1, &lit_pos);
             }
 
-            StaticCaptureVertices(shape, bake_vertices_.data(), num_vert);
+            StaticCaptureVertices(shape, {bake_vertices_.data(), (size_t)num_vert});
 
             (*pass_var) += 1;
 
@@ -828,7 +828,7 @@ class ColormapShader : public AbstractShader
             TextureCoordinates(dest, 1, &lit_pos);
         }
 
-        StaticCaptureVertices(shape, glvert, num_vert);
+        StaticCaptureVertices(shape, {glvert, (size_t)num_vert});
 
         EndRenderUnit(num_vert);
 
@@ -861,9 +861,11 @@ class ColormapShader : public AbstractShader
         (*pass_var) += 1;
     }
 
-    virtual void WorldBaked(GLuint shape, const RendererVertex *source, int num_vert, GLuint tex, float alpha,
+    virtual void WorldBaked(GLuint shape, std::span<const RendererVertex> source, GLuint tex, float alpha,
                             int *pass_var, BlendingMode blending, int glow_set)
     {
+        int num_vert = (int)source.size();
+
         epi::RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
 

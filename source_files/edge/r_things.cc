@@ -125,7 +125,7 @@ void CollectCrosshairs()
             if (!chd[i].is_dir)
             {
                 std::string filename = epi::GetStem(chd[i].name);
-                if (!available_crosshairs.count(filename))
+                if (!available_crosshairs.contains(filename))
                 {
                     epi::File *ovimg_file = epi::FileOpen(chd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
                     if (ovimg_file)
@@ -156,7 +156,7 @@ void CollectCrosshairs()
             if (!chd[i].is_dir)
             {
                 std::string filename = epi::GetStem(chd[i].name);
-                if (!available_crosshairs.count(filename))
+                if (!available_crosshairs.contains(filename))
                 {
                     epi::File *ovimg_file = epi::FileOpen(chd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
                     if (ovimg_file)
@@ -194,7 +194,7 @@ void CollectCrosshairs()
                 if (!chd[i].is_dir)
                 {
                     std::string filename = epi::GetStem(chd[i].name);
-                    if (!available_crosshairs.count(filename))
+                    if (!available_crosshairs.contains(filename))
                     {
                         epi::File *ovimg_file =
                             epi::FileOpen(chd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
@@ -226,7 +226,7 @@ void CollectCrosshairs()
                 if (!chd[i].is_dir)
                 {
                     std::string filename = epi::GetStem(chd[i].name);
-                    if (!available_crosshairs.count(filename))
+                    if (!available_crosshairs.contains(filename))
                     {
                         epi::File *ovimg_file =
                             epi::FileOpen(chd[i].name, epi::kFileAccessRead | epi::kFileAccessBinary);
@@ -248,7 +248,7 @@ void CollectCrosshairs()
     }
 
     // Check for previously saved overlay CVAR; revert if not present anymore
-    if (!available_crosshairs.count(crosshair_image.s_))
+    if (!available_crosshairs.contains(crosshair_image.s_))
     {
         crosshair_image = "None";
     }
@@ -2093,12 +2093,13 @@ static void UploadResidentBatches(void)
                 DeleteStaticVertexBuffer(batch.buffer);
 
             batch.buffer_capacity = epi::Max(256, count + count / 2);
-            batch.buffer          = CreateSpriteInstanceBuffer(batch.instances.data(), count, batch.buffer_capacity);
+            batch.buffer          = CreateSpriteInstanceBuffer(batch.instances, batch.buffer_capacity);
         }
         else
         {
-            UpdateSpriteInstanceBuffer(batch.buffer, batch.dirty_low, batch.instances.data() + batch.dirty_low,
-                                       batch.dirty_high - batch.dirty_low + 1);
+            UpdateSpriteInstanceBuffer(
+                batch.buffer, batch.dirty_low,
+                {batch.instances.data() + batch.dirty_low, (size_t)(batch.dirty_high - batch.dirty_low + 1)});
         }
 
         batch.dirty_low  = INT_MAX;

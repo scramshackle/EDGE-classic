@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
-static const uint32_t kModelVertexShaderSamplerCount = 0;
-static const uint32_t kModelVertexShaderUniformBufferCount = 2;
-static const uint32_t kModelVertexShaderStorageBufferCount = 0;
+constexpr uint32_t kModelVertexShaderSamplerCount = 0;
+constexpr uint32_t kModelVertexShaderUniformBufferCount = 2;
+constexpr uint32_t kModelVertexShaderStorageBufferCount = 0;
 
-static const uint32_t kModelVertexShaderSpirv[] = {
+constexpr uint32_t kModelVertexShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x000000cf, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000f000f, 0x00000000,
@@ -253,11 +253,11 @@ static const uint32_t kModelVertexShaderSpirv[] = {
     0x00000065, 0x00000069, 0x000200fe, 0x0000006a, 0x00010038,
 };
 
-static const uint32_t kModelFragmentShaderSamplerCount = 2;
-static const uint32_t kModelFragmentShaderUniformBufferCount = 1;
-static const uint32_t kModelFragmentShaderStorageBufferCount = 3;
+constexpr uint32_t kModelFragmentShaderSamplerCount = 2;
+constexpr uint32_t kModelFragmentShaderUniformBufferCount = 1;
+constexpr uint32_t kModelFragmentShaderStorageBufferCount = 3;
 
-static const uint32_t kModelFragmentShaderSpirv[] = {
+constexpr uint32_t kModelFragmentShaderSpirv[] = {
     0x07230203, 0x00010000, 0x0008000b, 0x00000204, 0x00000000, 0x00020011,
     0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
     0x00000000, 0x0003000e, 0x00000000, 0x00000001, 0x000b000f, 0x00000004,

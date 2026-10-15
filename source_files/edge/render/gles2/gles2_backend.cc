@@ -408,7 +408,7 @@ class Gles2RenderBackend : public RenderBackend
 
     void GetFrameStats(FrameStats &stats)
     {
-        EPI_CLEAR_MEMORY(&stats, FrameStats, 1);
+        epi::ClearMemory(&stats, 1);
 
         stats.num_draw_           = gles2_immediate.DrawCount();
         stats.num_apply_uniforms_ = gles2_program.UniformUpdateCount();

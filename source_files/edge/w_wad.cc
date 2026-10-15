@@ -39,6 +39,7 @@
 
 #include <algorithm>
 #include <list>
+#include <string_view>
 #include <vector>
 
 #include "ddf_anim.h"
@@ -51,7 +52,6 @@
 #include "dm_state.h"
 #include "dstrings.h"
 #include "e_main.h"
-#include "e_search.h"
 #include "epi_endian.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -378,7 +378,7 @@ static bool IsDummySF(const char *name)
 //
 static bool IsSkin(const char *name)
 {
-    return (strncmp(name, "S_SKIN", 6) == 0);
+    return epi::StringPrefixCompare(name, "S_SKIN") == 0;
 }
 
 bool WadFile::HasLevel(const char *name) const
@@ -506,7 +506,7 @@ static void AddLump(DataFile *df, const char *raw_name, int pos, int size, int f
     int lump = (int)lump_info.size();
 
     LumpInfo info;
-    EPI_CLEAR_MEMORY(&info, LumpInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.position = pos;
     info.size     = size;
@@ -865,7 +865,7 @@ int CheckForUniqueGameLumps(epi::File *file)
 
         // Do not require IWAD header if loading Harmony, REKKR, BFG Edition
         // WADs, Chex Quest or a custom standalone IWAD
-        if (strncmp(header.magic, "IWAD", 4) != 0 && epi::StringCompare(lump0, "DMENUPIC") != 0 &&
+        if (std::string_view(header.magic, 4) != "IWAD" && epi::StringCompare(lump0, "DMENUPIC") != 0 &&
             epi::StringCompare(lump0, "REKCREDS") != 0 && epi::StringCompare(lump0, "0HAWK01") != 0 &&
             epi::StringCompare(lump0, "EDGEGAME") != 0 && epi::StringCompare(lump0, "ENDOOM") != 0)
         {
@@ -1134,10 +1134,10 @@ void ProcessWad(DataFile *df, size_t file_index)
     // TODO: handle Read failure
     file->Read(&header, sizeof(RawWadHeader));
 
-    if (strncmp(header.magic, "IWAD", 4) != 0)
+    if (std::string_view(header.magic, 4) != "IWAD")
     {
         // Homebrew levels?
-        if (strncmp(header.magic, "PWAD", 4) != 0)
+        if (std::string_view(header.magic, 4) != "PWAD")
         {
             FatalError("Wad file %s doesn't have IWAD or PWAD id\n", df->name_.c_str());
         }

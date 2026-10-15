@@ -92,7 +92,7 @@ void sprites::Shutdown()
 
 void sprites::MarkEntry(int num)
 {
-    if (sprnames.count(num))
+    if (sprnames.contains(num))
         return;
 
     // for the modified sprite, copy the original name
@@ -173,7 +173,7 @@ const char *sprites::GetSprite(int spr_num)
 
     const char *name = "";
 
-    if (sprnames.count(spr_num))
+    if (sprnames.contains(spr_num))
         name = sprnames[spr_num].c_str();
 
     if (strlen(name) == 0)

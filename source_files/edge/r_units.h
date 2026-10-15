@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <span>
+
 #include "dm_colors.h"
 #include "epi_color.h"
 #include "epi_vector.h"
@@ -205,9 +207,9 @@ RendererVertex *BeginRenderUnit(GLuint shape, int max_vert, GLuint env1, GLuint 
                                 bool world_lit = false, int glow_set = -1);
 void            EndRenderUnit(int actual_vert);
 
-uint32_t CreateStaticVertexBuffer(const RendererVertex *vertices, int count);
-uint32_t CreateStaticVertexBufferWithCapacity(const RendererVertex *vertices, int count, int capacity);
-void     UpdateStaticVertexBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
+uint32_t CreateStaticVertexBuffer(std::span<const RendererVertex> vertices);
+uint32_t CreateStaticVertexBufferWithCapacity(std::span<const RendererVertex> vertices, int capacity);
+void     UpdateStaticVertexBuffer(uint32_t handle, int first, std::span<const RendererVertex> vertices);
 void     FlushStaticVertexUploads(void);
 void     DeleteStaticVertexBuffer(uint32_t handle);
 void     AddStaticRenderUnit(uint32_t handle, GLuint shape, int first, int count, GLuint env1, GLuint tex1, GLuint env2,
@@ -218,8 +220,8 @@ SpriteInstance *ReserveSpriteInstances(int count, int *first);
 void            AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_texture, BlendingMode blending,
                                     epi::RGBAColor fog_color, float fog_density, int color_lookup, bool world_lit, int glow_set,
                                     const SpriteLightTable *light_table, uint8_t alpha, uint32_t buffer = 0);
-uint32_t        CreateSpriteInstanceBuffer(const SpriteInstance *instances, int count, int capacity);
-void            UpdateSpriteInstanceBuffer(uint32_t handle, int first, const SpriteInstance *instances, int count);
+uint32_t        CreateSpriteInstanceBuffer(std::span<const SpriteInstance> instances, int capacity);
+void            UpdateSpriteInstanceBuffer(uint32_t handle, int first, std::span<const SpriteInstance> instances);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

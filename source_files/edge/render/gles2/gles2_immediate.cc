@@ -378,17 +378,17 @@ size_t Gles2Immediate::StreamVertices(const RendererVertex *vertices, int32_t co
     return offset;
 }
 
-void Gles2Immediate::UploadBatch(const RendererVertex *vertices, int32_t count)
+void Gles2Immediate::UploadBatch(std::span<const RendererVertex> vertices)
 {
-    if (!vertices || count <= 0)
+    if (vertices.empty())
     {
         InvalidateBatch();
         return;
     }
 
-    batch_offset_ = StreamVertices(vertices, count);
-    batch_base_   = vertices;
-    batch_count_  = count;
+    batch_offset_ = StreamVertices(vertices.data(), (int32_t)vertices.size());
+    batch_base_   = vertices.data();
+    batch_count_  = (int32_t)vertices.size();
 }
 
 void Gles2Immediate::BindVertexAttributes(size_t byte_offset)
@@ -452,10 +452,12 @@ void Gles2Immediate::UpdateStaticBytes(GLuint buffer, size_t offset, const void 
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 }
 
-GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity)
+GLuint Gles2Immediate::CreateStaticBuffer(std::span<const RendererVertex> vertices, int capacity)
 {
-    if (!vertices || count <= 0)
+    if (vertices.empty())
         return 0;
+
+    int count = (int)vertices.size();
 
     if (capacity < count)
         capacity = count;
@@ -471,13 +473,13 @@ GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int co
 
     if (capacity == count)
     {
-        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertices.size_bytes(), vertices.data(), GL_STATIC_DRAW);
     }
     else
     {
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)capacity * sizeof(RendererVertex)), nullptr,
                      GL_STATIC_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertices.size_bytes(), vertices.data());
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
@@ -485,14 +487,14 @@ GLuint Gles2Immediate::CreateStaticBuffer(const RendererVertex *vertices, int co
     return buffer;
 }
 
-void Gles2Immediate::UpdateStaticBuffer(GLuint buffer, int first, const RendererVertex *vertices, int count)
+void Gles2Immediate::UpdateStaticBuffer(GLuint buffer, int first, std::span<const RendererVertex> vertices)
 {
-    if (!buffer || !vertices || count <= 0 || first < 0)
+    if (!buffer || vertices.empty() || first < 0)
         return;
 
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)((size_t)first * sizeof(RendererVertex)),
-                    (GLsizeiptr)((size_t)count * sizeof(RendererVertex)), vertices);
+                    (GLsizeiptr)vertices.size_bytes(), vertices.data());
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 }
 
@@ -620,9 +622,9 @@ void Gles2Immediate::DrawSprites(int32_t first, int32_t count, GLuint buffer)
     BindVertexAttributes(batch_offset_);
 }
 
-void Gles2Immediate::UploadMergedIndices(const uint16_t *indices, int32_t count)
+void Gles2Immediate::UploadMergedIndices(std::span<const uint16_t> indices)
 {
-    if (!indices || count <= 0)
+    if (indices.empty())
         return;
 
     if (!merged_index_buffer_)
@@ -634,9 +636,9 @@ void Gles2Immediate::UploadMergedIndices(const uint16_t *indices, int32_t count)
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, merged_index_buffer_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(uint16_t)), indices, GL_STREAM_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indices.size_bytes(), indices.data(), GL_STREAM_DRAW);
 
-    uploaded_bytes_ += (size_t)count * sizeof(uint16_t);
+    uploaded_bytes_ += indices.size_bytes();
     upload_count_++;
 }
 
@@ -670,9 +672,9 @@ void Gles2Immediate::DrawMergedWithoutMatrices(int32_t index_offset, int32_t ind
     draw_count_++;
 }
 
-void Gles2Immediate::UploadModelIndices(const uint16_t *indices, int32_t count)
+void Gles2Immediate::UploadModelIndices(std::span<const uint16_t> indices)
 {
-    if (!indices || count <= 0)
+    if (indices.empty())
         return;
 
     if (!model_index_buffer_)
@@ -684,9 +686,9 @@ void Gles2Immediate::UploadModelIndices(const uint16_t *indices, int32_t count)
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_index_buffer_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)count * sizeof(uint16_t)), indices, GL_STREAM_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indices.size_bytes(), indices.data(), GL_STREAM_DRAW);
 
-    uploaded_bytes_ += (size_t)count * sizeof(uint16_t);
+    uploaded_bytes_ += indices.size_bytes();
     upload_count_++;
 }
 
@@ -706,12 +708,12 @@ void Gles2Immediate::DrawModelIndexed(int32_t index_offset, int32_t index_count)
     draw_count_++;
 }
 
-uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count)
+uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices)
 {
-    if (!data.frame_positions || !data.frame_normals || !data.texture_coordinates || !indices)
+    if (!data.frame_positions || !data.frame_normals || !data.texture_coordinates || indices.empty())
         return 0;
 
-    if (data.vertex_count <= 0 || data.frame_count <= 0 || index_count <= 0)
+    if (data.vertex_count <= 0 || data.frame_count <= 0)
         return 0;
 
     Gles2ModelMesh mesh;
@@ -740,8 +742,7 @@ uint32_t Gles2Immediate::CreateModelMesh(const ModelMeshData &data, const uint16
                  data.texture_coordinates, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)((size_t)index_count * sizeof(uint16_t)), indices,
-                 GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indices.size_bytes(), indices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -770,7 +771,7 @@ void Gles2Immediate::DeleteModelMesh(uint32_t handle)
     if (mesh->index_buffer)
         glDeleteBuffers(1, &mesh->index_buffer);
 
-    EPI_CLEAR_MEMORY(mesh, Gles2ModelMesh, 1);
+    epi::ClearMemory(mesh, 1);
 }
 
 void Gles2Immediate::BindModelMesh(const ModelDrawInfo &info)
@@ -1188,7 +1189,7 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
 
     RendererVertex quad[4];
 
-    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+    epi::ClearMemory(quad, 4);
 
     for (int32_t i = 0; i < 4; i++)
         quad[i].rgba = kRGBAWhite;
@@ -1283,7 +1284,7 @@ void Gles2Immediate::ResolveRenderTarget(const Gles2ResolveRect &source, const G
 
     RendererVertex quad[4];
 
-    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+    epi::ClearMemory(quad, 4);
 
     for (int32_t i = 0; i < 4; i++)
         quad[i].rgba = kRGBAWhite;

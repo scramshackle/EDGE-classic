@@ -36,6 +36,7 @@
 #include <limits.h>
 #include <math.h>
 
+#include <algorithm>
 #include <list>
 #include <map>
 
@@ -46,7 +47,6 @@
 #include "dm_format.h"
 #include "dm_state.h"
 #include "e_main.h"
-#include "e_search.h"
 #include "epi.h"
 #include "epi_endian.h"
 #include "epi_file.h"
@@ -267,7 +267,7 @@ Image::Image()
     : width_(0), height_(0), name_("_UNINIT_"), source_type_(kImageSourceDummy), source_graphic_{}, source_flat_{},
       source_texture_{}, source_dummy_{}, source_user_{}, source_palette_(-1), cache_()
 {
-    EPI_CLEAR_MEMORY(&animation_, ImageAnimation, 1);
+    epi::ClearMemory(&animation_, 1);
 }
 
 Image::~Image()
@@ -1065,6 +1065,11 @@ void ImageAddTxHx(int lump, const char *name, bool hires)
     AddImage_SmartInternal(name, kImageSourceTXHI, lump, real_textures);
 }
 
+static bool ImageNameLess(const Image *a, const Image *b)
+{
+    return strcmp(a->name_.c_str(), b->name_.c_str()) < 0;
+}
+
 //
 // Only used during sprite initialisation.  The returned array of
 // images is guaranteed to be sorted by name.
@@ -1108,9 +1113,7 @@ const Image **GetUserSprites(int *count)
         }
     }
 
-#define EDGE_CMP(a, b) (strcmp(a->name_.c_str(), b->name_.c_str()) < 0)
-    EDGE_QSORT(const Image *, array, (*count), 10);
-#undef EDGE_CMP
+    std::stable_sort(array, array + (*count), ImageNameLess);
 
     return array;
 }

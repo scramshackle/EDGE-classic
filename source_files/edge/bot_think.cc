@@ -1344,7 +1344,7 @@ void DeathBot::Think()
     EPI_ASSERT(pl_->map_object_ != nullptr);
 
     // initialize the BotCommand
-    EPI_CLEAR_MEMORY(&cmd_, BotCommand, 1);
+    epi::ClearMemory(&cmd_, 1);
     cmd_.weapon = -1;
 
     // do nothing when game is paused
@@ -1551,7 +1551,7 @@ void CreateBotPlayer(Player *p, bool recreate)
 void BotPlayerBuilder(const Player *p, void *data, EventTicCommand *cmd)
 {
     EPI_UNUSED(p);
-    EPI_CLEAR_MEMORY(cmd, EventTicCommand, 1);
+    epi::ClearMemory(cmd, 1);
 
     if (game_state != kGameStateLevel)
         return;

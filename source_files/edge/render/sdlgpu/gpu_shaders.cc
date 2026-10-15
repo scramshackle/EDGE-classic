@@ -24,7 +24,7 @@ static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage sta
                                    const char *name, uint32_t num_storage_buffers = 0)
 {
     SDL_GPUShaderCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUShaderCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.code                 = (const uint8_t *)code;
     info.code_size            = code_size;

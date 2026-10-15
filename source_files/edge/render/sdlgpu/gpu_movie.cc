@@ -39,7 +39,7 @@ static bool                 movie_staging_dirty = false;
 static SDL_GPUTexture *CreatePlaneTexture(SDL_GPUDevice *device, int width, int height)
 {
     SDL_GPUTextureCreateInfo info;
-    EPI_CLEAR_MEMORY(&info, SDL_GPUTextureCreateInfo, 1);
+    epi::ClearMemory(&info, 1);
 
     info.type                 = SDL_GPU_TEXTURETYPE_2D;
     info.format               = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
@@ -74,7 +74,7 @@ void MovieSetupPlanes(const MoviePlaneSizes &sizes)
     movie_planes[2] = CreatePlaneTexture(device, sizes.chroma_width, sizes.chroma_height);
 
     SDL_GPUSamplerCreateInfo sampler_info;
-    EPI_CLEAR_MEMORY(&sampler_info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(&sampler_info, 1);
 
     sampler_info.min_filter     = SDL_GPU_FILTER_LINEAR;
     sampler_info.mag_filter     = SDL_GPU_FILTER_LINEAR;
@@ -91,7 +91,7 @@ void MovieSetupPlanes(const MoviePlaneSizes &sizes)
     movie_transfer_bytes = luma_bytes + chroma_bytes * 2;
 
     SDL_GPUTransferBufferCreateInfo transfer_info;
-    EPI_CLEAR_MEMORY(&transfer_info, SDL_GPUTransferBufferCreateInfo, 1);
+    epi::ClearMemory(&transfer_info, 1);
 
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size  = (uint32_t)movie_transfer_bytes;
@@ -150,14 +150,14 @@ static void FlushStagedPlanes(void)
     for (int i = 0; i < 3; i++)
     {
         SDL_GPUTextureTransferInfo source;
-        EPI_CLEAR_MEMORY(&source, SDL_GPUTextureTransferInfo, 1);
+        epi::ClearMemory(&source, 1);
         source.transfer_buffer = movie_transfer;
         source.offset          = (uint32_t)offsets[i];
         source.pixels_per_row  = (uint32_t)widths[i];
         source.rows_per_layer  = (uint32_t)heights[i];
 
         SDL_GPUTextureRegion destination;
-        EPI_CLEAR_MEMORY(&destination, SDL_GPUTextureRegion, 1);
+        epi::ClearMemory(&destination, 1);
         destination.texture = movie_planes[i];
         destination.w       = (uint32_t)widths[i];
         destination.h       = (uint32_t)heights[i];
@@ -182,7 +182,7 @@ void MovieDrawFrame(float x1, float y1, float x2, float y2, float luma_scale_x, 
     if (!quad)
         return;
 
-    EPI_CLEAR_MEMORY(quad, RendererVertex, 4);
+    epi::ClearMemory(quad, 4);
 
     quad[0].position               = {x1, y1, 0.0f};
     quad[0].texture_coordinates[0] = {0.0f, 0.0f};

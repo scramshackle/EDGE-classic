@@ -25,7 +25,7 @@
 
 #include "hu_stuff.h"
 
-#include <deque>
+#include <vector>
 
 #include "con_gui.h"
 #include "con_main.h"
@@ -64,7 +64,7 @@ struct HUDMessage
     int         counter;
 };
 
-static std::deque<HUDMessage> queued_messages;
+static std::vector<HUDMessage> queued_messages;
 
 static void UpdatePickupMessages(ConsoleVariable *self)
 {
@@ -231,7 +231,7 @@ void HUDDrawer(void)
 void HUDStartMessage(const char *msg)
 {
     // only display message if necessary
-    queued_messages.push_front({msg, kHUDMessageTimeout});
+    queued_messages.insert(queued_messages.begin(), {msg, kHUDMessageTimeout});
     if (queued_messages.size() > (size_t)maximum_pickup_messages.d_ + 1)
         queued_messages.pop_back();
 }

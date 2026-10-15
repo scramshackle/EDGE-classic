@@ -155,32 +155,32 @@ static SaveField sv_fields_player[] = {
     //   avail_weapons, totalarmour: regenerated.
     //   attacker: not very important
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_player = {
-    nullptr,                     // link in list
-    "player_t",                  // structure name
-    "play",                      // start marker
-    sv_fields_player,            // field descriptions
-    (const char *)&dummy_player, // dummy base
-    true,                        // define_me
-    nullptr                      // pointer to known struct
+    .next        = nullptr,          // link in list
+    .struct_name = "player_t",       // structure name
+    .marker      = "play",           // start marker
+    .fields      = sv_fields_player, // field descriptions
+    .dummy_base  = (const char *)&dummy_player,
+    .define_me   = true,
+    .counterpart = nullptr,          // pointer to known struct
 };
 
 SaveArray sv_array_player = {
-    nullptr,                     // link in list
-    "players",                   // array name
-    &sv_struct_player,           // array type
-    true,                        // define_me
-    false,                       // allow_hub
+    .next       = nullptr,           // link in list
+    .array_name = "players",
+    .sdef       = &sv_struct_player, // array type
+    .define_me  = true,
+    .allow_hub  = false,
 
-    SaveGamePlayerCountElems,    // count routine
-    SaveGamePlayerFindByIndex,   // index routine
-    SaveGamePlayerCreateElems,   // creation routine
-    SaveGamePlayerFinaliseElems, // finalisation routine
+    .count_elems    = SaveGamePlayerCountElems,    // count routine
+    .get_elem       = SaveGamePlayerFindByIndex,   // index routine
+    .create_elems   = SaveGamePlayerCreateElems,   // creation routine
+    .finalise_elems = SaveGamePlayerFinaliseElems, // finalisation routine
 
-    nullptr,                     // pointer to known array
-    0                            // loaded size
+    .counterpart = nullptr,                        // pointer to known array
+    .loaded_size = 0,
 };
 
 //----------------------------------------------------------------------------
@@ -206,16 +206,16 @@ static SaveField sv_fields_playerweapon[] = {
     EDGE_SAVE_FIELD(dummy_weapon, model_skin, "model_skin", 1, kSaveFieldNumeric, 4, nullptr, SaveGameGetInteger,
                     SaveGamePutInteger),
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_playerweapon = {
-    nullptr,                     // link in list
-    "playerweapon_t",            // structure name
-    "weap",                      // start marker
-    sv_fields_playerweapon,      // field descriptions
-    (const char *)&dummy_weapon, // dummy base
-    true,                        // define_me
-    nullptr                      // pointer to known struct
+    .next        = nullptr,                // link in list
+    .struct_name = "playerweapon_t",       // structure name
+    .marker      = "weap",                 // start marker
+    .fields      = sv_fields_playerweapon, // field descriptions
+    .dummy_base  = (const char *)&dummy_weapon,
+    .define_me   = true,
+    .counterpart = nullptr,                // pointer to known struct
 };
 
 static PlayerStock dummy_stock;  // this works for the following 3 (counter/inv/ammo)
@@ -231,16 +231,16 @@ static SaveField sv_fields_playercounter[] = {
     EDGE_SAVE_FIELD(dummy_stock, maximum, "max", 1, kSaveFieldNumeric, 4, nullptr, SaveGameGetInteger,
                     SaveGamePutInteger),
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_playercounter = {
-    nullptr,                    // link in list
-    "playercounter_t",          // structure name
-    "cntr",                     // start marker
-    sv_fields_playercounter,    // field descriptions
-    (const char *)&dummy_stock, // dummy base
-    true,                       // define_me
-    nullptr                     // pointer to known struct
+    .next        = nullptr,                 // link in list
+    .struct_name = "playercounter_t",       // structure name
+    .marker      = "cntr",                  // start marker
+    .fields      = sv_fields_playercounter, // field descriptions
+    .dummy_base  = (const char *)&dummy_stock,
+    .define_me   = true,
+    .counterpart = nullptr,                 // pointer to known struct
 };
 
 //----------------------------------------------------------------------------
@@ -253,16 +253,16 @@ static SaveField sv_fields_playerinv[] = {EDGE_SAVE_FIELD(dummy_stock, count, "n
                                           EDGE_SAVE_FIELD(dummy_stock, maximum, "max", 1, kSaveFieldNumeric, 4, nullptr,
                                                           SaveGameGetInteger, SaveGamePutInteger),
 
-                                          {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+                                          kSaveFieldTerminator};
 
 SaveStruct sv_struct_playerinv = {
-    nullptr,                    // link in list
-    "playerinv_t",              // structure name
-    "invy",                     // start marker
-    sv_fields_playerinv,        // field descriptions
-    (const char *)&dummy_stock, // dummy base
-    true,                       // define_me
-    nullptr                     // pointer to known struct
+    .next        = nullptr,             // link in list
+    .struct_name = "playerinv_t",       // structure name
+    .marker      = "invy",              // start marker
+    .fields      = sv_fields_playerinv, // field descriptions
+    .dummy_base  = (const char *)&dummy_stock,
+    .define_me   = true,
+    .counterpart = nullptr,             // pointer to known struct
 };
 
 //----------------------------------------------------------------------------
@@ -275,16 +275,16 @@ static SaveField sv_fields_playerammo[] = {EDGE_SAVE_FIELD(dummy_stock, count, "
                                            EDGE_SAVE_FIELD(dummy_stock, maximum, "max", 1, kSaveFieldNumeric, 4,
                                                            nullptr, SaveGameGetInteger, SaveGamePutInteger),
 
-                                           {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+                                           kSaveFieldTerminator};
 
 SaveStruct sv_struct_playerammo = {
-    nullptr,                    // link in list
-    "playerammo_t",             // structure name
-    "ammo",                     // start marker
-    sv_fields_playerammo,       // field descriptions
-    (const char *)&dummy_stock, // dummy base
-    true,                       // define_me
-    nullptr                     // pointer to known struct
+    .next        = nullptr,              // link in list
+    .struct_name = "playerammo_t",       // structure name
+    .marker      = "ammo",               // start marker
+    .fields      = sv_fields_playerammo, // field descriptions
+    .dummy_base  = (const char *)&dummy_stock,
+    .define_me   = true,
+    .counterpart = nullptr,              // pointer to known struct
 };
 
 //----------------------------------------------------------------------------
@@ -308,16 +308,16 @@ static SaveField sv_fields_psprite[] = {
     // NOT HERE:
     //   sx, sy: they can be regenerated.
 
-    {0, nullptr, 0, {kSaveFieldInvalid, 0, nullptr}, nullptr, nullptr, nullptr}};
+    kSaveFieldTerminator};
 
 SaveStruct sv_struct_psprite = {
-    nullptr,                            // link in list
-    "pspdef_t",                         // structure name
-    "pspr",                             // start marker
-    sv_fields_psprite,                  // field descriptions
-    (const char *)&dummy_player_sprite, // dummy base
-    true,                               // define_me
-    nullptr                             // pointer to known struct
+    .next        = nullptr,           // link in list
+    .struct_name = "pspdef_t",        // structure name
+    .marker      = "pspr",            // start marker
+    .fields      = sv_fields_psprite, // field descriptions
+    .dummy_base  = (const char *)&dummy_player_sprite,
+    .define_me   = true,
+    .counterpart = nullptr,           // pointer to known struct
 };
 
 //----------------------------------------------------------------------------
@@ -396,7 +396,7 @@ void SaveGamePlayerCreateElems(int num_elems)
     {
         Player *p = new Player;
 
-        EPI_CLEAR_MEMORY(p, Player, 1);
+        epi::ClearMemory(p, 1);
 
         // Note: while loading, we don't follow the normal principle
         //       where players[p->player_number_] == p.  This is fixed in the

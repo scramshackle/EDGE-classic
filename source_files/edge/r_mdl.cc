@@ -244,8 +244,7 @@ static void MDLBuildMesh(MDLModel *md)
         triangle_points[(size_t)p] = p;
     }
 
-    ModelMeshBuild(md->mesh_, points.data(), md->total_points_, triangle_points.data(), md->total_triangles_,
-                   md->vertices_per_frame_);
+    ModelMeshBuild(md->mesh_, points, triangle_points, md->vertices_per_frame_);
 
     epi::LogMessage(epi::kLogLevelDebug, "  mesh: %d vertices, %d indices, %d submeshes\n", md->mesh_.TotalVertices(),
                     md->mesh_.TotalIndices(), (int)md->mesh_.submeshes_.size());
@@ -305,7 +304,7 @@ static void MDLUploadMesh(MDLModel *md)
     data.frame_count         = md->total_frames_;
     data.vertex_count        = vertex_count;
 
-    mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_.data(), mesh.TotalIndices());
+    mesh.gpu_handle_ = render_state->CreateModelMesh(data, mesh.indices_);
 
     epi::LogMessage(epi::kLogLevelDebug, "  mesh gpu handle: %u\n", mesh.gpu_handle_);
 }
@@ -980,13 +979,13 @@ void MDLRenderModel2D(MDLModel *md, int frame, float x, float y, float xscale, f
 
     render_state->SetPipeline(0);
 
-    render_state->SetModelIndices(mesh.indices_.data(), mesh.TotalIndices());
+    render_state->SetModelIndices(mesh.indices_);
 
     for (size_t s = 0; s < mesh.submeshes_.size(); s++)
     {
         const ModelMeshSubmesh &submesh = mesh.submeshes_[s];
 
-        render_state->SetVertexArrays(model_vertices.data() + submesh.first_vertex, submesh.vertex_count);
+        render_state->SetVertexArrays({model_vertices.data() + submesh.first_vertex, (size_t)submesh.vertex_count});
         render_state->DrawModelIndexed(submesh.first_index, submesh.index_count);
     }
 

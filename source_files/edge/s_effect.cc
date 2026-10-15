@@ -85,8 +85,10 @@ void LowPassEffect::Shutdown(void)
     ready_ = false;
 }
 
-void LowPassEffect::Process(float *frames, int frame_count)
+void LowPassEffect::Process(std::span<float> frames)
 {
+    int frame_count = (int)(frames.size() / (size_t)channels_);
+
     if (!ready_ || frame_count <= 0)
         return;
 
@@ -151,8 +153,10 @@ void DelayEffect::Shutdown(void)
     cursor_        = 0;
 }
 
-void DelayEffect::Process(float *frames, int frame_count)
+void DelayEffect::Process(std::span<float> frames)
 {
+    int frame_count = (int)(frames.size() / (size_t)channels_);
+
     if (!ready_ || frame_count <= 0)
         return;
 
@@ -171,9 +175,9 @@ void DelayEffect::Process(float *frames, int frame_count)
     }
 }
 
-static const int kReverbBaseLineLengths[kReverbDelayLines]      = {1499, 1889, 2381, 2999};
-static const int kReverbAllpassLengths[kReverbAllpassStages]    = {379, 277, 213, 149};
-static const float kReverbModulationRates[kReverbDelayLines]    = {0.31f, 0.43f, 0.57f, 0.71f};
+constexpr int   kReverbBaseLineLengths[kReverbDelayLines]   = {1499, 1889, 2381, 2999};
+constexpr int   kReverbAllpassLengths[kReverbAllpassStages] = {379, 277, 213, 149};
+constexpr float kReverbModulationRates[kReverbDelayLines]   = {0.31f, 0.43f, 0.57f, 0.71f};
 
 static constexpr int   kReverbReferenceRate    = 44100;
 static constexpr float kReverbMaximumSizeScale = 2.0f;
@@ -427,8 +431,10 @@ void ReverbEffect::ApplyParameters(void)
     }
 }
 
-void ReverbEffect::Process(float *frames, int frame_count)
+void ReverbEffect::Process(std::span<float> frames)
 {
+    int frame_count = (int)(frames.size() / (size_t)channels_);
+
     if (!ready_ || frame_count <= 0)
         return;
 

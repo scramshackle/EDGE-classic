@@ -38,7 +38,7 @@ static SDL_GPUSamplerAddressMode GpuAddressMode(GLint wrap)
 static void GpuFillSamplerInfo(SDL_GPUSamplerCreateInfo *info, GLint minification, GLint magnification, GLint wrap_s,
                                GLint wrap_t)
 {
-    EPI_CLEAR_MEMORY(info, SDL_GPUSamplerCreateInfo, 1);
+    epi::ClearMemory(info, 1);
 
     info->address_mode_u = GpuAddressMode(wrap_s);
     info->address_mode_v = GpuAddressMode(wrap_t);
@@ -599,25 +599,24 @@ class GpuRenderState : public RenderState
         }
     }
 
-    void SetVertexArrays(const RendererVertex *vertices, int count)
+    void SetVertexArrays(std::span<const RendererVertex> vertices)
     {
-        vertex_array_base_  = vertices;
-        vertex_array_count_ = count;
+        vertex_array_ = vertices;
     }
 
     void DrawVertexArray(GLuint shape, int first, int count)
     {
-        if (!vertex_array_base_ || count <= 0)
+        if (vertex_array_.empty() || count <= 0)
             return;
 
         ApplyTextureBindings();
 
-        gpu_immediate.Draw(shape, vertex_array_base_ + first, count);
+        gpu_immediate.Draw(shape, vertex_array_.data() + first, count);
     }
 
-    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count)
+    uint32_t CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices)
     {
-        return gpu_immediate.CreateModelMesh(data, indices, index_count);
+        return gpu_immediate.CreateModelMesh(data, indices);
     }
 
     void DeleteModelMesh(uint32_t handle)
@@ -652,7 +651,7 @@ class GpuRenderState : public RenderState
         ApplyTextureBindings();
 
         GpuModelVertexParameters vertex_parameters;
-        EPI_CLEAR_MEMORY(&vertex_parameters, GpuModelVertexParameters, 1);
+        epi::ClearMemory(&vertex_parameters, 1);
 
         const epi::Mat4 &model_view = gpu_immediate.ModelViewMatrix();
         const epi::Mat4 &projection = gpu_immediate.ProjectionMatrix();
@@ -679,7 +678,7 @@ class GpuRenderState : public RenderState
         vertex_parameters.tint[3] = 1.0f;
 
         GpuModelFragmentParameters fragment_parameters;
-        EPI_CLEAR_MEMORY(&fragment_parameters, GpuModelFragmentParameters, 1);
+        epi::ClearMemory(&fragment_parameters, 1);
 
         fragment_parameters.alpha      = info.alpha;
         fragment_parameters.alpha_test = info.alpha_test;
@@ -736,25 +735,24 @@ class GpuRenderState : public RenderState
         gpu_immediate.RecordModelDraw(info, vertex_parameters, fragment_parameters);
     }
 
-    void SetModelIndices(const uint16_t *indices, int count)
+    void SetModelIndices(std::span<const uint16_t> indices)
     {
-        model_indices_     = indices;
-        model_index_count_ = count;
+        model_indices_ = indices;
     }
 
     void DrawModelIndexed(int index_first, int index_count)
     {
-        if (!vertex_array_base_ || !model_indices_ || index_count <= 0)
+        if (vertex_array_.empty() || model_indices_.empty() || index_count <= 0)
             return;
 
-        if (index_first < 0 || index_first + index_count > model_index_count_)
+        if (index_first < 0 || index_first + index_count > (int)model_indices_.size())
             return;
 
         ApplyTextureBindings();
 
         gpu_immediate.SetColorLookup(color_lookup_slot_);
 
-        gpu_immediate.DrawIndexed(vertex_array_base_, vertex_array_count_, model_indices_ + index_first, index_count);
+        gpu_immediate.DrawIndexed(vertex_array_, model_indices_.subspan(index_first, index_count));
 
         gpu_immediate.SetColorLookup(0);
     }
@@ -870,11 +868,9 @@ class GpuRenderState : public RenderState
 
     std::vector<GpuMipLevel> mip_levels_;
 
-    const RendererVertex *vertex_array_base_  = nullptr;
-    int                   vertex_array_count_ = 0;
+    std::span<const RendererVertex> vertex_array_;
 
-    const uint16_t *model_indices_     = nullptr;
-    int             model_index_count_ = 0;
+    std::span<const uint16_t> model_indices_;
 
     int color_lookup_slot_ = 0;
 };

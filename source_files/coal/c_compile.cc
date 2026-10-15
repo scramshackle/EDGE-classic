@@ -23,7 +23,6 @@
 //
 //----------------------------------------------------------------------
 
-#include <errno.h>
 #include <float.h>
 #include <math.h>
 #include <stdarg.h>
@@ -508,7 +507,7 @@ Type *RealVM::ParseType()
         return type;
 
     // function type
-    EPI_CLEAR_MEMORY(&t_new, Type, 1);
+    epi::ClearMemory(&t_new, 1);
     t_new.type     = ev_function;
     t_new.aux_type = type; // return type
     t_new.parm_num = 0;
@@ -578,13 +577,13 @@ Definition *RealVM::NewGlobal(Type *type)
     int tsize = type_size[type->type];
 
     Definition *var = new Definition;
-    EPI_CLEAR_MEMORY(var, Definition, 1);
+    epi::ClearMemory(var, 1);
 
     var->ofs  = global_mem_.Alloc(tsize * sizeof(double));
     var->type = type;
 
     // clear it
-    EPI_CLEAR_MEMORY((double *)global_mem_.Deref(var->ofs), double, tsize);
+    epi::ClearMemory((double *)global_mem_.Deref(var->ofs), tsize);
 
     return var;
 }
@@ -592,7 +591,7 @@ Definition *RealVM::NewGlobal(Type *type)
 Definition *RealVM::NewLocal(Type *type)
 {
     Definition *var = new Definition;
-    EPI_CLEAR_MEMORY(var, Definition, 1);
+    epi::ClearMemory(var, 1);
 
     var->ofs  = -(comp_.locals_end + 1);
     var->type = type;
@@ -1418,7 +1417,7 @@ void RealVM::GLOBFunction()
 
     Type t_new;
 
-    EPI_CLEAR_MEMORY(&t_new, Type, 1);
+    epi::ClearMemory(&t_new, 1);
     t_new.type         = ev_function;
     t_new.parm_num     = 0;
     t_new.aux_type     = &type_void;
@@ -1478,7 +1477,7 @@ void RealVM::GLOBFunction()
     COAL_G_FLOAT(def->ofs) = (double)functions_.size();
 
     Function *df = new Function;
-    EPI_CLEAR_MEMORY(df, Function, 1);
+    epi::ClearMemory(df, 1);
 
     functions_.push_back(df);
 
@@ -1640,7 +1639,7 @@ void RealVM::GLOBModule()
     else
     {
         def = new Definition;
-        EPI_CLEAR_MEMORY(def, Definition, 1);
+        epi::ClearMemory(def, 1);
 
         def->name  = mod_name;
         def->type  = &type_module;
@@ -1761,7 +1760,7 @@ RealVM::RealVM()
 
     // function #0 is the "null function"
     Function *df = new Function;
-    EPI_CLEAR_MEMORY(df, Function, 1);
+    epi::ClearMemory(df, 1);
 
     functions_.push_back(df);
 
@@ -1777,7 +1776,7 @@ RealVM::RealVM()
     // global #4-#6 are reserved for a zero value
     ofs = global_mem_.Alloc(7 * sizeof(double));
     EPI_ASSERT(ofs == 0);
-    EPI_CLEAR_MEMORY((double *)global_mem_.Deref(0), double, 7);
+    epi::ClearMemory((double *)global_mem_.Deref(0), 7);
 }
 
 RealVM::~RealVM()

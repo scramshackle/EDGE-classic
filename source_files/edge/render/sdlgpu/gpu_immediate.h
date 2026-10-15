@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <stdint.h>
 
+#include <span>
 #include <vector>
 
 #include "epi_vector.h"
@@ -300,8 +301,8 @@ class GpuImmediate
 
     void UploadColorLookup(int slot, const uint8_t *pixels);
 
-    uint32_t CreateStaticBuffer(const RendererVertex *vertices, int count, int capacity);
-    void     UpdateStaticBuffer(uint32_t handle, int first, const RendererVertex *vertices, int count);
+    uint32_t CreateStaticBuffer(std::span<const RendererVertex> vertices, int capacity);
+    void     UpdateStaticBuffer(uint32_t handle, int first, std::span<const RendererVertex> vertices);
     void     FlushStaticUploads();
     void     DeleteStaticBuffer(uint32_t handle);
     void     FlushDeletedStaticBuffers();
@@ -342,10 +343,9 @@ class GpuImmediate
 
     void Draw(GLuint shape, const RendererVertex *vertices, int32_t count);
 
-    void DrawIndexed(const RendererVertex *vertices, int32_t vertex_count, const uint16_t *indices,
-                     int32_t index_count);
+    void DrawIndexed(std::span<const RendererVertex> vertices, std::span<const uint16_t> indices);
 
-    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int32_t index_count);
+    uint32_t CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices);
 
     void DeleteModelMesh(uint32_t handle);
 

@@ -465,12 +465,12 @@ class Gles2RenderState : public RenderState
         state_dirty_ = true;
     }
 
-    void SetVertexArrays(const RendererVertex *vertices, int count)
+    void SetVertexArrays(std::span<const RendererVertex> vertices)
     {
-        vertex_array_base_ = vertices;
+        vertex_array_base_ = vertices.data();
 
-        if (vertices && count > 0)
-            gles2_immediate.UploadBatch(vertices, count);
+        if (!vertices.empty())
+            gles2_immediate.UploadBatch(vertices);
     }
 
     void DrawVertexArray(GLuint shape, int first, int count)
@@ -485,9 +485,9 @@ class Gles2RenderState : public RenderState
         gles2_immediate.Draw(shape, vertex_array_base_, first, count);
     }
 
-    uint32_t CreateModelMesh(const ModelMeshData &data, const uint16_t *indices, int index_count)
+    uint32_t CreateModelMesh(const ModelMeshData &data, std::span<const uint16_t> indices)
     {
-        return gles2_immediate.CreateModelMesh(data, indices, index_count);
+        return gles2_immediate.CreateModelMesh(data, indices);
     }
 
     void DeleteModelMesh(uint32_t handle)
@@ -583,9 +583,9 @@ class Gles2RenderState : public RenderState
         state_dirty_ = true;
     }
 
-    void SetModelIndices(const uint16_t *indices, int count)
+    void SetModelIndices(std::span<const uint16_t> indices)
     {
-        gles2_immediate.UploadModelIndices(indices, count);
+        gles2_immediate.UploadModelIndices(indices);
     }
 
     void DrawModelIndexed(int index_first, int index_count)

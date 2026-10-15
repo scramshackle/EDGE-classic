@@ -1045,7 +1045,7 @@ void CreatePlayer(int pnum, bool is_bot)
 
     Player *p = new Player;
 
-    EPI_CLEAR_MEMORY(p, Player, 1);
+    epi::ClearMemory(p, 1);
 
     p->player_number_ = pnum;
     p->player_state_  = kPlayerDead;

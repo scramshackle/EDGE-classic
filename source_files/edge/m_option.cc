@@ -2217,7 +2217,7 @@ static void OptionMenuChangeSoundbank(int key_pressed, ConsoleVariable *console_
 
     std::set<std::string>::iterator sf_pos;
 
-    if (!available_soundbanks.count(midi_soundbank.s_)) // Something is weird
+    if (!available_soundbanks.contains(midi_soundbank.s_)) // Something is weird
     {
         epi::LogMessage(epi::kLogLevelWarning, "OptionMenuChangeSoundbank: Could not read list of available "
                                                "soundbanks. "
@@ -2260,7 +2260,7 @@ static void OptionMenuChangeOverlay(int key_pressed, ConsoleVariable *console_va
 
     std::map<std::string, std::pair<ImageData *, unsigned int>>::iterator ov_pos;
 
-    if (!available_overlays.count(video_overlay.s_)) // Something is weird
+    if (!available_overlays.contains(video_overlay.s_)) // Something is weird
     {
         epi::LogMessage(epi::kLogLevelWarning, "OptionMenuChangeOverlay: Could not read list of available "
                                                "overlays. "
@@ -2302,7 +2302,7 @@ static void OptionMenuChangeCrosshair(int key_pressed, ConsoleVariable *console_
 
     std::map<std::string, unsigned int>::iterator ch_pos;
 
-    if (!available_crosshairs.count(crosshair_image.s_)) // Something is weird
+    if (!available_crosshairs.contains(crosshair_image.s_)) // Something is weird
     {
         epi::LogMessage(epi::kLogLevelWarning, "OptionMenuChangeOverlay: Could not read list of available "
                                                "overlays. "
