@@ -687,8 +687,25 @@ void ReleaseAllKeys(void)
 //
 void PostEvent(InputEvent *ev)
 {
+    if (ev->type == kInputEventKeyMouse && event_head != event_tail)
+    {
+        InputEvent *previous = &events[(event_head + kMaximumInputEvents - 1) % kMaximumInputEvents];
+
+        if (previous->type == kInputEventKeyMouse)
+        {
+            previous->value.mouse.dx += ev->value.mouse.dx;
+            previous->value.mouse.dy += ev->value.mouse.dy;
+            return;
+        }
+    }
+
+    int next_head = (event_head + 1) % kMaximumInputEvents;
+
+    if (next_head == event_tail)
+        return;
+
     events[event_head] = *ev;
-    event_head         = (event_head + 1) % kMaximumInputEvents;
+    event_head         = next_head;
 
 #ifdef EDGE_DEBUG_KEY_EV //!!!!
     if (ev->type == kInputEventKeyDown || ev->type == kInputEventKeyUp)
