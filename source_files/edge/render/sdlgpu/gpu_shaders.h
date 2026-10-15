@@ -103,9 +103,12 @@ struct GpuFragmentParameters
     float    sky_ty;
     float    sky_u_offset;
     float    sky_v_offset;
-    float    sky_vertical_fov_slope;
+    float    sky_fade_exponent;
     float    sky_horizon_shift;
     float    sky_is_box;
+    float    sky_band[4];
+    float    sky_cap_top[4];
+    float    sky_cap_bottom[4];
 
     float light_view[4];
     float light_range[4];
@@ -227,15 +230,18 @@ static_assert(offsetof(GpuFragmentParameters, sky_stretch_mode) == 192,
               "GpuFragmentParameters::sky_stretch_mode offset");
 static_assert(offsetof(GpuFragmentParameters, sky_horizon_shift) == 216,
               "GpuFragmentParameters::sky_horizon_shift offset");
-static_assert(offsetof(GpuFragmentParameters, light_view) == 224, "GpuFragmentParameters::light_view offset");
-static_assert(offsetof(GpuFragmentParameters, light_range) == 240, "GpuFragmentParameters::light_range offset");
-static_assert(offsetof(GpuFragmentParameters, glow_plane) == 256, "GpuFragmentParameters::glow_plane offset");
-static_assert(offsetof(GpuFragmentParameters, glow_color) == 288, "GpuFragmentParameters::glow_color offset");
-static_assert(offsetof(GpuFragmentParameters, glow_additive) == 320, "GpuFragmentParameters::glow_additive offset");
-static_assert(offsetof(GpuFragmentParameters, color_lookup) == 336, "GpuFragmentParameters::color_lookup offset");
-static_assert(offsetof(GpuFragmentParameters, blur) == 352, "GpuFragmentParameters::blur offset");
-static_assert(offsetof(GpuFragmentParameters, liquid) == 368, "GpuFragmentParameters::liquid offset");
-static_assert(sizeof(GpuFragmentParameters) == 384, "GpuFragmentParameters size");
+static_assert(offsetof(GpuFragmentParameters, sky_band) == 224, "GpuFragmentParameters::sky_band offset");
+static_assert(offsetof(GpuFragmentParameters, sky_cap_top) == 240, "GpuFragmentParameters::sky_cap_top offset");
+static_assert(offsetof(GpuFragmentParameters, sky_cap_bottom) == 256, "GpuFragmentParameters::sky_cap_bottom offset");
+static_assert(offsetof(GpuFragmentParameters, light_view) == 272, "GpuFragmentParameters::light_view offset");
+static_assert(offsetof(GpuFragmentParameters, light_range) == 288, "GpuFragmentParameters::light_range offset");
+static_assert(offsetof(GpuFragmentParameters, glow_plane) == 304, "GpuFragmentParameters::glow_plane offset");
+static_assert(offsetof(GpuFragmentParameters, glow_color) == 336, "GpuFragmentParameters::glow_color offset");
+static_assert(offsetof(GpuFragmentParameters, glow_additive) == 368, "GpuFragmentParameters::glow_additive offset");
+static_assert(offsetof(GpuFragmentParameters, color_lookup) == 384, "GpuFragmentParameters::color_lookup offset");
+static_assert(offsetof(GpuFragmentParameters, blur) == 400, "GpuFragmentParameters::blur offset");
+static_assert(offsetof(GpuFragmentParameters, liquid) == 416, "GpuFragmentParameters::liquid offset");
+static_assert(sizeof(GpuFragmentParameters) == 432, "GpuFragmentParameters size");
 
 bool CreateModelShaders(SDL_GPUDevice *device);
 

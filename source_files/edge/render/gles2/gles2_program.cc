@@ -235,7 +235,10 @@ bool Gles2Program::Init()
     uniform_sky_ty_                 = glGetUniformLocation(program_, "u_sky_ty");
     uniform_sky_u_offset_           = glGetUniformLocation(program_, "u_sky_u_offset");
     uniform_sky_v_offset_           = glGetUniformLocation(program_, "u_sky_v_offset");
-    uniform_sky_vertical_fov_slope_ = glGetUniformLocation(program_, "u_sky_vertical_fov_slope");
+    uniform_sky_band_               = glGetUniformLocation(program_, "u_sky_band");
+    uniform_sky_fade_exponent_      = glGetUniformLocation(program_, "u_sky_fade_exponent");
+    uniform_sky_cap_top_            = glGetUniformLocation(program_, "u_sky_cap_top");
+    uniform_sky_cap_bottom_         = glGetUniformLocation(program_, "u_sky_cap_bottom");
     uniform_sky_horizon_shift_      = glGetUniformLocation(program_, "u_sky_horizon_shift");
     uniform_sky_is_box_             = glGetUniformLocation(program_, "u_sky_is_box");
     uniform_sky_geometry_           = glGetUniformLocation(program_, "u_sky_geometry");
@@ -550,7 +553,15 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
     glUniform1f(uniform_sky_ty_, sky_pass->ty);
     glUniform1f(uniform_sky_u_offset_, sky_pass->u_offset);
     glUniform1f(uniform_sky_v_offset_, sky_pass->v_offset);
-    glUniform1f(uniform_sky_vertical_fov_slope_, sky_pass->vertical_fov_slope);
+    glUniform4f(uniform_sky_band_, sky_pass->band_top.x, sky_pass->band_top.y, sky_pass->band_bottom.x,
+                sky_pass->band_bottom.y);
+    glUniform1f(uniform_sky_fade_exponent_, sky_pass->fade_exponent);
+    glUniform4f(uniform_sky_cap_top_, epi::GetRGBARed(sky_pass->cap_top_color) / 255.0f,
+                epi::GetRGBAGreen(sky_pass->cap_top_color) / 255.0f,
+                epi::GetRGBABlue(sky_pass->cap_top_color) / 255.0f, 1.0f);
+    glUniform4f(uniform_sky_cap_bottom_, epi::GetRGBARed(sky_pass->cap_bottom_color) / 255.0f,
+                epi::GetRGBAGreen(sky_pass->cap_bottom_color) / 255.0f,
+                epi::GetRGBABlue(sky_pass->cap_bottom_color) / 255.0f, 1.0f);
     glUniform1f(uniform_sky_horizon_shift_, sky_pass->horizon_shift);
     glUniform1f(uniform_sky_fog_depth_, sky_pass->fog_depth);
 

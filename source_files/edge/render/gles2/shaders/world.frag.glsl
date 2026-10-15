@@ -49,7 +49,10 @@ uniform float u_sky_u_scale;
 uniform float u_sky_ty;
 uniform float u_sky_u_offset;
 uniform float u_sky_v_offset;
-uniform float u_sky_vertical_fov_slope;
+uniform vec4  u_sky_band;
+uniform float u_sky_fade_exponent;
+uniform vec4  u_sky_cap_top;
+uniform vec4  u_sky_cap_bottom;
 uniform float u_sky_horizon_shift;
 uniform float u_sky_is_box;
 
@@ -66,11 +69,6 @@ const float kSkyStretchMirror  = 0.0;
 const float kSkyStretchRepeat  = 1.0;
 const float kSkyStretchStretch = 2.0;
 const float kSkyStretchVanilla = 3.0;
-
-const int   kSkyPinchTaps      = 64;
-const float kSkyPinchTapWeight = 0.015625;
-const float kSkyPinchFadeStart = 0.9397;
-const float kSkyPinchFadeEnd   = 0.9848;
 
 float FogFactor()
 {
@@ -123,52 +121,26 @@ vec4 SampleEquirectSky()
     const float kTwoPi = 6.28318530718;
 
     float horiz_len = max(length(dir.xy), 0.0001);
-    float sky_tan   = dir.z / horiz_len - u_sky_horizon_shift;
-    float p         = sky_tan / sqrt(1.0 + sky_tan * sky_tan);
+    float sky_z     = dir.z / horiz_len - u_sky_horizon_shift;
     float u = fract((atan(dir.y, dir.x) / kTwoPi + 0.5) * u_sky_u_scale + u_sky_u_offset);
 
-    bool mode_is_vanilla = abs(u_sky_stretch_mode - kSkyStretchVanilla) < 0.5;
-    bool mode_is_mirror  = abs(u_sky_stretch_mode - kSkyStretchMirror) < 0.5;
-    bool lower_hemisphere = p < 0.0;
+    bool mode_is_mirror = abs(u_sky_stretch_mode - kSkyStretchMirror) < 0.5;
 
-    float v_raw;
+    float base  = sky_z * 0.5 * u_sky_ty;
+    float v_raw = (mode_is_mirror && sky_z < 0.0) ? -(base + u_sky_v_offset) : (base - u_sky_v_offset);
 
-    if (mode_is_vanilla)
-    {
-        float pc = clamp(sky_tan / u_sky_vertical_fov_slope, -1.0, 1.0);
-        v_raw           = (pc + 1.0) * 0.5 * u_sky_ty - u_sky_v_offset;
-    }
-    else if (mode_is_mirror)
-    {
-        float base = (p + 1.0) * 0.5 * u_sky_ty;
-        v_raw      = lower_hemisphere ? -(base + u_sky_v_offset) : (base - u_sky_v_offset);
-    }
+    vec4 sampled = texture2D(u_texture0, vec2(u, fract(v_raw)));
+
+    float top_alpha    = clamp((u_sky_band.x - sky_z) / (u_sky_band.x - u_sky_band.y), 0.0, 1.0);
+    float bottom_alpha = clamp((sky_z - u_sky_band.w) / (u_sky_band.z - u_sky_band.w), 0.0, 1.0);
+    float sky_alpha    = 1.0 - pow(1.0 - min(top_alpha, bottom_alpha), u_sky_fade_exponent);
+
+    vec3 cap = (sky_z > 0.5 * (u_sky_band.y + u_sky_band.z)) ? u_sky_cap_top.rgb : u_sky_cap_bottom.rgb;
+
+    if (sky_alpha <= 0.0)
+        sampled = vec4(cap, 1.0);
     else
-    {
-        v_raw = (p + 1.0) * 0.5 * u_sky_ty - u_sky_v_offset;
-    }
-
-    float v = fract(v_raw);
-
-    vec4 sampled = texture2D(u_texture0, vec2(u, v));
-
-    float pinch_mix = smoothstep(kSkyPinchFadeStart, kSkyPinchFadeEnd, abs(dir.z));
-
-    if (pinch_mix > 0.0)
-    {
-        vec4 averaged = vec4(0.0);
-
-        float average_span = min(abs(u_sky_u_scale), 1.0);
-
-        for (int i = 0; i < kSkyPinchTaps; i++)
-        {
-            float tap = (float(i) + 0.5) * kSkyPinchTapWeight - 0.5;
-
-            averaged += texture2D(u_texture0, vec2(fract(u + tap * average_span), v));
-        }
-
-        sampled = mix(sampled, averaged * kSkyPinchTapWeight, pinch_mix);
-    }
+        sampled = vec4(mix(cap, sampled.rgb, sky_alpha), mix(1.0, sampled.a, sky_alpha));
 
     vec3 rgb = sampled.rgb * v_color.rgb;
 

@@ -431,7 +431,7 @@ static OptionMenuItem vidoptions[] = {
      OptionMenuChangeMipMap, "Applies to all native-resolution images", nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Title/Intermission Scaling", "Normal/Border Fill", 2, &title_scaling.d_,
      OptionMenuUpdateConsoleVariableFromInt, nullptr, &title_scaling, 0, 0, 0, ""},
-    {kOptionMenuItemTypeSwitch, "Sky Scaling", "Mirror/Repeat/Stretch", 3, &sky_stretch_mode.d_,
+    {kOptionMenuItemTypeSwitch, "Sky Scaling", "Mirror/Repeat/Stretch/Vanilla", 4, &sky_stretch_mode.d_,
      OptionMenuUpdateConsoleVariableFromInt, "Vanilla scaling is used whenever Mouselook is Off", &sky_stretch_mode, 0,
      0, 0, ""},
     {kOptionMenuItemTypeSwitch, "Dynamic Lighting", YesNo, 2, &use_dynamic_lights, nullptr, nullptr, nullptr, 0, 0, 0,

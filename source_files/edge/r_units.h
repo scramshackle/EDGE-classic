@@ -193,8 +193,12 @@ struct SkyPassInfo
     float    u_offset           = 0.0f;
     float    v_offset           = 0.0f;
     float    fog_depth          = 0.0f;
-    float    vertical_fov_slope = 1.0f;
     float    horizon_shift      = 0.0f;
+    epi::Vec2 band_top          = {1.0f, 0.75f};
+    epi::Vec2 band_bottom       = {-0.75f, -1.0f};
+    float    fade_exponent      = 1.0f;
+    epi::RGBAColor cap_top_color    = kRGBABlack;
+    epi::RGBAColor cap_bottom_color = kRGBABlack;
     GLuint   cube_texture       = 0;
     int      is_box             = 0;
     int      is_geometry        = 0;

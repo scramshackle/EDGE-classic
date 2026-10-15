@@ -22,6 +22,7 @@
 #include <math.h>
 
 #include <algorithm>
+#include <bit>
 
 #include "dm_colors.h"
 #include "dm_state.h"
@@ -66,7 +67,7 @@ static int      ddf_scroll_tic     = -1;
 
 SkyStretch current_sky_stretch = kSkyStretchUnset;
 
-EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 2);
+EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(sky_stretch_mode, "0", kConsoleVariableFlagArchive, 0, 3);
 
 struct SectorSkyRing
 {
@@ -223,6 +224,9 @@ struct FakeSkybox
     int face_size = 1;
 
     GLuint cubemap = 0;
+
+    epi::RGBAColor cap_top_color    = kRGBABlack;
+    epi::RGBAColor cap_bottom_color = kRGBABlack;
 
     // face images are only present for custom skyboxes.
     // pseudo skyboxes are generated outside of the image system.
@@ -1277,11 +1281,6 @@ static void RenderSkyEquirect(const SkySection &section)
     if (sky_mirror_active)
         sky_pass_info.inverse_view = epi::MultiplyMatrices(sky_mirror_inverse, sky_pass_info.inverse_view);
 
-    float ty = 2.0f;
-
-    if (current_sky_stretch == kSkyStretchStretch || current_sky_stretch == kSkyStretchVanilla)
-        ty = 1.0f;
-
     epi::RGBAColor fc_to_use = current_map->outdoor_fog_color_;
     float        fd_to_use = 0.01f * current_map->outdoor_fog_density_;
     BlendingMode blend     = kBlendingNone;
@@ -1365,16 +1364,53 @@ static void RenderSkyEquirect(const SkySection &section)
         sky_u_offset = offx + (sky_rotation - 0.75f) * sky_horizontal_tilings;
     }
 
+    bool  tall_sky      = sky_image->ScaledHeight() > 128;
+    float height_ratio  = tall_sky ? sky_image->ScaledHeight() / 256.0f : 1.0f;
+    float ty            = 2.0f;
     float horizon_shift = -0.15f;
 
-    if (current_sky_stretch == kSkyStretchStretch)
-        horizon_shift = 0.15f;
-    else if (current_sky_stretch == kSkyStretchVanilla)
-    {
-        float band_fraction = (sky_image->ScaledHeight() > 128) ? 0.30f : 0.18f;
+    epi::RGBAColor cap_top_color    = current_fake_box ? current_fake_box->cap_top_color : culling_fog_color;
+    epi::RGBAColor cap_bottom_color = current_fake_box ? current_fake_box->cap_bottom_color : culling_fog_color;
 
-        horizon_shift = (1.0f - 2.0f * band_fraction) * view_y_slope;
+    if (current_sky_stretch == kSkyStretchVanilla)
+    {
+        if (tall_sky)
+        {
+            horizon_shift          = -0.30f;
+            sky_pass_info.band_top = {height_ratio, height_ratio * 0.98f};
+            sky_pass_info.band_bottom = {height_ratio * 0.02f, 0.0f};
+        }
+        else
+        {
+            ty                        = 3.0f;
+            horizon_shift             = -0.45f;
+            sky_pass_info.band_top    = {1.0f, 0.98f};
+            sky_pass_info.band_bottom = {0.35f, 0.33f};
+        }
     }
+    else
+    {
+        if (current_sky_stretch == kSkyStretchStretch)
+        {
+            ty            = tall_sky ? height_ratio : 1.0f;
+            height_ratio  = 1.0f;
+            horizon_shift = 0.15f;
+        }
+        else if (current_sky_stretch == kSkyStretchMirror)
+            cap_bottom_color = cap_top_color;
+
+        sky_pass_info.band_top      = {height_ratio, height_ratio * 0.5f};
+        sky_pass_info.band_bottom   = {-height_ratio * 0.5f, -height_ratio};
+        sky_pass_info.fade_exponent = 3.0f;
+    }
+
+    float padded_scale = (float)std::bit_ceil((uint32_t)sky_image->height_) / (float)sky_image->height_;
+    float v_anchor     = (0.5f * ty - floorf(0.5f * ty)) * padded_scale;
+
+    ty *= padded_scale;
+
+    sky_pass_info.cap_top_color    = cap_top_color;
+    sky_pass_info.cap_bottom_color = cap_bottom_color;
 
     sky_pass_info.viewport_origin    = {(float)view_window_x, (float)view_window_y};
     sky_pass_info.viewport_size      = {(float)view_window_width, (float)view_window_height};
@@ -1382,9 +1418,8 @@ static void RenderSkyEquirect(const SkySection &section)
     sky_pass_info.ty                 = ty;
     sky_pass_info.u_scale            = sky_u_scale;
     sky_pass_info.u_offset           = sky_u_offset;
-    sky_pass_info.v_offset           = offy;
+    sky_pass_info.v_offset           = offy - v_anchor;
     sky_pass_info.fog_depth          = renderer_far_clip.f_ * 2.0f;
-    sky_pass_info.vertical_fov_slope = view_y_slope;
     sky_pass_info.horizon_shift      = horizon_shift;
     sky_pass_info.is_geometry        = 1;
 
@@ -1802,7 +1837,8 @@ void UpdateSkyboxTextures(void)
 
     if (info->base_sky == sky_image)
     {
-        custom_skybox = (info->face[kSkyboxNorth] != nullptr);
+        custom_skybox     = (info->face[kSkyboxNorth] != nullptr);
+        culling_fog_color = info->cap_bottom_color;
         return;
     }
 
@@ -1835,6 +1871,9 @@ void UpdateSkyboxTextures(void)
         tmp_img_data = rgb_img_data;
     }
     culling_fog_color = tmp_img_data->AverageColor(0, sky_image->width_, 0, sky_image->height_ / 2);
+    info->cap_bottom_color = culling_fog_color;
+    info->cap_top_color =
+        tmp_img_data->AverageColor(0, sky_image->width_, sky_image->height_ * 3 / 4, sky_image->height_);
     delete tmp_img_data;
 
     if (what_palette)
