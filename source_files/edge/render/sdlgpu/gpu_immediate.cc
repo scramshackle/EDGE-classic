@@ -1203,9 +1203,24 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
         current_fragment_parameters_.sky_ty                 = sky_pass->ty;
         current_fragment_parameters_.sky_u_offset           = sky_pass->u_offset;
         current_fragment_parameters_.sky_v_offset           = sky_pass->v_offset;
-        current_fragment_parameters_.sky_vertical_fov_slope = sky_pass->vertical_fov_slope;
         current_fragment_parameters_.sky_horizon_shift      = sky_pass->horizon_shift;
+        current_fragment_parameters_.sky_fade_exponent      = sky_pass->fade_exponent;
         current_fragment_parameters_.sky_is_box            = sky_pass->is_box ? 1.0f : 0.0f;
+
+        current_fragment_parameters_.sky_band[0] = sky_pass->band_top.x;
+        current_fragment_parameters_.sky_band[1] = sky_pass->band_top.y;
+        current_fragment_parameters_.sky_band[2] = sky_pass->band_bottom.x;
+        current_fragment_parameters_.sky_band[3] = sky_pass->band_bottom.y;
+
+        current_fragment_parameters_.sky_cap_top[0] = epi::GetRGBARed(sky_pass->cap_top_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_top[1] = epi::GetRGBAGreen(sky_pass->cap_top_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_top[2] = epi::GetRGBABlue(sky_pass->cap_top_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_top[3] = 1.0f;
+
+        current_fragment_parameters_.sky_cap_bottom[0] = epi::GetRGBARed(sky_pass->cap_bottom_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_bottom[1] = epi::GetRGBAGreen(sky_pass->cap_bottom_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_bottom[2] = epi::GetRGBABlue(sky_pass->cap_bottom_color) / 255.0f;
+        current_fragment_parameters_.sky_cap_bottom[3] = 1.0f;
 
         const GpuImage *cube = sky_pass->cube_texture ? GetGpuImage(sky_pass->cube_texture) : nullptr;
 

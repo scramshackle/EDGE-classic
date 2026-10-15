@@ -161,7 +161,10 @@ class Gles2Program
     GLint uniform_sky_ty_                 = -1;
     GLint uniform_sky_u_offset_           = -1;
     GLint uniform_sky_v_offset_           = -1;
-    GLint uniform_sky_vertical_fov_slope_ = -1;
+    GLint uniform_sky_band_               = -1;
+    GLint uniform_sky_fade_exponent_      = -1;
+    GLint uniform_sky_cap_top_            = -1;
+    GLint uniform_sky_cap_bottom_         = -1;
     GLint uniform_sky_geometry_ = -1;
     GLint uniform_sky_is_box_ = -1;
     GLint uniform_sky_cube_    = -1;
