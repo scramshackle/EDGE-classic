@@ -30,7 +30,6 @@
 #include "e_player.h"
 #include "epi_endian.h"
 #include "epi_str_util.h"
-#include "epi_windows.h"
 #include "g_game.h"
 #include "i_system.h"
 #include "m_argv.h"
@@ -44,12 +43,8 @@ extern void      COALSetFloat(coal::VM *vm, const char *mod_name, const char *va
 // only true if packets are exchanged with a server
 bool network_game = false;
 
-EDGE_DEFINE_CONSOLE_VARIABLE(busy_wait, "1",
+EDGE_DEFINE_CONSOLE_VARIABLE(busy_wait, "0",
                              kConsoleVariableFlagReadOnly) // Not sure what to rename this yet - Dasho
-
-#if !defined(__MINGW32__) && (defined(WIN32) || defined(_WIN32) || defined(_WIN64))
-HANDLE windows_timer = nullptr;
-#endif
 
 // game_tic is the tic about to (or currently being) run.
 // make_tic is the tic that hasn't had control made for it yet.
@@ -76,25 +71,10 @@ void NetworkInitialize(void)
     srand(PureRandomNumber());
 
     ResetTics();
-
-#if !defined(__MINGW32__) && (defined(WIN32) || defined(_WIN32) || defined(_WIN64))
-    windows_timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-    if (windows_timer != nullptr)
-    {
-        busy_wait = 0;
-    }
-#endif
 }
 
 void NetworkShutdown(void)
 {
-#if !defined(__MINGW32__) && (defined(WIN32) || defined(_WIN32) || defined(_WIN64))
-    if (windows_timer)
-    {
-        CloseHandle(windows_timer);
-        windows_timer = nullptr;
-    }
-#endif
 }
 
 static void PreInput()

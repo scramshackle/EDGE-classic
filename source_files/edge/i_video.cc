@@ -117,6 +117,8 @@ void GrabCursor(bool enable)
         SDL_SetWindowMouseGrab(program_window, false);
         SDL_SetWindowRelativeMouseMode(program_window, false);
     }
+
+    ControlSetMouseMotionPolling(SDL_GetWindowRelativeMouseMode(program_window));
 #endif
 }
 
@@ -513,10 +515,7 @@ void FinishFrame(void)
 
                 remaining_time = target_time - elapsed_time;
 
-                if (remaining_time > 2000)
-                {
-                    SleepForMilliseconds((remaining_time - 2000) / 1000);
-                }
+                SDL_DelayPrecise(remaining_time * SDL_NS_PER_US);
             }
         }
     }
