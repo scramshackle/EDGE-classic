@@ -2498,9 +2498,16 @@ void GpuImmediate::Replay()
 
     ApplyPassState();
 
+    bool pass_untouched       = true;
+    bool pass_depth_cleared   = true;
+    bool pass_stencil_cleared = true;
+
     for (size_t i = 0; i < commands_.size(); i++)
     {
         const GpuCommand *command = &commands_[i];
+
+        if (IsDrawCommand(command->type))
+            pass_untouched = false;
 
         if (command->type == kGpuCommandMovie)
         {
@@ -2808,17 +2815,25 @@ void GpuImmediate::Replay()
                 gpu_device.BeginPass(gpu_device.WorldDirect() ? kGpuLoadOperationLoad : kGpuLoadOperationClear,
                                      kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuPassTargetWorld);
 
+                pass_untouched       = true;
+                pass_depth_cleared   = true;
+                pass_stencil_cleared = true;
+
                 ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandBeginOitTarget)
             {
                 gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetOit);
+
+                pass_untouched = false;
             }
             else if (command->type == kGpuCommandEndOitTarget)
             {
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetWorld);
+
+                pass_untouched = false;
             }
             else if (command->type == kGpuCommandResolveWorldTarget)
             {
@@ -2844,17 +2859,33 @@ void GpuImmediate::Replay()
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetMain);
 
+                pass_untouched = false;
+
                 ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandClearStencil)
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear,
-                                     gpu_device.CurrentTarget());
+                if (!pass_untouched || !pass_stencil_cleared)
+                {
+                    gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear,
+                                         gpu_device.CurrentTarget());
+
+                    pass_depth_cleared   = pass_untouched && pass_depth_cleared;
+                    pass_untouched       = true;
+                    pass_stencil_cleared = true;
+                }
             }
             else
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
-                                     gpu_device.CurrentTarget());
+                if (!pass_untouched || !pass_depth_cleared)
+                {
+                    gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
+                                         gpu_device.CurrentTarget());
+
+                    pass_stencil_cleared = pass_untouched && pass_stencil_cleared;
+                    pass_untouched       = true;
+                    pass_depth_cleared   = true;
+                }
             }
 
             ApplyPassState();
