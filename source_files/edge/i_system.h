@@ -79,6 +79,8 @@ void ControlGetEvents(void);
 
 void ControlPumpEvents(void);
 
+void ControlSetMouseMotionPolling(bool enable);
+
 // Used when hotplugging controllers
 void CheckJoystickChanged(void);
 

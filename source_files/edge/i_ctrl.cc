@@ -41,6 +41,9 @@ bool eat_mouse_motion = true;
 bool no_joystick;                     // what a wowser, joysticks completely disabled
 
 bool                need_mouse_recapture = false;
+static bool         mouse_motion_polled  = false;
+static float        mouse_remainder_x    = 0.0f;
+static float        mouse_remainder_y    = 0.0f;
 std::set<SDL_JoystickID> attached_joysticks;
 static std::set<SDL_JoystickID>::iterator joystick_device;
 SDL_Joystick       *joystick_info        = nullptr;
@@ -812,6 +815,57 @@ void StartupControl(void)
     StartupJoystick();
 }
 
+static void PollMouseMotion(void)
+{
+    float dx = 0.0f;
+    float dy = 0.0f;
+
+    SDL_GetRelativeMouseState(&dx, &dy);
+
+    if (!(app_state & kApplicationActive) || eat_mouse_motion)
+    {
+        if (app_state & kApplicationActive)
+            eat_mouse_motion = false;
+        mouse_remainder_x = 0.0f;
+        mouse_remainder_y = 0.0f;
+        return;
+    }
+
+    dx += mouse_remainder_x;
+    dy += mouse_remainder_y;
+
+    int whole_dx = (int)dx;
+    int whole_dy = (int)dy;
+
+    mouse_remainder_x = dx - (float)whole_dx;
+    mouse_remainder_y = dy - (float)whole_dy;
+
+    if (whole_dx || whole_dy)
+    {
+        InputEvent event;
+
+        event.type           = kInputEventKeyMouse;
+        event.value.mouse.dx = whole_dx;
+        event.value.mouse.dy = -whole_dy;
+
+        PostEvent(&event);
+    }
+}
+
+void ControlSetMouseMotionPolling(bool enable)
+{
+    if (enable == mouse_motion_polled)
+        return;
+
+    mouse_motion_polled = enable;
+
+    SDL_SetEventEnabled(SDL_EVENT_MOUSE_MOTION, !enable);
+    SDL_GetRelativeMouseState(nullptr, nullptr);
+
+    mouse_remainder_x = 0.0f;
+    mouse_remainder_y = 0.0f;
+}
+
 void ControlGetEvents(void)
 {
     SDL_Event sdl_ev;
@@ -823,6 +877,9 @@ void ControlGetEvents(void)
         else
             InactiveEventProcess(&sdl_ev);
     }
+
+    if (mouse_motion_polled)
+        PollMouseMotion();
 }
 
 void ControlPumpEvents(void)
