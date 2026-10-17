@@ -1002,6 +1002,9 @@ void BSPWalkThing(MapObject *mo)
     if (epi::AlmostEquals(mo->visibility_, 0.0f))
         return;
 
+    if (mo->flags_ & kMapObjectFlagNoSector)
+        return;
+
     bool is_model = (mo->state_->flags & kStateFrameFlagModel) ? true : false;
 
     // transform the origin point
@@ -1676,7 +1679,7 @@ static bool ResidentSignaturesMatch(const ResidentSignature &a, const ResidentSi
 
 static void DynamicThingAdd(MapObject *mo)
 {
-    if (mo->render_dynamic_index_ >= 0)
+    if (mo->render_dynamic_index_ >= 0 || (mo->flags_ & kMapObjectFlagNoSector))
         return;
 
     mo->render_dynamic_index_ = (int)dynamic_things.size();
@@ -1699,6 +1702,14 @@ static void DynamicThingRemove(MapObject *mo)
     dynamic_things.pop_back();
 
     mo->render_dynamic_index_ = -1;
+}
+
+static void DynamicThingRefresh(MapObject *mo)
+{
+    if (mo->flags_ & kMapObjectFlagNoSector)
+        DynamicThingRemove(mo);
+    else
+        DynamicThingAdd(mo);
 }
 
 static void MarkResidentSlot(ResidentBatch &batch, int slot)
@@ -1914,10 +1925,9 @@ void ThingRenderTic(MapObject *mo)
         mo->render_quiet_tics_ = 0;
 
         if (mo->render_resident_batch_ >= 0)
-        {
             ResidentThingRemove(mo);
-            DynamicThingAdd(mo);
-        }
+
+        DynamicThingRefresh(mo);
 
         return;
     }
@@ -1930,6 +1940,8 @@ void ThingRenderTic(MapObject *mo)
 
         if (mo->render_resident_batch_ >= 0)
             AddResidentCandidate(mo);
+        else
+            DynamicThingRefresh(mo);
     }
 
     if (mo->render_quiet_tics_ >= 2)
