@@ -95,7 +95,7 @@ void Gles2UploadColorLookup(int slot, const uint8_t *pixels)
     color_lookup_bound = color_lookup_textures[slot];
 }
 
-static GLuint CompileStage(GLenum stage, const char *source, const char *label)
+static GLuint CompileStage(GLenum stage, const char *source, const char *label, const char *defines = "")
 {
     GLuint shader = glCreateShader(stage);
 
@@ -104,9 +104,9 @@ static GLuint CompileStage(GLenum stage, const char *source, const char *label)
         FatalError("Gles2Program: glCreateShader failed for %s\n", label);
     }
 
-    const char *strings[2] = {Gles2ShaderPreamble(stage == GL_FRAGMENT_SHADER), source};
+    const char *strings[3] = {Gles2ShaderPreamble(stage == GL_FRAGMENT_SHADER), defines, source};
 
-    glShaderSource(shader, 2, strings, nullptr);
+    glShaderSource(shader, 3, strings, nullptr);
     glCompileShader(shader);
 
     GLint compiled = GL_FALSE;
@@ -130,145 +130,228 @@ static GLuint CompileStage(GLenum stage, const char *source, const char *label)
     return shader;
 }
 
-bool Gles2Program::Init()
+void Gles2Program::LinkVariant(int32_t variant, const char *defines)
 {
     GLuint vertex_shader   = CompileStage(GL_VERTEX_SHADER, kWorldVertexSource, "world.vert.glsl");
-    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kWorldFragmentSource, "world.frag.glsl");
+    GLuint fragment_shader = CompileStage(GL_FRAGMENT_SHADER, kWorldFragmentSource, "world.frag.glsl", defines);
 
-    program_ = glCreateProgram();
+    GLuint program = glCreateProgram();
 
-    if (!program_)
+    if (!program)
     {
         FatalError("Gles2Program: glCreateProgram failed\n");
     }
 
-    glAttachShader(program_, vertex_shader);
-    glAttachShader(program_, fragment_shader);
+    glAttachShader(program, vertex_shader);
+    glAttachShader(program, fragment_shader);
 
-    glBindAttribLocation(program_, kGles2AttributePosition, "a_position");
-    glBindAttribLocation(program_, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
-    glBindAttribLocation(program_, kGles2AttributeColor, "a_color");
-    glBindAttribLocation(program_, kGles2AttributeSpriteOrigin, "a_sprite_origin");
-    glBindAttribLocation(program_, kGles2AttributeSpriteExtent, "a_sprite_extent");
-    glBindAttribLocation(program_, kGles2AttributeSpriteFuzz, "a_sprite_fuzz");
-    glBindAttribLocation(program_, kGles2AttributeSpriteLight, "a_sprite_light");
+    glBindAttribLocation(program, kGles2AttributePosition, "a_position");
+    glBindAttribLocation(program, kGles2AttributeTextureCoordinates, "a_texture_coordinates");
+    glBindAttribLocation(program, kGles2AttributeColor, "a_color");
+    glBindAttribLocation(program, kGles2AttributeSpriteOrigin, "a_sprite_origin");
+    glBindAttribLocation(program, kGles2AttributeSpriteExtent, "a_sprite_extent");
+    glBindAttribLocation(program, kGles2AttributeSpriteFuzz, "a_sprite_fuzz");
+    glBindAttribLocation(program, kGles2AttributeSpriteLight, "a_sprite_light");
 
-    glLinkProgram(program_);
+    glLinkProgram(program);
 
     GLint linked = GL_FALSE;
-    glGetProgramiv(program_, GL_LINK_STATUS, &linked);
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
 
     if (linked != GL_TRUE)
     {
         GLint log_length = 0;
-        glGetProgramiv(program_, GL_INFO_LOG_LENGTH, &log_length);
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
 
         char *log = (char *)calloc((size_t)(log_length > 1 ? log_length : 1), 1);
 
         if (log_length > 1)
         {
-            glGetProgramInfoLog(program_, log_length, nullptr, log);
+            glGetProgramInfoLog(program, log_length, nullptr, log);
         }
 
         FatalError("Gles2Program: world program failed to link:\n%s\n", log);
     }
 
-    glDetachShader(program_, vertex_shader);
-    glDetachShader(program_, fragment_shader);
+    glDetachShader(program, vertex_shader);
+    glDetachShader(program, fragment_shader);
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
-    uniform_model_view_projection_ = glGetUniformLocation(program_, "u_model_view_projection");
-    uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
-    uniform_texture0_              = glGetUniformLocation(program_, "u_texture0");
-    uniform_texture1_              = glGetUniformLocation(program_, "u_texture1");
-    uniform_multi_texture_         = glGetUniformLocation(program_, "u_multi_texture");
-    uniform_light_falloff_         = glGetUniformLocation(program_, "u_light_falloff");
-    uniform_world_lit_             = glGetUniformLocation(program_, "u_world_lit");
-    uniform_light_data_            = glGetUniformLocation(program_, "u_light_data");
-    uniform_light_headers_         = glGetUniformLocation(program_, "u_light_headers");
-    uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
-    uniform_light_list_            = glGetUniformLocation(program_, "u_light_list");
-    uniform_light_view_            = glGetUniformLocation(program_, "u_light_view");
-    uniform_light_cluster_         = glGetUniformLocation(program_, "u_light_cluster");
-    uniform_light_bounds_min_      = glGetUniformLocation(program_, "u_light_bounds_min");
-    uniform_light_bounds_range_    = glGetUniformLocation(program_, "u_light_bounds_range");
-    uniform_light_radius_scale_    = glGetUniformLocation(program_, "u_light_radius_scale");
-    uniform_light_data_step_       = glGetUniformLocation(program_, "u_light_data_step");
-    uniform_glow_count_            = glGetUniformLocation(program_, "u_glow_count");
-    uniform_glow_plane_            = glGetUniformLocation(program_, "u_glow_plane");
-    uniform_glow_color_            = glGetUniformLocation(program_, "u_glow_color");
-    uniform_glow_additive_         = glGetUniformLocation(program_, "u_glow_additive");
-    uniform_line_mode_             = glGetUniformLocation(program_, "u_line_mode");
-    uniform_skip_rgb_              = glGetUniformLocation(program_, "u_skip_rgb");
-    uniform_alpha_test_            = glGetUniformLocation(program_, "u_alpha_test");
-    uniform_fog_mode_              = glGetUniformLocation(program_, "u_fog_mode");
-    uniform_fog_color_             = glGetUniformLocation(program_, "u_fog_color");
-    uniform_fog_density_           = glGetUniformLocation(program_, "u_fog_density");
-    uniform_fog_start_             = glGetUniformLocation(program_, "u_fog_start");
-    uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
+    locations_.model_view_projection = glGetUniformLocation(program, "u_model_view_projection");
+    locations_.model_view            = glGetUniformLocation(program, "u_model_view");
+    locations_.texture0              = glGetUniformLocation(program, "u_texture0");
+    locations_.texture1              = glGetUniformLocation(program, "u_texture1");
+    locations_.multi_texture         = glGetUniformLocation(program, "u_multi_texture");
+    locations_.light_falloff         = glGetUniformLocation(program, "u_light_falloff");
+    locations_.world_lit             = glGetUniformLocation(program, "u_world_lit");
+    locations_.light_data            = glGetUniformLocation(program, "u_light_data");
+    locations_.light_headers         = glGetUniformLocation(program, "u_light_headers");
+    locations_.light_indices         = glGetUniformLocation(program, "u_light_indices");
+    locations_.light_list            = glGetUniformLocation(program, "u_light_list");
+    locations_.light_view            = glGetUniformLocation(program, "u_light_view");
+    locations_.light_cluster         = glGetUniformLocation(program, "u_light_cluster");
+    locations_.light_bounds_min      = glGetUniformLocation(program, "u_light_bounds_min");
+    locations_.light_bounds_range    = glGetUniformLocation(program, "u_light_bounds_range");
+    locations_.light_radius_scale    = glGetUniformLocation(program, "u_light_radius_scale");
+    locations_.light_data_step       = glGetUniformLocation(program, "u_light_data_step");
+    locations_.glow_count            = glGetUniformLocation(program, "u_glow_count");
+    locations_.glow_plane            = glGetUniformLocation(program, "u_glow_plane");
+    locations_.glow_color            = glGetUniformLocation(program, "u_glow_color");
+    locations_.glow_additive         = glGetUniformLocation(program, "u_glow_additive");
+    locations_.line_mode             = glGetUniformLocation(program, "u_line_mode");
+    locations_.skip_rgb              = glGetUniformLocation(program, "u_skip_rgb");
+    locations_.alpha_test            = glGetUniformLocation(program, "u_alpha_test");
+    locations_.fog_mode              = glGetUniformLocation(program, "u_fog_mode");
+    locations_.fog_color             = glGetUniformLocation(program, "u_fog_color");
+    locations_.fog_density           = glGetUniformLocation(program, "u_fog_density");
+    locations_.fog_start             = glGetUniformLocation(program, "u_fog_start");
+    locations_.fog_end               = glGetUniformLocation(program, "u_fog_end");
 
-    uniform_sky_pass_               = glGetUniformLocation(program_, "u_sky_pass");
-    uniform_oit_mode_               = glGetUniformLocation(program_, "u_oit_mode");
-    uniform_oit_scale_              = glGetUniformLocation(program_, "u_oit_scale");
-    uniform_color_lookup_           = glGetUniformLocation(program_, "u_color_lookup");
-    uniform_color_lookup_enabled_   = glGetUniformLocation(program_, "u_color_lookup_enabled");
-    uniform_whiten_                 = glGetUniformLocation(program_, "u_whiten");
-    uniform_blur_                   = glGetUniformLocation(program_, "u_blur");
-    uniform_texture_offset_         = glGetUniformLocation(program_, "u_texture_offset");
-    uniform_light_row_offset_       = glGetUniformLocation(program_, "u_light_row_offset");
-    uniform_sprite_mode_            = glGetUniformLocation(program_, "u_sprite_mode");
-    uniform_sprite_whites_          = glGetUniformLocation(program_, "u_sprite_whites");
-    uniform_sprite_lighting_        = glGetUniformLocation(program_, "u_sprite_lighting");
-    uniform_sprite_view0_           = glGetUniformLocation(program_, "u_sprite_view0");
-    uniform_sprite_view1_           = glGetUniformLocation(program_, "u_sprite_view1");
-    uniform_liquid_                 = glGetUniformLocation(program_, "u_liquid");
-    uniform_light_depth_            = glGetUniformLocation(program_, "u_light_depth");
-    uniform_view_tint_              = glGetUniformLocation(program_, "u_view_tint");
-    uniform_sky_fog_depth_          = glGetUniformLocation(program_, "u_sky_fog_depth");
-    uniform_sky_inverse_projection_ = glGetUniformLocation(program_, "u_sky_inverse_projection");
-    uniform_sky_inverse_view_       = glGetUniformLocation(program_, "u_sky_inverse_view");
-    uniform_sky_viewport_           = glGetUniformLocation(program_, "u_sky_viewport");
-    uniform_sky_stretch_mode_       = glGetUniformLocation(program_, "u_sky_stretch_mode");
-    uniform_sky_u_scale_            = glGetUniformLocation(program_, "u_sky_u_scale");
-    uniform_sky_ty_                 = glGetUniformLocation(program_, "u_sky_ty");
-    uniform_sky_u_offset_           = glGetUniformLocation(program_, "u_sky_u_offset");
-    uniform_sky_v_offset_           = glGetUniformLocation(program_, "u_sky_v_offset");
-    uniform_sky_band_               = glGetUniformLocation(program_, "u_sky_band");
-    uniform_sky_fade_exponent_      = glGetUniformLocation(program_, "u_sky_fade_exponent");
-    uniform_sky_cap_top_            = glGetUniformLocation(program_, "u_sky_cap_top");
-    uniform_sky_cap_bottom_         = glGetUniformLocation(program_, "u_sky_cap_bottom");
-    uniform_sky_horizon_shift_      = glGetUniformLocation(program_, "u_sky_horizon_shift");
-    uniform_sky_is_box_             = glGetUniformLocation(program_, "u_sky_is_box");
-    uniform_sky_geometry_           = glGetUniformLocation(program_, "u_sky_geometry");
-    uniform_sky_cube_               = glGetUniformLocation(program_, "u_sky_cube");
+    locations_.sky_pass               = glGetUniformLocation(program, "u_sky_pass");
+    locations_.oit_mode               = glGetUniformLocation(program, "u_oit_mode");
+    locations_.oit_scale              = glGetUniformLocation(program, "u_oit_scale");
+    locations_.color_lookup           = glGetUniformLocation(program, "u_color_lookup");
+    locations_.color_lookup_enabled   = glGetUniformLocation(program, "u_color_lookup_enabled");
+    locations_.whiten                 = glGetUniformLocation(program, "u_whiten");
+    locations_.blur                   = glGetUniformLocation(program, "u_blur");
+    locations_.texture_offset         = glGetUniformLocation(program, "u_texture_offset");
+    locations_.light_row_offset       = glGetUniformLocation(program, "u_light_row_offset");
+    locations_.sprite_mode            = glGetUniformLocation(program, "u_sprite_mode");
+    locations_.sprite_whites          = glGetUniformLocation(program, "u_sprite_whites");
+    locations_.sprite_lighting        = glGetUniformLocation(program, "u_sprite_lighting");
+    locations_.sprite_view0           = glGetUniformLocation(program, "u_sprite_view0");
+    locations_.sprite_view1           = glGetUniformLocation(program, "u_sprite_view1");
+    locations_.liquid                 = glGetUniformLocation(program, "u_liquid");
+    locations_.light_depth            = glGetUniformLocation(program, "u_light_depth");
+    locations_.view_tint              = glGetUniformLocation(program, "u_view_tint");
+    locations_.sky_fog_depth          = glGetUniformLocation(program, "u_sky_fog_depth");
+    locations_.sky_inverse_projection = glGetUniformLocation(program, "u_sky_inverse_projection");
+    locations_.sky_inverse_view       = glGetUniformLocation(program, "u_sky_inverse_view");
+    locations_.sky_viewport           = glGetUniformLocation(program, "u_sky_viewport");
+    locations_.sky_stretch_mode       = glGetUniformLocation(program, "u_sky_stretch_mode");
+    locations_.sky_u_scale            = glGetUniformLocation(program, "u_sky_u_scale");
+    locations_.sky_ty                 = glGetUniformLocation(program, "u_sky_ty");
+    locations_.sky_u_offset           = glGetUniformLocation(program, "u_sky_u_offset");
+    locations_.sky_v_offset           = glGetUniformLocation(program, "u_sky_v_offset");
+    locations_.sky_band               = glGetUniformLocation(program, "u_sky_band");
+    locations_.sky_fade_exponent      = glGetUniformLocation(program, "u_sky_fade_exponent");
+    locations_.sky_cap_top            = glGetUniformLocation(program, "u_sky_cap_top");
+    locations_.sky_cap_bottom         = glGetUniformLocation(program, "u_sky_cap_bottom");
+    locations_.sky_horizon_shift      = glGetUniformLocation(program, "u_sky_horizon_shift");
+    locations_.sky_is_box             = glGetUniformLocation(program, "u_sky_is_box");
+    locations_.sky_geometry           = glGetUniformLocation(program, "u_sky_geometry");
+    locations_.sky_cube               = glGetUniformLocation(program, "u_sky_cube");
 
-    glUseProgram(program_);
+    glUseProgram(program);
 
-    glUniform1i(uniform_texture0_, kGles2TextureUnit0);
-    glUniform1i(uniform_texture1_, kGles2TextureUnit1);
-    glUniform1i(uniform_sky_cube_, kGles2TextureUnitSkyCube);
-    glUniform1i(uniform_light_data_, kGles2TextureUnitLightData);
-    glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
-    glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
-    glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
+    glUniform1i(locations_.texture0, kGles2TextureUnit0);
+    glUniform1i(locations_.texture1, kGles2TextureUnit1);
+    glUniform1i(locations_.sky_cube, kGles2TextureUnitSkyCube);
+    glUniform1i(locations_.light_data, kGles2TextureUnitLightData);
+    glUniform1i(locations_.light_headers, kGles2TextureUnitLightHeaders);
+    glUniform1i(locations_.light_indices, kGles2TextureUnitLightIndices);
+    glUniform1i(locations_.color_lookup, kGles2TextureUnitColorLookup);
+
+    programs_[variant]          = program;
+    variant_locations_[variant] = locations_;
+}
+
+bool Gles2Program::Init()
+{
+    LinkVariant(1, "#define EDGE_NO_DISCARD 1\n");
+    LinkVariant(0, "");
+
+    variant_ = 0;
 
     return true;
 }
 
 void Gles2Program::Shutdown()
 {
-    if (program_)
+    for (int32_t i = 0; i < 2; i++)
     {
-        glDeleteProgram(program_);
-        program_ = 0;
+        if (programs_[i])
+        {
+            glDeleteProgram(programs_[i]);
+            programs_[i] = 0;
+        }
     }
 }
 
 void Gles2Program::Use()
 {
-    glUseProgram(program_);
+    glUseProgram(programs_[variant_]);
+}
+
+void Gles2Program::SelectVariant(bool opaque)
+{
+    int32_t variant = opaque ? 1 : 0;
+
+    if (variant == variant_)
+        return;
+
+    variant_   = variant;
+    locations_ = variant_locations_[variant];
+
+    glUseProgram(programs_[variant]);
+
+    ResendUniforms();
+}
+
+void Gles2Program::ResendUniforms()
+{
+    glUniformMatrix4fv(locations_.model_view_projection, 1, GL_FALSE, (const GLfloat *)&shadow_model_view_projection_);
+    glUniformMatrix4fv(locations_.model_view, 1, GL_FALSE, (const GLfloat *)&shadow_model_view_);
+
+    glUniform1f(locations_.multi_texture, shadow_multi_texture_);
+    glUniform1f(locations_.light_falloff, shadow_light_falloff_);
+    glUniform1f(locations_.world_lit, shadow_world_lit_);
+    glUniform1f(locations_.line_mode, shadow_line_mode_);
+    glUniform1f(locations_.skip_rgb, shadow_skip_rgb_);
+    glUniform1f(locations_.alpha_test, shadow_alpha_test_);
+    glUniform1f(locations_.fog_mode, shadow_fog_mode_);
+    glUniform1f(locations_.fog_density, shadow_fog_density_);
+    glUniform1f(locations_.fog_start, shadow_fog_start_);
+    glUniform1f(locations_.fog_end, shadow_fog_end_);
+    glUniform4f(locations_.fog_color, shadow_fog_color_[0], shadow_fog_color_[1], shadow_fog_color_[2],
+                shadow_fog_color_[3]);
+    glUniform1f(locations_.sky_pass, shadow_sky_pass_);
+    glUniform1f(locations_.light_depth, shadow_light_depth_);
+    glUniform1f(locations_.oit_mode, shadow_oit_mode_);
+    glUniform1f(locations_.oit_scale, shadow_oit_scale_);
+    glUniform2f(locations_.texture_offset, shadow_texture_offset_.x, shadow_texture_offset_.y);
+    glUniform1f(locations_.light_row_offset, shadow_light_row_offset_);
+    glUniform1f(locations_.sprite_mode, shadow_sprite_mode_);
+    glUniform4f(locations_.sprite_view0, shadow_sprite_view_[0].x, shadow_sprite_view_[0].y, shadow_sprite_view_[0].z,
+                shadow_sprite_view_[0].w);
+    glUniform4f(locations_.sprite_view1, shadow_sprite_view_[1].x, shadow_sprite_view_[1].y, shadow_sprite_view_[1].z,
+                shadow_sprite_view_[1].w);
+    glUniform4f(locations_.liquid, shadow_liquid_.x, shadow_liquid_.y, shadow_liquid_.z, shadow_liquid_.w);
+    glUniform1f(locations_.color_lookup_enabled, shadow_color_lookup_enabled_);
+    glUniform1f(locations_.whiten, shadow_whiten_);
+    glUniform4f(locations_.blur, shadow_blur_.x, shadow_blur_.y, shadow_blur_.z, shadow_blur_.w);
+
+    if (locations_.view_tint >= 0)
+        glUniform4f(locations_.view_tint, shadow_view_tint_[0], shadow_view_tint_[1], shadow_view_tint_[2], 1.0f);
+
+    if (shadow_sprite_light_table_)
+    {
+        glUniform4fv(locations_.sprite_whites, kSpriteLightLevels, &shadow_sprite_light_table_->whites[0][0]);
+        glUniform4fv(locations_.sprite_lighting, 1, shadow_sprite_light_table_->parameters);
+    }
+
+    if (shadow_glow_set_ != -2)
+        UploadGlowSet(shadow_glow_set_);
+
+    if (shadow_light_grid_)
+        UploadLightGrid(shadow_light_grid_);
+
+    if (shadow_sky_pass_valid_)
+        UploadSkyPass(shadow_sky_pass_info_);
+
+    uniform_update_count_ += 32;
 }
 
 void Gles2Program::SetFloat(GLint location, float &shadow, float value)
@@ -294,7 +377,7 @@ void Gles2Program::SetModelViewProjection(const epi::Mat4 &matrix)
 
     shadow_model_view_projection_ = matrix;
 
-    glUniformMatrix4fv(uniform_model_view_projection_, 1, GL_FALSE, (const GLfloat *)&matrix);
+    glUniformMatrix4fv(locations_.model_view_projection, 1, GL_FALSE, (const GLfloat *)&matrix);
 
     uniform_update_count_++;
 }
@@ -308,24 +391,24 @@ void Gles2Program::SetModelView(const epi::Mat4 &matrix)
 
     shadow_model_view_ = matrix;
 
-    glUniformMatrix4fv(uniform_model_view_, 1, GL_FALSE, (const GLfloat *)&matrix);
+    glUniformMatrix4fv(locations_.model_view, 1, GL_FALSE, (const GLfloat *)&matrix);
 
     uniform_update_count_++;
 }
 
 void Gles2Program::SetMultiTexture(bool enabled)
 {
-    SetFloat(uniform_multi_texture_, shadow_multi_texture_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.multi_texture, shadow_multi_texture_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetLightFalloff(bool enabled)
 {
-    SetFloat(uniform_light_falloff_, shadow_light_falloff_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.light_falloff, shadow_light_falloff_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetWorldLit(bool enabled)
 {
-    SetFloat(uniform_world_lit_, shadow_world_lit_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.world_lit, shadow_world_lit_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetLightGrid(const Gles2LightGridState *grid)
@@ -333,18 +416,28 @@ void Gles2Program::SetLightGrid(const Gles2LightGridState *grid)
     if (!grid || !grid->active)
         return;
 
-    glUniform4f(uniform_light_view_, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
+    shadow_light_grid_ = grid;
+
+    UploadLightGrid(grid);
+}
+
+void Gles2Program::UploadLightGrid(const Gles2LightGridState *grid)
+{
+    if (!grid->active)
+        return;
+
+    glUniform4f(locations_.light_view, grid->view_origin[0], grid->view_origin[1], grid->header_texel_step[0],
                 grid->header_texel_step[1]);
 
-    glUniform4f(uniform_light_cluster_, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
+    glUniform4f(locations_.light_cluster, grid->cluster[0], grid->cluster[1], grid->cluster[2], grid->cluster[3]);
 
-    glUniform4f(uniform_light_list_, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
+    glUniform4f(locations_.light_list, grid->list_width, grid->list_texel_step[0], grid->list_texel_step[1], 0.0f);
 
-    glUniform3f(uniform_light_bounds_min_, grid->bounds_minimum[0], grid->bounds_minimum[1], grid->bounds_minimum[2]);
-    glUniform3f(uniform_light_bounds_range_, grid->bounds_range[0], grid->bounds_range[1], grid->bounds_range[2]);
+    glUniform3f(locations_.light_bounds_min, grid->bounds_minimum[0], grid->bounds_minimum[1], grid->bounds_minimum[2]);
+    glUniform3f(locations_.light_bounds_range, grid->bounds_range[0], grid->bounds_range[1], grid->bounds_range[2]);
 
-    glUniform1f(uniform_light_radius_scale_, grid->radius_scale);
-    glUniform1f(uniform_light_data_step_, grid->data_texel_step);
+    glUniform1f(locations_.light_radius_scale, grid->radius_scale);
+    glUniform1f(locations_.light_data_step, grid->data_texel_step);
 }
 
 void Gles2Program::SetGlowSet(int index)
@@ -354,11 +447,16 @@ void Gles2Program::SetGlowSet(int index)
 
     shadow_glow_set_ = index;
 
+    UploadGlowSet(index);
+}
+
+void Gles2Program::UploadGlowSet(int index)
+{
     const LightGridGlowSet *set = LightGridGlowSetAt(index);
 
     if (!set || set->count <= 0)
     {
-        glUniform1f(uniform_glow_count_, 0.0f);
+        glUniform1f(locations_.glow_count, 0.0f);
         return;
     }
 
@@ -382,31 +480,31 @@ void Gles2Program::SetGlowSet(int index)
             additive[i] = (i < set->count) ? glow.additive : 0.0f;
     }
 
-    glUniform4fv(uniform_glow_plane_, kLightGridMaximumGlows, planes);
-    glUniform4fv(uniform_glow_color_, kLightGridMaximumGlows, colors);
-    glUniform4fv(uniform_glow_additive_, 1, additive);
+    glUniform4fv(locations_.glow_plane, kLightGridMaximumGlows, planes);
+    glUniform4fv(locations_.glow_color, kLightGridMaximumGlows, colors);
+    glUniform4fv(locations_.glow_additive, 1, additive);
 
-    glUniform1f(uniform_glow_count_, (float)set->count);
+    glUniform1f(locations_.glow_count, (float)set->count);
 }
 
 void Gles2Program::SetLineMode(bool enabled)
 {
-    SetFloat(uniform_line_mode_, shadow_line_mode_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.line_mode, shadow_line_mode_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetSkipRGB(bool enabled)
 {
-    SetFloat(uniform_skip_rgb_, shadow_skip_rgb_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.skip_rgb, shadow_skip_rgb_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetAlphaTest(float reference)
 {
-    SetFloat(uniform_alpha_test_, shadow_alpha_test_, reference);
+    SetFloat(locations_.alpha_test, shadow_alpha_test_, reference);
 }
 
 void Gles2Program::SetViewTint(float r, float g, float b)
 {
-    if (uniform_view_tint_ < 0)
+    if (locations_.view_tint < 0)
         return;
 
     if (epi::AlmostEquals(shadow_view_tint_[0], r) && epi::AlmostEquals(shadow_view_tint_[1], g) &&
@@ -417,20 +515,20 @@ void Gles2Program::SetViewTint(float r, float g, float b)
     shadow_view_tint_[1] = g;
     shadow_view_tint_[2] = b;
 
-    glUniform4f(uniform_view_tint_, r, g, b, 1.0f);
+    glUniform4f(locations_.view_tint, r, g, b, 1.0f);
 
     uniform_update_count_++;
 }
 
 void Gles2Program::SetLightDepth(bool enabled)
 {
-    SetFloat(uniform_light_depth_, shadow_light_depth_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.light_depth, shadow_light_depth_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetOit(float mode, float scale)
 {
-    SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
-    SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
+    SetFloat(locations_.oit_mode, shadow_oit_mode_, mode);
+    SetFloat(locations_.oit_scale, shadow_oit_scale_, scale);
 }
 
 void Gles2Program::SetTextureOffset(const epi::Vec2 &offset)
@@ -440,17 +538,17 @@ void Gles2Program::SetTextureOffset(const epi::Vec2 &offset)
 
     shadow_texture_offset_ = offset;
 
-    glUniform2f(uniform_texture_offset_, offset.x, offset.y);
+    glUniform2f(locations_.texture_offset, offset.x, offset.y);
 }
 
 void Gles2Program::SetLightRowOffset(float offset)
 {
-    SetFloat(uniform_light_row_offset_, shadow_light_row_offset_, offset);
+    SetFloat(locations_.light_row_offset, shadow_light_row_offset_, offset);
 }
 
 void Gles2Program::SetSpriteMode(bool enabled)
 {
-    SetFloat(uniform_sprite_mode_, shadow_sprite_mode_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.sprite_mode, shadow_sprite_mode_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetSpriteLightTable(const SpriteLightTable *light_table)
@@ -460,8 +558,8 @@ void Gles2Program::SetSpriteLightTable(const SpriteLightTable *light_table)
 
     shadow_sprite_light_table_ = light_table;
 
-    glUniform4fv(uniform_sprite_whites_, kSpriteLightLevels, &light_table->whites[0][0]);
-    glUniform4fv(uniform_sprite_lighting_, 1, light_table->parameters);
+    glUniform4fv(locations_.sprite_whites, kSpriteLightLevels, &light_table->whites[0][0]);
+    glUniform4fv(locations_.sprite_lighting, 1, light_table->parameters);
 
     uniform_update_count_++;
 }
@@ -474,8 +572,8 @@ void Gles2Program::SetSpriteView(const epi::Vec4 view[2])
     shadow_sprite_view_[0] = view[0];
     shadow_sprite_view_[1] = view[1];
 
-    glUniform4f(uniform_sprite_view0_, view[0].x, view[0].y, view[0].z, view[0].w);
-    glUniform4f(uniform_sprite_view1_, view[1].x, view[1].y, view[1].z, view[1].w);
+    glUniform4f(locations_.sprite_view0, view[0].x, view[0].y, view[0].z, view[0].w);
+    glUniform4f(locations_.sprite_view1, view[1].x, view[1].y, view[1].z, view[1].w);
 
     uniform_update_count_++;
 }
@@ -488,17 +586,17 @@ void Gles2Program::SetLiquid(const epi::Vec4 &liquid)
 
     shadow_liquid_ = liquid;
 
-    glUniform4f(uniform_liquid_, liquid.x, liquid.y, liquid.z, liquid.w);
+    glUniform4f(locations_.liquid, liquid.x, liquid.y, liquid.z, liquid.w);
 }
 
 void Gles2Program::SetColorLookup(int slot)
 {
-    SetFloat(uniform_color_lookup_enabled_, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
+    SetFloat(locations_.color_lookup_enabled, shadow_color_lookup_enabled_, UseColorLookup(slot) ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetWhiten(bool enabled)
 {
-    SetFloat(uniform_whiten_, shadow_whiten_, enabled ? 1.0f : 0.0f);
+    SetFloat(locations_.whiten, shadow_whiten_, enabled ? 1.0f : 0.0f);
 }
 
 void Gles2Program::SetBlur(const epi::Vec4 &blur)
@@ -509,26 +607,23 @@ void Gles2Program::SetBlur(const epi::Vec4 &blur)
 
     shadow_blur_ = blur;
 
-    glUniform4f(uniform_blur_, blur.x, blur.y, blur.z, blur.w);
+    glUniform4f(locations_.blur, blur.x, blur.y, blur.z, blur.w);
 }
 
 void Gles2Program::ForceOitReset()
 {
     shadow_oit_mode_ = 0.0f;
 
-    glUniform1f(uniform_oit_mode_, 0.0f);
+    glUniform1f(locations_.oit_mode, 0.0f);
 }
 
 void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
 {
     if (!sky_pass)
     {
-        SetFloat(uniform_sky_pass_, shadow_sky_pass_, 0.0f);
+        SetFloat(locations_.sky_pass, shadow_sky_pass_, 0.0f);
         return;
     }
-
-    glUniform1f(uniform_sky_is_box_, sky_pass->is_box ? 1.0f : 0.0f);
-    glUniform1f(uniform_sky_geometry_, sky_pass->is_geometry ? 1.0f : 0.0f);
 
     if (sky_pass->is_box && sky_pass->cube_texture)
     {
@@ -537,40 +632,51 @@ void Gles2Program::SetSkyPass(const SkyPassInfo *sky_pass)
         glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
     }
 
-    SetFloat(uniform_sky_pass_, shadow_sky_pass_, 1.0f);
+    SetFloat(locations_.sky_pass, shadow_sky_pass_, 1.0f);
 
-    glUniformMatrix4fv(uniform_sky_inverse_projection_, 1, GL_FALSE, (const GLfloat *)&sky_pass->inverse_projection);
-    glUniformMatrix4fv(uniform_sky_inverse_view_, 1, GL_FALSE, (const GLfloat *)&sky_pass->inverse_view);
+    shadow_sky_pass_info_  = *sky_pass;
+    shadow_sky_pass_valid_ = true;
+
+    UploadSkyPass(*sky_pass);
+}
+
+void Gles2Program::UploadSkyPass(const SkyPassInfo &sky_pass)
+{
+    glUniform1f(locations_.sky_is_box, sky_pass.is_box ? 1.0f : 0.0f);
+    glUniform1f(locations_.sky_geometry, sky_pass.is_geometry ? 1.0f : 0.0f);
+
+    glUniformMatrix4fv(locations_.sky_inverse_projection, 1, GL_FALSE, (const GLfloat *)&sky_pass.inverse_projection);
+    glUniformMatrix4fv(locations_.sky_inverse_view, 1, GL_FALSE, (const GLfloat *)&sky_pass.inverse_view);
 
     float scale_x = render_backend->ActiveScaleX();
     float scale_y = render_backend->ActiveScaleY();
 
-    glUniform4f(uniform_sky_viewport_, sky_pass->viewport_origin.x * scale_x, sky_pass->viewport_origin.y * scale_y,
-                sky_pass->viewport_size.x * scale_x, sky_pass->viewport_size.y * scale_y);
+    glUniform4f(locations_.sky_viewport, sky_pass.viewport_origin.x * scale_x, sky_pass.viewport_origin.y * scale_y,
+                sky_pass.viewport_size.x * scale_x, sky_pass.viewport_size.y * scale_y);
 
-    glUniform1f(uniform_sky_stretch_mode_, (float)sky_pass->stretch_mode);
-    glUniform1f(uniform_sky_u_scale_, sky_pass->u_scale);
-    glUniform1f(uniform_sky_ty_, sky_pass->ty);
-    glUniform1f(uniform_sky_u_offset_, sky_pass->u_offset);
-    glUniform1f(uniform_sky_v_offset_, sky_pass->v_offset);
-    glUniform4f(uniform_sky_band_, sky_pass->band_top.x, sky_pass->band_top.y, sky_pass->band_bottom.x,
-                sky_pass->band_bottom.y);
-    glUniform1f(uniform_sky_fade_exponent_, sky_pass->fade_exponent);
-    glUniform4f(uniform_sky_cap_top_, epi::GetRGBARed(sky_pass->cap_top_color) / 255.0f,
-                epi::GetRGBAGreen(sky_pass->cap_top_color) / 255.0f,
-                epi::GetRGBABlue(sky_pass->cap_top_color) / 255.0f, 1.0f);
-    glUniform4f(uniform_sky_cap_bottom_, epi::GetRGBARed(sky_pass->cap_bottom_color) / 255.0f,
-                epi::GetRGBAGreen(sky_pass->cap_bottom_color) / 255.0f,
-                epi::GetRGBABlue(sky_pass->cap_bottom_color) / 255.0f, 1.0f);
-    glUniform1f(uniform_sky_horizon_shift_, sky_pass->horizon_shift);
-    glUniform1f(uniform_sky_fog_depth_, sky_pass->fog_depth);
+    glUniform1f(locations_.sky_stretch_mode, (float)sky_pass.stretch_mode);
+    glUniform1f(locations_.sky_u_scale, sky_pass.u_scale);
+    glUniform1f(locations_.sky_ty, sky_pass.ty);
+    glUniform1f(locations_.sky_u_offset, sky_pass.u_offset);
+    glUniform1f(locations_.sky_v_offset, sky_pass.v_offset);
+    glUniform4f(locations_.sky_band, sky_pass.band_top.x, sky_pass.band_top.y, sky_pass.band_bottom.x,
+                sky_pass.band_bottom.y);
+    glUniform1f(locations_.sky_fade_exponent, sky_pass.fade_exponent);
+    glUniform4f(locations_.sky_cap_top, epi::GetRGBARed(sky_pass.cap_top_color) / 255.0f,
+                epi::GetRGBAGreen(sky_pass.cap_top_color) / 255.0f, epi::GetRGBABlue(sky_pass.cap_top_color) / 255.0f,
+                1.0f);
+    glUniform4f(locations_.sky_cap_bottom, epi::GetRGBARed(sky_pass.cap_bottom_color) / 255.0f,
+                epi::GetRGBAGreen(sky_pass.cap_bottom_color) / 255.0f,
+                epi::GetRGBABlue(sky_pass.cap_bottom_color) / 255.0f, 1.0f);
+    glUniform1f(locations_.sky_horizon_shift, sky_pass.horizon_shift);
+    glUniform1f(locations_.sky_fog_depth, sky_pass.fog_depth);
 
     uniform_update_count_ += 11;
 }
 
 void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end)
 {
-    SetFloat(uniform_fog_mode_, shadow_fog_mode_, (float)mode);
+    SetFloat(locations_.fog_mode, shadow_fog_mode_, (float)mode);
 
     if (mode == kGles2FogModeNone)
     {
@@ -585,14 +691,14 @@ void Gles2Program::SetFog(Gles2FogMode mode, float red, float green, float blue,
         shadow_fog_color_[2] = blue;
         shadow_fog_color_[3] = 1.0f;
 
-        glUniform4f(uniform_fog_color_, red, green, blue, 1.0f);
+        glUniform4f(locations_.fog_color, red, green, blue, 1.0f);
 
         uniform_update_count_++;
     }
 
-    SetFloat(uniform_fog_density_, shadow_fog_density_, density);
-    SetFloat(uniform_fog_start_, shadow_fog_start_, start);
-    SetFloat(uniform_fog_end_, shadow_fog_end_, end);
+    SetFloat(locations_.fog_density, shadow_fog_density_, density);
+    SetFloat(locations_.fog_start, shadow_fog_start_, start);
+    SetFloat(locations_.fog_end, shadow_fog_end_, end);
 }
 
 bool Gles2ModelProgram::Init()

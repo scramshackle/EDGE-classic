@@ -1002,9 +1002,9 @@ void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTa
         instance_buffer = static_buffers_[buffer - 1];
     }
 
-    SDL_GPUGraphicsPipeline *pipeline = oit_pipeline_
-                                            ? GetSpriteOitPipeline(pipeline_flags_)
-                                            : GetSpritePipeline(pipeline_flags_, source_blend_, destination_blend_);
+    SDL_GPUGraphicsPipeline *pipeline =
+        oit_pipeline_ ? GetSpriteOitPipeline(pipeline_flags_)
+                      : GetSpritePipeline(WorldPipelineFlags(), source_blend_, destination_blend_);
 
     GpuCommand command;
 
@@ -1563,12 +1563,20 @@ RendererVertex *GpuImmediate::ReserveVertices(int32_t count)
     return vertices_.data() + pending_base_;
 }
 
+uint32_t GpuImmediate::WorldPipelineFlags() const
+{
+    if (current_fragment_parameters_.alpha_test <= 0.0f)
+        return pipeline_flags_ | kGpuPipelineNoDiscard;
+
+    return pipeline_flags_;
+}
+
 SDL_GPUGraphicsPipeline *GpuImmediate::SelectWorldPipeline(GpuPrimitiveType primitive)
 {
     if (oit_pipeline_)
         return GetOitPipeline(pipeline_flags_, primitive);
 
-    return GetPipeline(pipeline_flags_, source_blend_, destination_blend_, primitive);
+    return GetPipeline(WorldPipelineFlags(), source_blend_, destination_blend_, primitive);
 }
 
 void GpuImmediate::RecordDraw(GLuint shape, int32_t count)

@@ -385,6 +385,8 @@ class GpuImmediate
 
 
   private:
+    uint32_t WorldPipelineFlags() const;
+
     SDL_GPUGraphicsPipeline *SelectWorldPipeline(GpuPrimitiveType primitive);
 
     bool CreateIndexBuffers(SDL_GPUDevice *device);

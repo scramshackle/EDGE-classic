@@ -611,6 +611,18 @@ class Gles2RenderState : public RenderState
 
     void ApplyState()
     {
+        if (gles2_immediate.OitClearPending())
+        {
+            glDisable(GL_SCISSOR_TEST);
+
+            gles2_immediate.ClearOitTargets();
+
+            glClearColor(epi::GetRGBARed(clear_color_) / 255.0f, epi::GetRGBAGreen(clear_color_) / 255.0f,
+                         epi::GetRGBABlue(clear_color_) / 255.0f, epi::GetRGBAAlpha(clear_color_) / 255.0f);
+
+            InvalidateApplied();
+        }
+
         if (!state_dirty_)
         {
             return;
@@ -746,13 +758,17 @@ class Gles2RenderState : public RenderState
 
         glActiveTexture(active_texture_);
 
+        float alpha_test = enable_alpha_test_ ? alpha_function_reference_ : 0.0f;
+
+        gles2_program.SelectVariant(alpha_test <= 0.0f);
+
         gles2_program.SetMultiTexture(multi_texture);
 
         gles2_program.SetSkipRGB(texture_environment_mode_[0] == GL_COMBINE &&
                                  texture_environment_combine_rgb_[0] == GL_REPLACE &&
                                  texture_environment_source_0_rgb_[0] == GL_PREVIOUS);
 
-        gles2_program.SetAlphaTest(enable_alpha_test_ ? alpha_function_reference_ : 0.0f);
+        gles2_program.SetAlphaTest(alpha_test);
 
         Gles2FogMode fog_mode = kGles2FogModeNone;
 

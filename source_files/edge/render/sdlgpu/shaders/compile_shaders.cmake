@@ -21,7 +21,7 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model world_oit model_oit sprite)
+set(SHADER_NAMES world movie model world_oit world_opaque model_oit sprite)
 set(SHADER_STAGES vert frag)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
@@ -33,6 +33,8 @@ set(SYMBOL_BASE "${NAME_HEAD}${NAME_TAIL}")
 
 if (SHADER_NAME STREQUAL "world_oit")
   set(SYMBOL_BASE "WorldOit")
+elseif (SHADER_NAME STREQUAL "world_opaque")
+  set(SYMBOL_BASE "WorldOpaque")
 elseif (SHADER_NAME STREQUAL "model_oit")
   set(SYMBOL_BASE "ModelOit")
 endif()
@@ -59,6 +61,15 @@ foreach(STAGE IN LISTS SHADER_STAGES)
     endif()
 
     set(EXTRA_DEFINES "-DEDGE_OIT_PASS=1")
+  endif()
+
+  if (SHADER_NAME STREQUAL "world_opaque")
+    if (STAGE STREQUAL "vert")
+      continue()
+    endif()
+
+    set(SHADER_SOURCE_NAME "world")
+    set(EXTRA_DEFINES "-DEDGE_NO_DISCARD=1")
   endif()
 
   set(SOURCE_FILE "${SHADER_DIR}/${SHADER_SOURCE_NAME}.${STAGE}.glsl")

@@ -527,6 +527,8 @@ class GpuRenderState : public RenderState
 
         if (depth_function_ == GL_GREATER)
             pipeline_flags |= kGpuPipelineDepthGreater;
+        else if (depth_function_ == GL_LESS)
+            pipeline_flags |= kGpuPipelineDepthLess;
 
         if (enable_depth_test_ && depth_function_ != GL_ALWAYS)
             pipeline_flags |= kGpuPipelineDepthTest;

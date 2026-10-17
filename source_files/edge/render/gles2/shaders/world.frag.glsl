@@ -298,10 +298,12 @@ void main()
         texel0 = texture2D(u_texture0, v_texture_coordinates.xy);
 
 
+#ifndef EDGE_NO_DISCARD
     if (u_alpha_test > 0.0 && texel0.a < u_alpha_test)
     {
         discard;
     }
+#endif
 
     if (u_color_lookup_enabled > 0.5)
     {

@@ -381,7 +381,7 @@ bool GpuDevice::EnsureWorldTextures(int32_t width, int32_t height)
 
     oit_accumulation_texture_ = SDL_CreateGPUTexture(device_, &info);
 
-    info.format = SDL_GPU_TEXTUREFORMAT_R16_FLOAT;
+    info.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
 
     oit_revealage_texture_ = SDL_CreateGPUTexture(device_, &info);
 

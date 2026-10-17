@@ -401,10 +401,12 @@ void main()
     else
         c0 = texture(tex0, uv.xy);
 
+#ifndef EDGE_NO_DISCARD
     if (alpha_test != 0.0 && c0.w < alpha_test)
     {
         discard;
     }
+#endif
 
     if (color_lookup.x > 0.5)
     {

@@ -1321,6 +1321,9 @@ static void FlushSpriteBatches(void)
 
         const SpriteBatchKey &key = batch.key;
 
+        if (UnitAccumulatesOit(key.blending, 0))
+            OitBoundsAddSprites(batch.instances, render_unit_sprite_view[0]);
+
         AddSpriteRenderUnit(first, count, key.texture, key.fuzz_texture, key.blending, key.fog_color,
                             key.fog_density, key.color_lookup, key.world_lit, key.glow_set, key.light_table,
                             key.alpha);
@@ -2134,6 +2137,9 @@ static void DrawResidentBatches(bool transparent)
             continue;
 
         const SpriteBatchKey &key = batch.key;
+
+        if (UnitAccumulatesOit(key.blending, 0))
+            OitBoundsAddSprites(batch.instances, render_unit_sprite_view[0]);
 
         AddSpriteRenderUnit(0, (int)batch.instances.size(), key.texture, key.fuzz_texture, key.blending,
                             key.fog_color, key.fog_density, key.color_lookup, key.world_lit, key.glow_set,

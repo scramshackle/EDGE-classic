@@ -120,9 +120,18 @@ class Gles2Immediate
 
     void BindOitTarget(int32_t mode);
 
+    void BeginOitTargets();
+
+    bool OitClearPending() const
+    {
+        return oit_clear_pending_ && oit_bound_framebuffer_ != 0;
+    }
+
     void ClearOitTargets();
 
-    void CompositeOit(const Gles2ResolveRect &view);
+    bool FinishOitTargets();
+
+    void CompositeOit(const Gles2ResolveRect &view, const Gles2ResolveRect &area);
 
     float OitScale() const
     {
@@ -248,6 +257,10 @@ class Gles2Immediate
     GLuint oit_revealage_texture_        = 0;
 
     float oit_scale_ = 1.0f;
+
+    GLuint oit_bound_framebuffer_ = 0;
+    bool   oit_clear_pending_     = false;
+    bool   oit_drawn_             = false;
 
     GLuint vertex_buffer_       = 0;
     GLuint quad_index_buffer_   = 0;

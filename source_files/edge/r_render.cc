@@ -1570,6 +1570,8 @@ static void RenderPlane(DrawFloor *dfloor, float h, MapSurface *surf, int face_d
 
 static void RenderSector(DrawSector *dsector);
 
+static bool sky_after_solid_pass = false;
+
 void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *> &dthings,
                       std::list<DrawMirror *> &dmirrors, bool for_mirror)
 {
@@ -1596,6 +1598,17 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         RenderThings(dthings, transparent_things);
 
         FinishUnitBatch();
+
+        if (!for_mirror && sky_after_solid_pass)
+        {
+            EDGE_ZoneScopedN("RenderSectorList sky");
+
+            render_state->DepthFunction(GL_LESS);
+
+            FinishSky(true);
+
+            render_state->DepthFunction(GL_LEQUAL);
+        }
     }
 
     {
@@ -1604,6 +1617,14 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         // draw all sprites and masked/translucent walls/planes
         solid_mode = false;
         render_backend->SetRenderLayer(kRenderLayerTransparent, false);
+
+        BeginOitBounds(!for_mirror);
+
+        for (size_t i = 0; i < transparent_things.size(); i++)
+        {
+            if (transparent_things[i]->is_model)
+                OitBoundsAddFull();
+        }
 
         BeginRetainedUnits();
         StartUnitBatch(solid_mode);
@@ -1625,7 +1646,13 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
                 render_backend->BeginOitPass();
 
             if (oit_passes[p] == kOitPassAdditive)
+            {
+                PublishOitBounds();
+
                 render_backend->FinishOitPass();
+
+                EndOitBounds();
+            }
 
             if (oit_passes[p] == kOitPassRevealage && render_backend->OitSinglePass())
                 continue;
@@ -2091,6 +2118,9 @@ void RenderTrueBSP(void)
     EnumerateViewMirrors();
 
 
+    sky_after_solid_pass = !draw_culling.d_ && draw_mirror_list.empty();
+
+    if (!sky_after_solid_pass)
     {
         EDGE_ZoneScopedN("RenderTrueBSP FinishSky");
 

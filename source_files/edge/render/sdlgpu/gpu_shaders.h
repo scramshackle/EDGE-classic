@@ -273,5 +273,6 @@ SDL_GPUShader *WorldVertexShader();
 
 SDL_GPUShader *WorldFragmentShader();
 SDL_GPUShader *WorldOitFragmentShader();
+SDL_GPUShader *WorldOpaqueFragmentShader();
 
 SDL_GPUShader *SpriteVertexShader();
