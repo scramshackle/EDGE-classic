@@ -290,12 +290,16 @@ void main()
 
     vec4 texel0;
 
+#ifdef EDGE_NO_EFFECTS
+    texel0 = texture2D(u_texture0, v_texture_coordinates.xy);
+#else
     if (u_blur.x > 0.0)
         texel0 = SampleBlurred(v_texture_coordinates.xy);
     else if (u_liquid.x > 0.5)
         texel0 = SampleLiquid(v_texture_coordinates.xy);
     else
         texel0 = texture2D(u_texture0, v_texture_coordinates.xy);
+#endif
 
 
 #ifndef EDGE_NO_DISCARD
@@ -305,6 +309,7 @@ void main()
     }
 #endif
 
+#ifndef EDGE_NO_EFFECTS
     if (u_color_lookup_enabled > 0.5)
     {
         texel0.rgb = ApplyColorLookup(texel0.rgb);
@@ -314,6 +319,7 @@ void main()
     {
         texel0.rgb = WhitenColor(texel0.rgb);
     }
+#endif
 
     texel0 = mix(texel0, vec4(1.0, 1.0, 1.0, texel0.a), u_skip_rgb);
 
@@ -324,6 +330,7 @@ void main()
     vec3 modulate_sum = vec3(0.0, 0.0, 0.0);
     vec3 additive_sum = vec3(0.0, 0.0, 0.0);
 
+#ifndef EDGE_NO_LIGHTS
     if (u_world_lit > 0.5)
     {
         AccumulateClusterLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, modulate_sum, additive_sum);
@@ -333,6 +340,7 @@ void main()
     {
         AccumulateGlows(v_eye_position, modulate_sum, additive_sum);
     }
+#endif
 
     if (u_multi_texture > 0.5 || u_light_falloff > 0.5)
     {

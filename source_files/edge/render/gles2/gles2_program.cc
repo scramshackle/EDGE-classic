@@ -260,8 +260,16 @@ void Gles2Program::LinkVariant(int32_t variant, const char *defines)
 
 bool Gles2Program::Init()
 {
-    LinkVariant(1, "#define EDGE_NO_DISCARD 1\n");
-    LinkVariant(0, "");
+    static const char *variant_defines[kGles2WorldVariants] = {
+        "",
+        "#define EDGE_NO_DISCARD 1\n",
+        "#define EDGE_NO_EFFECTS 1\n",
+        "#define EDGE_NO_EFFECTS 1\n#define EDGE_NO_DISCARD 1\n",
+        "#define EDGE_NO_EFFECTS 1\n#define EDGE_NO_LIGHTS 1\n",
+        "#define EDGE_NO_EFFECTS 1\n#define EDGE_NO_LIGHTS 1\n#define EDGE_NO_DISCARD 1\n"};
+
+    for (int32_t i = kGles2WorldVariants - 1; i >= 0; i--)
+        LinkVariant(i, variant_defines[i]);
 
     variant_ = 0;
 
@@ -270,7 +278,7 @@ bool Gles2Program::Init()
 
 void Gles2Program::Shutdown()
 {
-    for (int32_t i = 0; i < 2; i++)
+    for (int32_t i = 0; i < kGles2WorldVariants; i++)
     {
         if (programs_[i])
         {
@@ -287,7 +295,18 @@ void Gles2Program::Use()
 
 void Gles2Program::SelectVariant(bool opaque)
 {
-    int32_t variant = opaque ? 1 : 0;
+    bool effects = shadow_blur_.x > 0.0f || shadow_liquid_.x > 0.5f || shadow_color_lookup_enabled_ > 0.5f ||
+                   shadow_whiten_ > 0.5f;
+
+    bool lights = shadow_world_lit_ > 0.5f || shadow_glow_active_;
+
+    int32_t variant = 0;
+
+    if (!effects)
+        variant = lights ? 2 : 4;
+
+    if (opaque)
+        variant++;
 
     if (variant == variant_)
         return;
@@ -454,7 +473,9 @@ void Gles2Program::UploadGlowSet(int index)
 {
     const LightGridGlowSet *set = LightGridGlowSetAt(index);
 
-    if (!set || set->count <= 0)
+    shadow_glow_active_ = set && set->count > 0;
+
+    if (!shadow_glow_active_)
     {
         glUniform1f(locations_.glow_count, 0.0f);
         return;

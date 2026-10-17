@@ -1565,10 +1565,27 @@ RendererVertex *GpuImmediate::ReserveVertices(int32_t count)
 
 uint32_t GpuImmediate::WorldPipelineFlags() const
 {
-    if (current_fragment_parameters_.alpha_test <= 0.0f)
-        return pipeline_flags_ | kGpuPipelineNoDiscard;
+    const GpuFragmentParameters &parameters = current_fragment_parameters_;
 
-    return pipeline_flags_;
+    uint32_t flags = pipeline_flags_;
+
+    if (parameters.alpha_test <= 0.0f)
+        flags |= kGpuPipelineNoDiscard;
+
+    bool effects = parameters.blur[0] > 0.0f || parameters.liquid[0] > 0.5f || parameters.color_lookup[0] > 0.5f ||
+                   (parameters.flags & kGpuFragmentFlagWhiten);
+
+    bool lights = parameters.light_range[2] > 0.5f || parameters.glow_additive[3] > 0.5f;
+
+    if (!effects)
+    {
+        flags |= kGpuPipelineNoEffects;
+
+        if (!lights)
+            flags |= kGpuPipelineNoLights;
+    }
+
+    return flags;
 }
 
 SDL_GPUGraphicsPipeline *GpuImmediate::SelectWorldPipeline(GpuPrimitiveType primitive)

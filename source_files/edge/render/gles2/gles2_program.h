@@ -105,6 +105,8 @@ struct Gles2WorldLocations
     GLint blur                   = -1;
 };
 
+constexpr int32_t kGles2WorldVariants = 6;
+
 class Gles2Program
 {
   public:
@@ -198,9 +200,9 @@ class Gles2Program
 
     void UploadSkyPass(const SkyPassInfo &sky_pass);
 
-    GLuint programs_[2] = {0, 0};
+    GLuint programs_[kGles2WorldVariants] = {};
 
-    Gles2WorldLocations variant_locations_[2];
+    Gles2WorldLocations variant_locations_[kGles2WorldVariants];
     Gles2WorldLocations locations_;
 
     int32_t variant_ = 0;
@@ -212,6 +214,7 @@ class Gles2Program
     float shadow_light_falloff_ = -1.0f;
     float shadow_world_lit_     = -1.0f;
     int   shadow_glow_set_      = -2;
+    bool  shadow_glow_active_   = false;
     float shadow_line_mode_     = -1.0f;
     float shadow_skip_rgb_      = -1.0f;
     float shadow_alpha_test_    = -1.0f;

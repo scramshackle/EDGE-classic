@@ -83,6 +83,8 @@ struct GpuVertexParameters
     float    sprite_view1[4];
 };
 
+constexpr int32_t kGpuWorldFragmentVariants = 6;
+
 struct GpuFragmentParameters
 {
     int32_t flags;
@@ -271,8 +273,7 @@ void DestroyWorldShaders(SDL_GPUDevice *device);
 
 SDL_GPUShader *WorldVertexShader();
 
-SDL_GPUShader *WorldFragmentShader();
+SDL_GPUShader *WorldFragmentShader(int32_t variant);
 SDL_GPUShader *WorldOitFragmentShader();
-SDL_GPUShader *WorldOpaqueFragmentShader();
 
 SDL_GPUShader *SpriteVertexShader();

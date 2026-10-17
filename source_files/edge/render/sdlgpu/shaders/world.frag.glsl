@@ -394,12 +394,16 @@ void main()
 
     vec4 c0;
 
+#ifdef EDGE_NO_EFFECTS
+    c0 = texture(tex0, uv.xy);
+#else
     if (blur.x > 0.0)
         c0 = SampleBlurred(uv.xy);
     else if (liquid.x > 0.5)
         c0 = SampleLiquid(uv.xy);
     else
         c0 = texture(tex0, uv.xy);
+#endif
 
 #ifndef EDGE_NO_DISCARD
     if (alpha_test != 0.0 && c0.w < alpha_test)
@@ -408,6 +412,7 @@ void main()
     }
 #endif
 
+#ifndef EDGE_NO_EFFECTS
     if (color_lookup.x > 0.5)
     {
         c0.rgb = ApplyColorLookup(c0.rgb);
@@ -417,6 +422,7 @@ void main()
     {
         c0.rgb = WhitenColor(c0.rgb);
     }
+#endif
 
     if ((flags & 4) == 4)
     {
@@ -430,6 +436,7 @@ void main()
     vec3 modulate_sum = vec3(0.0);
     vec3 additive_sum = vec3(0.0);
 
+#ifndef EDGE_NO_LIGHTS
     if (light_range.z > 0.5)
     {
         AccumulateClusterLights(modulate_sum, additive_sum);
@@ -439,6 +446,7 @@ void main()
     {
         AccumulateGlows(modulate_sum, additive_sum);
     }
+#endif
 
     if ((flags & 1) == 1 || (flags & 32) == 32)
     {

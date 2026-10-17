@@ -595,9 +595,9 @@ class Gles2RenderState : public RenderState
             return;
         }
 
-        ApplyState();
-
         gles2_program.SetColorLookup(color_lookup_slot_);
+
+        ApplyState();
 
         gles2_immediate.DrawModelIndexed(index_first, index_count);
 
@@ -622,6 +622,10 @@ class Gles2RenderState : public RenderState
 
             InvalidateApplied();
         }
+
+        float alpha_test = enable_alpha_test_ ? alpha_function_reference_ : 0.0f;
+
+        gles2_program.SelectVariant(alpha_test <= 0.0f);
 
         if (!state_dirty_)
         {
@@ -757,10 +761,6 @@ class Gles2RenderState : public RenderState
         }
 
         glActiveTexture(active_texture_);
-
-        float alpha_test = enable_alpha_test_ ? alpha_function_reference_ : 0.0f;
-
-        gles2_program.SelectVariant(alpha_test <= 0.0f);
 
         gles2_program.SetMultiTexture(multi_texture);
 
