@@ -836,7 +836,7 @@ class ColormapShader : public AbstractShader
     }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
-                                    BlendingMode blending, int glow_set)
+                                    BlendingMode blending, int glow_set, bool world_lit)
     {
         epi::RGBAColor fc_to_use = fog_color_;
         float     fd_to_use = fog_density_;
@@ -856,7 +856,7 @@ class ColormapShader : public AbstractShader
         }
 
         AddStaticRenderUnit(handle, shape, first, count, GL_MODULATE, tex, GL_MODULATE, fade_texture_, *pass_var,
-                            blending, fc_to_use, fd_to_use, nullptr, true, glow_set);
+                            blending, fc_to_use, fd_to_use, nullptr, world_lit, glow_set);
 
         (*pass_var) += 1;
     }

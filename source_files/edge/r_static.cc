@@ -1993,9 +1993,11 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
             {
                 int count = epi::Min(run.count, batch.gpu_count - run.start);
 
+                bool world_lit = !refresh || LightGridReachesBox(run.low, run.high);
+
                 if (count > 0)
                     shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
-                                               blending, glow_set);
+                                               blending, glow_set, world_lit);
                 continue;
             }
 

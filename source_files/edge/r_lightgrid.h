@@ -17,6 +17,8 @@ struct LightGridLight
     epi::Vec3 eye_position;
     float    radius;
 
+    epi::Vec3 world_position;
+
     epi::Vec3 color;
 
     float additive;
@@ -89,5 +91,7 @@ void BuildLightGrid(void);
 void ClearLightGrid(void);
 
 const LightGrid *CurrentLightGrid(void);
+
+bool LightGridReachesBox(const float low[3], const float high[3]);
 
 int LightGridSliceFromDepth(float eye_depth, float near_plane, float far_plane);

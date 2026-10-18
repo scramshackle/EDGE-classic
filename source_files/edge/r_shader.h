@@ -130,7 +130,7 @@ class AbstractShader
     }
 
     virtual void WorldBakedResident(uint32_t handle, GLuint shape, int first, int count, GLuint tex, int *pass_var,
-                                    BlendingMode blending, int glow_set)
+                                    BlendingMode blending, int glow_set, bool world_lit)
     {
         EPI_UNUSED(handle);
         EPI_UNUSED(shape);
@@ -140,6 +140,7 @@ class AbstractShader
         EPI_UNUSED(pass_var);
         EPI_UNUSED(blending);
         EPI_UNUSED(glow_set);
+        EPI_UNUSED(world_lit);
     }
 
     virtual void WorldBaked(GLuint shape, std::span<const RendererVertex> source, GLuint tex, float alpha,
