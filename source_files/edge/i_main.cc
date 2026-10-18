@@ -33,6 +33,10 @@ extern "C"
 {
     int main(int argc, char *argv[])
     {
+#ifndef EDGE_SDL_GPU
+        SDL_setenv_unsafe("INTEL_SIMD_DEBUG", "fs8,fs16", 0);
+#endif
+
         if (!SDL_Init(0))
             FatalError("Couldn't init SDL!!\n%s\n", SDL_GetError());
 
