@@ -595,9 +595,9 @@ class Gles2RenderState : public RenderState
             return;
         }
 
-        ApplyState();
-
         gles2_program.SetColorLookup(color_lookup_slot_);
+
+        ApplyState();
 
         gles2_immediate.DrawModelIndexed(index_first, index_count);
 
@@ -611,6 +611,22 @@ class Gles2RenderState : public RenderState
 
     void ApplyState()
     {
+        if (gles2_immediate.OitClearPending())
+        {
+            glDisable(GL_SCISSOR_TEST);
+
+            gles2_immediate.ClearOitTargets();
+
+            glClearColor(epi::GetRGBARed(clear_color_) / 255.0f, epi::GetRGBAGreen(clear_color_) / 255.0f,
+                         epi::GetRGBABlue(clear_color_) / 255.0f, epi::GetRGBAAlpha(clear_color_) / 255.0f);
+
+            InvalidateApplied();
+        }
+
+        float alpha_test = enable_alpha_test_ ? alpha_function_reference_ : 0.0f;
+
+        gles2_program.SelectVariant(alpha_test <= 0.0f);
+
         if (!state_dirty_)
         {
             return;
@@ -752,7 +768,7 @@ class Gles2RenderState : public RenderState
                                  texture_environment_combine_rgb_[0] == GL_REPLACE &&
                                  texture_environment_source_0_rgb_[0] == GL_PREVIOUS);
 
-        gles2_program.SetAlphaTest(enable_alpha_test_ ? alpha_function_reference_ : 0.0f);
+        gles2_program.SetAlphaTest(alpha_test);
 
         Gles2FogMode fog_mode = kGles2FogModeNone;
 

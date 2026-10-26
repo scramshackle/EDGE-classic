@@ -38,6 +38,75 @@ enum Gles2FogMode
     kGles2FogModeExponential = 2
 };
 
+struct Gles2WorldLocations
+{
+    GLint model_view_projection  = -1;
+    GLint model_view             = -1;
+    GLint texture0               = -1;
+    GLint texture1               = -1;
+    GLint multi_texture          = -1;
+    GLint light_falloff          = -1;
+    GLint world_lit              = -1;
+    GLint light_data             = -1;
+    GLint light_headers          = -1;
+    GLint light_indices          = -1;
+    GLint light_list             = -1;
+    GLint light_view             = -1;
+    GLint light_cluster          = -1;
+    GLint light_bounds_min       = -1;
+    GLint light_bounds_range     = -1;
+    GLint light_radius_scale     = -1;
+    GLint light_data_step        = -1;
+    GLint glow_count             = -1;
+    GLint glow_plane             = -1;
+    GLint glow_color             = -1;
+    GLint glow_additive          = -1;
+    GLint line_mode              = -1;
+    GLint skip_rgb               = -1;
+    GLint alpha_test             = -1;
+    GLint fog_mode               = -1;
+    GLint fog_color              = -1;
+    GLint fog_density            = -1;
+    GLint fog_start              = -1;
+    GLint fog_end                = -1;
+    GLint sky_pass               = -1;
+    GLint light_depth            = -1;
+    GLint view_tint              = -1;
+    GLint sky_fog_depth          = -1;
+    GLint sky_inverse_projection = -1;
+    GLint sky_inverse_view       = -1;
+    GLint sky_viewport           = -1;
+    GLint sky_stretch_mode       = -1;
+    GLint sky_u_scale            = -1;
+    GLint sky_ty                 = -1;
+    GLint sky_u_offset           = -1;
+    GLint sky_v_offset           = -1;
+    GLint sky_band               = -1;
+    GLint sky_fade_exponent      = -1;
+    GLint sky_cap_top            = -1;
+    GLint sky_cap_bottom         = -1;
+    GLint sky_geometry           = -1;
+    GLint sky_is_box             = -1;
+    GLint sky_cube               = -1;
+    GLint sky_horizon_shift      = -1;
+    GLint oit_mode               = -1;
+    GLint oit_scale              = -1;
+    GLint texture_offset         = -1;
+    GLint light_row_offset       = -1;
+    GLint sprite_mode            = -1;
+    GLint sprite_whites          = -1;
+    GLint sprite_lighting        = -1;
+    GLint sprite_view0           = -1;
+    GLint sprite_view1           = -1;
+    GLint liquid                 = -1;
+    GLint color_lookup           = -1;
+    GLint color_lookup_enabled   = -1;
+    GLint whiten                 = -1;
+    GLint blur                   = -1;
+};
+
+constexpr int32_t kGles2WorldVariants = 6;
+
 class Gles2Program
 {
   public:
@@ -102,6 +171,8 @@ class Gles2Program
 
     void ForceOitReset();
 
+    void SelectVariant(bool opaque);
+
     uint32_t UniformUpdateCount() const
     {
         return uniform_update_count_;
@@ -112,77 +183,29 @@ class Gles2Program
         uniform_update_count_      = 0;
         shadow_glow_set_           = -2;
         shadow_sprite_light_table_ = nullptr;
+        shadow_light_grid_         = nullptr;
+        shadow_sky_pass_valid_     = false;
     }
 
   private:
     void SetFloat(GLint location, float &shadow, float value);
 
-    GLuint program_ = 0;
+    void LinkVariant(int32_t variant, const char *defines);
 
-    GLint uniform_model_view_projection_ = -1;
-    GLint uniform_model_view_            = -1;
-    GLint uniform_texture0_              = -1;
-    GLint uniform_texture1_              = -1;
-    GLint uniform_multi_texture_         = -1;
-    GLint uniform_light_falloff_         = -1;
-    GLint uniform_world_lit_             = -1;
-    GLint uniform_light_data_            = -1;
-    GLint uniform_light_headers_         = -1;
-    GLint uniform_light_indices_         = -1;
-    GLint uniform_light_list_            = -1;
-    GLint uniform_light_view_            = -1;
-    GLint uniform_light_cluster_         = -1;
-    GLint uniform_light_bounds_min_      = -1;
-    GLint uniform_light_bounds_range_    = -1;
-    GLint uniform_light_radius_scale_    = -1;
-    GLint uniform_light_data_step_       = -1;
-    GLint uniform_glow_count_            = -1;
-    GLint uniform_glow_plane_            = -1;
-    GLint uniform_glow_color_            = -1;
-    GLint uniform_glow_additive_         = -1;
-    GLint uniform_line_mode_             = -1;
-    GLint uniform_skip_rgb_              = -1;
-    GLint uniform_alpha_test_            = -1;
-    GLint uniform_fog_mode_              = -1;
-    GLint uniform_fog_color_             = -1;
-    GLint uniform_fog_density_           = -1;
-    GLint uniform_fog_start_             = -1;
-    GLint uniform_fog_end_               = -1;
+    void ResendUniforms();
 
-    GLint uniform_sky_pass_               = -1;
-    GLint uniform_light_depth_           = -1;
-    GLint uniform_view_tint_             = -1;
-    GLint uniform_sky_fog_depth_          = -1;
-    GLint uniform_sky_inverse_projection_ = -1;
-    GLint uniform_sky_inverse_view_       = -1;
-    GLint uniform_sky_viewport_           = -1;
-    GLint uniform_sky_stretch_mode_       = -1;
-    GLint uniform_sky_u_scale_            = -1;
-    GLint uniform_sky_ty_                 = -1;
-    GLint uniform_sky_u_offset_           = -1;
-    GLint uniform_sky_v_offset_           = -1;
-    GLint uniform_sky_band_               = -1;
-    GLint uniform_sky_fade_exponent_      = -1;
-    GLint uniform_sky_cap_top_            = -1;
-    GLint uniform_sky_cap_bottom_         = -1;
-    GLint uniform_sky_geometry_ = -1;
-    GLint uniform_sky_is_box_ = -1;
-    GLint uniform_sky_cube_    = -1;
-    GLint uniform_sky_horizon_shift_      = -1;
-    GLint uniform_oit_mode_               = -1;
-    GLint uniform_oit_scale_              = -1;
-    GLint uniform_texture_offset_         = -1;
-    GLint uniform_light_row_offset_       = -1;
-    GLint uniform_sprite_mode_            = -1;
-    GLint uniform_sprite_whites_          = -1;
-    GLint uniform_sprite_lighting_        = -1;
-    GLint uniform_sprite_view0_           = -1;
-    GLint uniform_sprite_view1_           = -1;
-    GLint uniform_liquid_                 = -1;
-    GLint uniform_color_lookup_           = -1;
-    GLint uniform_color_lookup_enabled_   = -1;
-    GLint uniform_whiten_                 = -1;
-    GLint uniform_blur_                   = -1;
+    void UploadLightGrid(const struct Gles2LightGridState *grid);
+
+    void UploadGlowSet(int index);
+
+    void UploadSkyPass(const SkyPassInfo &sky_pass);
+
+    GLuint programs_[kGles2WorldVariants] = {};
+
+    Gles2WorldLocations variant_locations_[kGles2WorldVariants];
+    Gles2WorldLocations locations_;
+
+    int32_t variant_ = 0;
 
     epi::Mat4 shadow_model_view_projection_ = {};
     epi::Mat4 shadow_model_view_            = {};
@@ -191,6 +214,7 @@ class Gles2Program
     float shadow_light_falloff_ = -1.0f;
     float shadow_world_lit_     = -1.0f;
     int   shadow_glow_set_      = -2;
+    bool  shadow_glow_active_   = false;
     float shadow_line_mode_     = -1.0f;
     float shadow_skip_rgb_      = -1.0f;
     float shadow_alpha_test_    = -1.0f;
@@ -220,6 +244,11 @@ class Gles2Program
     float shadow_whiten_               = -1.0f;
 
     epi::Vec4 shadow_blur_ = epi::Vec4{-1.0f, -1.0f, -1.0f, -1.0f};
+
+    const struct Gles2LightGridState *shadow_light_grid_ = nullptr;
+
+    SkyPassInfo shadow_sky_pass_info_;
+    bool        shadow_sky_pass_valid_ = false;
 
     uint32_t uniform_update_count_ = 0;
 };

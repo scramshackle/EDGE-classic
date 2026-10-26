@@ -465,6 +465,9 @@ void EndRenderUnit(int actual_vert)
 
     unit->count = actual_vert;
 
+    if (UnitAccumulatesOit(unit->blending, unit->pass))
+        OitBoundsAddVertices({local_verts + unit->first, (size_t)actual_vert});
+
     current_render_vert += actual_vert;
     current_render_unit++;
 

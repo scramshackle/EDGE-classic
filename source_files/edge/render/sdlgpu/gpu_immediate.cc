@@ -1002,9 +1002,9 @@ void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTa
         instance_buffer = static_buffers_[buffer - 1];
     }
 
-    SDL_GPUGraphicsPipeline *pipeline = oit_pipeline_
-                                            ? GetSpriteOitPipeline(pipeline_flags_)
-                                            : GetSpritePipeline(pipeline_flags_, source_blend_, destination_blend_);
+    SDL_GPUGraphicsPipeline *pipeline =
+        oit_pipeline_ ? GetSpriteOitPipeline(pipeline_flags_)
+                      : GetSpritePipeline(WorldPipelineFlags(), source_blend_, destination_blend_);
 
     GpuCommand command;
 
@@ -1563,12 +1563,37 @@ RendererVertex *GpuImmediate::ReserveVertices(int32_t count)
     return vertices_.data() + pending_base_;
 }
 
+uint32_t GpuImmediate::WorldPipelineFlags() const
+{
+    const GpuFragmentParameters &parameters = current_fragment_parameters_;
+
+    uint32_t flags = pipeline_flags_;
+
+    if (parameters.alpha_test <= 0.0f)
+        flags |= kGpuPipelineNoDiscard;
+
+    bool effects = parameters.blur[0] > 0.0f || parameters.liquid[0] > 0.5f || parameters.color_lookup[0] > 0.5f ||
+                   (parameters.flags & kGpuFragmentFlagWhiten);
+
+    bool lights = parameters.light_range[2] > 0.5f || parameters.glow_additive[3] > 0.5f;
+
+    if (!effects)
+    {
+        flags |= kGpuPipelineNoEffects;
+
+        if (!lights)
+            flags |= kGpuPipelineNoLights;
+    }
+
+    return flags;
+}
+
 SDL_GPUGraphicsPipeline *GpuImmediate::SelectWorldPipeline(GpuPrimitiveType primitive)
 {
     if (oit_pipeline_)
         return GetOitPipeline(pipeline_flags_, primitive);
 
-    return GetPipeline(pipeline_flags_, source_blend_, destination_blend_, primitive);
+    return GetPipeline(WorldPipelineFlags(), source_blend_, destination_blend_, primitive);
 }
 
 void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
@@ -2490,9 +2515,16 @@ void GpuImmediate::Replay()
 
     ApplyPassState();
 
+    bool pass_untouched       = true;
+    bool pass_depth_cleared   = true;
+    bool pass_stencil_cleared = true;
+
     for (size_t i = 0; i < commands_.size(); i++)
     {
         const GpuCommand *command = &commands_[i];
+
+        if (IsDrawCommand(command->type))
+            pass_untouched = false;
 
         if (command->type == kGpuCommandMovie)
         {
@@ -2800,17 +2832,25 @@ void GpuImmediate::Replay()
                 gpu_device.BeginPass(gpu_device.WorldDirect() ? kGpuLoadOperationLoad : kGpuLoadOperationClear,
                                      kGpuLoadOperationClear, kGpuLoadOperationClear, kGpuPassTargetWorld);
 
+                pass_untouched       = true;
+                pass_depth_cleared   = true;
+                pass_stencil_cleared = true;
+
                 ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandBeginOitTarget)
             {
                 gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetOit);
+
+                pass_untouched = false;
             }
             else if (command->type == kGpuCommandEndOitTarget)
             {
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetWorld);
+
+                pass_untouched = false;
             }
             else if (command->type == kGpuCommandResolveWorldTarget)
             {
@@ -2836,17 +2876,33 @@ void GpuImmediate::Replay()
                 gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
                                      kGpuPassTargetMain);
 
+                pass_untouched = false;
+
                 ResetTargetRectangles();
             }
             else if (command->type == kGpuCommandClearStencil)
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear,
-                                     gpu_device.CurrentTarget());
+                if (!pass_untouched || !pass_stencil_cleared)
+                {
+                    gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationLoad, kGpuLoadOperationClear,
+                                         gpu_device.CurrentTarget());
+
+                    pass_depth_cleared   = pass_untouched && pass_depth_cleared;
+                    pass_untouched       = true;
+                    pass_stencil_cleared = true;
+                }
             }
             else
             {
-                gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
-                                     gpu_device.CurrentTarget());
+                if (!pass_untouched || !pass_depth_cleared)
+                {
+                    gpu_device.BeginPass(kGpuLoadOperationLoad, kGpuLoadOperationClear, kGpuLoadOperationLoad,
+                                         gpu_device.CurrentTarget());
+
+                    pass_stencil_cleared = pass_untouched && pass_stencil_cleared;
+                    pass_untouched       = true;
+                    pass_depth_cleared   = true;
+                }
             }
 
             ApplyPassState();

@@ -139,6 +139,19 @@ static void SetupBlendState(SDL_GPUColorTargetBlendState *blend, GLenum source_b
     blend->alpha_blend_op         = SDL_GPU_BLENDOP_ADD;
 }
 
+static SDL_GPUShader *WorldFragmentShaderForFlags(uint32_t pipeline_flags)
+{
+    int32_t variant = 0;
+
+    if (pipeline_flags & kGpuPipelineNoEffects)
+        variant = (pipeline_flags & kGpuPipelineNoLights) ? 4 : 2;
+
+    if (pipeline_flags & kGpuPipelineNoDiscard)
+        variant++;
+
+    return WorldFragmentShader(variant);
+}
+
 static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend,
                                                GpuPrimitiveType primitive, GpuPipelineShaderKind shader_kind)
 {
@@ -263,7 +276,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         shader_kind == kGpuPipelineShaderSpriteOit)
     {
         color_target[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
-        color_target[1].format = SDL_GPU_TEXTUREFORMAT_R16_FLOAT;
+        color_target[1].format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
 
         SetupBlendState(&color_target[0].blend_state, GL_ONE, GL_ONE);
         SetupBlendState(&color_target[1].blend_state, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
@@ -303,7 +316,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     else if (shader_kind == kGpuPipelineShaderSprite)
     {
         info.vertex_shader   = SpriteVertexShader();
-        info.fragment_shader = WorldFragmentShader();
+        info.fragment_shader = WorldFragmentShaderForFlags(pipeline_flags);
     }
     else if (shader_kind == kGpuPipelineShaderModel)
     {
@@ -313,7 +326,7 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
     else
     {
         info.vertex_shader   = WorldVertexShader();
-        info.fragment_shader = WorldFragmentShader();
+        info.fragment_shader = WorldFragmentShaderForFlags(pipeline_flags);
     }
 
     info.vertex_input_state.vertex_buffer_descriptions = buffer_description;
@@ -354,6 +367,8 @@ static SDL_GPUGraphicsPipeline *CreatePipeline(uint32_t pipeline_flags, GLenum s
         info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
     else if (pipeline_flags & kGpuPipelineDepthGreater)
         info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
+    else if (pipeline_flags & kGpuPipelineDepthLess)
+        info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
     else
         info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
 
@@ -516,7 +531,7 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
 {
     pipeline_flags = EncodeBlendFlags(pipeline_flags, source_blend, destination_blend);
 
-    uint32_t key = pipeline_flags | ((uint32_t)primitive << 16);
+    uint32_t key = pipeline_flags | ((uint32_t)primitive << 27);
 
     std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 
@@ -561,7 +576,7 @@ SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveTyp
                                   kGpuPipelineBlendDestinationOne | kGpuPipelineBlendDestinationOneMinusSourceAlpha |
                                   kGpuPipelineBlendDestinationSourceColor | kGpuPipelineBlendDestinationZero);
 
-    uint32_t key = pipeline_flags | ((uint32_t)primitive << 16) | (3u << 24);
+    uint32_t key = pipeline_flags | ((uint32_t)primitive << 27) | (3u << 24);
 
     std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline *>::iterator itr = pipelines.find(key);
 

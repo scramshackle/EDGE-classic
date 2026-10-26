@@ -67,8 +67,10 @@ struct StaticSpan
 
 struct StaticRun
 {
-    int start;
-    int count;
+    int   start;
+    int   count;
+    float low[3];
+    float high[3];
 };
 
 struct SpanReference
@@ -1849,8 +1851,10 @@ static void RebuildStaticRuns(StaticBatch &batch)
 {
     batch.runs.clear();
 
-    int run_start = -1;
-    int run_end   = -1;
+    StaticRun run;
+
+    run.start = -1;
+    run.count = 0;
 
     for (size_t k = 0; k < batch.spans.size(); k++)
     {
@@ -1861,21 +1865,34 @@ static void RebuildStaticRuns(StaticBatch &batch)
         if (!live)
             continue;
 
-        if (run_start >= 0 && span.start == run_end)
+        if (run.start >= 0 && span.start == run.start + run.count)
         {
-            run_end += span.count;
+            run.count += span.count;
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                run.low[axis]  = epi::Min(run.low[axis], span.low[axis]);
+                run.high[axis] = epi::Max(run.high[axis], span.high[axis]);
+            }
+
             continue;
         }
 
-        if (run_start >= 0)
-            batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+        if (run.start >= 0)
+            batch.runs.push_back(run);
 
-        run_start = span.start;
-        run_end   = span.start + span.count;
+        run.start = span.start;
+        run.count = span.count;
+
+        for (int axis = 0; axis < 3; axis++)
+        {
+            run.low[axis]  = span.low[axis];
+            run.high[axis] = span.high[axis];
+        }
     }
 
-    if (run_start >= 0)
-        batch.runs.push_back(StaticRun{run_start, run_end - run_start});
+    if (run.start >= 0)
+        batch.runs.push_back(run);
 
     batch.runs_dirty = false;
 }
@@ -1963,17 +1980,24 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         bool inverted   = mirror_view.reflective != (fliplevels.d_ != 0);
         blending = (BlendingMode)(blending | (inverted ? kBlendingCullFront : kBlendingCullBack));
 
+        bool track_bounds = (batch.draw_pass == kOitPassAccumulate && OitBoundsTracking());
+
         for (size_t r = 0; r < batch.runs.size(); r++)
         {
             const StaticRun &run = batch.runs[r];
+
+            if (track_bounds)
+                OitBoundsAddBox(run.low, run.high);
 
             if (resident)
             {
                 int count = epi::Min(run.count, batch.gpu_count - run.start);
 
+                bool world_lit = !refresh || LightGridReachesBox(run.low, run.high);
+
                 if (count > 0)
                     shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, run.start, count, tex_id, &pass,
-                                               blending, glow_set);
+                                               blending, glow_set, world_lit);
                 continue;
             }
 

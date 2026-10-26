@@ -366,6 +366,23 @@ void ClearLightGrid(void)
     current_light_grid.dropped_cluster   = 0;
 }
 
+bool LightGridReachesBox(const float low[3], const float high[3])
+{
+    for (size_t i = 0; i < current_light_grid.lights.size(); i++)
+    {
+        const LightGridLight &light = current_light_grid.lights[i];
+
+        float dx = light.world_position.x - epi::Clamp(light.world_position.x, low[0], high[0]);
+        float dy = light.world_position.y - epi::Clamp(light.world_position.y, low[1], high[1]);
+        float dz = light.world_position.z - epi::Clamp(light.world_position.z, low[2], high[2]);
+
+        if (dx * dx + dy * dy + dz * dz < light.radius * light.radius)
+            return true;
+    }
+
+    return false;
+}
+
 const LightGrid *CurrentLightGrid(void)
 {
     return &current_light_grid;
@@ -456,8 +473,9 @@ void BuildLightGrid(void)
 
         LightGridLight entry;
 
-        entry.eye_position = {eye.x, eye.y, eye.z};
-        entry.radius       = light.radius;
+        entry.eye_position   = {eye.x, eye.y, eye.z};
+        entry.radius         = light.radius;
+        entry.world_position = light.world_position;
         entry.color        = light.color;
         entry.additive     = light.additive;
 

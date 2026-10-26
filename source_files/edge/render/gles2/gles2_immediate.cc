@@ -1088,8 +1088,8 @@ bool Gles2Immediate::CreateOitTargets(int32_t texture_width, int32_t texture_hei
 
         if (CreateOitTarget(oit_accumulation_framebuffer_, oit_accumulation_texture_, formats[i].internal_format,
                             formats[i].format, formats[i].type, texture_width, texture_height) &&
-            CreateOitTarget(oit_revealage_framebuffer_, oit_revealage_texture_, formats[i].internal_format,
-                            formats[i].format, formats[i].type, texture_width, texture_height))
+            CreateOitTarget(oit_revealage_framebuffer_, oit_revealage_texture_, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+                            texture_width, texture_height))
         {
             oit_scale_ = formats[i].scale;
 
@@ -1137,16 +1137,29 @@ void Gles2Immediate::DestroyOitTargets()
     }
 
     oit_scale_ = 1.0f;
+
+    oit_bound_framebuffer_ = 0;
+    oit_clear_pending_     = false;
+    oit_drawn_             = false;
 }
 
 void Gles2Immediate::BindOitTarget(int32_t mode)
 {
-    glBindFramebuffer(GL_FRAMEBUFFER, (mode == 2) ? oit_revealage_framebuffer_ : oit_accumulation_framebuffer_);
+    oit_bound_framebuffer_ = (mode == 2) ? oit_revealage_framebuffer_ : oit_accumulation_framebuffer_;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, oit_bound_framebuffer_);
+}
+
+void Gles2Immediate::BeginOitTargets()
+{
+    oit_clear_pending_ = true;
+    oit_drawn_         = false;
 }
 
 void Gles2Immediate::ClearOitTargets()
 {
-    glDisable(GL_SCISSOR_TEST);
+    oit_clear_pending_ = false;
+    oit_drawn_         = true;
 
     glBindFramebuffer(GL_FRAMEBUFFER, oit_accumulation_framebuffer_);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1156,11 +1169,23 @@ void Gles2Immediate::ClearOitTargets()
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+    glBindFramebuffer(GL_FRAMEBUFFER, oit_bound_framebuffer_);
 }
 
-void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
+bool Gles2Immediate::FinishOitTargets()
 {
+    bool drawn = oit_drawn_;
+
+    oit_clear_pending_ = false;
+    oit_drawn_         = false;
+
+    return drawn;
+}
+
+void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view, const Gles2ResolveRect &area)
+{
+    oit_bound_framebuffer_ = 0;
+
     glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
 
     glDisable(GL_CULL_FACE);
@@ -1182,10 +1207,15 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, oit_accumulation_texture_);
 
-    float u0 = (float)view.x / (float)render_target_texture_width_;
-    float v0 = (float)view.y / (float)render_target_texture_height_;
-    float u1 = (float)(view.x + view.width) / (float)render_target_texture_width_;
-    float v1 = (float)(view.y + view.height) / (float)render_target_texture_height_;
+    float u0 = (float)area.x / (float)render_target_texture_width_;
+    float v0 = (float)area.y / (float)render_target_texture_height_;
+    float u1 = (float)(area.x + area.width) / (float)render_target_texture_width_;
+    float v1 = (float)(area.y + area.height) / (float)render_target_texture_height_;
+
+    float x0 = (float)(area.x - view.x) / (float)view.width * 2.0f - 1.0f;
+    float y0 = (float)(area.y - view.y) / (float)view.height * 2.0f - 1.0f;
+    float x1 = (float)(area.x + area.width - view.x) / (float)view.width * 2.0f - 1.0f;
+    float y1 = (float)(area.y + area.height - view.y) / (float)view.height * 2.0f - 1.0f;
 
     RendererVertex quad[4];
 
@@ -1194,16 +1224,16 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
     for (int32_t i = 0; i < 4; i++)
         quad[i].rgba = kRGBAWhite;
 
-    quad[0].position               = {-1.0f, -1.0f, 0.0f};
+    quad[0].position               = {x0, y0, 0.0f};
     quad[0].texture_coordinates[0] = {u0, v0};
 
-    quad[1].position               = {1.0f, -1.0f, 0.0f};
+    quad[1].position               = {x1, y0, 0.0f};
     quad[1].texture_coordinates[0] = {u1, v0};
 
-    quad[2].position               = {1.0f, 1.0f, 0.0f};
+    quad[2].position               = {x1, y1, 0.0f};
     quad[2].texture_coordinates[0] = {u1, v1};
 
-    quad[3].position               = {-1.0f, 1.0f, 0.0f};
+    quad[3].position               = {x0, y1, 0.0f};
     quad[3].texture_coordinates[0] = {u0, v1};
 
     size_t offset = StreamVertices(quad, 4);
@@ -1225,6 +1255,8 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view)
 
 void Gles2Immediate::BindRenderTarget()
 {
+    oit_bound_framebuffer_ = 0;
+
     if (!Gles2HasFramebufferObjects())
         return;
 

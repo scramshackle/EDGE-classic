@@ -316,9 +316,7 @@ class Gles2RenderBackend : public RenderBackend
 
     void BeginOitPass()
     {
-        gles2_immediate.ClearOitTargets();
-
-        Gles2InvalidateRenderState();
+        gles2_immediate.BeginOitTargets();
     }
 
     void SetOitPass(int32_t mode)
@@ -335,13 +333,29 @@ class Gles2RenderBackend : public RenderBackend
     {
         oit_mode_ = 0;
 
+        if (!gles2_immediate.FinishOitTargets())
+        {
+            gles2_immediate.BindRenderTarget();
+            return;
+        }
+
         Gles2ResolveRect view;
         view.x      = ScaleToRenderTargetX(view_window_x);
         view.y      = ScaleToRenderTargetY(view_window_y);
         view.width  = ScaleToRenderTargetX(view_window_width);
         view.height = ScaleToRenderTargetY(view_window_height);
 
-        gles2_immediate.CompositeOit(view);
+        Gles2ResolveRect area = view;
+
+        ClipToOitBounds(area.x, area.y, area.width, area.height);
+
+        if (area.width <= 0 || area.height <= 0)
+        {
+            gles2_immediate.BindRenderTarget();
+            return;
+        }
+
+        gles2_immediate.CompositeOit(view, area);
 
         Gles2InvalidateRenderState();
     }

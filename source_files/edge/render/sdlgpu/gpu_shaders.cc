@@ -6,12 +6,17 @@
 #include "shaders/model_spirv.h"
 #include "shaders/movie_spirv.h"
 #include "shaders/sprite_spirv.h"
+#include "shaders/world_base_opaque_spirv.h"
+#include "shaders/world_base_spirv.h"
+#include "shaders/world_lit_opaque_spirv.h"
+#include "shaders/world_lit_spirv.h"
 #include "shaders/world_oit_spirv.h"
+#include "shaders/world_opaque_spirv.h"
 #include "shaders/world_spirv.h"
 
 static SDL_GPUShader *world_vertex_shader   = nullptr;
 static SDL_GPUShader *world_oit_fragment_shader = nullptr;
-static SDL_GPUShader *world_fragment_shader = nullptr;
+static SDL_GPUShader *world_fragment_shaders[kGpuWorldFragmentVariants] = {};
 static SDL_GPUShader *sprite_vertex_shader  = nullptr;
 static SDL_GPUShader *movie_vertex_shader    = nullptr;
 static SDL_GPUShader *movie_fragment_shader  = nullptr;
@@ -51,19 +56,54 @@ static SDL_GPUShader *CreateShader(SDL_GPUDevice *device, SDL_GPUShaderStage sta
     return shader;
 }
 
+struct GpuWorldFragmentSource
+{
+    const uint32_t *code;
+    size_t          code_size;
+    uint32_t        sampler_count;
+    uint32_t        uniform_buffer_count;
+    uint32_t        storage_buffer_count;
+    const char     *name;
+};
+
+static const GpuWorldFragmentSource world_fragment_sources[kGpuWorldFragmentVariants] = {
+    {kWorldFragmentShaderSpirv, sizeof(kWorldFragmentShaderSpirv), kWorldFragmentShaderSamplerCount,
+     kWorldFragmentShaderUniformBufferCount, kWorldFragmentShaderStorageBufferCount, "world.frag"},
+    {kWorldOpaqueFragmentShaderSpirv, sizeof(kWorldOpaqueFragmentShaderSpirv), kWorldOpaqueFragmentShaderSamplerCount,
+     kWorldOpaqueFragmentShaderUniformBufferCount, kWorldOpaqueFragmentShaderStorageBufferCount, "world_opaque.frag"},
+    {kWorldLitFragmentShaderSpirv, sizeof(kWorldLitFragmentShaderSpirv), kWorldLitFragmentShaderSamplerCount,
+     kWorldLitFragmentShaderUniformBufferCount, kWorldLitFragmentShaderStorageBufferCount, "world_lit.frag"},
+    {kWorldLitOpaqueFragmentShaderSpirv, sizeof(kWorldLitOpaqueFragmentShaderSpirv),
+     kWorldLitOpaqueFragmentShaderSamplerCount, kWorldLitOpaqueFragmentShaderUniformBufferCount,
+     kWorldLitOpaqueFragmentShaderStorageBufferCount, "world_lit_opaque.frag"},
+    {kWorldBaseFragmentShaderSpirv, sizeof(kWorldBaseFragmentShaderSpirv), kWorldBaseFragmentShaderSamplerCount,
+     kWorldBaseFragmentShaderUniformBufferCount, kWorldBaseFragmentShaderStorageBufferCount, "world_base.frag"},
+    {kWorldBaseOpaqueFragmentShaderSpirv, sizeof(kWorldBaseOpaqueFragmentShaderSpirv),
+     kWorldBaseOpaqueFragmentShaderSamplerCount, kWorldBaseOpaqueFragmentShaderUniformBufferCount,
+     kWorldBaseOpaqueFragmentShaderStorageBufferCount, "world_base_opaque.frag"}};
+
 bool CreateWorldShaders(SDL_GPUDevice *device)
 {
-    if (world_vertex_shader && world_fragment_shader && sprite_vertex_shader)
+    if (world_vertex_shader && world_fragment_shaders[0] && sprite_vertex_shader)
         return true;
 
     world_vertex_shader =
         CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kWorldVertexShaderSpirv, sizeof(kWorldVertexShaderSpirv),
                      kWorldVertexShaderSamplerCount, kWorldVertexShaderUniformBufferCount, "world.vert");
 
-    world_fragment_shader =
-        CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, kWorldFragmentShaderSpirv, sizeof(kWorldFragmentShaderSpirv),
-                     kWorldFragmentShaderSamplerCount, kWorldFragmentShaderUniformBufferCount, "world.frag",
-                     kWorldFragmentShaderStorageBufferCount);
+    bool world_fragment_ready = true;
+
+    for (int32_t i = 0; i < kGpuWorldFragmentVariants; i++)
+    {
+        const GpuWorldFragmentSource &source = world_fragment_sources[i];
+
+        world_fragment_shaders[i] =
+            CreateShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, source.code, source.code_size, source.sampler_count,
+                         source.uniform_buffer_count, source.name, source.storage_buffer_count);
+
+        if (!world_fragment_shaders[i])
+            world_fragment_ready = false;
+    }
 
     world_oit_fragment_shader = CreateShader(
         device, SDL_GPU_SHADERSTAGE_FRAGMENT, kWorldOitFragmentShaderSpirv, sizeof(kWorldOitFragmentShaderSpirv),
@@ -74,7 +114,7 @@ bool CreateWorldShaders(SDL_GPUDevice *device)
         CreateShader(device, SDL_GPU_SHADERSTAGE_VERTEX, kSpriteVertexShaderSpirv, sizeof(kSpriteVertexShaderSpirv),
                      kSpriteVertexShaderSamplerCount, kSpriteVertexShaderUniformBufferCount, "sprite.vert");
 
-    if (!world_vertex_shader || !world_fragment_shader || !world_oit_fragment_shader || !sprite_vertex_shader)
+    if (!world_vertex_shader || !world_fragment_ready || !world_oit_fragment_shader || !sprite_vertex_shader)
     {
         DestroyWorldShaders(device);
         return false;
@@ -91,10 +131,13 @@ void DestroyWorldShaders(SDL_GPUDevice *device)
         world_vertex_shader = nullptr;
     }
 
-    if (world_fragment_shader)
+    for (int32_t i = 0; i < kGpuWorldFragmentVariants; i++)
     {
-        SDL_ReleaseGPUShader(device, world_fragment_shader);
-        world_fragment_shader = nullptr;
+        if (world_fragment_shaders[i])
+        {
+            SDL_ReleaseGPUShader(device, world_fragment_shaders[i]);
+            world_fragment_shaders[i] = nullptr;
+        }
     }
 
     if (world_oit_fragment_shader)
@@ -115,9 +158,9 @@ SDL_GPUShader *WorldVertexShader()
     return world_vertex_shader;
 }
 
-SDL_GPUShader *WorldFragmentShader()
+SDL_GPUShader *WorldFragmentShader(int32_t variant)
 {
-    return world_fragment_shader;
+    return world_fragment_shaders[variant];
 }
 
 SDL_GPUShader *WorldOitFragmentShader()

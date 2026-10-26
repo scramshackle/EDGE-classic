@@ -21,8 +21,37 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model world_oit model_oit sprite)
+set(SHADER_NAMES world movie model world_oit world_opaque world_lit world_lit_opaque world_base world_base_opaque model_oit
+                 sprite)
 set(SHADER_STAGES vert frag)
+
+set(VARIANT_world_oit_SOURCE world)
+set(VARIANT_world_oit_SYMBOL WorldOit)
+set(VARIANT_world_oit_DEFINES -DEDGE_OIT_PASS=1)
+
+set(VARIANT_world_opaque_SOURCE world)
+set(VARIANT_world_opaque_SYMBOL WorldOpaque)
+set(VARIANT_world_opaque_DEFINES -DEDGE_NO_DISCARD=1)
+
+set(VARIANT_world_lit_SOURCE world)
+set(VARIANT_world_lit_SYMBOL WorldLit)
+set(VARIANT_world_lit_DEFINES -DEDGE_NO_EFFECTS=1)
+
+set(VARIANT_world_lit_opaque_SOURCE world)
+set(VARIANT_world_lit_opaque_SYMBOL WorldLitOpaque)
+set(VARIANT_world_lit_opaque_DEFINES -DEDGE_NO_EFFECTS=1 -DEDGE_NO_DISCARD=1)
+
+set(VARIANT_world_base_SOURCE world)
+set(VARIANT_world_base_SYMBOL WorldBase)
+set(VARIANT_world_base_DEFINES -DEDGE_NO_EFFECTS=1 -DEDGE_NO_LIGHTS=1)
+
+set(VARIANT_world_base_opaque_SOURCE world)
+set(VARIANT_world_base_opaque_SYMBOL WorldBaseOpaque)
+set(VARIANT_world_base_opaque_DEFINES -DEDGE_NO_EFFECTS=1 -DEDGE_NO_LIGHTS=1 -DEDGE_NO_DISCARD=1)
+
+set(VARIANT_model_oit_SOURCE model)
+set(VARIANT_model_oit_SYMBOL ModelOit)
+set(VARIANT_model_oit_DEFINES -DEDGE_OIT_PASS=1)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
 
@@ -31,10 +60,8 @@ string(SUBSTRING "${SHADER_NAME}" 1 -1 NAME_TAIL)
 string(TOUPPER "${NAME_HEAD}" NAME_HEAD)
 set(SYMBOL_BASE "${NAME_HEAD}${NAME_TAIL}")
 
-if (SHADER_NAME STREQUAL "world_oit")
-  set(SYMBOL_BASE "WorldOit")
-elseif (SHADER_NAME STREQUAL "model_oit")
-  set(SYMBOL_BASE "ModelOit")
+if (DEFINED VARIANT_${SHADER_NAME}_SYMBOL)
+  set(SYMBOL_BASE "${VARIANT_${SHADER_NAME}_SYMBOL}")
 endif()
 
 set(GENERATED_BODY "")
@@ -47,18 +74,13 @@ foreach(STAGE IN LISTS SHADER_STAGES)
   set(SHADER_SOURCE_NAME "${SHADER_NAME}")
   set(EXTRA_DEFINES "")
 
-  if (SHADER_NAME STREQUAL "world_oit" OR SHADER_NAME STREQUAL "model_oit")
+  if (DEFINED VARIANT_${SHADER_NAME}_SOURCE)
     if (STAGE STREQUAL "vert")
       continue()
     endif()
 
-    if (SHADER_NAME STREQUAL "world_oit")
-      set(SHADER_SOURCE_NAME "world")
-    else()
-      set(SHADER_SOURCE_NAME "model")
-    endif()
-
-    set(EXTRA_DEFINES "-DEDGE_OIT_PASS=1")
+    set(SHADER_SOURCE_NAME "${VARIANT_${SHADER_NAME}_SOURCE}")
+    set(EXTRA_DEFINES ${VARIANT_${SHADER_NAME}_DEFINES})
   endif()
 
   set(SOURCE_FILE "${SHADER_DIR}/${SHADER_SOURCE_NAME}.${STAGE}.glsl")

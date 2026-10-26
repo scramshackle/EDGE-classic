@@ -83,6 +83,7 @@ typedef int GLsizei;
 #define GL_RGBA 0x1908
 
 #define GL_GREATER 0x0204
+#define GL_LESS    0x0201
 #define GL_LEQUAL  0x0203
 #define GL_ALWAYS  0x0207
 #define GL_EQUAL   0x0202

@@ -375,16 +375,34 @@ class GpuRenderBackend : public RenderBackend
         if (target_width < 1.0f || target_height < 1.0f)
             return;
 
-        float target_view_x = (float)ScaleToRenderTargetX(view_window_x);
-        float target_view_y = (float)ScaleToRenderTargetY(view_window_y);
-        float view_width    = (float)ScaleToRenderTargetX(view_window_width);
-        float view_height   = (float)ScaleToRenderTargetY(view_window_height);
+        int32_t view_x      = ScaleToRenderTargetX(view_window_x);
+        int32_t view_y      = ScaleToRenderTargetY(view_window_y);
+        int32_t view_width  = ScaleToRenderTargetX(view_window_width);
+        int32_t view_height = ScaleToRenderTargetY(view_window_height);
 
-        float u0 = target_view_x / target_width;
-        float u1 = (target_view_x + view_width) / target_width;
+        if (view_width <= 0 || view_height <= 0)
+            return;
 
-        float v_top    = (target_height - target_view_y - view_height) / target_height;
-        float v_bottom = (target_height - target_view_y) / target_height;
+        int32_t area_x      = view_x;
+        int32_t area_y      = view_y;
+        int32_t area_width  = view_width;
+        int32_t area_height = view_height;
+
+        ClipToOitBounds(area_x, area_y, area_width, area_height);
+
+        if (area_width <= 0 || area_height <= 0)
+            drawn = false;
+
+        float u0 = (float)area_x / target_width;
+        float u1 = (float)(area_x + area_width) / target_width;
+
+        float v_top    = (target_height - (float)area_y - (float)area_height) / target_height;
+        float v_bottom = (target_height - (float)area_y) / target_height;
+
+        float x0 = (float)(area_x - view_x) / (float)view_width * 2.0f - 1.0f;
+        float y0 = (float)(area_y - view_y) / (float)view_height * 2.0f - 1.0f;
+        float x1 = (float)(area_x + area_width - view_x) / (float)view_width * 2.0f - 1.0f;
+        float y1 = (float)(area_y + area_height - view_y) / (float)view_height * 2.0f - 1.0f;
 
         gpu_immediate.SetPipelineState(kGpuPipelineBlend, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -416,16 +434,16 @@ class GpuRenderBackend : public RenderBackend
         for (int32_t i = 0; i < 4; i++)
             quad[i].rgba = kRGBAWhite;
 
-        quad[0].position               = {-1.0f, -1.0f, 0.0f};
+        quad[0].position               = {x0, y0, 0.0f};
         quad[0].texture_coordinates[0] = {u0, v_bottom};
 
-        quad[1].position               = {1.0f, -1.0f, 0.0f};
+        quad[1].position               = {x1, y0, 0.0f};
         quad[1].texture_coordinates[0] = {u1, v_bottom};
 
-        quad[2].position               = {1.0f, 1.0f, 0.0f};
+        quad[2].position               = {x1, y1, 0.0f};
         quad[2].texture_coordinates[0] = {u1, v_top};
 
-        quad[3].position               = {-1.0f, 1.0f, 0.0f};
+        quad[3].position               = {x0, y1, 0.0f};
         quad[3].texture_coordinates[0] = {u0, v_top};
 
         if (drawn)

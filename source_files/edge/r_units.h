@@ -224,6 +224,16 @@ SpriteInstance *ReserveSpriteInstances(int count, int *first);
 void            AddSpriteRenderUnit(int first, int count, GLuint texture, GLuint fuzz_texture, BlendingMode blending,
                                     epi::RGBAColor fog_color, float fog_density, int color_lookup, bool world_lit, int glow_set,
                                     const SpriteLightTable *light_table, uint8_t alpha, uint32_t buffer = 0);
+void            BeginOitBounds(bool enabled);
+void            EndOitBounds(void);
+bool            OitBoundsTracking(void);
+bool            UnitAccumulatesOit(BlendingMode blending, int pass);
+void            OitBoundsAddFull(void);
+void            OitBoundsAddVertices(std::span<const RendererVertex> vertices);
+void            OitBoundsAddBox(const float low[3], const float high[3]);
+void            OitBoundsAddSprites(std::span<const SpriteInstance> instances, const epi::Vec4 &sprite_view);
+void            PublishOitBounds(void);
+
 uint32_t        CreateSpriteInstanceBuffer(std::span<const SpriteInstance> instances, int capacity);
 void            UpdateSpriteInstanceBuffer(uint32_t handle, int first, std::span<const SpriteInstance> instances);
 

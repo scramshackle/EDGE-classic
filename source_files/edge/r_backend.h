@@ -169,6 +169,42 @@ class RenderBackend
         return oit_mode_;
     }
 
+    void SetOitBounds(int32_t x, int32_t y, int32_t width, int32_t height)
+    {
+        oit_bounds_x_      = x;
+        oit_bounds_y_      = y;
+        oit_bounds_width_  = width;
+        oit_bounds_height_ = height;
+        oit_bounds_set_    = true;
+    }
+
+    void ClearOitBounds()
+    {
+        oit_bounds_set_ = false;
+    }
+
+    void ClipToOitBounds(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const
+    {
+        if (!oit_bounds_set_)
+            return;
+
+        int32_t low_x  = epi::Max(ScaleToRenderTargetX(oit_bounds_x_) - 1, x);
+        int32_t low_y  = epi::Max(ScaleToRenderTargetY(oit_bounds_y_) - 1, y);
+        int32_t high_x = epi::Min(ScaleToRenderTargetX(oit_bounds_x_ + oit_bounds_width_) + 1, x + width);
+        int32_t high_y = epi::Min(ScaleToRenderTargetY(oit_bounds_y_ + oit_bounds_height_) + 1, y + height);
+
+        if (oit_bounds_width_ <= 0 || oit_bounds_height_ <= 0)
+        {
+            high_x = low_x;
+            high_y = low_y;
+        }
+
+        x      = low_x;
+        y      = low_y;
+        width  = epi::Max(high_x - low_x, 0);
+        height = epi::Max(high_y - low_y, 0);
+    }
+
     virtual RenderLayer GetRenderLayer() = 0;
 
     void LockRenderUnits(bool locked)
@@ -277,6 +313,12 @@ class RenderBackend
 
     int32_t max_texture_size_ = 0;
     int32_t oit_mode_         = 0;
+
+    int32_t oit_bounds_x_      = 0;
+    int32_t oit_bounds_y_      = 0;
+    int32_t oit_bounds_width_  = 0;
+    int32_t oit_bounds_height_ = 0;
+    bool    oit_bounds_set_    = false;
     int64_t frame_number_;
     bool    units_locked_ = false;
 

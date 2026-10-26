@@ -25,7 +25,11 @@ enum GpuPipelineFlag
     kGpuPipelineStencilTest                         = 1 << 15,
     kGpuPipelineStencilIncrement                    = 1 << 16,
     kGpuPipelineStencilDecrement                    = 1 << 17,
-    kGpuPipelineNoColorWrite                        = 1 << 18
+    kGpuPipelineNoColorWrite                        = 1 << 18,
+    kGpuPipelineNoDiscard                           = 1 << 19,
+    kGpuPipelineDepthLess                           = 1 << 20,
+    kGpuPipelineNoLights                            = 1 << 21,
+    kGpuPipelineNoEffects                           = 1 << 22
 };
 
 enum GpuPrimitiveType
