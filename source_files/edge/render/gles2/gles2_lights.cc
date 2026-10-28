@@ -12,8 +12,11 @@
 
 static Gles2LightGridState light_grid_state;
 
-static constexpr int kGles2LightDataWidth  = 256;
-static constexpr int kGles2LightDataHeight = 4;
+static constexpr int kGles2LightDataWidth    = 256;
+static constexpr int kGles2LightDataRows     = 4;
+static constexpr int kGles2LightDataBlocks   = (kLightGridMaximumLights + kGles2LightDataWidth) / kGles2LightDataWidth;
+static constexpr int kGles2LightDataHeight   = kGles2LightDataRows * kGles2LightDataBlocks;
+static constexpr int kGles2LightDataCapacity = kGles2LightDataWidth * kGles2LightDataBlocks;
 
 static int header_texture_width  = 0;
 static int header_texture_height = 0;
@@ -124,8 +127,8 @@ void Gles2UploadLightGrid(const LightGrid *grid)
 
     int light_total = (int)grid->lights.size();
 
-    if (light_total > kGles2LightDataWidth)
-        light_total = kGles2LightDataWidth;
+    if (light_total > kGles2LightDataCapacity)
+        light_total = kGles2LightDataCapacity;
 
     float minimum[3] = {grid->lights[0].eye_position.x, grid->lights[0].eye_position.y, grid->lights[0].eye_position.z};
     float maximum[3] = {minimum[0], minimum[1], minimum[2]};
@@ -166,9 +169,13 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     {
         const LightGridLight &light = grid->lights[i];
 
-        uint8_t *row0 = light_data_pixels.data() + (size_t)(0 * kGles2LightDataWidth + i) * 4;
-        uint8_t *row1 = light_data_pixels.data() + (size_t)(1 * kGles2LightDataWidth + i) * 4;
-        uint8_t *row2 = light_data_pixels.data() + (size_t)(2 * kGles2LightDataWidth + i) * 4;
+        int block  = i / kGles2LightDataWidth;
+        int column = i % kGles2LightDataWidth;
+        int base   = block * kGles2LightDataRows;
+
+        uint8_t *row0 = light_data_pixels.data() + (size_t)((base + 0) * kGles2LightDataWidth + column) * 4;
+        uint8_t *row1 = light_data_pixels.data() + (size_t)((base + 1) * kGles2LightDataWidth + column) * 4;
+        uint8_t *row2 = light_data_pixels.data() + (size_t)((base + 2) * kGles2LightDataWidth + column) * 4;
 
         EncodeUnitPair(row0 + 0,
                        (light.eye_position.x - light_grid_state.bounds_minimum[0]) / light_grid_state.bounds_range[0]);
@@ -190,7 +197,9 @@ void Gles2UploadLightGrid(const LightGrid *grid)
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, light_grid_state.data_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kGles2LightDataWidth, kGles2LightDataHeight, GL_RGBA, GL_UNSIGNED_BYTE,
+    int used_height = kGles2LightDataRows * ((light_total + kGles2LightDataWidth - 1) / kGles2LightDataWidth);
+
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kGles2LightDataWidth, used_height, GL_RGBA, GL_UNSIGNED_BYTE,
                     light_data_pixels.data());
 
     int header_rows = grid->clusters_y * kLightGridDepthSlices;
@@ -249,11 +258,11 @@ void Gles2UploadLightGrid(const LightGrid *grid)
         list_texture_width  = wanted_list_width;
         list_texture_height = wanted_list_height;
 
-        list_pixels.assign((size_t)list_texture_width * list_texture_height, 0);
+        list_pixels.assign((size_t)list_texture_width * list_texture_height * 2, 0);
 
         glBindTexture(GL_TEXTURE_2D, light_grid_state.list_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, list_texture_width, list_texture_height, 0, GL_LUMINANCE,
-                     GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, list_texture_width, list_texture_height, 0,
+                     GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, nullptr);
     }
     else
         memset(list_pixels.data(), 0, list_pixels.size());
@@ -261,11 +270,14 @@ void Gles2UploadLightGrid(const LightGrid *grid)
     size_t list_capacity = (size_t)list_texture_width * list_texture_height;
 
     for (size_t entry = 0; entry < entry_total && entry < list_capacity; entry++)
-        list_pixels[entry] = grid->cluster_list[entry];
+    {
+        list_pixels[entry * 2 + 0] = (uint8_t)(grid->cluster_list[entry] & 0xFF);
+        list_pixels[entry * 2 + 1] = (uint8_t)(grid->cluster_list[entry] >> 8);
+    }
 
     glBindTexture(GL_TEXTURE_2D, light_grid_state.list_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, list_texture_width, list_texture_height, GL_LUMINANCE, GL_UNSIGNED_BYTE,
-                    list_pixels.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, list_texture_width, list_texture_height, GL_LUMINANCE_ALPHA,
+                    GL_UNSIGNED_BYTE, list_pixels.data());
 
     glBindTexture(GL_TEXTURE_2D, 0);
 

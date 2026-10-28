@@ -73,7 +73,6 @@ set (EDGE_SOURCE_FILES
   r_mdl.cc
   r_mdmesh.cc
   r_mirror.cc
-  r_occlude.cc
   r_polygon.cc
   r_things.cc
   r_units.cc

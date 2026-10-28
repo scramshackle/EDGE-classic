@@ -84,17 +84,7 @@ MapObject **dynamic_light_blockmap_things = nullptr;
 extern std::unordered_set<AbstractShader *> seen_dynamic_lights;
 extern ConsoleVariable                      draw_culling;
 
-static void UpdateDLightRadius(ConsoleVariable *self)
-{
-    for (MapObject *mo = map_object_list_head; mo; mo = mo->next_)
-    {
-        if (mo->dynamic_light_.shader)
-            mo->dynamic_light_.shader->SetRadius(epi::Min<double>(exp2(5 + self->d_), mo->dynamic_light_.r));
-    }
-}
-
-EDGE_DEFINE_CONSOLE_VARIABLE_WITH_CALLBACK_CLAMPED(max_dynamic_light_radius, "4", kConsoleVariableFlagArchive,
-                                                   UpdateDLightRadius, 0, 4)
+static constexpr float kMaximumDynamicLightRadius = 512.0f;
 
 void CreateThingBlockmap(void)
 {
@@ -930,7 +920,7 @@ void DynamicLightIterator(float x1, float y1, float z1, float x2, float y2, floa
                     continue;
 
                 // check whether radius touches the given bbox
-                float r = epi::Min<double>(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
+                float r = epi::Min(kMaximumDynamicLightRadius, mo->dynamic_light_.r);
 
                 if (mo->x + r <= x1 || mo->x - r >= x2 || mo->y + r <= y1 || mo->y - r >= y2 || mo->z + r <= z1 ||
                     mo->z - r >= z2)
@@ -968,7 +958,7 @@ void SectorGlowIterator(Sector *sec, float x1, float y1, float z1, float x2, flo
             continue;
 
         // check whether radius touches the given bbox
-        float r = epi::Min<double>(exp2(5 + max_dynamic_light_radius.d_), mo->dynamic_light_.r);
+        float r = epi::Min(kMaximumDynamicLightRadius, mo->dynamic_light_.r);
 
         if (mo->info_->glow_type_ == kSectorGlowTypeFloor && sec->floor_height + r <= z1)
             continue;

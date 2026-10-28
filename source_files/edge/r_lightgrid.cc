@@ -2,6 +2,7 @@
 
 #include <math.h>
 
+#include <algorithm>
 #include <unordered_map>
 
 #include "con_var.h"
@@ -18,9 +19,31 @@
 #include "r_state.h"
 
 
+EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(dynamic_light_density, "2", kConsoleVariableFlagArchive, 0, 2)
+
 static LightGrid current_light_grid;
 
 static constexpr float kLightGridMinimumW = 0.0001f;
+
+static constexpr int kLightGridDensityCaps[3] = {32, 48, kLightGridMaximumPerCluster};
+
+struct LightGridCoverage
+{
+    int cluster_x1, cluster_y1, cluster_x2, cluster_y2;
+    int slice1, slice2;
+};
+
+struct LightGridCandidate
+{
+    LightGridLight    light;
+    LightGridCoverage cover;
+    float             eye_distance_squared;
+};
+
+static bool LightGridCandidateNearer(const LightGridCandidate &a, const LightGridCandidate &b)
+{
+    return a.eye_distance_squared < b.eye_distance_squared;
+}
 
 struct LightGridCollected
 {
@@ -442,15 +465,13 @@ void BuildLightGrid(void)
     current_light_grid.cluster_counts.assign((size_t)cluster_total, 0);
     current_light_grid.cluster_offsets.assign((size_t)cluster_total, 0);
 
-    struct LightGridCoverage
-    {
-        int cluster_x1, cluster_y1, cluster_x2, cluster_y2;
-        int slice1, slice2;
-    };
-
     static std::vector<LightGridCoverage> coverage;
 
     coverage.clear();
+
+    static std::vector<LightGridCandidate> candidates;
+
+    candidates.clear();
 
     for (size_t i = 0; i < collected_lights.size(); i++)
     {
@@ -488,9 +509,6 @@ void BuildLightGrid(void)
         if (cover.cluster_x1 > cover.cluster_x2 || cover.cluster_y1 > cover.cluster_y2)
             continue;
 
-        if (current_light_grid.lights.size() >= (size_t)kLightGridMaximumLights)
-            break;
-
         float depth = -eye.z;
 
         cover.slice1 = LightGridSliceFromDepth(depth - light.radius, current_light_grid.cluster_near,
@@ -498,9 +516,30 @@ void BuildLightGrid(void)
         cover.slice2 = LightGridSliceFromDepth(depth + light.radius, current_light_grid.cluster_near,
                                                current_light_grid.cluster_far);
 
-        current_light_grid.lights.push_back(entry);
+        LightGridCandidate candidate;
 
-        coverage.push_back(cover);
+        candidate.light                = entry;
+        candidate.cover                = cover;
+        candidate.eye_distance_squared = eye.x * eye.x + eye.y * eye.y + eye.z * eye.z;
+
+        candidates.push_back(candidate);
+    }
+
+    size_t light_limit = (size_t)kLightGridMaximumLights;
+
+    if (candidates.size() > light_limit)
+        std::nth_element(candidates.begin(), candidates.begin() + light_limit, candidates.end(),
+                         LightGridCandidateNearer);
+
+    size_t kept = epi::Min(candidates.size(), light_limit);
+
+    std::sort(candidates.begin(), candidates.begin() + kept, LightGridCandidateNearer);
+
+    for (size_t i = 0; i < kept; i++)
+    {
+        current_light_grid.lights.push_back(candidates[i].light);
+
+        coverage.push_back(candidates[i].cover);
     }
 
     static std::vector<LightGridSliceCoverage> slice_coverage;
@@ -526,6 +565,8 @@ void BuildLightGrid(void)
         }
     }
 
+    int cluster_cap = kLightGridDensityCaps[epi::Clamp(dynamic_light_density.d_, 0, 2)];
+
     for (size_t i = 0; i < slice_coverage.size(); i++)
     {
         const LightGridSliceCoverage &cover = slice_coverage[i];
@@ -538,7 +579,7 @@ void BuildLightGrid(void)
 
                 int cluster = row * current_light_grid.clusters_x + cluster_x;
 
-                if (current_light_grid.cluster_counts[cluster] < kLightGridMaximumPerCluster)
+                if (current_light_grid.cluster_counts[cluster] < cluster_cap)
                     current_light_grid.cluster_counts[cluster]++;
                 else
                     current_light_grid.dropped_cluster++;
@@ -578,10 +619,57 @@ void BuildLightGrid(void)
 
                 if (cluster_filled[cluster] < current_light_grid.cluster_counts[cluster])
                     current_light_grid.cluster_list[current_light_grid.cluster_offsets[cluster] +
-                                                    cluster_filled[cluster]++] = (uint8_t)cover.light;
+                                                    cluster_filled[cluster]++] = (uint16_t)cover.light;
             }
         }
     }
 
     ec_frame_stats.light_grid_bin_us += GetMicroseconds() - bin_mark;
+}
+
+struct LightGridSnapshot
+{
+    LightGrid                               grid;
+    std::vector<LightGridCollected>         collected;
+    std::vector<LightGridGlowSet>           glow_sets;
+    std::unordered_map<const Sector *, int> glow_set_lookup;
+    epi::Mat4                               glow_model_view;
+    int                                     glow_dropped = 0;
+};
+
+static std::vector<LightGridSnapshot> saved_light_grids;
+
+static size_t saved_light_grid_depth = 0;
+
+void PushLightGrid(void)
+{
+    if (saved_light_grid_depth >= saved_light_grids.size())
+        saved_light_grids.resize(saved_light_grid_depth + 1);
+
+    LightGridSnapshot &snapshot = saved_light_grids[saved_light_grid_depth++];
+
+    snapshot.grid            = current_light_grid;
+    snapshot.collected       = collected_lights;
+    snapshot.glow_sets       = glow_sets;
+    snapshot.glow_set_lookup = glow_set_lookup;
+    snapshot.glow_model_view = glow_model_view;
+    snapshot.glow_dropped    = glow_dropped;
+}
+
+void PopLightGrid(void)
+{
+    EPI_ASSERT(saved_light_grid_depth > 0);
+
+    const LightGridSnapshot &snapshot = saved_light_grids[--saved_light_grid_depth];
+
+    uint32_t serial = current_light_grid.serial;
+
+    current_light_grid = snapshot.grid;
+    collected_lights   = snapshot.collected;
+    glow_sets          = snapshot.glow_sets;
+    glow_set_lookup    = snapshot.glow_set_lookup;
+    glow_model_view    = snapshot.glow_model_view;
+    glow_dropped       = snapshot.glow_dropped;
+
+    current_light_grid.serial = serial + 1;
 }

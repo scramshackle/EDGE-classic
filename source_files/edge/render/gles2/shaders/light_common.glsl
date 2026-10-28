@@ -1,8 +1,12 @@
 const float kLightClusterSize = 16.0;
+const float kLightDataRowStep = 0.0625;
 
 vec4 LightDataTexel(float index, float row)
 {
-    return texture2D(u_light_data, vec2((index + 0.5) * u_light_data_step, (row + 0.5) * 0.25));
+    float block  = floor((index + 0.5) * u_light_data_step);
+    float column = index - block * 256.0;
+
+    return texture2D(u_light_data, vec2((column + 0.5) * u_light_data_step, (block * 4.0 + row + 0.5) * kLightDataRowStep));
 }
 
 void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float use_normal, inout vec3 modulate_sum,
@@ -38,10 +42,10 @@ void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float u
         float entry_y = floor(entry * u_light_list.y);
         float entry_x = entry - entry_y * u_light_list.x;
 
-        float index = floor(
-            texture2D(u_light_indices, vec2((entry_x + 0.5) * u_light_list.y, (entry_y + 0.5) * u_light_list.z)).r *
-                255.0 +
-            0.5);
+        vec4 index_texel =
+            texture2D(u_light_indices, vec2((entry_x + 0.5) * u_light_list.y, (entry_y + 0.5) * u_light_list.z));
+
+        float index = floor(index_texel.r * 255.0 + 0.5) + floor(index_texel.a * 255.0 + 0.5) * 256.0;
 
         vec4 t0 = LightDataTexel(index, 0.0);
         vec4 t1 = LightDataTexel(index, 1.0);

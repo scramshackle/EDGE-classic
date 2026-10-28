@@ -323,6 +323,8 @@ void RenderMirror(DrawMirror *mir)
 
     render_backend->PushModelMatrix(mir->local_matrix);
 
+    PushLightGrid();
+
     BuildLightGrid();
 
     {
@@ -337,7 +339,7 @@ void RenderMirror(DrawMirror *mir)
 
     render_backend->PopModelMatrix();
 
-    BuildLightGrid();
+    PopLightGrid();
 
     {
         uint64_t upload_mark = GetMicroseconds();
