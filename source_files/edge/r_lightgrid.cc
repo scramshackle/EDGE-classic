@@ -44,9 +44,6 @@ static void LightGridCollect(MapObject *mo, void *data)
 {
     EPI_UNUSED(data);
 
-    if (collected_lights.size() >= (size_t)kLightGridMaximumLights)
-        return;
-
     if (!mo->dynamic_light_.shader)
         return;
 
@@ -490,6 +487,9 @@ void BuildLightGrid(void)
 
         if (cover.cluster_x1 > cover.cluster_x2 || cover.cluster_y1 > cover.cluster_y2)
             continue;
+
+        if (current_light_grid.lights.size() >= (size_t)kLightGridMaximumLights)
+            break;
 
         float depth = -eye.z;
 
