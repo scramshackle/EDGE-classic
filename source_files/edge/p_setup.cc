@@ -1589,9 +1589,9 @@ static void LoadUDMFSideDefs()
             sd->middle.old_offset.y = 0;
         }
         ld->front_sector        = sd->sector;
-        sd->top.translucency    = level_line_alphas[i];
+        //sd->top.translucency    = level_line_alphas[i];
         sd->middle.translucency = level_line_alphas[i];
-        sd->bottom.translucency = level_line_alphas[i];
+        //sd->bottom.translucency = level_line_alphas[i];
         sd++;
 
         if (side1 != -1)
@@ -1604,9 +1604,9 @@ static void LoadUDMFSideDefs()
                 sd->middle.old_offset.y = 0;
             }
             ld->back_sector         = sd->sector;
-            sd->top.translucency    = level_line_alphas[i];
+            //sd->top.translucency    = level_line_alphas[i];
             sd->middle.translucency = level_line_alphas[i];
-            sd->bottom.translucency = level_line_alphas[i];
+            //sd->bottom.translucency = level_line_alphas[i];
             sd++;
         }
 
@@ -1757,6 +1757,12 @@ static void LoadUDMFLineDefs()
                     break;
                 case udmf::kBlockSight:
                     flags |= (lex.state_.boolean ? kLineFlagSightBlock : 0);
+                    break;
+                case udmf::kBlockAttacks:
+                    flags |= (lex.state_.boolean ? kLineFlagShootBlock : 0);
+                    break;
+                case udmf::kBlockLandMonsters:
+                    flags |= (lex.state_.boolean ? kLineFlagBlockGroundedMonsters : 0);
                     break;
                 default:
                     break;

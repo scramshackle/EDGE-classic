@@ -392,6 +392,9 @@ constexpr uint32_t kMapped        = epi::KnownStringHash("MAPPED");
 constexpr uint32_t kPassUse       = epi::KnownStringHash("PASSUSE");
 constexpr uint32_t kBlockPlayers  = epi::KnownStringHash("BLOCKPLAYERS");
 constexpr uint32_t kBlockSight    = epi::KnownStringHash("BLOCKSIGHT");
+constexpr uint32_t kBlockAttacks  = epi::KnownStringHash("BLOCKATTACKS");
+constexpr uint32_t kBlockLandMonsters    = epi::KnownStringHash("BLOCKLANDMONSTERS");
+
 
 // sidedefs
 constexpr uint32_t kOffsetX        = epi::KnownStringHash("OFFSETX");
