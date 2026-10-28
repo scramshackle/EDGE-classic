@@ -87,8 +87,8 @@ void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
 
     for (uint i = 0u; i < count; i++)
     {
-        uint index_byte  = offset + i;
-        uint local_index = (gpu_light_indices[index_byte >> 2u] >> ((index_byte & 3u) * 8u)) & 255u;
+        uint index_entry = offset + i;
+        uint local_index = (gpu_light_indices[index_entry >> 1u] >> ((index_entry & 1u) * 16u)) & 65535u;
 
         GpuLight light = gpu_lights[uint(light_range.z) - 1u + local_index];
 

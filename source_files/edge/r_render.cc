@@ -56,7 +56,6 @@
 #include "r_mirror.h"
 #include "r_misc.h"
 #include "r_modes.h"
-#include "r_occlude.h"
 #include "r_polygon.h"
 #include "r_shader.h"
 #include "r_sky.h"
@@ -2060,7 +2059,6 @@ void RenderTrueBSP(void)
         FuzzUpdate();
 
         ClearBSP();
-        OcclusionClear();
 
         // handle powerup effects and BOOM colormaps
         RendererRainbowEffect(v_player);

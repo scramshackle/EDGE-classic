@@ -7,7 +7,7 @@
 #include "epi_vector.h"
 
 constexpr int kLightGridClusterSize       = 16;
-constexpr int kLightGridMaximumLights     = 254;
+constexpr int kLightGridMaximumLights     = 1023;
 constexpr int kLightGridMaximumPerCluster = 64;
 constexpr int kLightGridDepthSlices       = 8;
 constexpr int kLightGridMaximumGlows      = 2;
@@ -52,7 +52,7 @@ struct LightGrid
 
     std::vector<uint32_t> cluster_offsets;
     std::vector<uint8_t>  cluster_counts;
-    std::vector<uint8_t>  cluster_list;
+    std::vector<uint16_t> cluster_list;
 
     float cluster_near = 1.0f;
     float cluster_far  = 1.0f;
@@ -89,6 +89,10 @@ int LightGridGlowDropped(void);
 void BuildLightGrid(void);
 
 void ClearLightGrid(void);
+
+void PushLightGrid(void);
+
+void PopLightGrid(void);
 
 const LightGrid *CurrentLightGrid(void);
 

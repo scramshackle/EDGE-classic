@@ -129,7 +129,7 @@ extern ConsoleVariable draw_culling;
 extern ConsoleVariable draw_culling_distance;
 extern ConsoleVariable cull_fog_color;
 extern ConsoleVariable distance_cull_thinkers;
-extern ConsoleVariable max_dynamic_light_radius;
+extern ConsoleVariable dynamic_light_density;
 extern ConsoleVariable render_scale;
 extern ConsoleVariable vsync;
 extern ConsoleVariable view_bobbing;
@@ -705,9 +705,9 @@ static OptionMenuItem perfoptions[] = {
     {kOptionMenuItemTypeBoolean, "Slow Thinkers Over Distance", YesNo, 2, &distance_cull_thinkers.d_,
      OptionMenuUpdateConsoleVariableFromInt, "Only recommended for extreme monster/projectile counts",
      &distance_cull_thinkers, 0, 0, 0, ""},
-    {kOptionMenuItemTypeSwitch, "Max Dynamic Light Radius", "32/64/128/256/512", 5, &max_dynamic_light_radius.d_,
-     OptionMenuUpdateConsoleVariableFromInt, "Control the maximum radius of dynamic lights", &max_dynamic_light_radius,
-     0, 0, 0, ""},
+    {kOptionMenuItemTypeSwitch, "Dynamic Light Density", "Low/Medium/High", 3, &dynamic_light_density.d_,
+     OptionMenuUpdateConsoleVariableFromInt, "Limits overlapping lights in crowded scenes", &dynamic_light_density, 0,
+     0, 0, ""},
 };
 
 static OptionMenuDefinition perf_optmenu = {perfoptions,
