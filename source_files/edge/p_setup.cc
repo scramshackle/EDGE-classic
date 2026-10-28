@@ -1124,10 +1124,12 @@ static void LoadUDMFSectors()
                     tag = lex.state_.number;
                     break;
                 case udmf::kLightColor:
-                    light_color = ((uint32_t)lex.state_.number << 8 | 0xFF);
+                    light_color = epi::MakeRGBA((uint8_t)(lex.state_.number >> 16), (uint8_t)(lex.state_.number >> 8),
+                                                (uint8_t)lex.state_.number);
                     break;
                 case udmf::kFadeColor:
-                    fog_color = ((uint32_t)lex.state_.number << 8 | 0xFF);
+                    fog_color = epi::MakeRGBA((uint8_t)(lex.state_.number >> 16), (uint8_t)(lex.state_.number >> 8),
+                                              (uint8_t)lex.state_.number);
                     break;
                 case udmf::kFogDensity:
                     fog_density = epi::Clamp(lex.state_.number, 0, 1020);

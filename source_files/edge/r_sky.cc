@@ -1298,7 +1298,7 @@ static void RenderSkyEquirect(const SkySection &section)
     }
     else if (fc_to_use != kRGBANoValue)
     {
-        fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.03f : 0.010f);
+        fd_to_use *= 0.010f;
     }
 
     float offx = 0.0f;
@@ -1449,7 +1449,7 @@ static void RenderSkybox(const SkySection &section)
     }
     else if (fc_to_use != kRGBANoValue)
     {
-        fd_to_use *= (current_sky_stretch == kSkyStretchVanilla ? 0.015f : 0.045f);
+        fd_to_use *= 0.045f;
     }
 
     SkyPassInfo sky_pass_info;

@@ -548,9 +548,9 @@ void GetColormapRGB(const Colormap *colmap, float *r, float *g, float *b)
 
     epi::RGBAColor col = colmap->gl_color_;
 
-    (*r) = ((col >> 24) & 0xFF) / 255.0f;
-    (*g) = ((col >> 16) & 0xFF) / 255.0f;
-    (*b) = ((col >> 8) & 0xFF) / 255.0f;
+    (*r) = epi::GetRGBARed(col) / 255.0f;
+    (*g) = epi::GetRGBAGreen(col) / 255.0f;
+    (*b) = epi::GetRGBABlue(col) / 255.0f;
 }
 
 epi::RGBAColor GetFontColor(const Colormap *colmap)

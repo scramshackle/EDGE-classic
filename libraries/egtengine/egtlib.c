@@ -7,10 +7,6 @@
 #include <xmmintrin.h>
 #endif
 
-#ifdef _WIN32
-    #include <float.h>
-#endif
-
 /* Current version of instrument/song formats */
 #define EDGETRACKER_VERSION 1
 
@@ -174,10 +170,6 @@ egtsynth* egt_create(int _sampleRate)
             _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
             #ifdef _MM_DENORMALS_ZERO_ON
                 _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
-            #endif
-            #ifdef _WIN32
-                /* Round floats down (needed for FISTP fast int/float conversion) */
-                _controlfp(_RC_DOWN, _MCW_RC);
             #endif
         #elif defined(__aarch64__)
             #if defined(_MSC_VER)
