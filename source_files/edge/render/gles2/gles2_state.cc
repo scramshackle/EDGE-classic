@@ -507,18 +507,22 @@ class Gles2RenderState : public RenderState
             OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
 
             bool wanted = (model_pass == oit_mode) ||
-                          (model_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+                          (model_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
 
             if (!wanted)
                 return;
         }
 
-        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage)
+        bool oit_blend_pass = OitPassDrawsTranslucent(oit_mode);
+
+        if (oit_blend_pass)
         {
             Enable(GL_BLEND);
 
             if (oit_mode == kOitPassRevealage)
                 BlendFunction(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+            else if (oit_mode == kOitPassFrontColor)
+                BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             else
                 BlendFunction(GL_ONE, GL_ONE);
 
@@ -540,9 +544,12 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetAlphaTest(info.alpha_test);
         gles2_model_program.SetLighting(info);
         gles2_model_program.SetColorLookup(info.color_lookup);
-        gles2_model_program.SetOit(
-            (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage) ? (float)oit_mode : 0.0f,
-            gles2_immediate.OitScale());
+        gles2_model_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
+
+        if (oit_blend_pass && render_backend->OitFrontLayer())
+            gles2_model_program.SetOitFront(gles2_immediate.OitFrontScaleX(), gles2_immediate.OitFrontScaleY());
+        else
+            gles2_model_program.SetOitFront(0.0f, 0.0f);
 
         Gles2FogMode fog_mode = kGles2FogModeNone;
 

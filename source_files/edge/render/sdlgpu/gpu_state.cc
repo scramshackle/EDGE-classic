@@ -637,11 +637,14 @@ class GpuRenderState : public RenderState
         {
             OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
 
-            if (model_pass != oit_mode)
+            bool wanted = (model_pass == oit_mode) ||
+                          (model_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
+
+            if (!wanted)
                 return;
         }
 
-        if (oit_mode == kOitPassAccumulate)
+        if (OitPassDrawsTranslucent(oit_mode))
         {
             Enable(GL_BLEND);
             BlendFunction(GL_ONE, GL_ONE);

@@ -21,13 +21,21 @@ function(count_descriptor_set DISASSEMBLY SET_INDEX OUTPUT_VARIABLE)
   set(${OUTPUT_VARIABLE} ${MATCH_COUNT} PARENT_SCOPE)
 endfunction()
 
-set(SHADER_NAMES world movie model world_oit world_opaque world_lit world_lit_opaque world_base world_base_opaque model_oit
-                 sprite)
+set(SHADER_NAMES world movie model world_oit world_oit_front world_oit_composite world_opaque world_lit
+                 world_lit_opaque world_base world_base_opaque model_oit model_oit_front sprite)
 set(SHADER_STAGES vert frag)
 
 set(VARIANT_world_oit_SOURCE world)
 set(VARIANT_world_oit_SYMBOL WorldOit)
 set(VARIANT_world_oit_DEFINES -DEDGE_OIT_PASS=1)
+
+set(VARIANT_world_oit_front_SOURCE world)
+set(VARIANT_world_oit_front_SYMBOL WorldOitFront)
+set(VARIANT_world_oit_front_DEFINES -DEDGE_OIT_PASS=1 -DEDGE_OIT_FRONT_DEPTH=1)
+
+set(VARIANT_world_oit_composite_SOURCE world)
+set(VARIANT_world_oit_composite_SYMBOL WorldOitComposite)
+set(VARIANT_world_oit_composite_DEFINES -DEDGE_OIT_COMPOSITE=1)
 
 set(VARIANT_world_opaque_SOURCE world)
 set(VARIANT_world_opaque_SYMBOL WorldOpaque)
@@ -52,6 +60,10 @@ set(VARIANT_world_base_opaque_DEFINES -DEDGE_NO_EFFECTS=1 -DEDGE_NO_LIGHTS=1 -DE
 set(VARIANT_model_oit_SOURCE model)
 set(VARIANT_model_oit_SYMBOL ModelOit)
 set(VARIANT_model_oit_DEFINES -DEDGE_OIT_PASS=1)
+
+set(VARIANT_model_oit_front_SOURCE model)
+set(VARIANT_model_oit_front_SYMBOL ModelOitFront)
+set(VARIANT_model_oit_front_DEFINES -DEDGE_OIT_PASS=1 -DEDGE_OIT_FRONT_DEPTH=1)
 
 foreach(SHADER_NAME IN LISTS SHADER_NAMES)
 

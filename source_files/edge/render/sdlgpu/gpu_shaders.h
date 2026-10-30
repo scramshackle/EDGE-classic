@@ -54,7 +54,6 @@ enum GpuFragmentFlag
     kGpuFragmentFlagLine         = (1 << 1),
     kGpuFragmentFlagSkipRGB      = (1 << 2),
     kGpuFragmentFlagSkyPass      = (1 << 3),
-    kGpuFragmentFlagOitComposite = (1 << 4),
     kGpuFragmentFlagLightFalloff = (1 << 5),
     kGpuFragmentFlagWhiten       = (1 << 6)
 };
@@ -255,6 +254,8 @@ SDL_GPUShader *ModelFragmentShader();
 
 SDL_GPUShader *ModelOitFragmentShader();
 
+SDL_GPUShader *ModelOitFrontFragmentShader();
+
 
 
 
@@ -275,5 +276,7 @@ SDL_GPUShader *WorldVertexShader();
 
 SDL_GPUShader *WorldFragmentShader(int32_t variant);
 SDL_GPUShader *WorldOitFragmentShader();
+SDL_GPUShader *WorldOitFrontFragmentShader();
+SDL_GPUShader *WorldOitCompositeFragmentShader();
 
 SDL_GPUShader *SpriteVertexShader();

@@ -138,6 +138,23 @@ class Gles2Immediate
         return oit_scale_;
     }
 
+    bool OitFrontLayer() const
+    {
+        return oit_front_framebuffer_ != 0;
+    }
+
+    void BindOitFrontSampler(bool enabled);
+
+    float OitFrontScaleX() const
+    {
+        return 1.0f / (float)render_target_texture_width_;
+    }
+
+    float OitFrontScaleY() const
+    {
+        return 1.0f / (float)render_target_texture_height_;
+    }
+
     bool RenderTargetReady() const
     {
         return render_target_framebuffer_ != 0;
@@ -236,6 +253,8 @@ class Gles2Immediate
     bool CreateOitTarget(GLuint &framebuffer, GLuint &texture, GLint internal_format, GLenum format, GLenum type,
                          int32_t texture_width, int32_t texture_height);
 
+    void DestroyOitFrontTarget();
+
     void DestroyOitTargets();
 
     GLuint render_target_framebuffer_ = 0;
@@ -255,6 +274,8 @@ class Gles2Immediate
     GLuint oit_accumulation_texture_     = 0;
     GLuint oit_revealage_framebuffer_    = 0;
     GLuint oit_revealage_texture_        = 0;
+    GLuint oit_front_framebuffer_        = 0;
+    GLuint oit_front_texture_            = 0;
 
     float oit_scale_ = 1.0f;
 

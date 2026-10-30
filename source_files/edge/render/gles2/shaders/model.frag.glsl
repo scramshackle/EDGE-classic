@@ -35,6 +35,8 @@ uniform float u_fog_end;
 
 uniform float u_oit_mode;
 uniform float u_oit_scale;
+uniform sampler2D u_oit_front;
+uniform vec2      u_oit_front_scale;
 
 varying vec4 v_color_and_u;
 varying vec4 v_eye_and_v;
@@ -59,12 +61,33 @@ float FogFactor()
     return 1.0 - clamp(exp2(-u_fog_density * u_fog_density * fog_distance * fog_distance * kLog2), 0.0, 1.0);
 }
 
-float OitWeight(float alpha, float view_depth)
-{
-    float a = min(1.0, alpha * 10.0) + 0.01;
-    float d = 1.0 - view_depth * 0.9;
+const float kOitAccumulate     = 1.0;
+const float kOitRevealage      = 2.0;
+const float kOitFrontDepth     = 5.0;
+const float kOitFrontColor     = 6.0;
+const float kOitFrontClear     = 65504.0;
+const float kOitFrontTolerance = 1.0 + 1.0 / 512.0;
 
-    return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
+bool OitModeIs(float mode)
+{
+    return abs(u_oit_mode - mode) < 0.5;
+}
+
+bool OitFrontFragment(float view_distance)
+{
+    float front = texture2D(u_oit_front, gl_FragCoord.xy * u_oit_front_scale).r;
+
+    return view_distance <= front * kOitFrontTolerance;
+}
+
+float OitWeight(float alpha, float view_distance)
+{
+    if (u_oit_scale < 1.0)
+        return 3e3 * u_oit_scale;
+
+    float d = 32.0 / max(view_distance, 32.0);
+
+    return alpha * clamp(3e3 * d * d * d, 1e-2, 3e3);
 }
 
 vec3 ApplyColorLookup(vec3 source)
@@ -88,6 +111,29 @@ void main()
     if (u_alpha_test > 0.0 && texel.a < u_alpha_test)
     {
         discard;
+    }
+
+    if (u_oit_mode > 0.5)
+    {
+        float view_distance = -v_eye_and_v.z;
+
+        if (OitModeIs(kOitFrontDepth))
+        {
+            gl_FragColor = vec4(texel.a * u_alpha < 1.0 / 255.0 ? kOitFrontClear : view_distance);
+            return;
+        }
+
+        if (u_oit_front_scale.x > 0.0 && OitFrontFragment(view_distance) != OitModeIs(kOitFrontColor))
+        {
+            gl_FragColor = vec4(0.0);
+            return;
+        }
+
+        if (OitModeIs(kOitRevealage))
+        {
+            gl_FragColor = vec4(texel.a * u_alpha, 0.0, 0.0, texel.a * u_alpha);
+            return;
+        }
     }
 
     if (u_color_lookup_enabled > 0.5)
@@ -121,17 +167,9 @@ void main()
 
     vec4 fragment_color = vec4(rgb, texel.a * u_alpha);
 
-    if (u_oit_mode > 0.5)
+    if (OitModeIs(kOitAccumulate))
     {
-        float view_depth = clamp(-v_eye_and_v.z * 0.000625, 0.0, 1.0);
-
-        float weight = OitWeight(fragment_color.a, view_depth) * u_oit_scale;
-
-        if (u_oit_mode > 1.5)
-        {
-            gl_FragColor = vec4(fragment_color.a, 0.0, 0.0, fragment_color.a);
-            return;
-        }
+        float weight = OitWeight(fragment_color.a, -v_eye_and_v.z);
 
         gl_FragColor = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
         return;

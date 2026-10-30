@@ -426,7 +426,9 @@ void GpuImmediate::BeginFrame()
 
     texturing_enabled_ = false;
 
-    oit_pipeline_ = false;
+    oit_pipeline_ = kGpuOitPipelineNone;
+
+    oit_front_begun_ = false;
 
     pending_base_  = 0;
     pending_count_ = 0;
@@ -923,9 +925,7 @@ void GpuImmediate::DrawStatic(uint32_t handle, int32_t first, int32_t count)
     draw->sampler[0]               = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
     draw->texture[1]               = texturing_enabled_ ? current_texture_[1] : default_texture_;
     draw->sampler[1]               = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
-    draw->texture[2]               = current_sky_cube_texture_;
-    draw->sampler[2]               = current_sky_cube_sampler_;
-    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    ResolveCubeSlotBinding(&draw->texture[2], &draw->sampler[2]);
     draw->texture[3] = current_color_lookup_texture_;
     draw->sampler[3] = current_color_lookup_sampler_;
     ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
@@ -1003,7 +1003,7 @@ void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTa
     }
 
     SDL_GPUGraphicsPipeline *pipeline =
-        oit_pipeline_ ? GetSpriteOitPipeline(pipeline_flags_)
+        oit_pipeline_ ? GetSpriteOitPipeline(pipeline_flags_, oit_pipeline_ == kGpuOitPipelineFrontDepth)
                       : GetSpritePipeline(WorldPipelineFlags(), source_blend_, destination_blend_);
 
     GpuCommand command;
@@ -1017,9 +1017,7 @@ void GpuImmediate::DrawSprites(int32_t first, int32_t count, const SpriteLightTa
     draw->sampler[0] = texturing_enabled_ ? current_sampler_[0] : default_sampler_;
     draw->texture[1] = texturing_enabled_ ? current_texture_[1] : default_texture_;
     draw->sampler[1] = texturing_enabled_ ? current_sampler_[1] : default_sampler_;
-    draw->texture[2] = current_sky_cube_texture_;
-    draw->sampler[2] = current_sky_cube_sampler_;
-    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    ResolveCubeSlotBinding(&draw->texture[2], &draw->sampler[2]);
     draw->texture[3] = current_color_lookup_texture_;
     draw->sampler[3] = current_color_lookup_sampler_;
     ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
@@ -1244,24 +1242,9 @@ void GpuImmediate::SetSkyPass(const SkyPassInfo *sky_pass)
     vertex_parameters_dirty_   = true;
 }
 
-void GpuImmediate::SetOitPipeline(bool enabled)
+void GpuImmediate::SetOitPipeline(int32_t mode)
 {
-    oit_pipeline_ = enabled;
-}
-
-void GpuImmediate::SetOitComposite(bool enabled)
-{
-    bool current = (current_fragment_parameters_.flags & kGpuFragmentFlagOitComposite) != 0;
-
-    if (current == enabled)
-        return;
-
-    if (enabled)
-        current_fragment_parameters_.flags |= kGpuFragmentFlagOitComposite;
-    else
-        current_fragment_parameters_.flags &= ~kGpuFragmentFlagOitComposite;
-
-    fragment_parameters_dirty_ = true;
+    oit_pipeline_ = mode;
 }
 
 void GpuImmediate::SetSkipRGB(bool enabled)
@@ -1425,6 +1408,18 @@ void GpuImmediate::BeginWorldTarget(bool direct)
     commands_.push_back(command);
 }
 
+void GpuImmediate::BeginOitFrontTarget()
+{
+    GpuCommand command;
+
+    command.type = kGpuCommandBeginOitFrontTarget;
+
+    oit_front_begin_command_ = commands_.size();
+    oit_front_begun_         = true;
+
+    commands_.push_back(command);
+}
+
 void GpuImmediate::BeginOitTarget()
 {
     GpuCommand command;
@@ -1438,6 +1433,11 @@ void GpuImmediate::BeginOitTarget()
 
 bool GpuImmediate::EndOitTarget()
 {
+    bool front_begun = oit_front_begun_ && oit_front_begin_command_ < commands_.size() &&
+                       commands_[oit_front_begin_command_].type == kGpuCommandBeginOitFrontTarget;
+
+    oit_front_begun_ = false;
+
     if (oit_begin_command_ < commands_.size() && commands_[oit_begin_command_].type == kGpuCommandBeginOitTarget)
     {
         bool drawn = false;
@@ -1448,6 +1448,10 @@ bool GpuImmediate::EndOitTarget()
         if (!drawn)
         {
             commands_.erase(commands_.begin() + (ptrdiff_t)oit_begin_command_);
+
+            if (front_begun)
+                commands_.erase(commands_.begin() + (ptrdiff_t)oit_front_begin_command_);
+
             return false;
         }
     }
@@ -1590,8 +1594,11 @@ uint32_t GpuImmediate::WorldPipelineFlags() const
 
 SDL_GPUGraphicsPipeline *GpuImmediate::SelectWorldPipeline(GpuPrimitiveType primitive)
 {
+    if (oit_pipeline_ == kGpuOitPipelineComposite)
+        return GetOitCompositePipeline(WorldPipelineFlags(), source_blend_, destination_blend_, primitive);
+
     if (oit_pipeline_)
-        return GetOitPipeline(pipeline_flags_, primitive);
+        return GetOitPipeline(pipeline_flags_, primitive, oit_pipeline_ == kGpuOitPipelineFrontDepth);
 
     return GetPipeline(WorldPipelineFlags(), source_blend_, destination_blend_, primitive);
 }
@@ -1697,9 +1704,7 @@ void GpuImmediate::RecordDraw(GLuint shape, int32_t count)
     draw->sampler[0]               = sampler0;
     draw->texture[1]               = texture1;
     draw->sampler[1]               = sampler1;
-    draw->texture[2]               = current_sky_cube_texture_;
-    draw->sampler[2]               = current_sky_cube_sampler_;
-    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    ResolveCubeSlotBinding(&draw->texture[2], &draw->sampler[2]);
     draw->texture[3] = current_color_lookup_texture_;
     draw->sampler[3] = current_color_lookup_sampler_;
     ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
@@ -1922,9 +1927,9 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     if (!mesh->position_buffer || info.frame1 >= mesh->frame_count || info.frame2 >= mesh->frame_count)
         return;
 
-    SDL_GPUGraphicsPipeline *pipeline = oit_pipeline_
-                                            ? GetModelOitPipeline(pipeline_flags_)
-                                            : GetModelPipeline(pipeline_flags_, source_blend_, destination_blend_);
+    SDL_GPUGraphicsPipeline *pipeline =
+        oit_pipeline_ ? GetModelOitPipeline(pipeline_flags_, oit_pipeline_ == kGpuOitPipelineFrontDepth)
+                      : GetModelPipeline(pipeline_flags_, source_blend_, destination_blend_);
 
     model_vertex_parameters_.push_back(vertex_parameters);
     model_fragment_parameters_.push_back(fragment_parameters);
@@ -1943,6 +1948,12 @@ void GpuImmediate::RecordModelDraw(const ModelDrawInfo &info, const GpuModelVert
     draw->lookup_texture = current_color_lookup_texture_;
     draw->lookup_sampler = current_color_lookup_sampler_;
     ResolveColorLookupBinding(&draw->lookup_texture, &draw->lookup_sampler);
+
+    draw->oit_front_texture = nullptr;
+    draw->oit_front_sampler = nullptr;
+
+    if (oit_pipeline_)
+        ResolveCubeSlotBinding(&draw->oit_front_texture, &draw->oit_front_sampler);
 
     draw->position_buffer           = mesh->position_buffer;
     draw->normal_buffer             = mesh->normal_buffer;
@@ -2013,9 +2024,7 @@ void GpuImmediate::DrawIndexed(std::span<const RendererVertex> vertices, std::sp
     draw->sampler[0] = sampler0;
     draw->texture[1] = texture1;
     draw->sampler[1] = sampler1;
-    draw->texture[2] = current_sky_cube_texture_;
-    draw->sampler[2] = current_sky_cube_sampler_;
-    ResolveSkyCubeBinding(&draw->texture[2], &draw->sampler[2]);
+    ResolveCubeSlotBinding(&draw->texture[2], &draw->sampler[2]);
     draw->texture[3] = current_color_lookup_texture_;
     draw->sampler[3] = current_color_lookup_sampler_;
     ResolveColorLookupBinding(&draw->texture[3], &draw->sampler[3]);
@@ -2192,6 +2201,39 @@ void GpuImmediate::UploadSpriteInstances()
     SDL_EndGPUCopyPass(copy_pass);
 
     uploaded_bytes_ += bytes;
+}
+
+void GpuImmediate::ResolveCubeSlotBinding(SDL_GPUTexture **texture, SDL_GPUSampler **sampler)
+{
+    if (oit_pipeline_ == kGpuOitPipelineAccumulate)
+    {
+        const GpuImage *front = GetGpuImage(kGpuImageOitFrontDepth);
+
+        *texture = front ? front->texture : default_texture_;
+        *sampler = front ? front->sampler : default_sampler_;
+        return;
+    }
+
+    if (oit_pipeline_ == kGpuOitPipelineFrontDepth)
+    {
+        *texture = default_texture_;
+        *sampler = default_sampler_;
+        return;
+    }
+
+    if (oit_pipeline_ == kGpuOitPipelineComposite)
+    {
+        const GpuImage *front = GetGpuImage(kGpuImageOitFrontColor);
+
+        *texture = front ? front->texture : default_texture_;
+        *sampler = front ? front->sampler : default_sampler_;
+        return;
+    }
+
+    *texture = current_sky_cube_texture_;
+    *sampler = current_sky_cube_sampler_;
+
+    ResolveSkyCubeBinding(texture, sampler);
 }
 
 void GpuImmediate::BindFragmentTextures(SDL_GPURenderPass *pass, SDL_GPUTexture *const texture[4],
@@ -2633,13 +2675,15 @@ void GpuImmediate::Replay()
             SDL_SetGPUStencilReference(pass, model->stencil_reference);
             bound_stencil_reference_ = model->stencil_reference;
 
-            SDL_GPUTextureSamplerBinding model_bindings[2];
+            SDL_GPUTextureSamplerBinding model_bindings[3];
             model_bindings[0].texture = model->texture;
             model_bindings[0].sampler = model->sampler;
             model_bindings[1].texture = model->lookup_texture;
             model_bindings[1].sampler = model->lookup_sampler;
+            model_bindings[2].texture = model->oit_front_texture;
+            model_bindings[2].sampler = model->oit_front_sampler;
 
-            SDL_BindGPUFragmentSamplers(pass, 0, model_bindings, 2);
+            SDL_BindGPUFragmentSamplers(pass, 0, model_bindings, model->oit_front_texture ? 3 : 2);
             binding_count_++;
 
             for (int b = 0; b < 4; b++)
@@ -2837,6 +2881,13 @@ void GpuImmediate::Replay()
                 pass_stencil_cleared = true;
 
                 ResetTargetRectangles();
+            }
+            else if (command->type == kGpuCommandBeginOitFrontTarget)
+            {
+                gpu_device.BeginPass(kGpuLoadOperationClear, kGpuLoadOperationLoad, kGpuLoadOperationLoad,
+                                     kGpuPassTargetOitFront);
+
+                pass_untouched = false;
             }
             else if (command->type == kGpuCommandBeginOitTarget)
             {

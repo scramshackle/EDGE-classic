@@ -46,9 +46,18 @@ enum GpuCommandType
     kGpuCommandClearDepth,
     kGpuCommandClearStencil,
     kGpuCommandBeginWorldTarget,
+    kGpuCommandBeginOitFrontTarget,
     kGpuCommandBeginOitTarget,
     kGpuCommandEndOitTarget,
     kGpuCommandResolveWorldTarget
+};
+
+enum GpuOitPipeline
+{
+    kGpuOitPipelineNone = 0,
+    kGpuOitPipelineAccumulate,
+    kGpuOitPipelineFrontDepth,
+    kGpuOitPipelineComposite
 };
 
 struct GpuResolveArguments
@@ -99,6 +108,8 @@ struct GpuModelDrawArguments
     SDL_GPUSampler *sampler;
     SDL_GPUTexture *lookup_texture;
     SDL_GPUSampler *lookup_sampler;
+    SDL_GPUTexture *oit_front_texture;
+    SDL_GPUSampler *oit_front_sampler;
 
     SDL_GPUBuffer *position_buffer;
     SDL_GPUBuffer *normal_buffer;
@@ -274,9 +285,8 @@ class GpuImmediate
 
     void SetGlowSet(int index);
 
-    void SetOitPipeline(bool enabled);
+    void SetOitPipeline(int32_t mode);
 
-    void SetOitComposite(bool enabled);
 
 
     void SetSkyPass(const SkyPassInfo *sky_pass);
@@ -323,6 +333,8 @@ class GpuImmediate
     void BeginWorldTarget(bool direct);
 
     bool HasDrawCommands() const;
+
+    void BeginOitFrontTarget();
 
     void BeginOitTarget();
 
@@ -408,6 +420,8 @@ class GpuImmediate
     void BindFragmentTextures(SDL_GPURenderPass *pass, SDL_GPUTexture *const texture[4],
                               SDL_GPUSampler *const sampler[4]);
 
+    void ResolveCubeSlotBinding(SDL_GPUTexture **texture, SDL_GPUSampler **sampler);
+
     int32_t AppendDynamicIndices(GLuint shape, int32_t count, int32_t rebase);
 
     void MarkMatrixDirty()
@@ -471,6 +485,8 @@ class GpuImmediate
     int32_t                            vertex_count_ = 0;
     std::vector<GpuCommand>            commands_;
     size_t                             oit_begin_command_ = 0;
+    size_t                             oit_front_begin_command_ = 0;
+    bool                               oit_front_begun_         = false;
     std::vector<GpuVertexParameters>   vertex_parameters_;
     std::vector<GpuFragmentParameters> fragment_parameters_;
 
@@ -503,7 +519,7 @@ class GpuImmediate
 
     bool texturing_enabled_ = false;
 
-    bool oit_pipeline_ = false;
+    int32_t oit_pipeline_ = kGpuOitPipelineNone;
 
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;

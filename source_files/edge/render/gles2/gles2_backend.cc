@@ -314,6 +314,11 @@ class Gles2RenderBackend : public RenderBackend
         SetRenderLayer(kRenderLayerHUD);
     }
 
+    bool OitFrontLayer()
+    {
+        return gles2_immediate.OitFrontLayer();
+    }
+
     void BeginOitPass()
     {
         gles2_immediate.BeginOitTargets();
@@ -323,10 +328,18 @@ class Gles2RenderBackend : public RenderBackend
     {
         oit_mode_ = mode;
 
-        if (mode == kOitPassAccumulate || mode == kOitPassRevealage)
+        if (mode == kOitPassAccumulate || mode == kOitPassRevealage || mode == kOitPassFrontDepth)
             gles2_immediate.BindOitTarget(mode);
         else
             gles2_immediate.BindRenderTarget();
+
+        if (gles2_immediate.OitFrontLayer())
+        {
+            gles2_immediate.BindOitFrontSampler(mode == kOitPassAccumulate || mode == kOitPassRevealage ||
+                                                mode == kOitPassFrontColor);
+
+            glBlendEquation(mode == kOitPassFrontDepth ? kGles2BlendEquationMin : kGles2BlendEquationAdd);
+        }
     }
 
     void FinishOitPass()

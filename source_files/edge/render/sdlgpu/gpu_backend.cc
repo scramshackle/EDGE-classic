@@ -338,21 +338,34 @@ class GpuRenderBackend : public RenderBackend
         return true;
     }
 
+    bool OitFrontLayer()
+    {
+        return true;
+    }
+
     void BeginOitPass()
     {
-        gpu_immediate.BeginOitTarget();
+        gpu_immediate.BeginOitFrontTarget();
     }
 
     void SetOitPass(int32_t mode)
     {
         oit_mode_ = mode;
 
-        gpu_immediate.SetOitPipeline(mode == kOitPassAccumulate);
+        if (mode == kOitPassAccumulate)
+        {
+            gpu_immediate.BeginOitTarget();
+            gpu_immediate.SetOitPipeline(kGpuOitPipelineAccumulate);
+        }
+        else if (mode == kOitPassFrontDepth)
+            gpu_immediate.SetOitPipeline(kGpuOitPipelineFrontDepth);
+        else
+            gpu_immediate.SetOitPipeline(kGpuOitPipelineNone);
     }
 
     void FinishOitPass()
     {
-        gpu_immediate.SetOitPipeline(false);
+        gpu_immediate.SetOitPipeline(kGpuOitPipelineNone);
 
         bool drawn = gpu_immediate.EndOitTarget();
 
@@ -365,8 +378,9 @@ class GpuRenderBackend : public RenderBackend
     {
         const GpuImage *accumulation = GetGpuImage(kGpuImageOitAccumulation);
         const GpuImage *revealage    = GetGpuImage(kGpuImageOitRevealage);
+        const GpuImage *front_color  = GetGpuImage(kGpuImageOitFrontColor);
 
-        if (!accumulation || !revealage)
+        if (!accumulation || !revealage || !front_color)
             return;
 
         float target_width  = (float)gpu_device.WorldWidth();
@@ -404,7 +418,7 @@ class GpuRenderBackend : public RenderBackend
         float x1 = (float)(area_x + area_width - view_x) / (float)view_width * 2.0f - 1.0f;
         float y1 = (float)(area_y + area_height - view_y) / (float)view_height * 2.0f - 1.0f;
 
-        gpu_immediate.SetPipelineState(kGpuPipelineBlend, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        gpu_immediate.SetPipelineState(kGpuPipelineBlend, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         gpu_immediate.MatrixModeProjection();
         gpu_immediate.PushMatrix();
@@ -422,7 +436,7 @@ class GpuRenderBackend : public RenderBackend
         gpu_immediate.SetTextureOffset({0.0f, 0.0f});
         gpu_immediate.SetLightRowOffset(0.0f);
         gpu_immediate.SetLiquid(epi::Vec4{});
-        gpu_immediate.SetOitComposite(true);
+        gpu_immediate.SetOitPipeline(kGpuOitPipelineComposite);
 
         gpu_immediate.SetMultiTexture(accumulation->texture, accumulation->sampler, revealage->texture,
                                       revealage->sampler);
@@ -449,7 +463,7 @@ class GpuRenderBackend : public RenderBackend
         if (drawn)
             gpu_immediate.Draw(GL_QUADS, quad, 4);
 
-        gpu_immediate.SetOitComposite(false);
+        gpu_immediate.SetOitPipeline(kGpuOitPipelineNone);
 
         gpu_immediate.MatrixModeModelView();
         gpu_immediate.PopMatrix();

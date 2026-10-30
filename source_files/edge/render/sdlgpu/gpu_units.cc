@@ -110,7 +110,7 @@ static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
     else if (unit->blending & kBlendingAlpha)
         unit_pass = kOitPassAccumulate;
 
-    return unit_pass == oit_mode;
+    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
 }
 
 static bool                        retain_units = false;
@@ -692,7 +692,10 @@ void RenderCurrentUnits(void)
             else if (unit->blending & kBlendingAlpha)
                 unit_pass = kOitPassAccumulate;
 
-            if (unit_pass != oit_mode)
+            bool wanted = (unit_pass == oit_mode) ||
+                          (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
+
+            if (!wanted)
                 continue;
         }
 
@@ -726,7 +729,7 @@ void RenderCurrentUnits(void)
         else if (!culling || (unit->blending & kBlendingNoFog))
             render_state->Disable(GL_FOG);
 
-        bool oit_blend_pass = (oit_mode == kOitPassAccumulate);
+        bool oit_blend_pass = OitPassDrawsTranslucent(oit_mode);
 
         if (oit_blend_pass)
         {
