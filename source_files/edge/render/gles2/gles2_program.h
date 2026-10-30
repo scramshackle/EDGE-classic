@@ -30,6 +30,7 @@ constexpr GLint kGles2TextureUnitLightData = 3;
 constexpr GLint kGles2TextureUnitLightHeaders = 4;
 constexpr GLint kGles2TextureUnitLightIndices = 5;
 constexpr GLint kGles2TextureUnitColorLookup = 6;
+constexpr GLint kGles2TextureUnitOitFront = 7;
 
 enum Gles2FogMode
 {
@@ -91,6 +92,8 @@ struct Gles2WorldLocations
     GLint sky_horizon_shift      = -1;
     GLint oit_mode               = -1;
     GLint oit_scale              = -1;
+    GLint oit_front              = -1;
+    GLint oit_front_scale        = -1;
     GLint texture_offset         = -1;
     GLint light_row_offset       = -1;
     GLint sprite_mode            = -1;
@@ -145,6 +148,8 @@ class Gles2Program
     void SetViewTint(float r, float g, float b);
 
     void SetOit(float mode, float scale);
+
+    void SetOitFront(float scale_x, float scale_y);
 
     void SetTextureOffset(const epi::Vec2 &offset);
 
@@ -232,6 +237,8 @@ class Gles2Program
     float shadow_oit_mode_  = -1.0f;
     float shadow_oit_scale_ = -1.0f;
 
+    float shadow_oit_front_scale_[2] = {-1.0f, -1.0f};
+
     epi::Vec2 shadow_texture_offset_   = {-1.0e30f, -1.0e30f};
     float    shadow_light_row_offset_ = -1.0e30f;
     float    shadow_sprite_mode_      = -1.0f;
@@ -282,6 +289,8 @@ class Gles2ModelProgram
 
     void SetOit(float mode, float scale);
 
+    void SetOitFront(float scale_x, float scale_y);
+
     void SetWorldLit(bool enabled);
 
     void SetLightGrid(const struct Gles2LightGridState *grid);
@@ -330,6 +339,8 @@ class Gles2ModelProgram
     GLint uniform_fog_end_               = -1;
     GLint uniform_oit_mode_              = -1;
     GLint uniform_oit_scale_             = -1;
+    GLint uniform_oit_front_             = -1;
+    GLint uniform_oit_front_scale_       = -1;
     GLint uniform_color_lookup_          = -1;
     GLint uniform_color_lookup_enabled_  = -1;
 
@@ -346,6 +357,8 @@ class Gles2ModelProgram
     float shadow_oit_mode_  = -1.0f;
     float shadow_oit_scale_ = -1.0f;
     float shadow_world_lit_ = -1.0f;
+
+    float shadow_oit_front_scale_[2] = {-1.0f, -1.0f};
     int   shadow_glow_set_  = -2;
 
     float shadow_color_lookup_enabled_ = -1.0f;

@@ -114,7 +114,7 @@ static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
     else if (unit->blending & kBlendingAlpha)
         unit_pass = kOitPassAccumulate;
 
-    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
 }
 
 static bool                        retain_units = false;
@@ -974,7 +974,7 @@ void RenderCurrentUnits(void)
                 unit_pass = kOitPassAccumulate;
 
             bool wanted = (unit_pass == oit_mode) ||
-                          (unit_pass == kOitPassAccumulate && oit_mode == kOitPassRevealage);
+                          (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
 
             if (!wanted)
             {
@@ -983,7 +983,7 @@ void RenderCurrentUnits(void)
             }
         }
 
-        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage)
+        if (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage || oit_mode == kOitPassFrontDepth)
         {
             render_state->Enable(GL_BLEND);
 
@@ -1028,7 +1028,7 @@ void RenderCurrentUnits(void)
         else
             render_state->Disable(GL_CULL_FACE);
 
-        bool oit_blend_pass = (oit_mode == kOitPassAccumulate || oit_mode == kOitPassRevealage);
+        bool oit_blend_pass = OitPassDrawsTranslucent(oit_mode);
 
         render_state->DepthMask((oit_blend_pass || (unit->blending & kBlendingNoZBuffer)) ? false : true);
 
@@ -1128,6 +1128,11 @@ void RenderCurrentUnits(void)
         gles2_program.SetWorldLit(world_lit);
         gles2_program.SetGlowSet(unit->glow_set);
         gles2_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
+
+        if (oit_blend_pass && render_backend->OitFrontLayer())
+            gles2_program.SetOitFront(gles2_immediate.OitFrontScaleX(), gles2_immediate.OitFrontScaleY());
+        else
+            gles2_program.SetOitFront(0.0f, 0.0f);
         gles2_program.SetTextureOffset(unit->texture_offset);
         gles2_program.SetLightRowOffset(unit->light_row_offset);
         gles2_program.SetLiquid(unit->liquid);

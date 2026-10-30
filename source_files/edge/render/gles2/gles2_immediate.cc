@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <iterator>
+
 #include "dm_colors.h"
 #include "epi.h"
 #include "epi_math.h"
@@ -1066,19 +1068,25 @@ bool Gles2Immediate::CreateOitTargets(int32_t texture_width, int32_t texture_hei
 {
     struct Gles2OitFormat
     {
-        GLint  internal_format;
-        GLenum format;
-        GLenum type;
-        float  scale;
+        GLint       internal_format;
+        GLenum      format;
+        GLenum      type;
+        float       scale;
+        const char *name;
     };
 
-    static const Gles2OitFormat formats[3] = {{GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f},
-                                              {GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f},
-                                              {GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 1.0f / 3000.0f}};
+#ifdef EDGE_GLES2_DESKTOP_GL
+    static const Gles2OitFormat formats[] = {
+        {GL_RGBA16F, GL_RGBA, GL_FLOAT, 1.0f, "rgba16f"},
+        {GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 1.0f / 3000.0f, "rgba8 (LOW PRECISION)"}};
+#else
+    static const Gles2OitFormat formats[] = {
+        {GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f, "rgba16f"},
+        {GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 1.0f, "rgba half-float"},
+        {GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 1.0f / 3000.0f, "rgba8 (LOW PRECISION)"}};
+#endif
 
-    static const char *format_names[3] = {"rgba16f", "rgba half-float", "rgba8 (LOW PRECISION)"};
-
-    for (int32_t i = 0; i < 3; i++)
+    for (size_t i = 0; i < std::size(formats); i++)
     {
         DestroyOitTargets();
 
@@ -1093,7 +1101,15 @@ bool Gles2Immediate::CreateOitTargets(int32_t texture_width, int32_t texture_hei
         {
             oit_scale_ = formats[i].scale;
 
-            epi::LogMessage(epi::kLogLevelPrint, "OpenGL: transparency buffers: %s\n", format_names[i]);
+            bool front_layer = oit_scale_ >= 1.0f && Gles2HasBlendMinMax() &&
+                               CreateOitTarget(oit_front_framebuffer_, oit_front_texture_, formats[i].internal_format,
+                                               formats[i].format, formats[i].type, texture_width, texture_height);
+
+            if (!front_layer)
+                DestroyOitFrontTarget();
+
+            epi::LogMessage(epi::kLogLevelPrint, "OpenGL: transparency buffers: %s%s\n", formats[i].name,
+                            front_layer ? ", exact front layer" : "");
 
             glBindTexture(GL_TEXTURE_2D, 0);
             glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
@@ -1110,8 +1126,29 @@ bool Gles2Immediate::CreateOitTargets(int32_t texture_width, int32_t texture_hei
     return false;
 }
 
+void Gles2Immediate::DestroyOitFrontTarget()
+{
+    if (oit_front_framebuffer_)
+    {
+        glDeleteFramebuffers(1, &oit_front_framebuffer_);
+        oit_front_framebuffer_ = 0;
+    }
+
+    if (oit_front_texture_)
+    {
+        glDeleteTextures(1, &oit_front_texture_);
+        oit_front_texture_ = 0;
+    }
+
+    while (glGetError() != GL_NO_ERROR)
+    {
+    }
+}
+
 void Gles2Immediate::DestroyOitTargets()
 {
+    DestroyOitFrontTarget();
+
     if (oit_accumulation_framebuffer_)
     {
         glDeleteFramebuffers(1, &oit_accumulation_framebuffer_);
@@ -1145,9 +1182,21 @@ void Gles2Immediate::DestroyOitTargets()
 
 void Gles2Immediate::BindOitTarget(int32_t mode)
 {
-    oit_bound_framebuffer_ = (mode == 2) ? oit_revealage_framebuffer_ : oit_accumulation_framebuffer_;
+    if (mode == kOitPassRevealage)
+        oit_bound_framebuffer_ = oit_revealage_framebuffer_;
+    else if (mode == kOitPassFrontDepth)
+        oit_bound_framebuffer_ = oit_front_framebuffer_;
+    else
+        oit_bound_framebuffer_ = oit_accumulation_framebuffer_;
 
     glBindFramebuffer(GL_FRAMEBUFFER, oit_bound_framebuffer_);
+}
+
+void Gles2Immediate::BindOitFrontSampler(bool enabled)
+{
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnitOitFront);
+    glBindTexture(GL_TEXTURE_2D, enabled ? oit_front_texture_ : 0);
+    glActiveTexture(GL_TEXTURE0 + kGles2TextureUnit0);
 }
 
 void Gles2Immediate::BeginOitTargets()
@@ -1169,6 +1218,13 @@ void Gles2Immediate::ClearOitTargets()
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    if (oit_front_framebuffer_)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, oit_front_framebuffer_);
+        glClearColor(65504.0f, 65504.0f, 65504.0f, 65504.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, oit_bound_framebuffer_);
 }
 
@@ -1187,6 +1243,8 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view, const Gles2Resol
     oit_bound_framebuffer_ = 0;
 
     glBindFramebuffer(GL_FRAMEBUFFER, render_target_framebuffer_);
+
+    GLboolean stencil_test = glIsEnabled(GL_STENCIL_TEST);
 
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
@@ -1246,6 +1304,9 @@ void Gles2Immediate::CompositeOit(const Gles2ResolveRect &view, const Gles2Resol
     InvalidateBatch();
 
     draw_count_++;
+
+    if (stencil_test)
+        glEnable(GL_STENCIL_TEST);
 
     gles2_program.Use();
     gles2_program.ForceOitReset();

@@ -16,7 +16,8 @@ enum GpuPassTarget
 {
     kGpuPassTargetMain = 0,
     kGpuPassTargetWorld,
-    kGpuPassTargetOit
+    kGpuPassTargetOit,
+    kGpuPassTargetOitFront
 };
 
 struct GpuBlitRectangle
@@ -51,14 +52,12 @@ class GpuDevice
 
     int32_t CurrentTargetWidth() const
     {
-        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_width_
-                                                                                               : target_width_;
+        return (current_target_ != kGpuPassTargetMain) ? world_width_ : target_width_;
     }
 
     int32_t CurrentTargetHeight() const
     {
-        return (current_target_ == kGpuPassTargetWorld || current_target_ == kGpuPassTargetOit) ? world_height_
-                                                                                               : target_height_;
+        return (current_target_ != kGpuPassTargetMain) ? world_height_ : target_height_;
     }
 
     GpuPassTarget CurrentTarget() const
@@ -188,6 +187,8 @@ class GpuDevice
 
     SDL_GPUTexture *oit_accumulation_texture_ = nullptr;
     SDL_GPUTexture *oit_revealage_texture_    = nullptr;
+    SDL_GPUTexture *oit_front_depth_texture_  = nullptr;
+    SDL_GPUTexture *oit_front_color_texture_  = nullptr;
 
     SDL_GPUTexture *clear_pair_texture_ = nullptr;
 

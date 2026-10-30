@@ -58,6 +58,8 @@ uniform float u_sky_is_box;
 
 uniform float u_oit_mode;
 uniform float u_oit_scale;
+uniform sampler2D u_oit_front;
+uniform vec2      u_oit_front_scale;
 
 uniform samplerCube u_sky_cube;
 
@@ -156,12 +158,33 @@ vec4 SampleEquirectSky()
 
 EDGE_INCLUDE_LIGHT_COMMON
 
-float OitWeight(float alpha, float view_depth)
-{
-    float a = min(1.0, alpha * 10.0) + 0.01;
-    float d = 1.0 - view_depth * 0.9;
+const float kOitAccumulate     = 1.0;
+const float kOitRevealage      = 2.0;
+const float kOitFrontDepth     = 5.0;
+const float kOitFrontColor     = 6.0;
+const float kOitFrontClear     = 65504.0;
+const float kOitFrontTolerance = 1.0 + 1.0 / 512.0;
 
-    return clamp(a * a * a * 1e8 * d * d * d, 1e-2, 3e3);
+bool OitModeIs(float mode)
+{
+    return abs(u_oit_mode - mode) < 0.5;
+}
+
+bool OitFrontFragment(float view_distance)
+{
+    float front = texture2D(u_oit_front, gl_FragCoord.xy * u_oit_front_scale).r;
+
+    return view_distance <= front * kOitFrontTolerance;
+}
+
+float OitWeight(float alpha, float view_distance)
+{
+    if (u_oit_scale < 1.0)
+        return 3e3 * u_oit_scale;
+
+    float d = 32.0 / max(view_distance, 32.0);
+
+    return alpha * clamp(3e3 * d * d * d, 1e-2, 3e3);
 }
 
 vec2 LiquidFlow(vec2 point, vec2 direction, float time, float seed)
@@ -285,6 +308,12 @@ void main()
         float av = 1.0 - smoothstep(1.0 - ((3.0 * aa_radius) / line_length), 1.0, abs(v / line_length));
 
         gl_FragColor = vec4(v_color.rgb, v_color.a * min(au, av));
+
+        if (OitModeIs(kOitFrontDepth))
+            gl_FragColor = vec4(kOitFrontClear);
+        else if (OitModeIs(kOitFrontColor))
+            gl_FragColor = vec4(0.0);
+
         return;
     }
 
@@ -327,21 +356,6 @@ void main()
 
     float fog_factor = FogFactor();
 
-    vec3 modulate_sum = vec3(0.0, 0.0, 0.0);
-    vec3 additive_sum = vec3(0.0, 0.0, 0.0);
-
-#ifndef EDGE_NO_LIGHTS
-    if (u_world_lit > 0.5)
-    {
-        AccumulateClusterLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, modulate_sum, additive_sum);
-    }
-
-    if (u_glow_count > 0.5)
-    {
-        AccumulateGlows(v_eye_position, modulate_sum, additive_sum);
-    }
-#endif
-
     if (u_multi_texture > 0.5 || u_light_falloff > 0.5)
     {
         fragment_color *= texel0;
@@ -372,19 +386,49 @@ void main()
         }
     }
 
-    fragment_color.rgb += texel0.rgb * modulate_sum + additive_sum;
-
     if (u_oit_mode > 0.5)
     {
-        float view_depth = clamp(-v_eye_position.z * 0.000625, 0.0, 1.0);
+        float view_distance = -v_eye_position.z;
 
-        float weight = OitWeight(fragment_color.a, view_depth) * u_oit_scale;
+        if (OitModeIs(kOitFrontDepth))
+        {
+            gl_FragColor = vec4(fragment_color.a < 1.0 / 255.0 ? kOitFrontClear : view_distance);
+            return;
+        }
 
-        if (u_oit_mode > 1.5)
+        if (u_oit_front_scale.x > 0.0 && OitFrontFragment(view_distance) != OitModeIs(kOitFrontColor))
+        {
+            gl_FragColor = vec4(0.0);
+            return;
+        }
+
+        if (OitModeIs(kOitRevealage))
         {
             gl_FragColor = vec4(fragment_color.a, 0.0, 0.0, fragment_color.a);
             return;
         }
+    }
+
+    vec3 modulate_sum = vec3(0.0, 0.0, 0.0);
+    vec3 additive_sum = vec3(0.0, 0.0, 0.0);
+
+#ifndef EDGE_NO_LIGHTS
+    if (u_world_lit > 0.5)
+    {
+        AccumulateClusterLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, modulate_sum, additive_sum);
+    }
+
+    if (u_glow_count > 0.5)
+    {
+        AccumulateGlows(v_eye_position, modulate_sum, additive_sum);
+    }
+#endif
+
+    fragment_color.rgb += texel0.rgb * modulate_sum + additive_sum;
+
+    if (OitModeIs(kOitAccumulate))
+    {
+        float weight = OitWeight(fragment_color.a, -v_eye_position.z);
 
         gl_FragColor = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
         return;

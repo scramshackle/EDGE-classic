@@ -50,6 +50,8 @@ void ShutdownGpuImages(SDL_GPUDevice *device);
 
 constexpr GLuint kGpuImageOitAccumulation = 0xFFFFFF01u;
 constexpr GLuint kGpuImageOitRevealage    = 0xFFFFFF02u;
+constexpr GLuint kGpuImageOitFrontDepth   = 0xFFFFFF03u;
+constexpr GLuint kGpuImageOitFrontColor   = 0xFFFFFF04u;
 
 bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *texture, int32_t width,
                               int32_t height);

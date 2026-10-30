@@ -11,6 +11,7 @@
     X(PFNGLATTACHSHADERPROC, glAttachShader)                                                                            \
     X(PFNGLBINDATTRIBLOCATIONPROC, glBindAttribLocation)                                                                \
     X(PFNGLBINDBUFFERPROC, glBindBuffer)                                                                                \
+    X(PFNGLBLENDEQUATIONPROC, glBlendEquation)                                                                          \
     X(PFNGLBUFFERDATAPROC, glBufferData)                                                                                \
     X(PFNGLBUFFERSUBDATAPROC, glBufferSubData)                                                                          \
     X(PFNGLCOMPILESHADERPROC, glCompileShader)                                                                          \
@@ -61,6 +62,7 @@ EDGE_GLES2_GL_FRAMEBUFFER_FUNCTIONS(EDGE_GLES2_DECLARE)
 #define glAttachShader             ec_glAttachShader
 #define glBindAttribLocation       ec_glBindAttribLocation
 #define glBindBuffer               ec_glBindBuffer
+#define glBlendEquation            ec_glBlendEquation
 #define glBufferData               ec_glBufferData
 #define glBufferSubData            ec_glBufferSubData
 #define glCompileShader            ec_glCompileShader
@@ -123,6 +125,11 @@ void Gles2LoadEntryPoints();
 bool Gles2HasFramebufferObjects();
 
 bool Gles2HasFullNonPowerOfTwoTextures();
+
+constexpr GLenum kGles2BlendEquationAdd = 0x8006;
+constexpr GLenum kGles2BlendEquationMin = 0x8007;
+
+bool Gles2HasBlendMinMax();
 
 int32_t Gles2MaxVaryingVectors();
 

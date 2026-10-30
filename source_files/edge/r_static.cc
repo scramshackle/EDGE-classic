@@ -1943,7 +1943,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         StaticBatch &batch = static_batches[i];
 
         bool wanted = (batch.draw_pass == draw_pass) ||
-                      (batch.draw_pass == kOitPassAccumulate && draw_pass == kOitPassRevealage);
+                      (batch.draw_pass == kOitPassAccumulate && OitPassDrawsTranslucent(draw_pass));
 
         if (batch.spans.empty() || !wanted)
             continue;

@@ -1636,31 +1636,49 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         FinishUnitBatch();
         EndRetainedUnits();
 
-        static const OitPass oit_passes[4] = {kOitPassMasked, kOitPassAccumulate, kOitPassRevealage,
-                                              kOitPassAdditive};
+        static const OitPass oit_passes[6] = {kOitPassMasked,    kOitPassFrontDepth, kOitPassAccumulate,
+                                              kOitPassRevealage, kOitPassFrontColor, kOitPassAdditive};
 
-        for (int32_t p = 0; p < 4; p++)
+        bool oit_single_pass = render_backend->OitSinglePass();
+        bool oit_front_layer = render_backend->OitFrontLayer();
+        bool oit_open        = false;
+
+        for (int32_t p = 0; p < 6; p++)
         {
-            if (oit_passes[p] == kOitPassAccumulate)
+            OitPass pass = oit_passes[p];
+
+            if (pass == kOitPassFrontDepth && !oit_front_layer)
+                continue;
+
+            if (pass == kOitPassRevealage && oit_single_pass)
+                continue;
+
+            if (pass == kOitPassFrontColor && (!oit_front_layer || oit_single_pass))
+                continue;
+
+            if (!oit_open && (pass == kOitPassFrontDepth || pass == kOitPassAccumulate))
+            {
                 render_backend->BeginOitPass();
 
-            if (oit_passes[p] == kOitPassAdditive)
+                oit_open = true;
+            }
+
+            if (oit_open && (pass == kOitPassFrontColor || pass == kOitPassAdditive))
             {
                 PublishOitBounds();
 
                 render_backend->FinishOitPass();
 
                 EndOitBounds();
+
+                oit_open = false;
             }
 
-            if (oit_passes[p] == kOitPassRevealage && render_backend->OitSinglePass())
-                continue;
-
-            render_backend->SetOitPass(oit_passes[p]);
+            render_backend->SetOitPass(pass);
 
             StartUnitBatch(solid_mode);
 
-            DrawStaticMesh(oit_passes[p], !for_mirror);
+            DrawStaticMesh(pass, !for_mirror);
 
             ReplayRetainedUnits();
 

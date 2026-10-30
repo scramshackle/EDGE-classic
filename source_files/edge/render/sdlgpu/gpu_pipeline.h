@@ -52,10 +52,13 @@ SDL_GPUGraphicsPipeline *GetPipeline(uint32_t pipeline_flags, GLenum source_blen
 SDL_GPUGraphicsPipeline *GetModelPipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
 
 
-SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive);
+SDL_GPUGraphicsPipeline *GetOitPipeline(uint32_t pipeline_flags, GpuPrimitiveType primitive, bool front_depth);
 
-SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags);
+SDL_GPUGraphicsPipeline *GetOitCompositePipeline(uint32_t pipeline_flags, GLenum source_blend,
+                                                 GLenum destination_blend, GpuPrimitiveType primitive);
+
+SDL_GPUGraphicsPipeline *GetModelOitPipeline(uint32_t pipeline_flags, bool front_depth);
 
 SDL_GPUGraphicsPipeline *GetSpritePipeline(uint32_t pipeline_flags, GLenum source_blend, GLenum destination_blend);
 
-SDL_GPUGraphicsPipeline *GetSpriteOitPipeline(uint32_t pipeline_flags);
+SDL_GPUGraphicsPipeline *GetSpriteOitPipeline(uint32_t pipeline_flags, bool front_depth);

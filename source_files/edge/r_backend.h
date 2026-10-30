@@ -35,8 +35,16 @@ enum OitPass
     kOitPassAccumulate,
     kOitPassRevealage,
     kOitPassMasked,
-    kOitPassAdditive
+    kOitPassAdditive,
+    kOitPassFrontDepth,
+    kOitPassFrontColor
 };
+
+inline bool OitPassDrawsTranslucent(int32_t mode)
+{
+    return mode == kOitPassAccumulate || mode == kOitPassRevealage || mode == kOitPassFrontDepth ||
+           mode == kOitPassFrontColor;
+}
 
 enum ClipVolumeDepthRange
 {
@@ -147,6 +155,11 @@ class RenderBackend
     virtual void SetObliqueNearPlane(bool enabled, const epi::Vec4 &plane) = 0;
 
     virtual bool OitSinglePass()
+    {
+        return false;
+    }
+
+    virtual bool OitFrontLayer()
     {
         return false;
     }

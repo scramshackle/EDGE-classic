@@ -212,6 +212,8 @@ void Gles2Program::LinkVariant(int32_t variant, const char *defines)
     locations_.sky_pass               = glGetUniformLocation(program, "u_sky_pass");
     locations_.oit_mode               = glGetUniformLocation(program, "u_oit_mode");
     locations_.oit_scale              = glGetUniformLocation(program, "u_oit_scale");
+    locations_.oit_front              = glGetUniformLocation(program, "u_oit_front");
+    locations_.oit_front_scale        = glGetUniformLocation(program, "u_oit_front_scale");
     locations_.color_lookup           = glGetUniformLocation(program, "u_color_lookup");
     locations_.color_lookup_enabled   = glGetUniformLocation(program, "u_color_lookup_enabled");
     locations_.whiten                 = glGetUniformLocation(program, "u_whiten");
@@ -253,6 +255,7 @@ void Gles2Program::LinkVariant(int32_t variant, const char *defines)
     glUniform1i(locations_.light_headers, kGles2TextureUnitLightHeaders);
     glUniform1i(locations_.light_indices, kGles2TextureUnitLightIndices);
     glUniform1i(locations_.color_lookup, kGles2TextureUnitColorLookup);
+    glUniform1i(locations_.oit_front, kGles2TextureUnitOitFront);
 
     programs_[variant]          = program;
     variant_locations_[variant] = locations_;
@@ -340,6 +343,7 @@ void Gles2Program::ResendUniforms()
     glUniform1f(locations_.light_depth, shadow_light_depth_);
     glUniform1f(locations_.oit_mode, shadow_oit_mode_);
     glUniform1f(locations_.oit_scale, shadow_oit_scale_);
+    glUniform2f(locations_.oit_front_scale, shadow_oit_front_scale_[0], shadow_oit_front_scale_[1]);
     glUniform2f(locations_.texture_offset, shadow_texture_offset_.x, shadow_texture_offset_.y);
     glUniform1f(locations_.light_row_offset, shadow_light_row_offset_);
     glUniform1f(locations_.sprite_mode, shadow_sprite_mode_);
@@ -550,6 +554,20 @@ void Gles2Program::SetOit(float mode, float scale)
 {
     SetFloat(locations_.oit_mode, shadow_oit_mode_, mode);
     SetFloat(locations_.oit_scale, shadow_oit_scale_, scale);
+}
+
+void Gles2Program::SetOitFront(float scale_x, float scale_y)
+{
+    if (epi::AlmostEquals(shadow_oit_front_scale_[0], scale_x) &&
+        epi::AlmostEquals(shadow_oit_front_scale_[1], scale_y))
+        return;
+
+    shadow_oit_front_scale_[0] = scale_x;
+    shadow_oit_front_scale_[1] = scale_y;
+
+    glUniform2f(locations_.oit_front_scale, scale_x, scale_y);
+
+    uniform_update_count_++;
 }
 
 void Gles2Program::SetTextureOffset(const epi::Vec2 &offset)
@@ -804,6 +822,8 @@ bool Gles2ModelProgram::Init()
     uniform_fog_end_               = glGetUniformLocation(program_, "u_fog_end");
     uniform_oit_mode_              = glGetUniformLocation(program_, "u_oit_mode");
     uniform_oit_scale_             = glGetUniformLocation(program_, "u_oit_scale");
+    uniform_oit_front_             = glGetUniformLocation(program_, "u_oit_front");
+    uniform_oit_front_scale_       = glGetUniformLocation(program_, "u_oit_front_scale");
     uniform_color_lookup_          = glGetUniformLocation(program_, "u_color_lookup");
     uniform_color_lookup_enabled_  = glGetUniformLocation(program_, "u_color_lookup_enabled");
 
@@ -813,6 +833,7 @@ bool Gles2ModelProgram::Init()
     glUniform1i(uniform_light_headers_, kGles2TextureUnitLightHeaders);
     glUniform1i(uniform_light_indices_, kGles2TextureUnitLightIndices);
     glUniform1i(uniform_color_lookup_, kGles2TextureUnitColorLookup);
+    glUniform1i(uniform_oit_front_, kGles2TextureUnitOitFront);
 
     return true;
 }
@@ -963,6 +984,18 @@ void Gles2ModelProgram::SetOit(float mode, float scale)
 {
     SetFloat(uniform_oit_mode_, shadow_oit_mode_, mode);
     SetFloat(uniform_oit_scale_, shadow_oit_scale_, scale);
+}
+
+void Gles2ModelProgram::SetOitFront(float scale_x, float scale_y)
+{
+    if (epi::AlmostEquals(shadow_oit_front_scale_[0], scale_x) &&
+        epi::AlmostEquals(shadow_oit_front_scale_[1], scale_y))
+        return;
+
+    shadow_oit_front_scale_[0] = scale_x;
+    shadow_oit_front_scale_[1] = scale_y;
+
+    glUniform2f(uniform_oit_front_scale_, scale_x, scale_y);
 }
 
 void Gles2ModelProgram::SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start,
