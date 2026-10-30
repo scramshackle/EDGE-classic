@@ -51,6 +51,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include <charconv>
+
 #include "epi.h"
 #include "epi_str_compare.h"
 #include "epi_str_util.h"
@@ -144,7 +146,7 @@ void Scanner::CheckForMeta()
             {
                 SetScriptIdentifier(data_.substr(metaStart, fileLength));
                 std::string lineNumber(data_.data() + metaStart + fileLength + 1, lineLength);
-                line_       = atoi(lineNumber.c_str());
+                std::from_chars(lineNumber.data(), lineNumber.data() + lineNumber.size(), line_);
                 line_start_ = scan_position_;
             }
         }
@@ -594,7 +596,18 @@ bool Scanner::GetNextToken(bool expandState)
         }
         else if (next_state_.token == Scanner::kIntConst)
         {
-            next_state_.number  = strtol(next_state_.string.c_str(), NULL, integerBase);
+            {
+                const char *digits = next_state_.string.data();
+                const char *digits_end = digits + next_state_.string.size();
+                bool        negative   = digits < digits_end && *digits == '-';
+                if (negative || (digits < digits_end && *digits == '+'))
+                    digits++;
+                if (integerBase == 16 && digits_end - digits >= 2 && digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+                    digits += 2;
+                long parsed = 0;
+                std::from_chars(digits, digits_end, parsed, integerBase);
+                next_state_.number = (int)(negative ? -parsed : parsed);
+            }
             next_state_.decimal = next_state_.number;
             next_state_.boolean = (next_state_.number != 0);
         }
@@ -740,15 +753,47 @@ const std::string Scanner::Escape(const char *str)
 }
 const std::string &Scanner::Unescape(std::string &str)
 {
-    for (unsigned int i = 0; escapeCharacters[i] != 0; i++)
+    std::string result;
+    result.reserve(str.size());
+    for (size_t i = 0; i < str.size(); i++)
     {
-        std::string sequence("\\");
-        sequence.push_back(escapeCharacters[i]);
-        for (size_t p = 0; p < str.size() && (p = str.find(sequence, p)) != std::string::npos; p++)
+        if (str[i] != '\\' || i + 1 >= str.size())
         {
-            str.replace(str.find(sequence, p), 2, 1, resultCharacters[i]);
+            result.push_back(str[i]);
+            continue;
+        }
+        char code = str[++i];
+        switch (code)
+        {
+        case 'n':
+            result.push_back('\n');
+            break;
+        case 't':
+            result.push_back('\t');
+            break;
+        case 'r':
+            result.push_back('\r');
+            break;
+        case 'f':
+            result.push_back('\f');
+            break;
+        case 'x':
+            if (i + 2 < str.size() && epi::IsXDigitASCII(str[i + 1]) && epi::IsXDigitASCII(str[i + 2]))
+            {
+                int value = 0;
+                std::from_chars(str.data() + i + 1, str.data() + i + 3, value, 16);
+                result.push_back((char)value);
+                i += 2;
+            }
+            else
+                result.push_back(code);
+            break;
+        default:
+            result.push_back(code);
+            break;
         }
     }
+    str = result;
     return str;
 }
 

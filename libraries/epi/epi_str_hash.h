@@ -126,7 +126,7 @@ class StringHash
     std::string ToDebugString() const;
 
     /// Return string which has specific hash value. Return first string if many (in order of calculation).
-    /// Use for debug purposes only. Return empty string if EPI_STRING_HASH_DEBUG is off.
+    /// Use for debug purposes only. Return empty string if EPI_EXTRA_CHECKS is off.
     std::string Reverse() const;
 
     /// Return hash value for HashSet & HashMap.

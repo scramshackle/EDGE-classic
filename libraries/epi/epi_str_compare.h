@@ -33,7 +33,7 @@ int StringCaseCompareASCII(std::string_view A, std::string_view B);
 int StringCaseCompareMaxASCII(std::string_view A, std::string_view B, size_t n);
 int StringPrefixCaseCompareASCII(std::string_view A, std::string_view B);
 
-size_t StringCaseFindASCII(std::string_view haystack, std::string_view needle);
+size_t StringCaseFindASCII(std::string_view A, std::string_view B);
 
 } // namespace epi
 

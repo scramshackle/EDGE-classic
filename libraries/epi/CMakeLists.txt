@@ -14,7 +14,7 @@ add_library(
   epi_str_hash.cc
   epi_str_util.cc
   epi_vector.cc
-  epi_scanner.cpp
+  epi_scanner.cc
 )
 
 target_include_directories(epi PUBLIC ./)

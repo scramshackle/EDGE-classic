@@ -37,9 +37,6 @@ namespace epi
 #ifdef _WIN32
 static constexpr uint32_t kBadUnicodeValue = 0xFFFFFFFF;
 
-// The following two functions are adapted from PHYSFS' internal Unicode stuff,
-// but tweaked to account for string_views which are not null terminated
-
 static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
 {
     const char *str     = _str;
@@ -58,26 +55,22 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
     else
         octet = (uint32_t)((uint8_t)*str);
 
-    if (octet == 0) /* null terminator, end of string. */
+    if (octet == 0)
     {
         *u32c = 0;
         return 1;
     }
-    else if (octet < 128) /* one octet char: 0 to 127 */
+    else if (octet < 128)
     {
         *u32c = octet;
         return 1;
-    } /* else if */
-    else if ((octet > 127) && (octet < 192)) /* bad (starts with 10xxxxxx). */
+    }
+    else if ((octet > 127) && (octet < 192))
     {
-        /*
-         * Apparently each of these is supposed to be flagged as a bogus
-         *  char, instead of just resyncing to the next valid codepoint.
-         */
         *u32c = kBadUnicodeValue;
         return 1;
-    } /* else if */
-    else if (octet < 224) /* two octets */
+    }
+    else if (octet < 224)
     {
         advance = 1;
         octet -= (128 + 64);
@@ -86,7 +79,7 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             octet2 = (uint32_t)((uint8_t) * (++str));
             advance++;
         }
-        if ((octet2 & (128 + 64)) != 128) /* Format isn't 10xxxxxx? */
+        if ((octet2 & (128 + 64)) != 128)
         {
             *u32c = kBadUnicodeValue;
             return advance;
@@ -103,8 +96,8 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             *u32c = kBadUnicodeValue;
             return advance;
         }
-    } /* else if */
-    else if (octet < 240) /* three octets */
+    }
+    else if (octet < 240)
     {
         advance = 1;
         octet -= (128 + 64 + 32);
@@ -113,7 +106,7 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             octet2 = (uint32_t)((uint8_t) * (++str));
             advance++;
         }
-        if ((octet2 & (128 + 64)) != 128) /* Format isn't 10xxxxxx? */
+        if ((octet2 & (128 + 64)) != 128)
         {
             *u32c = kBadUnicodeValue;
             return advance;
@@ -124,7 +117,7 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             octet3 = (uint32_t)((uint8_t) * (++str));
             advance++;
         }
-        if ((octet3 & (128 + 64)) != 128) /* Format isn't 10xxxxxx? */
+        if ((octet3 & (128 + 64)) != 128)
         {
             *u32c = kBadUnicodeValue;
             return advance;
@@ -132,7 +125,7 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
 
         retval = (((octet << 12)) | ((octet2 - 128) << 6) | ((octet3 - 128)));
 
-        /* There are seven "UTF-16 surrogates" that are illegal in UTF-8. */
+        // There are seven "UTF-16 surrogates" that are illegal in UTF-8.
         switch (retval)
         {
         case 0xD800:
@@ -145,9 +138,8 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             *u32c = kBadUnicodeValue;
             return advance;
         }
-        } /* switch */
+        }
 
-        /* 0xFFFE and 0xFFFF are illegal, too, so we check them at the edge. */
         if ((retval >= 0x800) && (retval <= 0xFFFD))
         {
             *u32c = retval;
@@ -158,8 +150,8 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             *u32c = kBadUnicodeValue;
             return advance;
         }
-    } /* else if */
-    else if (octet < 248) /* four octets */
+    }
+    else if (octet < 248)
     {
         advance = 1;
         octet -= (128 + 64 + 32 + 16);
@@ -207,7 +199,7 @@ static int GetNextUTF8Codepoint(const char *_str, size_t length, uint32_t *u32c)
             *u32c = kBadUnicodeValue;
             return advance;
         }
-    } /* else if */
+    }
 
     // Shouldn't get here, but ok
     *u32c = kBadUnicodeValue;
@@ -224,11 +216,11 @@ static bool CodepointToUTF8(uint32_t cp, char *_dst, uint64_t *_len)
 
     if (cp > 0x10FFFF)
         cp = kBadUnicodeValue;
-    else if ((cp == 0xFFFE) || (cp == 0xFFFF)) /* illegal values. */
+    else if ((cp == 0xFFFE) || (cp == 0xFFFF))
         cp = kBadUnicodeValue;
     else
     {
-        /* There are seven "UTF-16 surrogates" that are illegal in UTF-8. */
+        // There are seven "UTF-16 surrogates" that are illegal in UTF-8.
         switch (cp)
         {
         case 0xD800:
@@ -239,15 +231,14 @@ static bool CodepointToUTF8(uint32_t cp, char *_dst, uint64_t *_len)
         case 0xDF80:
         case 0xDFFF:
             cp = kBadUnicodeValue;
-        } /* switch */
-    } /* else */
+        }
+    }
 
-    /* Do the encoding... */
     if (cp < 0x80)
     {
         *(dst++) = (char)cp;
         len--;
-    } /* if */
+    }
 
     else if (cp < 0x800)
     {
@@ -258,8 +249,8 @@ static bool CodepointToUTF8(uint32_t cp, char *_dst, uint64_t *_len)
             *(dst++) = (char)((cp >> 6) | 128 | 64);
             *(dst++) = (char)(cp & 0x3F) | 128;
             len -= 2;
-        } /* else */
-    } /* else if */
+        }
+    }
 
     else if (cp < 0x10000)
     {
@@ -271,8 +262,8 @@ static bool CodepointToUTF8(uint32_t cp, char *_dst, uint64_t *_len)
             *(dst++) = (char)((cp >> 6) & 0x3F) | 128;
             *(dst++) = (char)(cp & 0x3F) | 128;
             len -= 3;
-        } /* else */
-    } /* else if */
+        }
+    }
 
     else
     {
@@ -285,8 +276,8 @@ static bool CodepointToUTF8(uint32_t cp, char *_dst, uint64_t *_len)
             *(dst++) = (char)((cp >> 6) & 0x3F) | 128;
             *(dst++) = (char)(cp & 0x3F) | 128;
             len -= 4;
-        } /* else if */
-    } /* else */
+        }
+    }
 
     *_len = len;
     if (cp == kBadUnicodeValue)
