@@ -23,8 +23,8 @@ option(EDGE_GLES2 "WebGL1/GLES 2.0/GL 2.0 Renderer" OFF)
 option(EDGE_SDL_GPU "SDL3_GPU Renderer" ON)
 
 # Web Player
-option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" OFF)
-option(EDGE_WEB_SIMD "Build SIMD-enabled web player" OFF)
+option(EDGE_WEB_MULTITHREADED "Build multithreaded web player" ON)
+option(EDGE_WEB_SIMD "Build SIMD-enabled web player" ON)
 
 if (EMSCRIPTEN)
   set (EDGE_SDL_GPU OFF)

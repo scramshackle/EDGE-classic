@@ -421,18 +421,22 @@ static void HandleGamepadTriggerEvent(SDL_Event *ev)
 
 void HandleMouseMotionEvent(SDL_Event *ev)
 {
-    int dx, dy;
+    float dx = ev->motion.xrel + mouse_remainder_x;
+    float dy = ev->motion.yrel + mouse_remainder_y;
 
-    dx = ev->motion.xrel;
-    dy = ev->motion.yrel;
+    int whole_dx = (int)dx;
+    int whole_dy = (int)dy;
 
-    if (dx || dy)
+    mouse_remainder_x = dx - (float)whole_dx;
+    mouse_remainder_y = dy - (float)whole_dy;
+
+    if (whole_dx || whole_dy)
     {
         InputEvent event;
 
         event.type           = kInputEventKeyMouse;
-        event.value.mouse.dx = dx;
-        event.value.mouse.dy = -dy; // -AJA- positive should be "up"
+        event.value.mouse.dx = whole_dx;
+        event.value.mouse.dy = -whole_dy; // -AJA- positive should be "up"
 
         PostEvent(&event);
     }
@@ -670,7 +674,9 @@ void ActiveEventProcess(SDL_Event *sdl_ev)
     case SDL_EVENT_MOUSE_MOTION:
         if (eat_mouse_motion)
         {
-            eat_mouse_motion = false; // One motion needs to be discarded
+            eat_mouse_motion  = false; // One motion needs to be discarded
+            mouse_remainder_x = 0.0f;
+            mouse_remainder_y = 0.0f;
             break;
         }
         if (!need_mouse_recapture)
