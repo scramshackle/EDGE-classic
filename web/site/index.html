@@ -73,9 +73,13 @@
                     const lock = canvas === document.pointerLockElement;
                     if (!lock) {
                         try {
-                            await canvas.requestPointerLock();
-                        } catch (err) {
-                            console.error(err);
+                            await canvas.requestPointerLock({ unadjustedMovement: true });
+                        } catch (unadjusted_err) {
+                            try {
+                                await canvas.requestPointerLock();
+                            } catch (err) {
+                                console.error(err);
+                            }
                         }
                     }
                 }
