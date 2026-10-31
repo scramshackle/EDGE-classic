@@ -27,8 +27,6 @@
 #include "con_var.h"
 #include "s_effect.h"
 
-extern std::set<std::string> available_soundbanks;
-
 extern SDL_AudioDeviceID sound_device;
 extern int               sound_device_frequency;
 extern int               sound_device_channels;

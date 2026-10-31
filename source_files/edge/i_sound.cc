@@ -55,10 +55,8 @@ static SDL_AudioStream   *sound_device_stream = nullptr;
 static std::vector<float> sound_device_scratch;
 static bool               pending_device_format_change = false;
 
-std::set<std::string>  available_soundbanks;
 extern std::string     game_directory;
 extern std::string     home_directory;
-extern ConsoleVariable midi_soundbank;
 
 static LowPassEffect vacuum_filter;
 static LowPassEffect underwater_filter;
@@ -308,49 +306,6 @@ void StartupMusic(void)
 {
     if (no_music)
         return;
-
-    // Check for instrument banks
-    std::vector<epi::DirectoryEntry> sbd;
-    std::string                      soundbank_dir = epi::PathAppend(home_directory, "soundbank");
-
-    // Create home directory soundbank folder if it doesn't aleady exist
-    if (!epi::IsDirectory(soundbank_dir))
-        epi::MakeDirectory(soundbank_dir);
-
-    sbd.clear();
-
-    if (ReadDirectory(sbd, soundbank_dir, "*.egtb"))
-    {
-        for (size_t i = 0; i < sbd.size(); i++)
-        {
-            if (!sbd[i].is_dir)
-            {
-                std::string filename = epi::GetFilename(sbd[i].name);
-                if (!available_soundbanks.contains(filename))
-                    available_soundbanks.emplace(filename);
-            }
-        }
-    }
-
-    if (home_directory != game_directory)
-    {
-        // Read the program directory, but only add names we haven't encountered yet
-        sbd.clear();
-        soundbank_dir = epi::PathAppend(game_directory, "soundbank");
-
-        if (ReadDirectory(sbd, soundbank_dir, "*.egtb"))
-        {
-            for (size_t i = 0; i < sbd.size(); i++)
-            {
-                if (!sbd[i].is_dir)
-                {
-                    std::string filename = epi::GetFilename(sbd[i].name);
-                    if (!available_soundbanks.contains(filename))
-                        available_soundbanks.emplace(filename);
-                }
-            }
-        }
-    }
 
     if (!StartupMIDI())
         midi_disabled = true;

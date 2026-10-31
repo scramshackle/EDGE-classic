@@ -1,5 +1,5 @@
 add_subdirectory(dr_libs)
-add_subdirectory(egtengine)
+add_subdirectory(ecsynth)
 add_subdirectory(epi)
 add_subdirectory(hmm)
 add_subdirectory(libcRSID)

@@ -198,7 +198,7 @@ target_include_directories(edge-classic PRIVATE ./)
 set (EDGE_LINK_LIBRARIES
   ddf
   dr_libs
-  edgetracker
+  ecsynth
   epi
   ${SDL3_LIBRARIES}
   minilua
@@ -206,10 +206,6 @@ set (EDGE_LINK_LIBRARIES
   miniz
   pl_mpeg
   stb
-)
-
-list (APPEND
-  EDGE_LINK_LIBRARIES
   coal
   dehacked
   libcRSID
@@ -264,7 +260,6 @@ else()
     ${CMAKE_SOURCE_DIR}/edge_base@/edge_base
     ${CMAKE_SOURCE_DIR}/edge_defs@/edge_defs
     ${CMAKE_SOURCE_DIR}/overlays@/overlays
-    ${CMAKE_SOURCE_DIR}/soundbank@/soundbank
     --js-output=${DEST_DIR}/edge-classic-data.js
     --use-preload-cache
     --no-node

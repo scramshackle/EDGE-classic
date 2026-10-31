@@ -1,10 +1,10 @@
 ##########################################
-# edgetracker
+# ecsynth
 ##########################################
 
 add_library(
-  edgetracker
-  egtlib.c
+  ecsynth
+  ecsynth.c
   )
 
-target_include_directories(edgetracker PUBLIC ./)
+target_include_directories(ecsynth PUBLIC ./)

@@ -233,7 +233,6 @@ static constexpr char JoystickAxis[] = "Off/Turn/Turn (Reversed)/Look (Inverted)
 // Screen resolution changes
 static DisplayMode new_window_mode;
 
-extern std::set<std::string>               available_soundbanks;
 extern std::map<std::string, unsigned int> available_crosshairs;
 
 //
@@ -580,8 +579,8 @@ static OptionMenuItem soundoptions[] = {
     {kOptionMenuItemTypeSlider, "Movie/Music Volume", nullptr, 0, &music_volume.f_,
      OptionMenuUpdateConsoleVariableFromFloat, nullptr, &music_volume, 0.05f, 0.0f, 1.0f, "%0.2f"},
     {kOptionMenuItemTypePlain, "", nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, ""},
-    {kOptionMenuItemTypeFunction, "MIDI Instrument Set", nullptr, 0, nullptr, OptionMenuChangeSoundbank, nullptr,
-     nullptr, 0, 0, 0, ""},
+    {kOptionMenuItemTypeSwitch, "MIDI Instrument Set", "EC Studio/Organya", 2, &midi_soundbank.d_, OptionMenuChangeSoundbank, nullptr,
+     &midi_soundbank, 0, 0, 0, ""},
     {kOptionMenuItemTypeBoolean, "PC Speaker Mode", YesNo, 2, &pc_speaker_mode, OptionMenuChangePCSpeakerMode,
      "Music will be Off while this is enabled", nullptr, 0, 0, 0, ""},
     {kOptionMenuItemTypePlain, "", nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, ""},
@@ -1172,14 +1171,6 @@ void OptionMenuDrawer()
         HUDWriteText(style, fontType,
                      (current_menu->menu_center) - (style->fonts_[fontType]->StringWidth(name_entry) * TEXTscale),
                      curry, name_entry);
-
-        // Draw current soundbank
-        if (current_menu == &sound_optmenu && current_menu->items[i].routine == OptionMenuChangeSoundbank)
-        {
-            fontType  = StyleDefinition::kTextSectionAlternate;
-            TEXTscale = style->definition_->text_[fontType].scale_;
-            HUDWriteText(style, fontType, (current_menu->menu_center) + 15, curry, epi::GetStem(midi_soundbank.s_).c_str());
-        }
 
         // Draw current overlay
         if (current_menu == &video_optmenu && current_menu->items[i].routine == OptionMenuChangeOverlay)
@@ -2213,40 +2204,7 @@ static void OptionMenuChangeLanguage(int key_pressed, ConsoleVariable *console_v
 //
 static void OptionMenuChangeSoundbank(int key_pressed, ConsoleVariable *console_variable)
 {
-    EPI_UNUSED(console_variable);
-
-    std::set<std::string>::iterator sf_pos;
-
-    if (!available_soundbanks.contains(midi_soundbank.s_)) // Something is weird
-    {
-        epi::LogMessage(epi::kLogLevelWarning, "OptionMenuChangeSoundbank: Could not read list of available "
-                                               "soundbanks. "
-                                               "Falling back to default!\n");
-        midi_soundbank = "Default.egtb";
-        return;
-    }
-    else
-        sf_pos = available_soundbanks.find(midi_soundbank.s_);
-
-    if (key_pressed == kLeftArrow || key_pressed == kGamepadLeft)
-    {
-        if (sf_pos != available_soundbanks.begin())
-            sf_pos--;
-        else
-        {
-            sf_pos = available_soundbanks.end();
-            sf_pos--;
-        }
-    }
-    else if (key_pressed == kRightArrow || key_pressed == kGamepadRight)
-    {
-        sf_pos++;
-        if (sf_pos == available_soundbanks.end())
-            sf_pos = available_soundbanks.begin();
-    }
-
-    // update console_variable
-    midi_soundbank = *sf_pos;
+    console_variable->operator=(console_variable->d_);
     RestartMIDI();
 }
 

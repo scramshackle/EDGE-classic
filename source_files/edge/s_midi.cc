@@ -23,7 +23,7 @@
 #include <set>
 
 #include "dm_state.h"
-#include "egtlib.h"
+#include "ecsynth.h"
 #include "epi.h"
 #include "epi_file.h"
 #include "epi_filesystem.h"
@@ -42,29 +42,17 @@ extern int sound_device_frequency;
 
 bool midi_disabled = false;
 
-static egtsynth         *edge_synth             = NULL;
+static ECSynth          *edge_synth             = NULL;
 static uint16_t          imf_rate               = 0;
 
-EDGE_DEFINE_CONSOLE_VARIABLE(midi_soundbank, "Default.egtb", kConsoleVariableFlagArchive)
-
-extern std::set<std::string> available_soundbanks;
+EDGE_DEFINE_CONSOLE_VARIABLE_CLAMPED(midi_soundbank, "0", kConsoleVariableFlagArchive, 0, 1)
 
 bool StartupMIDI(void)
 {
     epi::LogMessage(epi::kLogLevelPrint, "Initializing MIDI...\n");
 
-    // Check for presence of previous CVAR value's file
-    if (!available_soundbanks.contains(midi_soundbank.s_))
-    {
-        epi::LogMessage(epi::kLogLevelWarning,
-                        "MIDI: Cannot find previously used soundbank %s, falling back to "
-                        "default!\n",
-                        midi_soundbank.c_str());
-        midi_soundbank = "Default.egtb";
-    }
-
     if (!edge_synth)
-        edge_synth = egt_create(sound_device_frequency);
+        edge_synth = ECSynthCreate(sound_device_frequency);
 
     if (!edge_synth)
     {
@@ -72,43 +60,11 @@ bool StartupMIDI(void)
         return false;
     }
 
-    std::string soundbank_dir = epi::PathAppend(home_directory, "soundbank");
-
-    epi::File *bank = epi::FileOpen(epi::PathAppend(soundbank_dir, midi_soundbank.s_), epi::kFileAccessRead|epi::kFileAccessBinary);
-
-    if (!bank && home_directory != game_directory)
-    {
-        soundbank_dir = epi::PathAppend(game_directory, "soundbank");
-        bank = epi::FileOpen(epi::PathAppend(soundbank_dir, midi_soundbank.s_), epi::kFileAccessRead|epi::kFileAccessBinary);
-    }
-
-    if (!bank)
+    if (ECSynthLoadBuiltinBank(edge_synth, midi_soundbank.d_ ? kECSynthBankOrganya : kECSynthBankDefault) != 1)
     {
         epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
         return false;
     }
-
-    uint8_t *raw_bank = bank->LoadIntoMemory();
-
-    if (!raw_bank)
-    {
-        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
-        delete bank;
-        return false;
-    }
-
-    if (egt_loadInstrumentBankFromMemory(edge_synth, (char *)raw_bank, bank->GetLength()) != 0)
-    {
-        epi::LogMessage(epi::kLogLevelWarning, "MIDI: Could not load bank: %s.\n", midi_soundbank.s_.c_str());
-        delete bank;
-        delete[] raw_bank;
-        return false;
-    }
-
-    delete bank;
-    delete[] raw_bank;
-
-    egt_clearSong(edge_synth);
 
     return true; // OK!
 }
@@ -159,19 +115,33 @@ class MIDIPlayer : public AbstractMusicPlayer
         if (midi_disabled || edge_synth == NULL)
             return false;
 
-        if (egt_loadSongFromMemory(edge_synth, (char *)data, length, imf_rate) != 0)
+        ECSynthSongFormat format = kECSynthFormatAuto;
+
+        switch (imf_rate)
+        {
+            case 280:
+                format = kECSynthFormatImf280;
+                break;
+            case 560:
+                format = kECSynthFormatImf560;
+                break;
+            case 700:
+                format = kECSynthFormatImf700;
+                break;
+            default:
+                break;
+        }
+
+        if (ECSynthLoadSongFromMemory(edge_synth, data, length, format) != 1)
         {
             epi::LogMessage(epi::kLogLevelWarning, "Failed to load MIDI music\n");
             return false;
         }
 
-        egt_play(edge_synth);
-
         if (!OpenStream(sound_device_frequency, 2, SDL_AUDIO_S16))
-        {
-            egt_clearSong(edge_synth);
             return false;
-        }
+
+        ECSynthPlay(edge_synth, 0);
 
         // Loaded, but not playing
         status_ = kStopped;
@@ -189,8 +159,6 @@ class MIDIPlayer : public AbstractMusicPlayer
 
         CloseStream();
 
-        egt_clearSong(edge_synth);
-
         status_ = kNotLoaded;
     }
 
@@ -201,7 +169,7 @@ class MIDIPlayer : public AbstractMusicPlayer
 
         AbstractMusicPlayer::Stop();
 
-        egt_stop(edge_synth, 1);
+        ECSynthStop(edge_synth);
 
         // reset imf_rate in case tracks are switched to another format
         imf_rate = 0;
@@ -210,12 +178,12 @@ class MIDIPlayer : public AbstractMusicPlayer
   protected:
     int StreamIntoBuffer(void *buffer, int frames) override
     {
-        egt_render(edge_synth, buffer, frames * 2, EGT_RENDER_16);
+        ECSynthRender(edge_synth, buffer, frames * 2, kECSynthRender16);
 
-        if (epi::AlmostEquals(egt_getTime(edge_synth), egt_getSongLength(edge_synth)))
+        if (epi::AlmostEquals(ECSynthGetTime(edge_synth), ECSynthGetSongLength(edge_synth)))
         {
             if (looping_)
-                egt_setPosition(edge_synth, 0, 0, 2);
+                ECSynthPlay(edge_synth, 0);
             else
                 stream_ended_ = true;
         }

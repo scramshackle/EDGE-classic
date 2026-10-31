@@ -72,7 +72,6 @@
 //
 bool show_old_config_warning = false;
 
-extern ConsoleVariable midi_soundbank;
 extern bool            pc_speaker_mode;
 
 static bool done_first_init = false;
