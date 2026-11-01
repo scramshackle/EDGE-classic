@@ -46,18 +46,7 @@ enum GpuCommandType
     kGpuCommandClearDepth,
     kGpuCommandClearStencil,
     kGpuCommandBeginWorldTarget,
-    kGpuCommandBeginOitFrontTarget,
-    kGpuCommandBeginOitTarget,
-    kGpuCommandEndOitTarget,
     kGpuCommandResolveWorldTarget
-};
-
-enum GpuOitPipeline
-{
-    kGpuOitPipelineNone = 0,
-    kGpuOitPipelineAccumulate,
-    kGpuOitPipelineFrontDepth,
-    kGpuOitPipelineComposite
 };
 
 struct GpuResolveArguments
@@ -108,8 +97,6 @@ struct GpuModelDrawArguments
     SDL_GPUSampler *sampler;
     SDL_GPUTexture *lookup_texture;
     SDL_GPUSampler *lookup_sampler;
-    SDL_GPUTexture *oit_front_texture;
-    SDL_GPUSampler *oit_front_sampler;
 
     SDL_GPUBuffer *position_buffer;
     SDL_GPUBuffer *normal_buffer;
@@ -285,10 +272,6 @@ class GpuImmediate
 
     void SetGlowSet(int index);
 
-    void SetOitPipeline(int32_t mode);
-
-
-
     void SetSkyPass(const SkyPassInfo *sky_pass);
 
     void SetLightDepth(bool enabled);
@@ -333,12 +316,6 @@ class GpuImmediate
     void BeginWorldTarget(bool direct);
 
     bool HasDrawCommands() const;
-
-    void BeginOitFrontTarget();
-
-    void BeginOitTarget();
-
-    bool EndOitTarget();
 
     void ResolveWorldTarget(const GpuResolveArguments &resolve);
 
@@ -484,9 +461,6 @@ class GpuImmediate
     std::vector<RendererVertex>        vertices_;
     int32_t                            vertex_count_ = 0;
     std::vector<GpuCommand>            commands_;
-    size_t                             oit_begin_command_ = 0;
-    size_t                             oit_front_begin_command_ = 0;
-    bool                               oit_front_begun_         = false;
     std::vector<GpuVertexParameters>   vertex_parameters_;
     std::vector<GpuFragmentParameters> fragment_parameters_;
 
@@ -518,8 +492,6 @@ class GpuImmediate
     SDL_GPUSampler *current_sampler_[2] = {nullptr, nullptr};
 
     bool texturing_enabled_ = false;
-
-    int32_t oit_pipeline_ = kGpuOitPipelineNone;
 
     bool        sky_pass_enabled_ = false;
     bool        light_depth_enabled_ = false;

@@ -75,7 +75,7 @@ set (EDGE_SOURCE_FILES
   r_mirror.cc
   r_polygon.cc
   r_things.cc
-  r_units.cc
+  r_translucent.cc
   r_wipe.cc
   r_misc.cc
   r_sky.cc  

@@ -29,8 +29,7 @@ constexpr GLint kGles2TextureUnitSkyCube = 2;
 constexpr GLint kGles2TextureUnitLightData = 3;
 constexpr GLint kGles2TextureUnitLightHeaders = 4;
 constexpr GLint kGles2TextureUnitLightIndices = 5;
-constexpr GLint kGles2TextureUnitColorLookup = 6;
-constexpr GLint kGles2TextureUnitOitFront = 7;
+constexpr GLint kGles2TextureUnitColorLookup  = 6;
 
 enum Gles2FogMode
 {
@@ -90,10 +89,6 @@ struct Gles2WorldLocations
     GLint sky_is_box             = -1;
     GLint sky_cube               = -1;
     GLint sky_horizon_shift      = -1;
-    GLint oit_mode               = -1;
-    GLint oit_scale              = -1;
-    GLint oit_front              = -1;
-    GLint oit_front_scale        = -1;
     GLint texture_offset         = -1;
     GLint light_row_offset       = -1;
     GLint sprite_mode            = -1;
@@ -147,10 +142,6 @@ class Gles2Program
 
     void SetViewTint(float r, float g, float b);
 
-    void SetOit(float mode, float scale);
-
-    void SetOitFront(float scale_x, float scale_y);
-
     void SetTextureOffset(const epi::Vec2 &offset);
 
     void SetLightRowOffset(float offset);
@@ -168,13 +159,6 @@ class Gles2Program
     void SetWhiten(bool enabled);
 
     void SetBlur(const epi::Vec4 &blur);
-
-    float OitModeShadow() const
-    {
-        return shadow_oit_mode_;
-    }
-
-    void ForceOitReset();
 
     void SelectVariant(bool opaque);
 
@@ -234,11 +218,6 @@ class Gles2Program
     float shadow_light_depth_ = -1.0f;
     float shadow_view_tint_[3] = {-1.0f, -1.0f, -1.0f};
 
-    float shadow_oit_mode_  = -1.0f;
-    float shadow_oit_scale_ = -1.0f;
-
-    float shadow_oit_front_scale_[2] = {-1.0f, -1.0f};
-
     epi::Vec2 shadow_texture_offset_   = {-1.0e30f, -1.0e30f};
     float    shadow_light_row_offset_ = -1.0e30f;
     float    shadow_sprite_mode_      = -1.0f;
@@ -287,10 +266,6 @@ class Gles2ModelProgram
 
     void SetFog(Gles2FogMode mode, float red, float green, float blue, float density, float start, float end);
 
-    void SetOit(float mode, float scale);
-
-    void SetOitFront(float scale_x, float scale_y);
-
     void SetWorldLit(bool enabled);
 
     void SetLightGrid(const struct Gles2LightGridState *grid);
@@ -337,10 +312,6 @@ class Gles2ModelProgram
     GLint uniform_fog_density_           = -1;
     GLint uniform_fog_start_             = -1;
     GLint uniform_fog_end_               = -1;
-    GLint uniform_oit_mode_              = -1;
-    GLint uniform_oit_scale_             = -1;
-    GLint uniform_oit_front_             = -1;
-    GLint uniform_oit_front_scale_       = -1;
     GLint uniform_color_lookup_          = -1;
     GLint uniform_color_lookup_enabled_  = -1;
 
@@ -354,11 +325,7 @@ class Gles2ModelProgram
 
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 
-    float shadow_oit_mode_  = -1.0f;
-    float shadow_oit_scale_ = -1.0f;
     float shadow_world_lit_ = -1.0f;
-
-    float shadow_oit_front_scale_[2] = {-1.0f, -1.0f};
     int   shadow_glow_set_  = -2;
 
     float shadow_color_lookup_enabled_ = -1.0f;
@@ -394,26 +361,3 @@ class Gles2MovieProgram
 };
 
 extern Gles2MovieProgram gles2_movie_program;
-
-class Gles2OitProgram
-{
-  public:
-    bool Init();
-
-    void Shutdown();
-
-    void Use();
-
-    void SetScale(float scale);
-
-  private:
-    GLuint program_ = 0;
-
-    GLint uniform_accumulation_ = -1;
-    GLint uniform_revealage_    = -1;
-    GLint uniform_scale_        = -1;
-
-    float shadow_scale_ = -1.0f;
-};
-
-extern Gles2OitProgram gles2_oit_program;

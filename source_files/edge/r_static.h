@@ -23,7 +23,8 @@ struct StaticSectorChange
 void SnapshotSurfaceBaseOffsets(void);
 void BuildStaticMesh(void);
 void DestroyStaticMesh(void);
-void DrawStaticMesh(OitPass draw_pass, bool refresh = true);
+void DrawStaticMesh(DrawClass draw_pass, bool refresh = true);
+void StaticAddTranslucent(bool refresh);
 
 const std::vector<StaticSectorChange> &StaticSectorChanges(void);
 
@@ -132,11 +133,11 @@ Sector *StaticDynamicSector(int index);
 void StaticMeshStats(int *batches, int *live_spans, int *dead_spans, int *vertices);
 
 void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
-                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const epi::Vec2 &uv_scale,
-                            const Extrafloor *plane_ef);
+                            BlendingMode blending, DrawClass draw_pass, const MapSurface *surf,
+                            const epi::Vec2 &uv_scale, const Extrafloor *plane_ef);
 void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
-                        float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
+                        float div_delta_x, float div_delta_y, bool mid_masked, DrawClass draw_pass,
                         const epi::Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef);
 void StaticCaptureVertices(GLuint shape, std::span<const RendererVertex> verts);
 void StaticCaptureEnd(void);

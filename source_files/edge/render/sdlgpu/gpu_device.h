@@ -15,9 +15,7 @@ enum GpuLoadOperation
 enum GpuPassTarget
 {
     kGpuPassTargetMain = 0,
-    kGpuPassTargetWorld,
-    kGpuPassTargetOit,
-    kGpuPassTargetOitFront
+    kGpuPassTargetWorld
 };
 
 struct GpuBlitRectangle
@@ -179,16 +177,9 @@ class GpuDevice
     int32_t world_width_  = 0;
     int32_t world_height_ = 0;
 
-    void ReleaseOitTextures(void);
-
     void PairColorClear(void);
 
     GpuPassTarget current_target_ = kGpuPassTargetMain;
-
-    SDL_GPUTexture *oit_accumulation_texture_ = nullptr;
-    SDL_GPUTexture *oit_revealage_texture_    = nullptr;
-    SDL_GPUTexture *oit_front_depth_texture_  = nullptr;
-    SDL_GPUTexture *oit_front_color_texture_  = nullptr;
 
     SDL_GPUTexture *clear_pair_texture_ = nullptr;
 

@@ -143,9 +143,6 @@ class Gles2RenderBackend : public RenderBackend
         if (!gles2_model_program.Init())
             FatalError("OpenGL: failed to create the model shader program.\n");
 
-        if (!gles2_oit_program.Init())
-            FatalError("OpenGL: failed to create the transparency composite shader program.\n");
-
         if (!gles2_immediate.Init())
             FatalError("OpenGL: failed to initialise the immediate renderer.\n");
 
@@ -261,7 +258,6 @@ class Gles2RenderBackend : public RenderBackend
         gles2_program.Shutdown();
         gles2_model_program.Shutdown();
         gles2_movie_program.Shutdown();
-        gles2_oit_program.Shutdown();
     }
 
     void SetClearColor(epi::RGBAColor color)
@@ -312,65 +308,6 @@ class Gles2RenderBackend : public RenderBackend
         }
 
         SetRenderLayer(kRenderLayerHUD);
-    }
-
-    bool OitFrontLayer()
-    {
-        return gles2_immediate.OitFrontLayer();
-    }
-
-    void BeginOitPass()
-    {
-        gles2_immediate.BeginOitTargets();
-    }
-
-    void SetOitPass(int32_t mode)
-    {
-        oit_mode_ = mode;
-
-        if (mode == kOitPassAccumulate || mode == kOitPassRevealage || mode == kOitPassFrontDepth)
-            gles2_immediate.BindOitTarget(mode);
-        else
-            gles2_immediate.BindRenderTarget();
-
-        if (gles2_immediate.OitFrontLayer())
-        {
-            gles2_immediate.BindOitFrontSampler(mode == kOitPassAccumulate || mode == kOitPassRevealage ||
-                                                mode == kOitPassFrontColor);
-
-            glBlendEquation(mode == kOitPassFrontDepth ? kGles2BlendEquationMin : kGles2BlendEquationAdd);
-        }
-    }
-
-    void FinishOitPass()
-    {
-        oit_mode_ = 0;
-
-        if (!gles2_immediate.FinishOitTargets())
-        {
-            gles2_immediate.BindRenderTarget();
-            return;
-        }
-
-        Gles2ResolveRect view;
-        view.x      = ScaleToRenderTargetX(view_window_x);
-        view.y      = ScaleToRenderTargetY(view_window_y);
-        view.width  = ScaleToRenderTargetX(view_window_width);
-        view.height = ScaleToRenderTargetY(view_window_height);
-
-        Gles2ResolveRect area = view;
-
-        ClipToOitBounds(area.x, area.y, area.width, area.height);
-
-        if (area.width <= 0 || area.height <= 0)
-        {
-            gles2_immediate.BindRenderTarget();
-            return;
-        }
-
-        gles2_immediate.CompositeOit(view, area);
-
-        Gles2InvalidateRenderState();
     }
 
     void PushModelMatrix(const epi::Mat4 &matrix)

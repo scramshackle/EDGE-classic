@@ -500,35 +500,6 @@ class Gles2RenderState : public RenderState
         if (info.handle == 0 || info.index_count <= 0)
             return;
 
-        int32_t oit_mode = render_backend->OitMode();
-
-        if (oit_mode != kOitPassNone)
-        {
-            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
-
-            bool wanted = (model_pass == oit_mode) ||
-                          (model_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
-
-            if (!wanted)
-                return;
-        }
-
-        bool oit_blend_pass = OitPassDrawsTranslucent(oit_mode);
-
-        if (oit_blend_pass)
-        {
-            Enable(GL_BLEND);
-
-            if (oit_mode == kOitPassRevealage)
-                BlendFunction(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
-            else if (oit_mode == kOitPassFrontColor)
-                BlendFunction(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            else
-                BlendFunction(GL_ONE, GL_ONE);
-
-            DepthMask(false);
-        }
-
         ApplyState();
 
         gles2_model_program.Use();
@@ -544,12 +515,6 @@ class Gles2RenderState : public RenderState
         gles2_model_program.SetAlphaTest(info.alpha_test);
         gles2_model_program.SetLighting(info);
         gles2_model_program.SetColorLookup(info.color_lookup);
-        gles2_model_program.SetOit(oit_blend_pass ? (float)oit_mode : 0.0f, gles2_immediate.OitScale());
-
-        if (oit_blend_pass && render_backend->OitFrontLayer())
-            gles2_model_program.SetOitFront(gles2_immediate.OitFrontScaleX(), gles2_immediate.OitFrontScaleY());
-        else
-            gles2_model_program.SetOitFront(0.0f, 0.0f);
 
         Gles2FogMode fog_mode = kGles2FogModeNone;
 
@@ -618,18 +583,6 @@ class Gles2RenderState : public RenderState
 
     void ApplyState()
     {
-        if (gles2_immediate.OitClearPending())
-        {
-            glDisable(GL_SCISSOR_TEST);
-
-            gles2_immediate.ClearOitTargets();
-
-            glClearColor(epi::GetRGBARed(clear_color_) / 255.0f, epi::GetRGBAGreen(clear_color_) / 255.0f,
-                         epi::GetRGBABlue(clear_color_) / 255.0f, epi::GetRGBAAlpha(clear_color_) / 255.0f);
-
-            InvalidateApplied();
-        }
-
         float alpha_test = enable_alpha_test_ ? alpha_function_reference_ : 0.0f;
 
         gles2_program.SelectVariant(alpha_test <= 0.0f);

@@ -51,13 +51,7 @@ layout(set = 3, binding = 0) uniform FragmentParameters
 
 layout(set = 2, binding = 0) uniform sampler2D tex0;
 layout(set = 2, binding = 1) uniform sampler2D tex1;
-#if defined(EDGE_OIT_PASS)
-layout(set = 2, binding = 2) uniform sampler2D oit_front_depth;
-#elif defined(EDGE_OIT_COMPOSITE)
-layout(set = 2, binding = 2) uniform sampler2D oit_front_color;
-#else
 layout(set = 2, binding = 2) uniform samplerCube texCube;
-#endif
 layout(set = 2, binding = 3) uniform sampler3D color_lookup_texture;
 
 layout(location = 0) out vec4 frag_color;
@@ -185,7 +179,6 @@ vec3 SkyDirection()
     return normalize((sky_inverse_view * eye).xyz);
 }
 
-#if !defined(EDGE_OIT_PASS) && !defined(EDGE_OIT_COMPOSITE)
 vec4 SampleCubeSky()
 {
     vec3 dir = SkyDirection();
@@ -203,7 +196,6 @@ vec4 SampleCubeSky()
 
     return vec4(rgb, sampled.a * color.a);
 }
-#endif
 
 vec4 SampleEquirectSky()
 {
@@ -244,48 +236,6 @@ vec4 SampleEquirectSky()
 
     return vec4(rgb, sampled.a * color.a);
 }
-
-#ifdef EDGE_OIT_PASS
-const float kOitFrontClear     = 65504.0;
-const float kOitFrontTolerance = 1.0 + 1.0 / 512.0;
-
-#ifdef EDGE_OIT_FRONT_DEPTH
-void OitEmitFrontDepth(float alpha)
-{
-    frag_color = vec4(alpha < 1.0 / 255.0 ? kOitFrontClear : -vpos.z);
-}
-#else
-layout(location = 1) out vec4 frag_revealage;
-layout(location = 2) out vec4 frag_front;
-
-float OitWeight(float alpha, float view_distance)
-{
-    float d = 32.0 / max(view_distance, 32.0);
-
-    return alpha * clamp(3e3 * d * d * d, 1e-2, 3e3);
-}
-
-void OitEmit(vec4 fragment_color)
-{
-    float view_distance = -vpos.z;
-    float front         = texelFetch(oit_front_depth, ivec2(gl_FragCoord.xy), 0).r;
-
-    if (view_distance <= front * kOitFrontTolerance)
-    {
-        frag_color     = vec4(0.0);
-        frag_revealage = vec4(0.0);
-        frag_front     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a);
-        return;
-    }
-
-    float weight = OitWeight(fragment_color.a, view_distance);
-
-    frag_color     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
-    frag_revealage = vec4(fragment_color.a);
-    frag_front     = vec4(0.0);
-}
-#endif
-#endif
 
 vec2 LiquidFlow(vec2 point, vec2 direction, float time, float seed)
 {
@@ -375,31 +325,14 @@ vec3 ApplyColorLookup(vec3 source)
     return texture(color_lookup_texture, coordinate).rgb;
 }
 
-#ifdef EDGE_OIT_COMPOSITE
-void main()
-{
-    vec4  accumulation = texture(tex0, uv.xy);
-    float revealage    = texture(tex1, uv.xy).r;
-    vec4  front        = texture(oit_front_color, uv.xy);
-
-    float weight   = max(accumulation.a, 1e-5);
-    float coverage = (1.0 - front.a) * (1.0 - revealage);
-
-    frag_color = vec4(front.rgb + accumulation.rgb / weight * coverage, front.a + coverage);
-}
-#else
 void main()
 {
     if ((flags & 8) == 8)
     {
-#ifdef EDGE_OIT_PASS
-        frag_color = SampleEquirectSky();
-#else
         if (sky_is_box > 0.5)
             frag_color = SampleCubeSky();
         else
             frag_color = SampleEquirectSky();
-#endif
 
         if (color_lookup.x > 0.5)
             frag_color.rgb = ApplyColorLookup(frag_color.rgb);
@@ -419,13 +352,7 @@ void main()
 
         vec4 line_color = color;
         line_color.a *= min(au, av);
-#if defined(EDGE_OIT_FRONT_DEPTH)
-        frag_color = vec4(kOitFrontClear);
-#elif defined(EDGE_OIT_PASS)
-        OitEmit(line_color);
-#else
         frag_color = line_color;
-#endif
         return;
     }
 
@@ -473,7 +400,7 @@ void main()
     vec3 modulate_sum = vec3(0.0);
     vec3 additive_sum = vec3(0.0);
 
-#if !defined(EDGE_NO_LIGHTS) && !defined(EDGE_OIT_FRONT_DEPTH)
+#if !defined(EDGE_NO_LIGHTS)
     if (light_range.z > 0.5)
     {
         AccumulateClusterLights(modulate_sum, additive_sum);
@@ -516,12 +443,5 @@ void main()
 
     fcolor.rgb += c0.rgb * modulate_sum + additive_sum;
 
-#if defined(EDGE_OIT_FRONT_DEPTH)
-    OitEmitFrontDepth(fcolor.a);
-#elif defined(EDGE_OIT_PASS)
-    OitEmit(fcolor);
-#else
     frag_color = fcolor;
-#endif
 }
-#endif

@@ -62,6 +62,7 @@
 #include "r_state.h"
 #include "r_static.h"
 #include "r_things.h"
+#include "r_translucent.h"
 #include "r_units.h"
 
 extern std::vector<PlaneMover *> active_planes;
@@ -145,18 +146,18 @@ static float Slope_GetHeight(SlopePlane *slope, float x, float y)
     return slope->delta_z1 + along * (slope->delta_z2 - slope->delta_z1);
 }
 
-static OitPass CaptureDrawPass(BlendingMode blending)
+static DrawClass CaptureDrawPass(BlendingMode blending)
 {
     if (solid_mode)
-        return kOitPassNone;
+        return kDrawClassOpaque;
 
     if (blending & kBlendingAdd)
-        return kOitPassAdditive;
+        return kDrawClassAdditive;
 
     if (blending & kBlendingAlpha)
-        return kOitPassAccumulate;
+        return kDrawClassBlended;
 
-    return kOitPassMasked;
+    return kDrawClassMasked;
 }
 
 float LiquidLevelSeconds(void)
@@ -1586,7 +1587,7 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         render_backend->SetRenderLayer(kRenderLayerSolid, false);
         StartUnitBatch(solid_mode);
 
-        DrawStaticMesh(kOitPassNone, !for_mirror);
+        DrawStaticMesh(kDrawClassOpaque, !for_mirror);
 
         for (std::list<DrawSector *>::iterator FI = dsectors.begin(); FI != dsectors.end(); FI++)
             RenderSector(*FI);
@@ -1617,77 +1618,36 @@ void RenderSectorList(std::list<DrawSector *> &dsectors, std::vector<DrawThing *
         solid_mode = false;
         render_backend->SetRenderLayer(kRenderLayerTransparent, false);
 
-        BeginOitBounds(!for_mirror);
-
-        for (size_t i = 0; i < transparent_things.size(); i++)
-        {
-            if (transparent_things[i]->is_model)
-                OitBoundsAddFull();
-        }
-
         BeginRetainedUnits();
         StartUnitBatch(solid_mode);
 
         for (std::list<DrawSector *>::reverse_iterator RI = dsectors.rbegin(); RI != dsectors.rend(); RI++)
             RenderSector(*RI);
 
-        RenderTransparentThings(transparent_things, false);
-
         FinishUnitBatch();
         EndRetainedUnits();
 
-        static const OitPass oit_passes[6] = {kOitPassMasked,    kOitPassFrontDepth, kOitPassAccumulate,
-                                              kOitPassRevealage, kOitPassFrontColor, kOitPassAdditive};
+        TranslucentBegin();
 
-        bool oit_single_pass = render_backend->OitSinglePass();
-        bool oit_front_layer = render_backend->OitFrontLayer();
-        bool oit_open        = false;
+        StartUnitBatch(solid_mode);
 
-        for (int32_t p = 0; p < 6; p++)
-        {
-            OitPass pass = oit_passes[p];
+        DrawStaticMesh(kDrawClassMasked, !for_mirror);
 
-            if (pass == kOitPassFrontDepth && !oit_front_layer)
-                continue;
+        ReplayMaskedRetainedUnits();
 
-            if (pass == kOitPassRevealage && oit_single_pass)
-                continue;
+        FinishUnitBatch();
 
-            if (pass == kOitPassFrontColor && (!oit_front_layer || oit_single_pass))
-                continue;
+        AddRetainedUnitsToTranslucent();
 
-            if (!oit_open && (pass == kOitPassFrontDepth || pass == kOitPassAccumulate))
-            {
-                render_backend->BeginOitPass();
+        StaticAddTranslucent(!for_mirror);
 
-                oit_open = true;
-            }
+        RenderTransparentThings(transparent_things);
 
-            if (oit_open && (pass == kOitPassFrontColor || pass == kOitPassAdditive))
-            {
-                PublishOitBounds();
+        StartUnitBatch(solid_mode);
 
-                render_backend->FinishOitPass();
+        TranslucentDraw();
 
-                EndOitBounds();
-
-                oit_open = false;
-            }
-
-            render_backend->SetOitPass(pass);
-
-            StartUnitBatch(solid_mode);
-
-            DrawStaticMesh(pass, !for_mirror);
-
-            ReplayRetainedUnits();
-
-            RenderTransparentThings(transparent_things, true);
-
-            FinishUnitBatch();
-        }
-
-        render_backend->SetOitPass(kOitPassNone);
+        FinishUnitBatch();
     }
 }
 

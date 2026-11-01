@@ -69,6 +69,7 @@
 #include "r_shader.h"
 #include "r_static.h"
 #include "r_texgl.h"
+#include "r_translucent.h"
 #include "r_units.h"
 #include "script/compat/lua_compat.h"
 #include "vm_coal.h"
@@ -1321,9 +1322,6 @@ static void FlushSpriteBatches(void)
 
         const SpriteBatchKey &key = batch.key;
 
-        if (UnitAccumulatesOit(key.blending, 0))
-            OitBoundsAddSprites(batch.instances, render_unit_sprite_view[0]);
-
         AddSpriteRenderUnit(first, count, key.texture, key.fuzz_texture, key.blending, key.fog_color,
                             key.fog_density, key.color_lookup, key.world_lit, key.glow_set, key.light_table,
                             key.alpha);
@@ -1599,7 +1597,6 @@ struct ResidentBatch
     int                         dirty_low       = INT_MAX;
     int                         dirty_high      = -1;
     int                         live            = 0;
-    bool                        transparent     = false;
 };
 
 struct ResidentSignature
@@ -1760,8 +1757,7 @@ static size_t ResidentBatchFor(const SpriteBatchKey &key)
 
             ResidentBatch &batch = resident_batches.back();
 
-            batch.key         = key;
-            batch.transparent = (key.blending & kBlendingNoZBuffer) || (key.blending & kBlendingAlpha);
+            batch.key = key;
 
             resident_batch_index[probe] = resident_batches.size() - 1;
 
@@ -1857,7 +1853,13 @@ static bool BuildResidentInstance(MapObject *mo, SpriteInstance *instance, Sprit
     source.flip       = frame->flip_[0] ? true : false;
     source.resident   = true;
 
-    return BuildSpriteInstance(source, instance, key);
+    if (!BuildSpriteInstance(source, instance, key))
+        return false;
+
+    if (key->blending & (kBlendingAlpha | kBlendingAdd | kBlendingNoZBuffer))
+        return false;
+
+    return true;
 }
 
 static void AddResidentCandidate(MapObject *mo)
@@ -2124,7 +2126,7 @@ static void UploadResidentBatches(void)
     FlushStaticVertexUploads();
 }
 
-static void DrawResidentBatches(bool transparent)
+static void DrawResidentBatches(void)
 {
     if (!resident_ready)
         return;
@@ -2133,13 +2135,10 @@ static void DrawResidentBatches(bool transparent)
     {
         const ResidentBatch &batch = resident_batches[i];
 
-        if (batch.live <= 0 || !batch.buffer || batch.transparent != transparent)
+        if (batch.live <= 0 || !batch.buffer)
             continue;
 
         const SpriteBatchKey &key = batch.key;
-
-        if (UnitAccumulatesOit(key.blending, 0))
-            OitBoundsAddSprites(batch.instances, render_unit_sprite_view[0]);
 
         AddSpriteRenderUnit(0, (int)batch.instances.size(), key.texture, key.fuzz_texture, key.blending,
                             key.fog_color, key.fog_density, key.color_lookup, key.world_lit, key.glow_set,
@@ -2148,6 +2147,62 @@ static void DrawResidentBatches(bool transparent)
 }
 
 static bool render_thing_needs_transparent = false;
+
+struct TranslucentSprite
+{
+    SpriteBatchKey key;
+    SpriteInstance instance;
+};
+
+static std::vector<TranslucentSprite> translucent_sprites;
+static std::vector<DrawThing *>       translucent_models;
+
+static void AddTranslucentSprite(const SpriteBatchKey &key, const SpriteInstance &instance)
+{
+    int payload = (int)translucent_sprites.size();
+
+    translucent_sprites.push_back({key, instance});
+
+    float right_x = render_unit_sprite_view[0].x;
+    float right_y = render_unit_sprite_view[0].y;
+
+    float x      = instance.origin[0];
+    float y      = instance.origin[1];
+    float bottom = instance.origin[2];
+    float top    = instance.origin[3];
+    float left   = instance.extent[0];
+    float right  = instance.extent[1];
+
+    epi::Vec3 corners[4] = {{x + right_x * left, y + right_y * left, bottom},
+                            {x + right_x * right, y + right_y * right, bottom},
+                            {x + right_x * right, y + right_y * right, top},
+                            {x + right_x * left, y + right_y * left, top}};
+
+    TranslucentAddPoints(kTranslucentSprite, payload, HashSpriteBatchKey(key), corners);
+}
+
+static void AddTranslucentModel(DrawThing *dthing)
+{
+    int payload = (int)translucent_models.size();
+
+    translucent_models.push_back(dthing);
+
+    MapObject *mo = dthing->map_object;
+
+    float radius = mo->radius_;
+    float bottom = dthing->map_z + dthing->hover_dz;
+    float top    = bottom + mo->height_;
+
+    epi::Vec3 corners[8];
+
+    for (int i = 0; i < 8; i++)
+    {
+        corners[i] = {dthing->map_x + ((i & 1) ? radius : -radius), dthing->map_y + ((i & 2) ? radius : -radius),
+                      (i & 4) ? top : bottom};
+    }
+
+    TranslucentAddPoints(kTranslucentModel, payload, (uint64_t)payload, corners);
+}
 
 static bool RenderThing(DrawThing *dthing, bool solid)
 {
@@ -2168,7 +2223,11 @@ static bool RenderThing(DrawThing *dthing, bool solid)
 
         if (solid == is_solid)
         {
-            RenderModel(dthing);
+            if (solid)
+                RenderModel(dthing);
+            else
+                AddTranslucentModel(dthing);
+
             return is_solid;
         }
 
@@ -2210,6 +2269,12 @@ static bool RenderThing(DrawThing *dthing, bool solid)
     }
     else if (!transparent)
     {
+        return false;
+    }
+
+    if (!solid)
+    {
+        AddTranslucentSprite(key, instance);
         return false;
     }
 
@@ -2284,23 +2349,56 @@ void RenderThings(std::vector<DrawThing *> &things, std::vector<DrawThing *> &tr
 
     FlushSpriteBatches();
 
-    DrawResidentBatches(false);
+    DrawResidentBatches();
 }
 
-void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things, bool models)
+void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things)
 {
     SetSpriteViewParameters();
 
+    translucent_sprites.clear();
+    translucent_models.clear();
+
     for (size_t i = 0; i < transparent_things.size(); i++)
+        RenderThing(transparent_things[i], false);
+}
+
+void EmitTranslucentSprites(std::span<const int> payloads)
+{
+    size_t index = 0;
+
+    while (index < payloads.size())
     {
-        if (transparent_things[i]->is_model == models)
-            RenderThing(transparent_things[i], false);
+        const SpriteBatchKey &key = translucent_sprites[(size_t)payloads[index]].key;
+
+        size_t end = index + 1;
+
+        while (end < payloads.size() && SpriteBatchKeysMatch(translucent_sprites[(size_t)payloads[end]].key, key))
+            end++;
+
+        int count = (int)(end - index);
+        int first = 0;
+
+        SpriteInstance *destination = ReserveSpriteInstances(count, &first);
+
+        for (size_t i = index; i < end; i++)
+            destination[i - index] = translucent_sprites[(size_t)payloads[i]].instance;
+
+        AddSpriteRenderUnit(first, count, key.texture, key.fuzz_texture, key.blending, key.fog_color, key.fog_density,
+                            key.color_lookup, key.world_lit, key.glow_set, key.light_table, key.alpha);
+
+        index = end;
     }
+}
 
-    FlushSpriteBatches();
+void EmitTranslucentModels(std::span<const int> payloads)
+{
+    for (size_t i = 0; i < payloads.size(); i++)
+    {
+        RenderCurrentUnits();
 
-    if (!models)
-        DrawResidentBatches(true);
+        RenderModel(translucent_models[(size_t)payloads[i]]);
+    }
 }
 
 //--- editor settings ---

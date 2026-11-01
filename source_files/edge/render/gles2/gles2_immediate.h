@@ -118,43 +118,6 @@ class Gles2Immediate
     void ResolveRenderTarget(const Gles2ResolveRect &source, const Gles2ResolveRect &destination, int32_t window_width,
                              int32_t window_height, bool smooth);
 
-    void BindOitTarget(int32_t mode);
-
-    void BeginOitTargets();
-
-    bool OitClearPending() const
-    {
-        return oit_clear_pending_ && oit_bound_framebuffer_ != 0;
-    }
-
-    void ClearOitTargets();
-
-    bool FinishOitTargets();
-
-    void CompositeOit(const Gles2ResolveRect &view, const Gles2ResolveRect &area);
-
-    float OitScale() const
-    {
-        return oit_scale_;
-    }
-
-    bool OitFrontLayer() const
-    {
-        return oit_front_framebuffer_ != 0;
-    }
-
-    void BindOitFrontSampler(bool enabled);
-
-    float OitFrontScaleX() const
-    {
-        return 1.0f / (float)render_target_texture_width_;
-    }
-
-    float OitFrontScaleY() const
-    {
-        return 1.0f / (float)render_target_texture_height_;
-    }
-
     bool RenderTargetReady() const
     {
         return render_target_framebuffer_ != 0;
@@ -248,15 +211,6 @@ class Gles2Immediate
 
     bool CreateRenderTarget(int32_t width, int32_t height, int32_t texture_width, int32_t texture_height);
 
-    bool CreateOitTargets(int32_t texture_width, int32_t texture_height);
-
-    bool CreateOitTarget(GLuint &framebuffer, GLuint &texture, GLint internal_format, GLenum format, GLenum type,
-                         int32_t texture_width, int32_t texture_height);
-
-    void DestroyOitFrontTarget();
-
-    void DestroyOitTargets();
-
     GLuint render_target_framebuffer_ = 0;
     GLuint render_target_color_       = 0;
     GLuint render_target_depth_       = 0;
@@ -269,19 +223,6 @@ class Gles2Immediate
     GLuint render_target_stencil_          = 0;
     GLenum render_target_depth_attachment_ = 0;
     bool   render_target_separate_stencil_ = false;
-
-    GLuint oit_accumulation_framebuffer_ = 0;
-    GLuint oit_accumulation_texture_     = 0;
-    GLuint oit_revealage_framebuffer_    = 0;
-    GLuint oit_revealage_texture_        = 0;
-    GLuint oit_front_framebuffer_        = 0;
-    GLuint oit_front_texture_            = 0;
-
-    float oit_scale_ = 1.0f;
-
-    GLuint oit_bound_framebuffer_ = 0;
-    bool   oit_clear_pending_     = false;
-    bool   oit_drawn_             = false;
 
     GLuint vertex_buffer_       = 0;
     GLuint quad_index_buffer_   = 0;

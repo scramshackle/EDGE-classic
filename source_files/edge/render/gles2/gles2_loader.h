@@ -126,11 +126,6 @@ bool Gles2HasFramebufferObjects();
 
 bool Gles2HasFullNonPowerOfTwoTextures();
 
-constexpr GLenum kGles2BlendEquationAdd = 0x8006;
-constexpr GLenum kGles2BlendEquationMin = 0x8007;
-
-bool Gles2HasBlendMinMax();
-
 int32_t Gles2MaxVaryingVectors();
 
 const char *Gles2ShaderPreamble(bool fragment_stage);

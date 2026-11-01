@@ -34,11 +34,7 @@ struct GpuLight
     vec4 color_additive;
 };
 
-#ifdef EDGE_OIT_PASS
-#define EDGE_MODEL_STORAGE_BINDING 3
-#else
 #define EDGE_MODEL_STORAGE_BINDING 2
-#endif
 
 layout(set = 2, binding = EDGE_MODEL_STORAGE_BINDING) readonly buffer LightBuffer
 {
@@ -57,10 +53,6 @@ layout(set = 2, binding = EDGE_MODEL_STORAGE_BINDING + 2) readonly buffer LightI
 
 layout(set = 2, binding = 0) uniform sampler2D tex0;
 layout(set = 2, binding = 1) uniform sampler3D color_lookup_texture;
-
-#ifdef EDGE_OIT_PASS
-layout(set = 2, binding = 2) uniform sampler2D oit_front_depth;
-#endif
 
 layout(location = 0) out vec4 frag_color;
 
@@ -147,43 +139,6 @@ void AccumulateGlows(inout vec3 modulate_sum, inout vec3 additive_sum)
     }
 }
 
-#ifdef EDGE_OIT_PASS
-const float kOitFrontClear     = 65504.0;
-const float kOitFrontTolerance = 1.0 + 1.0 / 512.0;
-
-#ifndef EDGE_OIT_FRONT_DEPTH
-layout(location = 1) out vec4 frag_revealage;
-layout(location = 2) out vec4 frag_front;
-
-float OitWeight(float alpha, float view_distance)
-{
-    float d = 32.0 / max(view_distance, 32.0);
-
-    return alpha * clamp(3e3 * d * d * d, 1e-2, 3e3);
-}
-
-void OitEmit(vec4 fragment_color)
-{
-    float view_distance = -vpos.z;
-    float front         = texelFetch(oit_front_depth, ivec2(gl_FragCoord.xy), 0).r;
-
-    if (view_distance <= front * kOitFrontTolerance)
-    {
-        frag_color     = vec4(0.0);
-        frag_revealage = vec4(0.0);
-        frag_front     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a);
-        return;
-    }
-
-    float weight = OitWeight(fragment_color.a, view_distance);
-
-    frag_color     = vec4(fragment_color.rgb * fragment_color.a, fragment_color.a) * weight;
-    frag_revealage = vec4(fragment_color.a);
-    frag_front     = vec4(0.0);
-}
-#endif
-#endif
-
 float FogFactor(float fog_dist)
 {
     if (fog_mode == FOG_NONE)
@@ -214,11 +169,6 @@ void main()
     {
         discard;
     }
-
-#ifdef EDGE_OIT_FRONT_DEPTH
-    frag_color = vec4(texel.w * alpha < 1.0 / 255.0 ? kOitFrontClear : -vpos.z);
-    return;
-#endif
 
     if (color_lookup.x > 0.5)
     {
@@ -251,10 +201,5 @@ void main()
 
     vec4 fcolor = vec4(rgb, texel.w * alpha);
 
-#if defined(EDGE_OIT_FRONT_DEPTH)
-#elif defined(EDGE_OIT_PASS)
-    OitEmit(fcolor);
-#else
     frag_color = fcolor;
-#endif
 }

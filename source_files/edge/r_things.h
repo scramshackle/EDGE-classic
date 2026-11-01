@@ -41,7 +41,7 @@ void ResidentThingsReset(void);
 void ResidentThingsInvalidate(void);
 
 void RenderThings(std::vector<DrawThing *> &things, std::vector<DrawThing *> &transparent_things);
-void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things, bool models);
+void RenderTransparentThings(const std::vector<DrawThing *> &transparent_things);
 
 void RenderWeaponSprites(Player *p);
 void RenderWeaponModel(Player *p);

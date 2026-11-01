@@ -631,28 +631,6 @@ class GpuRenderState : public RenderState
         if (info.handle == 0 || info.index_count <= 0)
             return;
 
-        int32_t oit_mode = render_backend->OitMode();
-
-        if (oit_mode != kOitPassNone)
-        {
-            OitPass model_pass = (info.alpha < 1.0f) ? kOitPassAccumulate : kOitPassMasked;
-
-            bool wanted = (model_pass == oit_mode) ||
-                          (model_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
-
-            if (!wanted)
-                return;
-        }
-
-        if (OitPassDrawsTranslucent(oit_mode))
-        {
-            Enable(GL_BLEND);
-            BlendFunction(GL_ONE, GL_ONE);
-            DepthMask(false);
-
-            SetPipeline(0);
-        }
-
         ApplyTextureBindings();
 
         GpuModelVertexParameters vertex_parameters;

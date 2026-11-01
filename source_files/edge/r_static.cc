@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stddef.h>
 
+#include <algorithm>
 #include <iterator>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +33,7 @@
 #include "r_misc.h"
 #include "r_shader.h"
 #include "r_state.h"
+#include "r_translucent.h"
 #include "r_units.h"
 
 EDGE_DEFINE_CONSOLE_VARIABLE(r_static_mesh_resident, "1", kConsoleVariableFlagArchive)
@@ -79,6 +81,24 @@ struct SpanReference
     int span;
 };
 
+struct StaticTranslucentRange
+{
+    int   start;
+    int   count;
+    float low[3];
+    float high[3];
+};
+
+struct StaticTranslucentPlane
+{
+    epi::Vec3 normal;
+    float     distance;
+    float     low[3];
+    float     high[3];
+    int       first_range;
+    int       range_count;
+};
+
 struct StaticBatch
 {
     const Image      *image;
@@ -86,7 +106,7 @@ struct StaticBatch
     RegionProperties *properties;
     Sector           *sector;
     BlendingMode      blending;
-    OitPass           draw_pass;
+    DrawClass         draw_pass;
     bool              scrolling;
     Sector           *glow_sector;
     int               fog_sky;
@@ -104,6 +124,10 @@ struct StaticBatch
     std::vector<StaticRun> runs;
     bool                   runs_dirty       = true;
     bool                   height_sensitive = false;
+
+    std::vector<StaticTranslucentPlane> translucent_planes;
+    std::vector<StaticTranslucentRange> translucent_ranges;
+    bool                                translucent_dirty = true;
 };
 
 static std::vector<StaticBatch> static_batches;
@@ -944,7 +968,7 @@ void StaticRefreshSectorTraits(void)
 }
 
 static int FindBatch(const Image *image, const Colormap *colormap, RegionProperties *props, Sector *sec,
-                     BlendingMode blending, OitPass draw_pass, bool scrolling)
+                     BlendingMode blending, DrawClass draw_pass, bool scrolling)
 {
     Sector *glow_sector = sec->glow_things ? sec : nullptr;
     int     fog_sky     = BatchFogSky(props, sec);
@@ -1212,7 +1236,7 @@ bool StaticMeshCoversWall(const LineSide *line_side, const MapSurface *surf, con
 
 void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const Image *image, RegionProperties *props,
                         Sector *sector, BlendingMode blending, int light_adjust, float div_x, float div_y,
-                        float div_delta_x, float div_delta_y, bool mid_masked, OitPass draw_pass,
+                        float div_delta_x, float div_delta_y, bool mid_masked, DrawClass draw_pass,
                         const epi::Vec2 &uv_scale, const Extrafloor *region_ef, const Extrafloor *surface_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
@@ -1277,8 +1301,8 @@ void StaticCaptureBegin(const LineSide *line_side, const MapSurface *surf, const
 }
 
 void StaticCaptureBeginFlat(Sector *sector, int face_dir, const Image *image, RegionProperties *props,
-                            BlendingMode blending, OitPass draw_pass, const MapSurface *surf, const epi::Vec2 &uv_scale,
-                            const Extrafloor *plane_ef)
+                            BlendingMode blending, DrawClass draw_pass, const MapSurface *surf,
+                            const epi::Vec2 &uv_scale, const Extrafloor *plane_ef)
 {
     SetCaptureScrollOffset(surf, uv_scale);
 
@@ -1849,6 +1873,8 @@ static void RefreshStaticScrolling(void)
 
 static void RebuildStaticRuns(StaticBatch &batch)
 {
+    batch.translucent_dirty = true;
+
     batch.runs.clear();
 
     StaticRun run;
@@ -1897,14 +1923,14 @@ static void RebuildStaticRuns(StaticBatch &batch)
     batch.runs_dirty = false;
 }
 
-void DrawStaticMesh(OitPass draw_pass, bool refresh)
+void DrawStaticMesh(DrawClass draw_pass, bool refresh)
 {
     if (!static_mesh_built)
         return;
 
     EDGE_ZoneScoped;
 
-    if (refresh && draw_pass == kOitPassNone)
+    if (refresh && draw_pass == kDrawClassOpaque)
     {
         EDGE_ZoneScopedN("StaticMesh RefreshLighting");
 
@@ -1942,10 +1968,7 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
     {
         StaticBatch &batch = static_batches[i];
 
-        bool wanted = (batch.draw_pass == draw_pass) ||
-                      (batch.draw_pass == kOitPassAccumulate && OitPassDrawsTranslucent(draw_pass));
-
-        if (batch.spans.empty() || !wanted)
+        if (batch.spans.empty() || batch.draw_pass != draw_pass)
             continue;
 
 
@@ -1980,14 +2003,9 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
         bool inverted   = mirror_view.reflective != (fliplevels.d_ != 0);
         blending = (BlendingMode)(blending | (inverted ? kBlendingCullFront : kBlendingCullBack));
 
-        bool track_bounds = (batch.draw_pass == kOitPassAccumulate && OitBoundsTracking());
-
         for (size_t r = 0; r < batch.runs.size(); r++)
         {
             const StaticRun &run = batch.runs[r];
-
-            if (track_bounds)
-                OitBoundsAddBox(run.low, run.high);
 
             if (resident)
             {
@@ -2014,4 +2032,333 @@ void DrawStaticMesh(OitPass draw_pass, bool refresh)
     render_unit_liquid = {};
 
     static_batch_light_row_offset = 0;
+}
+
+struct StaticTranslucentReference
+{
+    int batch;
+    int plane;
+};
+
+struct StaticPlaneSlot
+{
+    int plane;
+    int range_count;
+};
+
+static std::vector<StaticTranslucentReference> static_translucent_references;
+static std::vector<StaticTranslucentRange>     static_translucent_scratch;
+static std::vector<int>                        static_translucent_span_plane;
+static std::unordered_map<uint64_t, int>       static_translucent_plane_index;
+static bool                                    static_translucent_refresh = true;
+
+static bool StaticTrianglePlane(std::span<const RendererVertex> vertices, epi::Vec3 *normal, float *distance)
+{
+    epi::Vec3 best        = {0.0f, 0.0f, 0.0f};
+    float     best_length = 0.0f;
+
+    for (size_t i = 0; i + 2 < vertices.size(); i += 3)
+    {
+        epi::Vec3 a = epi::SubtractVectors(vertices[i + 1].position, vertices[i].position);
+        epi::Vec3 b = epi::SubtractVectors(vertices[i + 2].position, vertices[i].position);
+
+        epi::Vec3 cross = {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+
+        float length = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+
+        if (length > best_length)
+        {
+            best        = cross;
+            best_length = length;
+        }
+    }
+
+    if (best_length < 1e-8f)
+        return false;
+
+    float inverse = 1.0f / sqrtf(best_length);
+
+    *normal = {best.x * inverse, best.y * inverse, best.z * inverse};
+    *distance =
+        -(normal->x * vertices[0].position.x + normal->y * vertices[0].position.y + normal->z * vertices[0].position.z);
+
+    return true;
+}
+
+static uint64_t StaticPlaneKey(const epi::Vec3 &normal, float distance)
+{
+    bool flip = normal.z < 0.0f || (normal.z == 0.0f && (normal.y < 0.0f || (normal.y == 0.0f && normal.x < 0.0f)));
+
+    float sign = flip ? -1.0f : 1.0f;
+
+    uint64_t key = 14695981039346656037ULL;
+
+    key = key * 1000003ULL + (uint64_t)(int64_t)lrintf(normal.x * sign * 1024.0f);
+    key = key * 1000003ULL + (uint64_t)(int64_t)lrintf(normal.y * sign * 1024.0f);
+    key = key * 1000003ULL + (uint64_t)(int64_t)lrintf(normal.z * sign * 1024.0f);
+    key = key * 1000003ULL + (uint64_t)(int64_t)lrintf(distance * sign * 2.0f);
+
+    return key;
+}
+
+static bool StaticRangeStartsBefore(const StaticTranslucentRange &a, const StaticTranslucentRange &b)
+{
+    return a.start < b.start;
+}
+
+static void BuildTranslucentPlanes(StaticBatch &batch)
+{
+    batch.translucent_dirty = false;
+    batch.translucent_planes.clear();
+    batch.translucent_ranges.clear();
+
+    static_translucent_plane_index.clear();
+    static_translucent_span_plane.assign(batch.spans.size(), -1);
+
+    bool resident = r_static_mesh_resident.d_ != 0;
+
+    for (size_t s = 0; s < batch.spans.size(); s++)
+    {
+        const StaticSpan &span = batch.spans[s];
+
+        if (!span.live || span.count <= 0)
+            continue;
+
+        if (resident && span.start + span.count > batch.gpu_count)
+            continue;
+
+        std::span<const RendererVertex> vertices = {batch.vertices.data() + span.start, (size_t)span.count};
+
+        epi::Vec3 normal;
+        float     distance;
+
+        if (!StaticTrianglePlane(vertices, &normal, &distance))
+            continue;
+
+        uint64_t key = StaticPlaneKey(normal, distance);
+
+        std::unordered_map<uint64_t, int>::iterator found = static_translucent_plane_index.find(key);
+
+        int plane_index;
+
+        if (found == static_translucent_plane_index.end())
+        {
+            StaticTranslucentPlane plane;
+
+            plane.normal      = normal;
+            plane.distance    = distance;
+            plane.first_range = 0;
+            plane.range_count = 0;
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                plane.low[axis]  = span.low[axis];
+                plane.high[axis] = span.high[axis];
+            }
+
+            plane_index = (int)batch.translucent_planes.size();
+
+            batch.translucent_planes.push_back(plane);
+
+            static_translucent_plane_index[key] = plane_index;
+        }
+        else
+        {
+            plane_index = found->second;
+
+            StaticTranslucentPlane &plane = batch.translucent_planes[(size_t)plane_index];
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                plane.low[axis]  = epi::Min(plane.low[axis], span.low[axis]);
+                plane.high[axis] = epi::Max(plane.high[axis], span.high[axis]);
+            }
+        }
+
+        static_translucent_span_plane[s] = plane_index;
+
+        batch.translucent_planes[(size_t)plane_index].range_count++;
+    }
+
+    int next = 0;
+
+    for (size_t p = 0; p < batch.translucent_planes.size(); p++)
+    {
+        StaticTranslucentPlane &plane = batch.translucent_planes[p];
+
+        plane.first_range = next;
+        next += plane.range_count;
+        plane.range_count = 0;
+    }
+
+    batch.translucent_ranges.resize((size_t)next);
+
+    for (size_t s = 0; s < batch.spans.size(); s++)
+    {
+        int plane_index = static_translucent_span_plane[s];
+
+        if (plane_index < 0)
+            continue;
+
+        const StaticSpan       &span  = batch.spans[s];
+        StaticTranslucentPlane &plane = batch.translucent_planes[(size_t)plane_index];
+
+        StaticTranslucentRange &range = batch.translucent_ranges[(size_t)(plane.first_range + plane.range_count++)];
+
+        range.start = span.start;
+        range.count = span.count;
+
+        for (int axis = 0; axis < 3; axis++)
+        {
+            range.low[axis]  = span.low[axis];
+            range.high[axis] = span.high[axis];
+        }
+    }
+}
+
+void StaticAddTranslucent(bool refresh)
+{
+    static_translucent_references.clear();
+    static_translucent_refresh = refresh;
+
+    if (!static_mesh_built)
+        return;
+
+    bool resident = r_static_mesh_resident.d_ != 0;
+
+    for (size_t i = 0; i < static_batches.size(); i++)
+    {
+        StaticBatch &batch = static_batches[i];
+
+        if (batch.spans.empty() || (batch.draw_pass != kDrawClassBlended && batch.draw_pass != kDrawClassAdditive))
+            continue;
+
+        if (resident && !batch.gpu_handle)
+            continue;
+
+        if (batch.runs_dirty)
+            RebuildStaticRuns(batch);
+
+        if (batch.translucent_dirty)
+            BuildTranslucentPlanes(batch);
+
+        for (size_t p = 0; p < batch.translucent_planes.size(); p++)
+        {
+            const StaticTranslucentPlane &plane = batch.translucent_planes[p];
+
+            int payload = (int)static_translucent_references.size();
+
+            static_translucent_references.push_back({(int)i, (int)p});
+
+            TranslucentAddPlanarBox(kTranslucentStatic, payload, (uint64_t)i, plane.normal, plane.distance, plane.low,
+                                    plane.high);
+        }
+    }
+}
+
+static void EmitStaticTranslucentRange(StaticBatch &batch, const StaticTranslucentRange &range, bool resident,
+                                       bool inverted)
+{
+    int          start = range.start;
+    int          count = range.count;
+    const float *low   = range.low;
+    const float *high  = range.high;
+
+    {
+        GLuint tex_id = ImageCache(batch.image, true);
+
+        int extra_light = render_view_extra_light;
+
+        if (batch.properties->colourmap && (batch.properties->colourmap->special_ & kColorSpecialNoFlash) &&
+            extra_light <= 250)
+            extra_light = 0;
+
+        static_batch_light_row_offset = (float)(extra_light / 4) / 64.0f;
+
+        render_unit_liquid = LiquidShaderParameters(batch.image, LiquidLevelSeconds());
+
+        AbstractShader *shader = GetColormapShader(batch.properties, 0, batch.sector);
+
+        int glow_set = LightGridGlowSetForSector(batch.glow_sector);
+
+        BlendingMode blending = (BlendingMode)(batch.blending | (inverted ? kBlendingCullFront : kBlendingCullBack));
+
+        int pass = 0;
+
+        if (resident)
+        {
+            bool world_lit = !static_translucent_refresh || LightGridReachesBox(low, high);
+
+            shader->WorldBakedResident(batch.gpu_handle, GL_TRIANGLES, start, count, tex_id, &pass, blending, glow_set,
+                                       world_lit);
+        }
+        else
+        {
+            for (int offset = 0; offset < count; offset += (int)kMaximumStaticRun)
+            {
+                int part = epi::Min((int)kMaximumStaticRun, count - offset);
+
+                shader->WorldBaked(GL_TRIANGLES, {batch.vertices.data() + start + offset, (size_t)part}, tex_id, 1.0f,
+                                   &pass, blending, glow_set);
+            }
+        }
+    }
+
+    render_unit_liquid = {};
+
+    static_batch_light_row_offset = 0;
+}
+
+void EmitTranslucentStatic(std::span<const int> payloads)
+{
+    bool resident = r_static_mesh_resident.d_ != 0;
+
+    bool inverted = mirror_view.reflective != (fliplevels.d_ != 0);
+
+    size_t index = 0;
+
+    while (index < payloads.size())
+    {
+        int batch_index = static_translucent_references[(size_t)payloads[index]].batch;
+
+        StaticBatch &batch = static_batches[(size_t)batch_index];
+
+        static_translucent_scratch.clear();
+
+        while (index < payloads.size() && static_translucent_references[(size_t)payloads[index]].batch == batch_index)
+        {
+            const StaticTranslucentPlane &plane =
+                batch.translucent_planes[(size_t)static_translucent_references[(size_t)payloads[index]].plane];
+
+            for (int r = 0; r < plane.range_count; r++)
+                static_translucent_scratch.push_back(batch.translucent_ranges[(size_t)(plane.first_range + r)]);
+
+            index++;
+        }
+
+        std::sort(static_translucent_scratch.begin(), static_translucent_scratch.end(), StaticRangeStartsBefore);
+
+        size_t r = 0;
+
+        while (r < static_translucent_scratch.size())
+        {
+            StaticTranslucentRange merged = static_translucent_scratch[r++];
+
+            while (r < static_translucent_scratch.size() &&
+                   static_translucent_scratch[r].start == merged.start + merged.count)
+            {
+                const StaticTranslucentRange &next = static_translucent_scratch[r++];
+
+                merged.count += next.count;
+
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    merged.low[axis]  = epi::Min(merged.low[axis], next.low[axis]);
+                    merged.high[axis] = epi::Max(merged.high[axis], next.high[axis]);
+                }
+            }
+
+            EmitStaticTranslucentRange(batch, merged, resident, inverted);
+        }
+    }
 }

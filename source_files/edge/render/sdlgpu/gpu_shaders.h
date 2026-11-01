@@ -252,14 +252,6 @@ SDL_GPUShader *ModelVertexShader();
 
 SDL_GPUShader *ModelFragmentShader();
 
-SDL_GPUShader *ModelOitFragmentShader();
-
-SDL_GPUShader *ModelOitFrontFragmentShader();
-
-
-
-
-
 bool CreateWorldShaders(SDL_GPUDevice *device);
 
 bool CreateMovieShaders(SDL_GPUDevice *device);
@@ -275,8 +267,5 @@ void DestroyWorldShaders(SDL_GPUDevice *device);
 SDL_GPUShader *WorldVertexShader();
 
 SDL_GPUShader *WorldFragmentShader(int32_t variant);
-SDL_GPUShader *WorldOitFragmentShader();
-SDL_GPUShader *WorldOitFrontFragmentShader();
-SDL_GPUShader *WorldOitCompositeFragmentShader();
 
 SDL_GPUShader *SpriteVertexShader();

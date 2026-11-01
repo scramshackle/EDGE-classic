@@ -19,6 +19,7 @@
 #include "r_gldefs.h"
 #include "r_misc.h"
 #include "r_state.h"
+#include "r_translucent.h"
 #include "r_units.h"
 
 static constexpr uint16_t kMaximumLocalUnits = 1024;
@@ -101,18 +102,6 @@ static uint8_t UnitAlpha(const RendererUnit *unit)
     return epi::GetRGBAAlpha(local_verts[unit->first].rgba);
 }
 
-static bool UnitWantedInOitPass(const RendererUnit *unit, int32_t oit_mode)
-{
-    OitPass unit_pass = kOitPassMasked;
-
-    if ((unit->blending & kBlendingAdd) || unit->pass > 0)
-        unit_pass = kOitPassAdditive;
-    else if (unit->blending & kBlendingAlpha)
-        unit_pass = kOitPassAccumulate;
-
-    return (unit_pass == oit_mode) || (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
-}
-
 static bool                        retain_units = false;
 static std::vector<RendererVertex> retained_verts;
 static std::vector<RendererUnit>   retained_units;
@@ -151,40 +140,61 @@ void EndRetainedUnits(void)
     retain_units = false;
 }
 
-void ReplayRetainedUnits(void)
+static bool RetainedUnitTranslucent(const RendererUnit &unit)
 {
-    int32_t oit_mode = render_backend->OitMode();
+    if (unit.static_buffer || unit.sprite)
+        return false;
 
-    for (size_t i = 0; i < retained_units.size(); i++)
+    return (unit.blending & (kBlendingAlpha | kBlendingAdd)) || unit.pass > 0;
+}
+
+void ReplayRetainedUnit(int index)
+{
+    const RendererUnit &source = retained_units[(size_t)index];
+
+    int vertices = (source.static_buffer || source.sprite) ? 0 : source.count;
+
+    if (current_render_vert + vertices >= kMaximumLocalVertices || current_render_unit >= kMaximumLocalUnits)
+        RenderCurrentUnits();
+
+    RendererUnit *dest = local_units + current_render_unit;
+
+    *dest = source;
+
+    if (!source.static_buffer && !source.sprite)
     {
-        const RendererUnit &source = retained_units[i];
+        dest->first = current_render_vert;
 
-        if (oit_mode != kOitPassNone && !UnitWantedInOitPass(&source, oit_mode))
-            continue;
+        memcpy(local_verts + current_render_vert, retained_verts.data() + source.first,
+               sizeof(RendererVertex) * (size_t)vertices);
 
-        int vertices = (source.static_buffer || source.sprite) ? 0 : source.count;
-
-        if (current_render_vert + vertices >= kMaximumLocalVertices || current_render_unit >= kMaximumLocalUnits)
-            RenderCurrentUnits();
-
-        RendererUnit *dest = local_units + current_render_unit;
-
-        *dest = source;
-
-        if (!source.static_buffer && !source.sprite)
-        {
-            dest->first = current_render_vert;
-
-            memcpy(local_verts + current_render_vert, retained_verts.data() + source.first,
-                   sizeof(RendererVertex) * (size_t)vertices);
-
-            current_render_vert += vertices;
-        }
-
-        current_render_unit++;
+        current_render_vert += vertices;
     }
 
-    RenderCurrentUnits();
+    current_render_unit++;
+}
+
+void ReplayMaskedRetainedUnits(void)
+{
+    for (size_t i = 0; i < retained_units.size(); i++)
+    {
+        if (!RetainedUnitTranslucent(retained_units[i]))
+            ReplayRetainedUnit((int)i);
+    }
+}
+
+void AddRetainedUnitsToTranslucent(void)
+{
+    for (size_t i = 0; i < retained_units.size(); i++)
+    {
+        const RendererUnit &unit = retained_units[i];
+
+        if (!RetainedUnitTranslucent(unit))
+            continue;
+
+        TranslucentAddPolygon(kTranslucentUnit, (int)i, ((uint64_t)unit.texture[0] << 32) ^ (uint64_t)unit.blending,
+                              unit.shape, {retained_verts.data() + unit.first, (size_t)unit.count});
+    }
 }
 
 void StartUnitBatch(bool sort_em)
@@ -458,9 +468,6 @@ void EndRenderUnit(int actual_vert)
 
     unit->count = actual_vert;
 
-    if (UnitAccumulatesOit(unit->blending, unit->pass))
-        OitBoundsAddVertices({local_verts + unit->first, (size_t)actual_vert});
-
     current_render_vert += actual_vert;
     current_render_unit++;
 
@@ -627,8 +634,6 @@ void RenderCurrentUnits(void)
 
     RenderLayer render_layer = render_backend->GetRenderLayer();
 
-    int32_t oit_mode = render_backend->OitMode();
-
     ec_frame_stats.draw_render_units += current_render_unit;
 
     bool no_fog = (render_layer == kRenderLayerHUD) || (render_layer == kRenderLayerViewport);
@@ -683,22 +688,6 @@ void RenderCurrentUnits(void)
 
         EPI_ASSERT(unit->count > 0);
 
-        if (oit_mode != kOitPassNone)
-        {
-            OitPass unit_pass = kOitPassMasked;
-
-            if ((unit->blending & kBlendingAdd) || unit->pass > 0)
-                unit_pass = kOitPassAdditive;
-            else if (unit->blending & kBlendingAlpha)
-                unit_pass = kOitPassAccumulate;
-
-            bool wanted = (unit_pass == oit_mode) ||
-                          (unit_pass == kOitPassAccumulate && OitPassDrawsTranslucent(oit_mode));
-
-            if (!wanted)
-                continue;
-        }
-
         if (unit->scissor_enabled)
         {
             render_state->Enable(GL_SCISSOR_TEST);
@@ -729,14 +718,7 @@ void RenderCurrentUnits(void)
         else if (!culling || (unit->blending & kBlendingNoFog))
             render_state->Disable(GL_FOG);
 
-        bool oit_blend_pass = OitPassDrawsTranslucent(oit_mode);
-
-        if (oit_blend_pass)
-        {
-            render_state->Enable(GL_BLEND);
-            render_state->BlendFunction(GL_ONE, GL_ONE);
-        }
-        else if (unit->blending & kBlendingAdd)
+        if (unit->blending & kBlendingAdd)
         {
             render_state->Enable(GL_BLEND);
             render_state->BlendFunction(GL_SRC_ALPHA, GL_ONE);
@@ -772,7 +754,7 @@ void RenderCurrentUnits(void)
         else
             render_state->Disable(GL_CULL_FACE);
 
-        render_state->DepthMask((oit_blend_pass || (unit->blending & kBlendingNoZBuffer)) ? false : true);
+        render_state->DepthMask((unit->blending & (kBlendingNoZBuffer | kBlendingAlpha | kBlendingAdd)) ? false : true);
 
         if (unit->blending & kBlendingLess)
         {

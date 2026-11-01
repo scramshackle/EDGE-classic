@@ -290,12 +290,6 @@ typedef double GLdouble;
 #ifndef GL_ACTIVE_TEXTURE
 #define GL_ACTIVE_TEXTURE 0x84E0
 #endif
-#ifndef GL_RGBA16F
-#define GL_RGBA16F 0x881A
-#endif
-#ifndef GL_HALF_FLOAT_OES
-#define GL_HALF_FLOAT_OES 0x8D61
-#endif
 #else
 #include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_video.h>

@@ -203,7 +203,6 @@ bool CreateGpuImage(SDL_GPUDevice *device, GLuint id, const GpuImageLevel *level
     image.height        = levels[0].height;
     image.levels        = level_count;
     image.update_frame  = -1;
-    image.external      = false;
 
     gpu_images[id] = image;
 
@@ -379,7 +378,6 @@ bool CreateGpuCubemap(SDL_GPUDevice *device, GLuint id, const GpuImageLevel face
     image.height        = faces[0].height;
     image.levels        = 1;
     image.update_frame  = -1;
-    image.external      = false;
 
     gpu_images[id] = image;
 
@@ -528,7 +526,6 @@ bool CreateGpuVolume(SDL_GPUDevice *device, GLuint id, int32_t size, const void 
     image.height        = size;
     image.levels        = 1;
     image.update_frame  = -1;
-    image.external      = false;
 
     gpu_images[id] = image;
 
@@ -749,14 +746,6 @@ void ShutdownGpuImages(SDL_GPUDevice *device)
         if (!device)
             continue;
 
-        if (itr->second.external)
-        {
-            if (itr->second.sampler)
-                SDL_ReleaseGPUSampler(device, itr->second.sampler);
-
-            continue;
-        }
-
         if (itr->second.texture)
             SDL_ReleaseGPUTexture(device, itr->second.texture);
 
@@ -773,55 +762,6 @@ void ShutdownGpuImages(SDL_GPUDevice *device)
     }
 
     gpu_samplers.clear();
-}
-
-bool RegisterGpuExternalImage(SDL_GPUDevice *device, GLuint id, SDL_GPUTexture *texture, int32_t width,
-                              int32_t height)
-{
-    if (!device || !texture)
-        return false;
-
-    ForgetGpuExternalImage(device, id);
-
-    SDL_GPUSamplerCreateInfo sampler_info;
-    epi::ClearMemory(&sampler_info, 1);
-
-    sampler_info.min_filter     = SDL_GPU_FILTER_NEAREST;
-    sampler_info.mag_filter     = SDL_GPU_FILTER_NEAREST;
-    sampler_info.mipmap_mode    = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-
-    GpuImage image;
-    epi::ClearMemory(&image, 1);
-
-    image.texture  = texture;
-    image.sampler  = SDL_CreateGPUSampler(device, &sampler_info);
-    image.width    = width;
-    image.height   = height;
-    image.levels   = 1;
-    image.external = true;
-
-    if (!image.sampler)
-        return false;
-
-    gpu_images[id] = image;
-
-    return true;
-}
-
-void ForgetGpuExternalImage(SDL_GPUDevice *device, GLuint id)
-{
-    std::unordered_map<GLuint, GpuImage>::iterator itr = gpu_images.find(id);
-
-    if (itr == gpu_images.end())
-        return;
-
-    if (device && itr->second.sampler)
-        SDL_ReleaseGPUSampler(device, itr->second.sampler);
-
-    gpu_images.erase(itr);
 }
 
 SDL_GPUSampler *GetGpuImageFilteredSampler(const GpuImage *image, bool smooth)
