@@ -563,4 +563,186 @@ inline void StoreHi64(uint8_t *p, SimdI32x4 v)
 #endif
 }
 
+inline SimdI32x4 LoadI32x4(const int32_t *p)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_loadu_si128((const __m128i *)p);
+#elif defined(EPI_SIMD_NEON)
+    return vld1q_s32(p);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_v128_load(p);
+#else
+    SimdI32x4 r;
+    r.v[0] = p[0]; r.v[1] = p[1]; r.v[2] = p[2]; r.v[3] = p[3];
+    return r;
+#endif
+}
+
+inline SimdI32x4 AddI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_add_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+    return vaddq_s32(a, b);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_add(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] + b.v[i];
+    return r;
+#endif
+}
+
+inline SimdI32x4 SubI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_sub_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+    return vsubq_s32(a, b);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_sub(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] - b.v[i];
+    return r;
+#endif
+}
+
+inline SimdI32x4 AbsI32x4(SimdI32x4 a)
+{
+#if defined(EPI_SIMD_SSE2)
+    __m128i sign = _mm_srai_epi32(a, 31);
+    return _mm_sub_epi32(_mm_xor_si128(a, sign), sign);
+#elif defined(EPI_SIMD_NEON)
+    return vabsq_s32(a);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_abs(a);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] < 0 ? -a.v[i] : a.v[i];
+    return r;
+#endif
+}
+
+inline SimdI32x4 CmpEqI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_cmpeq_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+    return vreinterpretq_s32_u32(vceqq_s32(a, b));
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_eq(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] == b.v[i] ? -1 : 0;
+    return r;
+#endif
+}
+
+inline SimdI32x4 CmpGtI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_cmpgt_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+    return vreinterpretq_s32_u32(vcgtq_s32(a, b));
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_gt(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] > b.v[i] ? -1 : 0;
+    return r;
+#endif
+}
+
+inline SimdI32x4 AndI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_and_si128(a, b);
+#elif defined(EPI_SIMD_NEON)
+    return vandq_s32(a, b);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_v128_and(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] & b.v[i];
+    return r;
+#endif
+}
+
+inline SimdI32x4 AndNotI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_andnot_si128(b, a);
+#elif defined(EPI_SIMD_NEON)
+    return vbicq_s32(a, b);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_v128_andnot(a, b);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = a.v[i] & ~b.v[i];
+    return r;
+#endif
+}
+
+inline SimdI32x4 SelectI32x4(SimdI32x4 mask, SimdI32x4 if_set, SimdI32x4 if_clear)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_or_si128(_mm_and_si128(mask, if_set), _mm_andnot_si128(mask, if_clear));
+#elif defined(EPI_SIMD_NEON)
+    return vbslq_s32(vreinterpretq_u32_s32(mask), if_set, if_clear);
+#elif defined(EPI_SIMD_WASM)
+    return wasm_v128_bitselect(if_set, if_clear, mask);
+#else
+    SimdI32x4 r;
+    for (int i = 0; i < 4; i++)
+        r.v[i] = (mask.v[i] & if_set.v[i]) | (~mask.v[i] & if_clear.v[i]);
+    return r;
+#endif
+}
+
+inline SimdI32x4 InterleaveLoI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_unpacklo_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+#if defined(__aarch64__)
+    return vzip1q_s32(a, b);
+#else
+    return vzipq_s32(a, b).val[0];
+#endif
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_shuffle(a, b, 0, 4, 1, 5);
+#else
+    SimdI32x4 r;
+    r.v[0] = a.v[0]; r.v[1] = b.v[0]; r.v[2] = a.v[1]; r.v[3] = b.v[1];
+    return r;
+#endif
+}
+
+inline SimdI32x4 InterleaveHiI32x4(SimdI32x4 a, SimdI32x4 b)
+{
+#if defined(EPI_SIMD_SSE2)
+    return _mm_unpackhi_epi32(a, b);
+#elif defined(EPI_SIMD_NEON)
+#if defined(__aarch64__)
+    return vzip2q_s32(a, b);
+#else
+    return vzipq_s32(a, b).val[1];
+#endif
+#elif defined(EPI_SIMD_WASM)
+    return wasm_i32x4_shuffle(a, b, 2, 6, 3, 7);
+#else
+    SimdI32x4 r;
+    r.v[0] = a.v[2]; r.v[1] = b.v[2]; r.v[2] = a.v[3]; r.v[3] = b.v[3];
+    return r;
+#endif
+}
+
 } // namespace epi

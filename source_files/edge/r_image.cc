@@ -1345,7 +1345,7 @@ static ImageData *BuildImageData(Image *rim, int max_pix, int *upload_flags)
 
     if (IM_ShouldUpscale(rim, tmp_img, max_pix))
     {
-        ImageData *scaled_img = ImageEPX(tmp_img, IM_UpscaleWraps(rim));
+        ImageData *scaled_img = ImageXBR(tmp_img, IM_UpscaleWraps(rim));
 
         delete tmp_img;
         tmp_img = scaled_img;
