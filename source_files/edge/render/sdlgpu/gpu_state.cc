@@ -692,6 +692,8 @@ class GpuRenderState : public RenderState
                 fragment_parameters.light_view[i]  = light_view->light_view[i];
                 fragment_parameters.light_range[i] = light_view->light_range[i];
             }
+
+            fragment_parameters.light_owner = (float)info.light_owner;
         }
 
         const LightGridGlowSet *glow_set = info.world_lit ? LightGridGlowSetAt(info.glow_set) : nullptr;

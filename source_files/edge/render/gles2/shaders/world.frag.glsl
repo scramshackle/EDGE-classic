@@ -61,6 +61,7 @@ uniform samplerCube u_sky_cube;
 varying vec4 v_texture_coordinates;
 varying vec4 v_color;
 varying vec3 v_eye_position;
+varying vec3 v_light_owner;
 
 const float kSkyStretchMirror  = 0.0;
 const float kSkyStretchRepeat  = 1.0;
@@ -353,7 +354,7 @@ void main()
 #ifndef EDGE_NO_LIGHTS
     if (u_world_lit > 0.5)
     {
-        AccumulateClusterLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, modulate_sum, additive_sum);
+        AccumulateClusterLights(v_eye_position, vec3(0.0, 0.0, 1.0), 0.0, v_light_owner, modulate_sum, additive_sum);
     }
 
     if (u_glow_count > 0.5)

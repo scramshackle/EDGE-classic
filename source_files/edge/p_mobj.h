@@ -375,6 +375,7 @@ class MapObject : public Position
     int      render_resident_batch_ = -1;
     int      render_resident_slot_  = -1;
     bool     render_candidate_      = false;
+    uint32_t render_light_owner_    = 0;
 
     // linked list (map_object_list_head)
     MapObject *next_     = nullptr;

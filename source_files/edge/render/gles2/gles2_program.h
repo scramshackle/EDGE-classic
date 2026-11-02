@@ -272,6 +272,8 @@ class Gles2ModelProgram
 
     void SetGlowSet(int index);
 
+    void SetLightOwner(uint32_t owner);
+
     void SetColorLookup(int slot);
 
   private:
@@ -293,6 +295,7 @@ class Gles2ModelProgram
     GLint uniform_light_bounds_range_    = -1;
     GLint uniform_light_radius_scale_    = -1;
     GLint uniform_light_data_step_       = -1;
+    GLint uniform_light_owner_           = -1;
     GLint uniform_glow_count_            = -1;
     GLint uniform_glow_plane_            = -1;
     GLint uniform_glow_color_            = -1;
@@ -325,8 +328,9 @@ class Gles2ModelProgram
 
     float shadow_fog_color_[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 
-    float shadow_world_lit_ = -1.0f;
-    int   shadow_glow_set_  = -2;
+    float   shadow_world_lit_   = -1.0f;
+    int     shadow_glow_set_    = -2;
+    int64_t shadow_light_owner_ = -1;
 
     float shadow_color_lookup_enabled_ = -1.0f;
 };

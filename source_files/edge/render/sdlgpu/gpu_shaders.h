@@ -141,7 +141,7 @@ struct GpuModelFragmentParameters
 {
     float alpha;
     float alpha_test;
-    float model_fragment_padding1;
+    float light_owner;
 
     int32_t fog_mode;
     float   fog_density;
@@ -178,8 +178,7 @@ static_assert(sizeof(GpuModelVertexParameters) == 256, "GpuModelVertexParameters
 
 static_assert(offsetof(GpuModelFragmentParameters, alpha) == 0, "GpuModelFragmentParameters::alpha offset");
 static_assert(offsetof(GpuModelFragmentParameters, alpha_test) == 4, "GpuModelFragmentParameters::alpha_test offset");
-static_assert(offsetof(GpuModelFragmentParameters, model_fragment_padding1) == 8,
-              "GpuModelFragmentParameters::model_fragment_padding1 offset");
+static_assert(offsetof(GpuModelFragmentParameters, light_owner) == 8, "GpuModelFragmentParameters::light_owner offset");
 static_assert(offsetof(GpuModelFragmentParameters, fog_mode) == 12, "GpuModelFragmentParameters::fog_mode offset");
 static_assert(offsetof(GpuModelFragmentParameters, fog_density) == 16,
               "GpuModelFragmentParameters::fog_density offset");

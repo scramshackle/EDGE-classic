@@ -24,6 +24,7 @@ layout(location = 2) in vec4 color0;
 layout(location = 0) out vec4 uv;
 layout(location = 1) out vec4 color;
 layout(location = 2) out vec3 vpos;
+layout(location = 3) flat out float light_owner;
 
 void main()
 {
@@ -58,4 +59,6 @@ void main()
 
 
     vpos = vertex.xyz;
+
+    light_owner = 0.0;
 }

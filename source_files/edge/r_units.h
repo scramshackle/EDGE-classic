@@ -169,8 +169,9 @@ struct ModelDrawInfo
     int first_index  = 0;
     int index_count  = 0;
 
-    bool world_lit = false;
-    int  glow_set  = -1;
+    bool     world_lit   = false;
+    int      glow_set    = -1;
+    uint32_t light_owner = 0;
 
     int color_lookup = 0;
 

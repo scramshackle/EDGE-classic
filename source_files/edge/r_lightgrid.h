@@ -11,6 +11,7 @@ constexpr int kLightGridMaximumLights     = 1023;
 constexpr int kLightGridMaximumPerCluster = 64;
 constexpr int kLightGridDepthSlices       = 8;
 constexpr int kLightGridMaximumGlows      = 2;
+constexpr int kLightGridMaximumOwners     = 4194303;
 
 struct LightGridLight
 {
@@ -22,6 +23,8 @@ struct LightGridLight
     epi::Vec3 color;
 
     float additive;
+
+    uint32_t owner;
 };
 
 struct LightGridGlow
@@ -81,6 +84,12 @@ int LightGridGlowSetForSector(Sector *sec);
 int LightGridSampleTotal(void);
 
 MapObject *LightGridSampleLight(int index);
+
+uint32_t LightGridOwnerId(MapObject *mo);
+
+void LightGridReleaseOwner(MapObject *mo);
+
+void LightGridResetOwners(void);
 
 const LightGridGlowSet *LightGridGlowSetAt(int index);
 

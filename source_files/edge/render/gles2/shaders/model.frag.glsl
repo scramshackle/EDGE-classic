@@ -17,6 +17,7 @@ uniform vec3  u_light_bounds_min;
 uniform vec3  u_light_bounds_range;
 uniform float u_light_radius_scale;
 uniform float u_light_data_step;
+uniform vec3  u_light_owner;
 
 uniform float u_glow_count;
 uniform vec4  u_glow_plane[EDGE_LIGHT_MAX_GLOWS];
@@ -89,7 +90,7 @@ void main()
 
     if (u_world_lit > 0.5)
     {
-        AccumulateClusterLights(v_eye_and_v.xyz, normalize(v_normal), 1.0, modulate_sum, additive_sum);
+        AccumulateClusterLights(v_eye_and_v.xyz, normalize(v_normal), 1.0, u_light_owner, modulate_sum, additive_sum);
     }
 
     if (u_glow_count > 0.5)

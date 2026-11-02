@@ -1561,7 +1561,8 @@ static bool BuildSpriteInstance(const SpriteSource &source, SpriteInstance *inst
     instance->fuzz[3] = fuzz_add.y;
 
     instance->light[0] = (float)light_level;
-    instance->light[1] = 0.0f;
+    instance->light[1] =
+        (sprite_lit && mo->info_->dlight_.type_ != kDynamicLightTypeNone) ? (float)LightGridOwnerId(mo) : 0.0f;
 
     if (is_fuzzy)
         instance->rgba = kRGBABlack;
@@ -1986,6 +1987,7 @@ void ThingRenderDeleted(MapObject *mo)
 {
     ResidentThingRemove(mo);
     DynamicThingRemove(mo);
+    LightGridReleaseOwner(mo);
 
     if (mo->render_candidate_)
     {

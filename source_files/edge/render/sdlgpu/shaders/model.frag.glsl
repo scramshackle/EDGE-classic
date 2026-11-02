@@ -9,7 +9,7 @@ layout(set = 3, binding = 0) uniform ModelFragmentParameters
 {
     float alpha;
     float alpha_test;
-    float model_fragment_padding1;
+    float light_owner;
 
     int   fog_mode;
     float fog_density;
@@ -103,11 +103,16 @@ void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
         if (normalised >= 1.0)
             continue;
 
+        float owner_tag = light.color_additive.a;
+
+        if (light_owner > 0.5 && abs(floor(owner_tag * 0.5) - light_owner) < 0.5)
+            continue;
+
         float shade = max(0.6 - 0.7 * dot(normalize(-delta), surface_normal), 0.0);
 
         vec3 contribution = light.color_additive.rgb * exp(-5.44 * normalised) * shade;
 
-        if (light.color_additive.a > 0.5)
+        if (mod(owner_tag, 2.0) > 0.5)
             additive_sum += contribution;
         else
             modulate_sum += contribution;

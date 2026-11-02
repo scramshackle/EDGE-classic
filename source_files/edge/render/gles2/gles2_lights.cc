@@ -176,6 +176,7 @@ void Gles2UploadLightGrid(const LightGrid *grid)
         uint8_t *row0 = light_data_pixels.data() + (size_t)((base + 0) * kGles2LightDataWidth + column) * 4;
         uint8_t *row1 = light_data_pixels.data() + (size_t)((base + 1) * kGles2LightDataWidth + column) * 4;
         uint8_t *row2 = light_data_pixels.data() + (size_t)((base + 2) * kGles2LightDataWidth + column) * 4;
+        uint8_t *row3 = light_data_pixels.data() + (size_t)((base + 3) * kGles2LightDataWidth + column) * 4;
 
         EncodeUnitPair(row0 + 0,
                        (light.eye_position.x - light_grid_state.bounds_minimum[0]) / light_grid_state.bounds_range[0]);
@@ -193,6 +194,9 @@ void Gles2UploadLightGrid(const LightGrid *grid)
         row2[1] = (uint8_t)epi::Clamp(green, 0.0f, 255.0f);
         row2[2] = (uint8_t)epi::Clamp(blue, 0.0f, 255.0f);
         row2[3] = (light.additive > 0.5f) ? 255 : 0;
+        row3[0] = (uint8_t)((light.owner >> 16) & 0xFF);
+        row3[1] = (uint8_t)((light.owner >> 8) & 0xFF);
+        row3[2] = (uint8_t)(light.owner & 0xFF);
     }
 
     glActiveTexture(GL_TEXTURE0);
