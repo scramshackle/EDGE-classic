@@ -87,6 +87,7 @@ static const FinaleDefinition *finale;
 static void CastInitNew(int num);
 static void CastTicker(void);
 static void CastSkip(void);
+static int  CastResolveState(int st);
 
 static const Image *finale_text_background;
 static float        finale_text_background_scale = 1.0f;
@@ -544,6 +545,11 @@ static void CastSetState(int st)
     if (st == 0)
         return;
 
+    int resolved = CastResolveState(st);
+
+    if (resolved != 0)
+        st = resolved;
+
     cast_state = &states[st];
 
     cast_tics = cast_state->tics;
@@ -582,33 +588,33 @@ static void CAST_RangeAttack(const AttackDefinition *range)
     StartSoundEffect(sfx);
 }
 
-static void CastPerformAction(void)
+static void CastPerformAction(const State *state)
 {
     SoundEffect *sfx = nullptr;
 
     // Yuk, handles sounds
 
-    if (cast_state->action == A_MakeCloseAttemptSound)
+    if (state->action == A_MakeCloseAttemptSound)
     {
         if (cast_order->closecombat_)
             sfx = cast_order->closecombat_->initsound_;
     }
-    else if (cast_state->action == A_MeleeAttack)
+    else if (state->action == A_MeleeAttack)
     {
         if (cast_order->closecombat_)
             sfx = cast_order->closecombat_->sound_;
     }
-    else if (cast_state->action == A_MakeRangeAttemptSound)
+    else if (state->action == A_MakeRangeAttemptSound)
     {
         if (cast_order->rangeattack_)
             sfx = cast_order->rangeattack_->initsound_;
     }
-    else if (cast_state->action == A_RangeAttack)
+    else if (state->action == A_RangeAttack)
     {
         if (cast_order->rangeattack_)
             CAST_RangeAttack(cast_order->rangeattack_);
     }
-    else if (cast_state->action == A_ComboAttack)
+    else if (state->action == A_ComboAttack)
     {
         if (cast_on_melee && cast_order->closecombat_)
         {
@@ -623,12 +629,44 @@ static void CastPerformAction(void)
     {
         sfx = cast_order->activesound_;
     }
-    else if (cast_state->action == A_WalkSoundChase)
+    else if (state->action == A_WalkSoundChase)
     {
         sfx = cast_order->walksound_;
     }
 
     StartSoundEffect(sfx);
+}
+
+static int CastNextState(const State *state)
+{
+    if (state->action == A_Jump && state->jumpstate && state->action_par)
+    {
+        const JumpActionInfo *jump = (const JumpActionInfo *)state->action_par;
+
+        if (RandomByteTest(jump->chance))
+            return state->jumpstate;
+    }
+
+    return state->nextstate;
+}
+
+static constexpr int kCastMaximumZeroTicStates = 64;
+
+static int CastResolveState(int st)
+{
+    for (int i = 0; i < kCastMaximumZeroTicStates && st != 0; i++)
+    {
+        const State *state = &states[st];
+
+        if (state->tics != 0)
+            return st;
+
+        CastPerformAction(state);
+
+        st = CastNextState(state);
+    }
+
+    return st;
 }
 
 static void CastInitNew(int num)
@@ -650,6 +688,14 @@ static void CastInitNew(int num)
     CastSetState(cast_order->chase_state_);
 }
 
+static void CastNextMember(void)
+{
+    CastInitNew(cast_order->castorder_ + 1);
+
+    if (cast_order->seesound_)
+        StartSoundEffect(cast_order->seesound_);
+}
+
 //
 // CastTicker
 //
@@ -666,25 +712,24 @@ static void CastTicker(void)
         return;
 
     // switch from deathstate to next monster
-    if (cast_state->tics == -1 || cast_state->nextstate == 0 || (cast_death && cast_frames >= 30))
+    if (cast_state->tics == -1 || (cast_death && cast_frames >= 30))
     {
-        CastInitNew(cast_order->castorder_ + 1);
-
-        if (cast_order->seesound_)
-            StartSoundEffect(cast_order->seesound_);
-
+        CastNextMember();
         return;
     }
 
-    CastPerformAction();
+    CastPerformAction(cast_state);
 
     // advance to next state in animation
     // -AJA- if there's a jumpstate, enter it occasionally
 
-    if (cast_state->action == A_Jump && cast_state->jumpstate && (RandomByte() < 64))
-        st = cast_state->jumpstate;
-    else
-        st = cast_state->nextstate;
+    st = CastResolveState(CastNextState(cast_state));
+
+    if (st == 0)
+    {
+        CastNextMember();
+        return;
+    }
 
     CastSetState(st);
     cast_frames++;
@@ -732,13 +777,21 @@ static void CastSkip(void)
     // go into death frame
     cast_death = true;
 
+    int st = 0;
+
     if (cast_order->overkill_state_ && (RandomByte() < 32))
-        cast_state = &states[cast_order->overkill_state_];
-    else
+        st = CastResolveState(cast_order->overkill_state_);
+
+    if (st == 0)
     {
         EPI_ASSERT(cast_order->death_state_); // checked in ddf_mobj.c
-        cast_state = &states[cast_order->death_state_];
+        st = CastResolveState(cast_order->death_state_);
     }
+
+    if (st == 0)
+        st = cast_order->death_state_;
+
+    cast_state = &states[st];
 
     cast_tics      = cast_state->tics;
     cast_frames    = 0;

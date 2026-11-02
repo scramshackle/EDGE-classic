@@ -205,22 +205,22 @@ static bool AddItem(TranslucentKind kind, int payload, uint64_t group, int point
     {
         for (int i = 0; i < point_count; i++)
         {
-            const epi::Vec4 &near = translucent_clip[(size_t)i];
+            const epi::Vec4 &near_point = translucent_clip[(size_t)i];
 
-            if (near.w <= kTranslucentNearW)
+            if (near_point.w <= kTranslucentNearW)
                 continue;
 
             for (int j = 0; j < point_count; j++)
             {
-                const epi::Vec4 &far = translucent_clip[(size_t)j];
+                const epi::Vec4 &far_point = translucent_clip[(size_t)j];
 
-                if (far.w > kTranslucentNearW)
+                if (far_point.w > kTranslucentNearW)
                     continue;
 
-                float t = (near.w - kTranslucentNearW) / (near.w - far.w);
+                float t = (near_point.w - kTranslucentNearW) / (near_point.w - far_point.w);
 
-                float clip_x = near.x + (far.x - near.x) * t;
-                float clip_y = near.y + (far.y - near.y) * t;
+                float clip_x = near_point.x + (far_point.x - near_point.x) * t;
+                float clip_y = near_point.y + (far_point.y - near_point.y) * t;
 
                 float x = clip_x / kTranslucentNearW;
                 float y = clip_y / kTranslucentNearW;
