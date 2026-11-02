@@ -59,6 +59,7 @@ layout(location = 0) out vec4 frag_color;
 layout(location = 0) in vec4 uv;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec3 vpos;
+layout(location = 3) flat in float light_owner;
 
 struct GpuLight
 {
@@ -121,9 +122,14 @@ void AccumulateClusterLights(inout vec3 modulate_sum, inout vec3 additive_sum)
         if (normalised >= 1.0)
             continue;
 
+        float owner_tag = light.color_additive.a;
+
+        if (light_owner > 0.5 && abs(floor(owner_tag * 0.5) - light_owner) < 0.5)
+            continue;
+
         vec3 contribution = light.color_additive.rgb * exp(-5.44 * normalised);
 
-        if (light.color_additive.a > 0.5)
+        if (mod(owner_tag, 2.0) > 0.5)
             additive_sum += contribution;
         else
             modulate_sum += contribution;

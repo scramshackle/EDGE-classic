@@ -1231,6 +1231,7 @@ void MD2RenderModel(MD2Model *md, const Image *skin_img, bool is_weapon, int fra
     info.world_lit = use_dynamic_lights && render_view_extra_light < 250 && !data.is_fuzzy_;
 
     info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
+    info.light_owner = (info.world_lit && mo->info_->dlight_.type_ != kDynamicLightTypeNone) ? LightGridOwnerId(mo) : 0;
 
     info.color_lookup = render_unit_color_lookup;
 

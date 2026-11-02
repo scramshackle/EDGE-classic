@@ -52,9 +52,13 @@ struct LightGridCollected
     float      radius;
     epi::Vec3  color;
     float      additive;
+    uint32_t   owner;
 };
 
 static std::vector<LightGridCollected> collected_lights;
+
+static std::vector<uint32_t> free_light_owners;
+static uint32_t              next_light_owner = 1;
 
 static std::vector<LightGridGlowSet>   glow_sets;
 static std::unordered_map<const Sector *, int> glow_set_lookup;
@@ -82,6 +86,7 @@ static void LightGridCollect(MapObject *mo, void *data)
     entry.radius         = parameters.radius;
     entry.color          = parameters.color;
     entry.additive       = parameters.additive ? 1.0f : 0.0f;
+    entry.owner          = 0;
 
     if (entry.radius <= 0.0f)
         return;
@@ -89,7 +94,44 @@ static void LightGridCollect(MapObject *mo, void *data)
     if (entry.color.x <= 0.0f && entry.color.y <= 0.0f && entry.color.z <= 0.0f)
         return;
 
+    entry.owner = LightGridOwnerId(mo);
+
     collected_lights.push_back(entry);
+}
+
+uint32_t LightGridOwnerId(MapObject *mo)
+{
+    if (mo->render_light_owner_ != 0)
+        return mo->render_light_owner_;
+
+    if (!free_light_owners.empty())
+    {
+        mo->render_light_owner_ = free_light_owners.back();
+        free_light_owners.pop_back();
+    }
+    else if (next_light_owner <= (uint32_t)kLightGridMaximumOwners)
+    {
+        mo->render_light_owner_ = next_light_owner++;
+    }
+
+    return mo->render_light_owner_;
+}
+
+void LightGridReleaseOwner(MapObject *mo)
+{
+    if (mo->render_light_owner_ == 0)
+        return;
+
+    free_light_owners.push_back(mo->render_light_owner_);
+
+    mo->render_light_owner_ = 0;
+}
+
+void LightGridResetOwners(void)
+{
+    free_light_owners.clear();
+
+    next_light_owner = 1;
 }
 
 int LightGridSampleTotal(void)
@@ -255,8 +297,10 @@ static bool LightGridScreenBounds(const epi::Mat4 &view_projection, const LightG
         if (clip.w <= kLightGridMinimumW)
             continue;
 
-        float screen_x = (float)view_window_x + ((clip.x / clip.w) * 0.5f + 0.5f) * (float)view_window_width;
-        float screen_y = (float)view_window_y + ((clip.y / clip.w) * 0.5f + 0.5f) * (float)view_window_height;
+        float screen_x = (float)current_light_grid.view_x +
+                         ((clip.x / clip.w) * 0.5f + 0.5f) * (float)current_light_grid.view_width;
+        float screen_y = (float)current_light_grid.view_y +
+                         ((clip.y / clip.w) * 0.5f + 0.5f) * (float)current_light_grid.view_height;
 
         in_front++;
 
@@ -279,10 +323,10 @@ static bool LightGridScreenBounds(const epi::Mat4 &view_projection, const LightG
 
     if (in_front < 8)
     {
-        *out_min_x = (float)view_window_x;
-        *out_min_y = (float)view_window_y;
-        *out_max_x = (float)(view_window_x + view_window_width);
-        *out_max_y = (float)(view_window_y + view_window_height);
+        *out_min_x = (float)current_light_grid.view_x;
+        *out_min_y = (float)current_light_grid.view_y;
+        *out_max_x = (float)(current_light_grid.view_x + current_light_grid.view_width);
+        *out_max_y = (float)(current_light_grid.view_y + current_light_grid.view_height);
 
         return true;
     }
@@ -449,13 +493,15 @@ void BuildLightGrid(void)
 
     glow_model_view = model_view;
 
-    current_light_grid.view_x      = view_window_x;
-    current_light_grid.view_y      = view_window_y;
-    current_light_grid.view_width  = view_window_width;
-    current_light_grid.view_height = view_window_height;
+    current_light_grid.view_x      = render_backend->ScaleToRenderTargetX(view_window_x);
+    current_light_grid.view_y      = render_backend->ScaleToRenderTargetY(view_window_y);
+    current_light_grid.view_width  = render_backend->ScaleToRenderTargetX(view_window_width);
+    current_light_grid.view_height = render_backend->ScaleToRenderTargetY(view_window_height);
 
-    current_light_grid.clusters_x = (view_window_width + kLightGridClusterSize - 1) / kLightGridClusterSize;
-    current_light_grid.clusters_y = (view_window_height + kLightGridClusterSize - 1) / kLightGridClusterSize;
+    current_light_grid.clusters_x =
+        (current_light_grid.view_width + kLightGridClusterSize - 1) / kLightGridClusterSize;
+    current_light_grid.clusters_y =
+        (current_light_grid.view_height + kLightGridClusterSize - 1) / kLightGridClusterSize;
 
     current_light_grid.cluster_near = epi::Max(1.0f, renderer_near_clip.f_);
     current_light_grid.cluster_far  = epi::Max(current_light_grid.cluster_near * 2.0f, renderer_far_clip.f_);
@@ -496,15 +542,19 @@ void BuildLightGrid(void)
         entry.world_position = light.world_position;
         entry.color        = light.color;
         entry.additive     = light.additive;
+        entry.owner          = light.owner;
 
         LightGridCoverage cover;
 
-        cover.cluster_x1 = epi::Max(0, (int)floorf((minimum_x - (float)view_window_x) / (float)kLightGridClusterSize));
-        cover.cluster_y1 = epi::Max(0, (int)floorf((minimum_y - (float)view_window_y) / (float)kLightGridClusterSize));
+        float grid_x = (float)current_light_grid.view_x;
+        float grid_y = (float)current_light_grid.view_y;
+
+        cover.cluster_x1 = epi::Max(0, (int)floorf((minimum_x - grid_x) / (float)kLightGridClusterSize));
+        cover.cluster_y1 = epi::Max(0, (int)floorf((minimum_y - grid_y) / (float)kLightGridClusterSize));
         cover.cluster_x2 = epi::Min(current_light_grid.clusters_x - 1,
-                                    (int)floorf((maximum_x - (float)view_window_x) / (float)kLightGridClusterSize));
+                                    (int)floorf((maximum_x - grid_x) / (float)kLightGridClusterSize));
         cover.cluster_y2 = epi::Min(current_light_grid.clusters_y - 1,
-                                    (int)floorf((maximum_y - (float)view_window_y) / (float)kLightGridClusterSize));
+                                    (int)floorf((maximum_y - grid_y) / (float)kLightGridClusterSize));
 
         if (cover.cluster_x1 > cover.cluster_x2 || cover.cluster_y1 > cover.cluster_y2)
             continue;

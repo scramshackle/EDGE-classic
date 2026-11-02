@@ -9,8 +9,8 @@ vec4 LightDataTexel(float index, float row)
     return texture2D(u_light_data, vec2((column + 0.5) * u_light_data_step, (block * 4.0 + row + 0.5) * kLightDataRowStep));
 }
 
-void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float use_normal, inout vec3 modulate_sum,
-                          inout vec3 additive_sum)
+void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float use_normal, vec3 owner,
+                             inout vec3 modulate_sum, inout vec3 additive_sum)
 {
     float cluster_x = floor((gl_FragCoord.x - u_light_view.x) / kLightClusterSize);
     float cluster_y = floor((gl_FragCoord.y - u_light_view.y) / kLightClusterSize);
@@ -64,6 +64,14 @@ void AccumulateClusterLights(vec3 surface_position, vec3 surface_normal, float u
 
         if (normalised >= 1.0)
             continue;
+
+        if (owner.x + owner.y + owner.z > 0.5)
+        {
+            vec3 t3 = floor(LightDataTexel(index, 3.0).rgb * 255.0 + 0.5);
+
+            if (all(lessThan(abs(t3 - owner), vec3(0.5))))
+                continue;
+        }
 
         vec4 t2 = LightDataTexel(index, 2.0);
 

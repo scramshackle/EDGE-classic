@@ -33,6 +33,7 @@ layout(location = 5) in vec4 sprite_color;
 layout(location = 0) out vec4 uv;
 layout(location = 1) out vec4 color;
 layout(location = 2) out vec3 vpos;
+layout(location = 3) flat out float light_owner;
 
 void main()
 {
@@ -104,4 +105,6 @@ void main()
     gl_Position = mvp * model_position;
 
     vpos = vertex.xyz;
+
+    light_owner = fuzzy ? 0.0 : sprite_light.y;
 }

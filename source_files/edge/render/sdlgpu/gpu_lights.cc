@@ -197,7 +197,7 @@ void GpuUploadLightGrid(const LightGrid *grid)
         record.color_additive[0] = light.color.x / 255.0f;
         record.color_additive[1] = light.color.y / 255.0f;
         record.color_additive[2] = light.color.z / 255.0f;
-        record.color_additive[3] = light.additive;
+        record.color_additive[3] = light.additive + 2.0f * (float)light.owner;
 
         frame_lights.push_back(record);
     }

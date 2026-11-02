@@ -72,6 +72,7 @@
 #include "n_network.h"
 #include "p_local.h"
 #include "r_gldefs.h"
+#include "r_lightgrid.h"
 #include "r_misc.h"
 #include "r_shader.h"
 #include "r_things.h"
@@ -2179,6 +2180,7 @@ void RemoveAllMapObjects(bool loading)
         mo->reference_count_ = 0;
         DeleteMobj(mo);
     }
+    LightGridResetOwners();
     active_tagged_map_objects.clear();
     active_tids.clear();
     next_available_tid = 1;

@@ -547,6 +547,7 @@ class Gles2RenderState : public RenderState
 
         gles2_model_program.SetWorldLit(model_lit);
         gles2_model_program.SetGlowSet(model_lit ? info.glow_set : -1);
+        gles2_model_program.SetLightOwner(model_lit ? info.light_owner : 0);
 
         gles2_immediate.DrawModelMesh(info);
 

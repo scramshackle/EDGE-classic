@@ -754,6 +754,7 @@ bool Gles2ModelProgram::Init()
     uniform_model_view_            = glGetUniformLocation(program_, "u_model_view");
     uniform_model_transform_       = glGetUniformLocation(program_, "u_model_transform");
     uniform_world_lit_             = glGetUniformLocation(program_, "u_world_lit");
+    uniform_light_owner_           = glGetUniformLocation(program_, "u_light_owner");
     uniform_light_data_            = glGetUniformLocation(program_, "u_light_data");
     uniform_light_headers_         = glGetUniformLocation(program_, "u_light_headers");
     uniform_light_indices_         = glGetUniformLocation(program_, "u_light_indices");
@@ -804,6 +805,17 @@ void Gles2ModelProgram::SetColorLookup(int slot)
 void Gles2ModelProgram::SetWorldLit(bool enabled)
 {
     SetFloat(uniform_world_lit_, shadow_world_lit_, enabled ? 1.0f : 0.0f);
+}
+
+void Gles2ModelProgram::SetLightOwner(uint32_t owner)
+{
+    if (shadow_light_owner_ == (int64_t)owner)
+        return;
+
+    shadow_light_owner_ = (int64_t)owner;
+
+    glUniform3f(uniform_light_owner_, (float)((owner >> 16) & 0xFF), (float)((owner >> 8) & 0xFF),
+                (float)(owner & 0xFF));
 }
 
 void Gles2ModelProgram::SetLightGrid(const Gles2LightGridState *grid)

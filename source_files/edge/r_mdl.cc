@@ -874,6 +874,7 @@ void MDLRenderModel(MDLModel *md, bool is_weapon, int frame1, int frame2, float 
     info.world_lit = use_dynamic_lights && render_view_extra_light < 250 && !data.is_fuzzy_;
 
     info.glow_set  = info.world_lit ? LightGridGlowSetForSector(mo->sector_) : -1;
+    info.light_owner = (info.world_lit && mo->info_->dlight_.type_ != kDynamicLightTypeNone) ? LightGridOwnerId(mo) : 0;
 
     info.color_lookup = data.is_fuzzy_ ? 0 : render_unit_color_lookup;
 

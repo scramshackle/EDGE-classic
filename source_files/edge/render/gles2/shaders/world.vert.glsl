@@ -29,6 +29,7 @@ uniform vec4  u_sprite_lighting;
 varying vec4 v_texture_coordinates;
 varying vec4 v_color;
 varying vec3 v_eye_position;
+varying vec3 v_light_owner;
 
 vec4 SpriteColor(float eye_depth)
 {
@@ -64,6 +65,7 @@ void main()
 
     v_texture_coordinates = a_texture_coordinates;
     v_color               = a_color;
+    v_light_owner         = vec3(0.0, 0.0, 0.0);
 
     if (u_sprite_mode > 0.5)
     {
@@ -98,6 +100,15 @@ void main()
         v_texture_coordinates.w = corner_y * a_sprite_fuzz.y + a_sprite_fuzz.w;
 
         v_color = SpriteColor(-(u_model_view * model_position).z);
+
+        if (a_sprite_extent.w < 2.0)
+        {
+            float owner_high = floor(a_sprite_light.y / 65536.0);
+            float owner_rest = a_sprite_light.y - owner_high * 65536.0;
+            float owner_mid  = floor(owner_rest / 256.0);
+
+            v_light_owner = vec3(owner_high, owner_mid, owner_rest - owner_mid * 256.0);
+        }
     }
 
     v_texture_coordinates.xy += u_texture_offset;
