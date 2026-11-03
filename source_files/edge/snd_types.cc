@@ -28,7 +28,11 @@ SoundFormat DetectSoundFormat(uint8_t *data, int song_len)
     // Start by trying the simple reliable header checks
     if (data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F')
     {
-        return kSoundWAV;
+        // RIFF MIDI check
+        if (song_len > 11 && data[8] == 'R' && data[9] == 'M' && data[10] == 'I' && data[11] == 'D')
+            return kSoundMIDI;
+        else
+            return kSoundWAV;
     }
     if (data[0] == 'f' && data[1] == 'L' && data[2] == 'a' && data[3] == 'C')
     {
@@ -42,20 +46,7 @@ SoundFormat DetectSoundFormat(uint8_t *data, int song_len)
     {
         return kSoundMP3;
     }
-    // GMF MIDI
-    if (data[0] == 'G' && data[1] == 'M' && data[2] == 'F' && data[3] == '\x1')
-    {
-        return kSoundMIDI;
-    }
-    // Electronic Arts MIDI
-    if (song_len > data[0] && data[0] >= 0x5D)
-    {
-        int offset = data[0] - 0x10;
-        if (data[offset] == 'r' && data[offset + 1] == 's' && data[offset + 2] == 'x' && data[offset + 3] == 'x' &&
-            data[offset + 4] == '}' && data[offset + 5] == 'u')
-            return kSoundMIDI;
-    }
-    if (data[0] == 'M' && data[1] == 'U' && data[2] == 'S')
+    if (data[0] == 'M' && data[1] == 'U' && data[2] == 'S' && data[3] == '\x1a')
     {
         return kSoundMUS;
     }
@@ -63,15 +54,13 @@ SoundFormat DetectSoundFormat(uint8_t *data, int song_len)
     {
         return kSoundMIDI;
     }
-    // XMI MIDI
-    if (song_len > 12 && data[0] == 'F' && data[1] == 'O' && data[2] == 'R' && data[3] == 'M' && data[8] == 'X' &&
-        data[9] == 'D' && data[10] == 'I' && data[11] == 'R')
-    {
-        return kSoundMIDI;
-    }
     if (song_len > 4 && data[0] == 'O' && data[1] == 'r' && data[2] == 'g' && data[3] == '-' && data[4] == '0')
     {
         return kSoundORG;
+    }
+    if (data[0] == 'E' && data[1] == 'C' && data[2] == 'S' && data[3] == 'G')
+    {
+        return kSoundECS;
     }
     if (m4p_TestFromData(data, song_len))
     {
@@ -109,7 +98,7 @@ SoundFormat SoundFilenameToFormat(std::string_view filename)
         return kSoundMIDI;
     if (ext == ".mus")
         return kSoundMUS;
-    if (ext == ".xmi")
+    if (ext == ".rmi" || ext == ".rmid")
         return kSoundMIDI;
     if (ext == ".mod" || ext == ".s3m" || ext == ".xm" || ext == ".it" || ext == ".ft")
         return kSoundM4P;
@@ -117,6 +106,8 @@ SoundFormat SoundFilenameToFormat(std::string_view filename)
         return kSoundSID;
     if (ext == ".org")
         return kSoundORG;
+    if (ext == ".ecs")
+        return kSoundECS;
     // Not sure if these will ever be encountered in the wild, but according to
     // the VGMPF Wiki they are valid DMX file extensions
     if (ext == ".dsp" || ext == ".pcs" || ext == ".gsp" || ext == ".gsw")

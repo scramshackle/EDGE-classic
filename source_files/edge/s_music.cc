@@ -364,6 +364,7 @@ void ChangeMusic(int entry_number, bool loop)
     case kSoundMUS:
     case kSoundMIDI:
     case kSoundORG:
+    case kSoundECS:
         delete F;
         music_player = PlayMIDIMusic(data, length, loop);
         break;

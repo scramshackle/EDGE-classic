@@ -41,6 +41,7 @@ enum DDFMusicType
     kDDFMusicIMF560,
     kDDFMusicIMF700,
     kDDFMusicORG,
+    kDDFMusicECS,
     kTotalDDFMusicTypes
 };
 

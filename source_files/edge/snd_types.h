@@ -35,6 +35,7 @@ enum SoundFormat
     kSoundSID,
     kSoundIMF, // Used with DDFPLAY; not in auto-detection
     kSoundORG,
+    kSoundECS,
     kSoundDoom,
     kSoundPCSpeaker
 };
