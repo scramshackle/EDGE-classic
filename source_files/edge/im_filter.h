@@ -38,7 +38,7 @@
 
 #include "im_data.h"
 
-ImageData *ImageXBR(const ImageData *image, bool wrap);
+ImageData *ImageHQ2x(const ImageData *image, bool wrap);
 
 //--- editor settings ---
 // vi:ts=4:sw=4:noexpandtab

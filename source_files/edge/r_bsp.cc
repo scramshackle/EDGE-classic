@@ -36,7 +36,6 @@
 #include "edge_profiling.h"
 #include "epi.h"
 #include "epi_math.h"
-#include "epi_simd.h"
 #include "g_game.h"
 #include "i_defs_gl.h"
 #include "i_system.h"

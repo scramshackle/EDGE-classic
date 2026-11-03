@@ -38,7 +38,6 @@
 #include "dm_state.h" // EDGE_IMAGE_IS_SKY
 #include "epi.h"
 #include "epi_endian.h"
-#include "epi_simd.h"
 #include "g_game.h" //current_map
 #include "i_defs_gl.h"
 #include "n_network.h"
