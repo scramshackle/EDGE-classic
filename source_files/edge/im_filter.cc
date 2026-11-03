@@ -43,14 +43,310 @@
 #include "epi.h"
 #include "epi_simd.h"
 
-static constexpr int     kXBRBorder         = 2;
-static constexpr int32_t kXBRLumaRed        = 2126;
-static constexpr int32_t kXBRLumaGreen      = 7152;
-static constexpr int32_t kXBRLumaBlue       = 722;
-static constexpr int32_t kXBRLumaUnit       = 10000;
-static constexpr int32_t kXBREdgeBias       = 255 * kXBRLumaUnit / 10;
+static constexpr int      kHQ2xBorder          = 1;
+static constexpr int      kHQ2xGroup           = 16;
+static constexpr uint8_t  kHQ2xLumaThreshold   = 48;
+static constexpr uint8_t  kHQ2xChromaThreshold = 7;
+static constexpr uint64_t kHQ2xChannelMask     = 0x00FF00FF00FF00FFull;
 
-static inline int XBRSourceIndex(int index, int size, bool wrap)
+struct HQ2xRule
+{
+    uint8_t neighbor[3];
+    uint8_t weight[3];
+};
+
+struct HQ2xPatternRule
+{
+    uint8_t rule[2];
+    uint8_t condition;
+};
+
+static constexpr int kHQ2xRuleCount = 41;
+
+static constexpr HQ2xRule kHQ2xRules[kHQ2xRuleCount] = {
+    {{0, 1, 4}, {4, 4, 8}},  {{0, 3, 4}, {4, 4, 8}},  {{0, 4, 4}, {4, 12, 0}}, {{1, 3, 4}, {1, 1, 14}},
+    {{1, 4, 5}, {1, 14, 1}}, {{1, 3, 4}, {2, 2, 12}}, {{1, 3, 4}, {2, 4, 10}}, {{1, 4, 5}, {2, 10, 4}},
+    {{1, 4, 5}, {2, 12, 2}}, {{1, 2, 4}, {4, 4, 8}},  {{1, 3, 4}, {4, 2, 10}}, {{1, 3, 4}, {4, 4, 8}},
+    {{1, 4, 5}, {4, 8, 4}},  {{1, 4, 5}, {4, 10, 2}}, {{1, 4, 4}, {4, 12, 0}}, {{1, 3, 4}, {6, 6, 4}},
+    {{1, 4, 5}, {6, 4, 6}},  {{2, 4, 5}, {4, 8, 4}},  {{2, 4, 4}, {4, 12, 0}}, {{3, 4, 7}, {1, 14, 1}},
+    {{3, 4, 7}, {2, 10, 4}}, {{3, 4, 7}, {2, 12, 2}}, {{3, 4, 6}, {4, 8, 4}},  {{3, 4, 7}, {4, 8, 4}},
+    {{3, 4, 7}, {4, 10, 2}}, {{3, 4, 4}, {4, 12, 0}}, {{3, 4, 7}, {6, 4, 6}},  {{4, 5, 7}, {4, 6, 6}},
+    {{4, 5, 7}, {8, 4, 4}},  {{4, 5, 8}, {8, 4, 4}},  {{4, 6, 7}, {8, 4, 4}},  {{4, 7, 8}, {8, 4, 4}},
+    {{4, 5, 7}, {10, 2, 4}}, {{4, 5, 7}, {10, 4, 2}}, {{4, 5, 7}, {12, 2, 2}}, {{4, 5, 4}, {12, 4, 0}},
+    {{4, 6, 4}, {12, 4, 0}}, {{4, 7, 4}, {12, 4, 0}}, {{4, 8, 4}, {12, 4, 0}}, {{4, 5, 7}, {14, 1, 1}},
+    {{4, 4, 4}, {16, 0, 0}},
+};
+
+static constexpr HQ2xPatternRule kHQ2xPatterns[256][4] = {
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 2}, 0}, {{17, 17}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{15, 2}, 0}, {{13, 35}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{15, 40}, 0}, {{13, 35}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{1, 1}, 0}, {{12, 18}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{10, 25}, 1}, {{16, 18}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{10, 25}, 1}, {{16, 40}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{11, 40}, 0}, {{12, 40}, 1}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{11, 40}, 0}, {{18, 18}, 0}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{2, 2}, 0}, {{12, 40}, 1}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{11, 40}, 0}, {{12, 40}, 1}, {{30, 30}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{15, 2}, 0}, {{17, 17}, 0}, {{24, 37}, 0}, {{28, 28}, 0}},
+    {{{15, 40}, 0}, {{17, 17}, 0}, {{24, 37}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{5, 2}, 0}, {{35, 35}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{3, 40}, 0}, {{35, 35}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{1, 1}, 0}, {{12, 18}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{10, 25}, 1}, {{16, 18}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{10, 25}, 1}, {{16, 40}, 1}, {{23, 23}, 0}, {{31, 31}, 0}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{11, 40}, 0}, {{8, 18}, 1}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{2, 2}, 0}, {{12, 40}, 1}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{3, 40}, 0}, {{12, 40}, 1}, {{37, 37}, 0}, {{31, 31}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{22, 22}, 0}, {{29, 29}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{23, 36}, 2}, {{29, 29}, 0}},
+    {{{6, 14}, 2}, {{12, 12}, 0}, {{26, 36}, 2}, {{29, 29}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{36, 36}, 0}, {{29, 29}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{23, 36}, 2}, {{29, 29}, 0}},
+    {{{6, 14}, 2}, {{12, 12}, 0}, {{26, 36}, 2}, {{29, 29}, 0}},
+    {{{5, 2}, 0}, {{35, 35}, 0}, {{21, 36}, 2}, {{29, 29}, 0}},
+    {{{11, 40}, 0}, {{35, 35}, 0}, {{21, 36}, 2}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{22, 22}, 0}, {{28, 38}, 3}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{22, 22}, 0}, {{28, 38}, 3}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{25, 25}, 0}, {{8, 18}, 1}, {{22, 22}, 0}, {{34, 38}, 3}},
+    {{{11, 11}, 0}, {{7, 14}, 3}, {{22, 22}, 0}, {{27, 38}, 3}},
+    {{{11, 11}, 0}, {{7, 14}, 3}, {{22, 22}, 0}, {{27, 38}, 3}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{22, 22}, 0}, {{38, 38}, 0}},
+    {{{25, 25}, 0}, {{12, 40}, 1}, {{22, 22}, 0}, {{34, 38}, 3}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{23, 40}, 2}, {{28, 40}, 3}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{11, 40}, 0}, {{8, 18}, 1}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{5, 2}, 0}, {{12, 40}, 1}, {{21, 36}, 2}, {{34, 38}, 3}},
+    {{{11, 40}, 0}, {{12, 40}, 1}, {{36, 36}, 0}, {{38, 38}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{25, 25}, 0}, {{29, 29}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{6, 14}, 2}, {{12, 12}, 0}, {{26, 40}, 2}, {{29, 29}, 0}},
+    {{{2, 2}, 0}, {{17, 17}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{6, 14}, 2}, {{12, 12}, 0}, {{26, 40}, 2}, {{29, 29}, 0}},
+    {{{2, 2}, 0}, {{35, 35}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{3, 40}, 0}, {{35, 35}, 0}, {{23, 40}, 2}, {{29, 29}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{20, 25}, 3}, {{27, 38}, 3}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{20, 25}, 3}, {{27, 38}, 3}},
+    {{{1, 1}, 0}, {{8, 18}, 1}, {{25, 25}, 0}, {{34, 38}, 3}},
+    {{{25, 25}, 0}, {{8, 18}, 1}, {{25, 25}, 0}, {{34, 38}, 3}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{25, 25}, 0}, {{34, 38}, 3}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{25, 25}, 0}, {{34, 38}, 3}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{25, 25}, 0}, {{38, 38}, 0}},
+    {{{10, 25}, 1}, {{16, 40}, 1}, {{25, 25}, 0}, {{38, 38}, 0}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{23, 40}, 2}, {{38, 38}, 0}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{23, 40}, 2}, {{34, 38}, 3}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{23, 40}, 2}, {{34, 38}, 3}},
+    {{{11, 40}, 0}, {{18, 18}, 0}, {{23, 40}, 2}, {{38, 38}, 0}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{23, 40}, 2}, {{38, 38}, 0}},
+    {{{6, 14}, 2}, {{14, 14}, 0}, {{26, 40}, 2}, {{38, 38}, 0}},
+    {{{2, 2}, 0}, {{12, 40}, 1}, {{23, 40}, 2}, {{38, 38}, 0}},
+    {{{3, 40}, 0}, {{12, 40}, 1}, {{23, 40}, 2}, {{38, 38}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 2}, 0}, {{17, 17}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{15, 2}, 0}, {{13, 35}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{15, 40}, 0}, {{13, 35}, 0}, {{30, 30}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{1, 1}, 0}, {{16, 18}, 1}, {{23, 23}, 0}, {{33, 37}, 1}},
+    {{{25, 25}, 0}, {{8, 18}, 1}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{1, 1}, 0}, {{16, 40}, 1}, {{23, 23}, 0}, {{33, 37}, 1}},
+    {{{25, 25}, 0}, {{4, 40}, 1}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{11, 40}, 0}, {{18, 18}, 0}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{5, 2}, 0}, {{12, 40}, 1}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{11, 40}, 0}, {{4, 40}, 1}, {{30, 30}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{23, 23}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{15, 2}, 0}, {{17, 17}, 0}, {{24, 37}, 0}, {{28, 28}, 0}},
+    {{{15, 40}, 0}, {{17, 17}, 0}, {{24, 37}, 0}, {{28, 28}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{5, 2}, 0}, {{35, 35}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{3, 40}, 0}, {{35, 35}, 0}, {{37, 37}, 0}, {{28, 28}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{1, 1}, 0}, {{16, 18}, 1}, {{23, 23}, 0}, {{33, 37}, 1}},
+    {{{25, 25}, 0}, {{8, 18}, 1}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{1, 1}, 0}, {{16, 40}, 1}, {{23, 23}, 0}, {{33, 37}, 1}},
+    {{{25, 25}, 0}, {{4, 40}, 1}, {{23, 23}, 0}, {{37, 37}, 0}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{15, 40}, 0}, {{18, 18}, 0}, {{24, 37}, 0}, {{37, 37}, 0}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{2, 2}, 0}, {{16, 40}, 1}, {{37, 37}, 0}, {{33, 37}, 1}},
+    {{{3, 40}, 0}, {{4, 40}, 1}, {{37, 37}, 0}, {{37, 37}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{22, 22}, 0}, {{35, 35}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{26, 36}, 2}, {{32, 35}, 2}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{21, 36}, 2}, {{35, 35}, 0}},
+    {{{5, 2}, 0}, {{17, 17}, 0}, {{21, 36}, 2}, {{35, 35}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{36, 36}, 0}, {{35, 35}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{26, 36}, 2}, {{32, 35}, 2}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{21, 36}, 2}, {{35, 35}, 0}},
+    {{{5, 2}, 0}, {{35, 35}, 0}, {{21, 36}, 2}, {{35, 35}, 0}},
+    {{{15, 40}, 0}, {{13, 35}, 0}, {{36, 36}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{1, 1}, 0}, {{18, 18}, 0}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{25, 25}, 0}, {{18, 18}, 0}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{11, 11}, 0}, {{7, 14}, 3}, {{22, 22}, 0}, {{27, 40}, 3}},
+    {{{11, 11}, 0}, {{7, 14}, 3}, {{22, 22}, 0}, {{27, 40}, 3}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{25, 25}, 0}, {{4, 40}, 1}, {{22, 22}, 0}, {{28, 40}, 3}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{36, 36}, 0}, {{28, 40}, 3}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{36, 36}, 0}, {{28, 40}, 3}},
+    {{{5, 2}, 0}, {{8, 18}, 1}, {{21, 36}, 2}, {{28, 40}, 3}},
+    {{{11, 40}, 0}, {{18, 18}, 0}, {{36, 36}, 0}, {{28, 40}, 3}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{21, 36}, 2}, {{28, 40}, 3}},
+    {{{14, 14}, 0}, {{7, 14}, 3}, {{36, 36}, 0}, {{27, 40}, 3}},
+    {{{2, 2}, 0}, {{12, 40}, 1}, {{36, 36}, 0}, {{28, 40}, 3}},
+    {{{11, 40}, 0}, {{4, 40}, 1}, {{36, 36}, 0}, {{28, 40}, 3}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{1, 1}, 0}, {{17, 17}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{25, 25}, 0}, {{17, 17}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{12, 12}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{1, 1}, 0}, {{35, 35}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{25, 25}, 0}, {{35, 35}, 0}, {{25, 25}, 0}, {{35, 35}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{26, 40}, 2}, {{32, 35}, 2}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{19, 40}, 2}, {{35, 35}, 0}},
+    {{{5, 2}, 0}, {{17, 17}, 0}, {{23, 40}, 2}, {{35, 35}, 0}},
+    {{{11, 40}, 0}, {{17, 17}, 0}, {{19, 40}, 2}, {{35, 35}, 0}},
+    {{{0, 0}, 0}, {{12, 12}, 0}, {{26, 40}, 2}, {{32, 35}, 2}},
+    {{{14, 14}, 0}, {{12, 12}, 0}, {{19, 40}, 2}, {{35, 35}, 0}},
+    {{{2, 2}, 0}, {{35, 35}, 0}, {{26, 40}, 2}, {{32, 35}, 2}},
+    {{{3, 40}, 0}, {{35, 35}, 0}, {{19, 40}, 2}, {{35, 35}, 0}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{20, 25}, 3}, {{27, 40}, 3}},
+    {{{11, 11}, 0}, {{9, 9}, 0}, {{20, 25}, 3}, {{27, 40}, 3}},
+    {{{1, 1}, 0}, {{8, 18}, 1}, {{25, 25}, 0}, {{28, 40}, 3}},
+    {{{25, 25}, 0}, {{18, 18}, 0}, {{20, 25}, 3}, {{27, 40}, 3}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{25, 25}, 0}, {{39, 40}, 3}},
+    {{{11, 11}, 0}, {{14, 14}, 0}, {{25, 25}, 0}, {{39, 40}, 3}},
+    {{{1, 1}, 0}, {{12, 40}, 1}, {{25, 25}, 0}, {{39, 40}, 3}},
+    {{{25, 25}, 0}, {{4, 40}, 1}, {{25, 25}, 0}, {{39, 40}, 3}},
+    {{{0, 0}, 0}, {{9, 9}, 0}, {{23, 40}, 2}, {{28, 40}, 3}},
+    {{{14, 14}, 0}, {{9, 9}, 0}, {{19, 40}, 2}, {{28, 40}, 3}},
+    {{{2, 2}, 0}, {{18, 18}, 0}, {{23, 40}, 2}, {{28, 40}, 3}},
+    {{{11, 40}, 0}, {{18, 18}, 0}, {{19, 40}, 2}, {{28, 40}, 3}},
+    {{{0, 0}, 0}, {{14, 14}, 0}, {{23, 40}, 2}, {{39, 40}, 3}},
+    {{{14, 14}, 0}, {{14, 14}, 0}, {{19, 40}, 2}, {{39, 40}, 3}},
+    {{{2, 2}, 0}, {{12, 40}, 1}, {{23, 40}, 2}, {{39, 40}, 3}},
+    {{{3, 40}, 0}, {{4, 40}, 1}, {{19, 40}, 2}, {{39, 40}, 3}},
+};
+
+struct HQ2xPlanes
+{
+    int                   stride;
+    std::vector<uint8_t>  luma;
+    std::vector<uint8_t>  blue_difference;
+    std::vector<uint8_t>  red_difference;
+    std::vector<uint8_t>  alpha;
+    std::vector<uint64_t> colors;
+};
+
+static inline int HQ2xSourceIndex(int index, int size, bool wrap)
 {
     if (wrap)
         return ((index % size) + size) % size;
@@ -64,161 +360,310 @@ static inline int XBRSourceIndex(int index, int size, bool wrap)
     return index;
 }
 
-static inline epi::SimdI32x4 XBRDistance(epi::SimdI32x4 a, epi::SimdI32x4 b)
+static inline epi::SimdU8x16 HQ2xAbsoluteDifference(const std::vector<uint8_t> &plane, size_t a, size_t b)
 {
-    return epi::AbsI32x4(epi::SubI32x4(a, b));
+    epi::SimdU8x16 first  = epi::LoadU8x16(plane.data() + a);
+    epi::SimdU8x16 second = epi::LoadU8x16(plane.data() + b);
+
+    return epi::OrU8x16(epi::SubSaturateU8x16(first, second), epi::SubSaturateU8x16(second, first));
 }
 
-static inline epi::SimdI32x4 XBRCorner(epi::SimdI32x4 e, epi::SimdI32x4 b, epi::SimdI32x4 c, epi::SimdI32x4 d,
-                                       epi::SimdI32x4 f, epi::SimdI32x4 g, epi::SimdI32x4 h, epi::SimdI32x4 i,
-                                       epi::SimdI32x4 i4, epi::SimdI32x4 i5, epi::SimdI32x4 h5, epi::SimdI32x4 f4,
-                                       epi::SimdI32x4 color_e, epi::SimdI32x4 color_f, epi::SimdI32x4 color_h)
+static inline epi::SimdU8x16 HQ2xFlag(const HQ2xPlanes &planes, size_t a, size_t b, uint8_t bit)
 {
-    epi::SimdI32x4 same_as_neighbor = epi::OrI32x4(epi::CmpEqI32x4(e, f), epi::CmpEqI32x4(e, h));
+    epi::SimdU8x16 luma =
+        epi::SubSaturateU8x16(HQ2xAbsoluteDifference(planes.luma, a, b), epi::SplatU8x16(kHQ2xLumaThreshold));
+    epi::SimdU8x16 blue_difference = epi::SubSaturateU8x16(HQ2xAbsoluteDifference(planes.blue_difference, a, b),
+                                                           epi::SplatU8x16(kHQ2xChromaThreshold));
+    epi::SimdU8x16 red_difference  = epi::SubSaturateU8x16(HQ2xAbsoluteDifference(planes.red_difference, a, b),
+                                                           epi::SplatU8x16(kHQ2xChromaThreshold));
+    epi::SimdU8x16 alpha           = HQ2xAbsoluteDifference(planes.alpha, a, b);
 
-    epi::SimdI32x4 distance_ef = XBRDistance(e, f);
-    epi::SimdI32x4 distance_eh = XBRDistance(e, h);
+    epi::SimdU8x16 exceeded = epi::OrU8x16(epi::OrU8x16(luma, blue_difference), epi::OrU8x16(red_difference, alpha));
+    epi::SimdU8x16 same     = epi::CmpEqU8x16(exceeded, epi::SplatU8x16(0));
 
-    epi::SimdI32x4 weight_across =
-        epi::AddI32x4(epi::AddI32x4(XBRDistance(e, c), XBRDistance(e, g)),
-                      epi::AddI32x4(epi::AddI32x4(XBRDistance(i, h5), XBRDistance(i, f4)),
-                                    epi::ShiftLeftI32x4<2>(XBRDistance(h, f))));
-    epi::SimdI32x4 weight_along =
-        epi::AddI32x4(epi::AddI32x4(XBRDistance(h, d), XBRDistance(h, i5)),
-                      epi::AddI32x4(epi::AddI32x4(XBRDistance(f, i4), XBRDistance(f, b)),
-                                    epi::ShiftLeftI32x4<2>(XBRDistance(e, i))));
-
-    epi::SimdI32x4 no_edge =
-        epi::OrI32x4(same_as_neighbor,
-                     epi::CmpGtI32x4(epi::AddI32x4(weight_across, epi::SplatI32x4(kXBREdgeBias)), weight_along));
-
-    epi::SimdI32x4 nearest = epi::SelectI32x4(epi::CmpGtI32x4(distance_ef, distance_eh), color_h, color_f);
-
-    return epi::SelectI32x4(no_edge, color_e, nearest);
+    return epi::AndNotU8x16(epi::SplatU8x16(bit), same);
 }
 
-ImageData *ImageXBR(const ImageData *image, bool wrap)
+static inline uint64_t HQ2xSpread(uint32_t color)
+{
+    uint64_t spread = color;
+    spread          = (spread | (spread << 16)) & 0x0000FFFF0000FFFFull;
+    return (spread | (spread << 8)) & kHQ2xChannelMask;
+}
+
+static inline int HQ2xAbsolute(int value)
+{
+    return value < 0 ? -value : value;
+}
+
+static inline uint8_t HQ2xDifferentScalar(const HQ2xPlanes &planes, size_t a, size_t b)
+{
+    int luma            = HQ2xAbsolute(planes.luma[a] - planes.luma[b]);
+    int blue_difference = HQ2xAbsolute(planes.blue_difference[a] - planes.blue_difference[b]);
+    int red_difference  = HQ2xAbsolute(planes.red_difference[a] - planes.red_difference[b]);
+
+    return (uint8_t)((luma > kHQ2xLumaThreshold) | (blue_difference > kHQ2xChromaThreshold) |
+                     (red_difference > kHQ2xChromaThreshold) | (planes.alpha[a] != planes.alpha[b]));
+}
+
+static inline void HQ2xBuildEdges(const HQ2xPlanes &planes, int width, int height, std::vector<uint8_t> &edges)
+{
+    edges.assign(planes.luma.size(), 0);
+
+    for (int py = 0; py <= height; py++)
+    {
+        for (int px = 0; px <= width; px++)
+        {
+            size_t index = (size_t)py * planes.stride + px;
+            size_t right = index + 1;
+            size_t below = index + planes.stride;
+
+            edges[index] =
+                (uint8_t)(HQ2xDifferentScalar(planes, index, right) | (HQ2xDifferentScalar(planes, index, below) << 1) |
+                          (HQ2xDifferentScalar(planes, index, below + 1) << 2) |
+                          (HQ2xDifferentScalar(planes, right, below) << 3));
+        }
+    }
+}
+
+static inline void HQ2xScalarKey(const std::vector<uint8_t> &edges, size_t center, size_t stride, uint8_t *pattern,
+                                 uint8_t *condition)
+{
+    uint8_t upper_left = edges[center - stride - 1];
+    uint8_t upper      = edges[center - stride];
+    uint8_t left       = edges[center - 1];
+    uint8_t here       = edges[center];
+
+    *pattern   = (uint8_t)(((upper_left >> 2) & 1) | (upper & 2) | ((upper >> 1) & 4) | ((left << 3) & 8) |
+                         ((here << 4) & 0x10) | ((left << 2) & 0x20) | ((here << 5) & 0x40) | ((here << 5) & 0x80));
+    *condition = (uint8_t)(((upper_left >> 3) & 1) | ((upper >> 1) & 2) | (left & 4) | (here & 8));
+}
+
+struct HQ2xRuleLookup
+{
+    uint8_t rule[4096][4];
+};
+
+static constexpr HQ2xRuleLookup HQ2xBuildRuleLookup()
+{
+    HQ2xRuleLookup lookup = {};
+
+    for (int key = 0; key < 4096; key++)
+    {
+        int pattern = key & 0xFF;
+        int flags   = key >> 8;
+
+        for (int subpixel = 0; subpixel < 4; subpixel++)
+        {
+            const HQ2xPatternRule &entry = kHQ2xPatterns[pattern][subpixel];
+            lookup.rule[key][subpixel]   = entry.rule[(flags >> entry.condition) & 1];
+        }
+    }
+
+    return lookup;
+}
+
+static constexpr HQ2xRuleLookup kHQ2xRuleLookup = HQ2xBuildRuleLookup();
+
+struct HQ2xRuleTaps
+{
+    ptrdiff_t offset[3];
+    uint64_t  weight[3];
+};
+
+static inline uint32_t HQ2xBlend(const uint64_t *center, const HQ2xRuleTaps &taps)
+{
+    uint64_t sum = taps.weight[0] * center[taps.offset[0]] + taps.weight[1] * center[taps.offset[1]] +
+                   taps.weight[2] * center[taps.offset[2]];
+
+    sum = (sum >> 4) & kHQ2xChannelMask;
+    sum = (sum | (sum >> 8)) & 0x0000FFFF0000FFFFull;
+    return (uint32_t)(sum | (sum >> 16));
+}
+
+ImageData *ImageHQ2x(const ImageData *image, bool wrap)
 {
     int width  = image->width_;
     int height = image->height_;
     int depth  = image->depth_;
 
-    int groups        = (width + 3) / 4;
-    int padded_width  = groups * 4 + kXBRBorder * 2;
-    int padded_height = height + kXBRBorder * 2;
+    bool opaque = true;
 
-    std::vector<int32_t> keys((size_t)padded_width * padded_height);
-    std::vector<int32_t> colors((size_t)padded_width * padded_height);
-
-    std::vector<int32_t> row_keys(width);
-    std::vector<int32_t> row_colors(width);
-
-    for (int py = 0; py < padded_height; py++)
+    if (depth == 4)
     {
-        int            sy  = XBRSourceIndex(py - kXBRBorder, height, wrap);
+        for (int index = 0; index < width * height && opaque; index++)
+            opaque = image->pixels_[index * 4 + 3] == 255;
+    }
+
+    HQ2xPlanes planes;
+    planes.stride = ((width + kHQ2xGroup - 1) & ~(kHQ2xGroup - 1)) + kHQ2xBorder * 2;
+
+    size_t count = (size_t)planes.stride * (height + kHQ2xBorder * 2);
+
+    planes.luma.assign(count, 0);
+    planes.blue_difference.assign(count, 0);
+    planes.red_difference.assign(count, 0);
+    planes.alpha.assign(count, 0);
+    planes.colors.assign(count, 0);
+
+    std::vector<uint8_t>  row_luma(width);
+    std::vector<uint8_t>  row_blue_difference(width);
+    std::vector<uint8_t>  row_red_difference(width);
+    std::vector<uint8_t>  row_alpha(width);
+    std::vector<uint64_t> row_colors(width);
+
+    for (int py = 0; py < height + kHQ2xBorder * 2; py++)
+    {
+        int            sy  = HQ2xSourceIndex(py - kHQ2xBorder, height, wrap);
         const uint8_t *src = image->pixels_ + (size_t)sy * width * depth;
 
         for (int x = 0; x < width; x++, src += depth)
         {
-            uint8_t rgba[4] = {src[0], src[1], src[2], (uint8_t)((depth == 4) ? src[3] : 255)};
+            int32_t red   = src[0];
+            int32_t green = src[1];
+            int32_t blue  = src[2];
+            int32_t alpha = (depth == 4) ? src[3] : 255;
 
-            int32_t luma = kXBRLumaRed * rgba[0] + kXBRLumaGreen * rgba[1] + kXBRLumaBlue * rgba[2];
+            if (alpha == 0)
+                red = green = blue = 0;
+            else if (alpha != 255)
+            {
+                red   = (red * alpha + 127) / 255;
+                green = (green * alpha + 127) / 255;
+                blue  = (blue * alpha + 127) / 255;
+            }
 
-            row_keys[x] = luma * rgba[3] / 255 - (255 - rgba[3]) * kXBRLumaUnit;
-            memcpy(&row_colors[x], rgba, 4);
+            row_luma[x]            = (uint8_t)((red * 77 + green * 150 + blue * 29) >> 8);
+            row_blue_difference[x] = (uint8_t)(128 + ((-red * 38 - green * 74 + blue * 111) >> 9));
+            row_red_difference[x]  = (uint8_t)(128 + ((red * 157 - green * 132 - blue * 26) >> 9));
+            row_alpha[x]           = (uint8_t)alpha;
+            row_colors[x] = HQ2xSpread(epi::MakeRGBA((uint8_t)red, (uint8_t)green, (uint8_t)blue, (uint8_t)alpha));
         }
 
-        int32_t *key_row   = keys.data() + (size_t)py * padded_width;
-        int32_t *color_row = colors.data() + (size_t)py * padded_width;
+        size_t row = (size_t)py * planes.stride + kHQ2xBorder;
 
-        for (int px = 0; px < padded_width; px++)
+        memcpy(planes.luma.data() + row, row_luma.data(), width);
+        memcpy(planes.blue_difference.data() + row, row_blue_difference.data(), width);
+        memcpy(planes.red_difference.data() + row, row_red_difference.data(), width);
+        memcpy(planes.alpha.data() + row, row_alpha.data(), width);
+        memcpy(planes.colors.data() + row, row_colors.data(), width * sizeof(uint64_t));
+
+        for (int border = 0; border < kHQ2xBorder; border++)
         {
-            int sx        = XBRSourceIndex(px - kXBRBorder, width, wrap);
-            key_row[px]   = row_keys[sx];
-            color_row[px] = row_colors[sx];
+            int left_column  = -1 - border;
+            int right_column = width + border;
+
+            int left_source  = HQ2xSourceIndex(left_column, width, wrap);
+            int right_source = HQ2xSourceIndex(right_column, width, wrap);
+
+            planes.luma[row + left_column]             = row_luma[left_source];
+            planes.blue_difference[row + left_column]  = row_blue_difference[left_source];
+            planes.red_difference[row + left_column]   = row_red_difference[left_source];
+            planes.alpha[row + left_column]            = row_alpha[left_source];
+            planes.colors[row + left_column]           = row_colors[left_source];
+            planes.luma[row + right_column]            = row_luma[right_source];
+            planes.blue_difference[row + right_column] = row_blue_difference[right_source];
+            planes.red_difference[row + right_column]  = row_red_difference[right_source];
+            planes.alpha[row + right_column]           = row_alpha[right_source];
+            planes.colors[row + right_column]          = row_colors[right_source];
         }
     }
 
     ImageData *result = new ImageData(width * 2, height * 2, 4);
 
-    int32_t tail[16];
+    uint8_t patterns[kHQ2xGroup];
+    uint8_t conditions[kHQ2xGroup];
+
+    ptrdiff_t up   = -(ptrdiff_t)planes.stride;
+    ptrdiff_t down = planes.stride;
+
+    const ptrdiff_t offsets[9] = {up - 1, up, up + 1, -1, 0, 1, down - 1, down, down + 1};
+
+    HQ2xRuleTaps rule_taps[kHQ2xRuleCount];
+
+    for (int rule = 0; rule < kHQ2xRuleCount; rule++)
+    {
+        for (int tap = 0; tap < 3; tap++)
+        {
+            rule_taps[rule].offset[tap] = offsets[kHQ2xRules[rule].neighbor[tap]];
+            rule_taps[rule].weight[tap] = kHQ2xRules[rule].weight[tap];
+        }
+    }
+
+    std::vector<uint8_t> edges;
+
+    if (!epi::kSimdAvailable)
+        HQ2xBuildEdges(planes, width, height, edges);
 
     for (int y = 0; y < height; y++)
     {
-        const int32_t *k0 = keys.data() + (size_t)(y + kXBRBorder) * padded_width + kXBRBorder;
-        const int32_t *km = k0 - padded_width;
-        const int32_t *kn = k0 - padded_width * 2;
-        const int32_t *kp = k0 + padded_width;
-        const int32_t *kq = k0 + padded_width * 2;
-        const int32_t *c0 = colors.data() + (size_t)(y + kXBRBorder) * padded_width + kXBRBorder;
-        const int32_t *cm = c0 - padded_width;
-        const int32_t *cp = c0 + padded_width;
+        size_t row = (size_t)(y + kHQ2xBorder) * planes.stride + kHQ2xBorder;
 
-        int32_t *top    = (int32_t *)result->pixels_ + (size_t)(y * 2) * (width * 2);
-        int32_t *bottom = top + width * 2;
+        uint32_t *top    = (uint32_t *)result->pixels_ + (size_t)(y * 2) * (width * 2);
+        uint32_t *bottom = top + width * 2;
 
-        for (int x = 0; x < width; x += 4)
+        for (int x = 0; x < width; x += kHQ2xGroup)
         {
-            epi::SimdI32x4 A1 = epi::LoadI32x4(kn + x - 1);
-            epi::SimdI32x4 B1 = epi::LoadI32x4(kn + x);
-            epi::SimdI32x4 C1 = epi::LoadI32x4(kn + x + 1);
+            size_t center = row + x;
 
-            epi::SimdI32x4 A0 = epi::LoadI32x4(km + x - 2);
-            epi::SimdI32x4 A  = epi::LoadI32x4(km + x - 1);
-            epi::SimdI32x4 B  = epi::LoadI32x4(km + x);
-            epi::SimdI32x4 C  = epi::LoadI32x4(km + x + 1);
-            epi::SimdI32x4 C4 = epi::LoadI32x4(km + x + 2);
+            int lanes = (width - x < kHQ2xGroup) ? width - x : kHQ2xGroup;
 
-            epi::SimdI32x4 D0 = epi::LoadI32x4(k0 + x - 2);
-            epi::SimdI32x4 D  = epi::LoadI32x4(k0 + x - 1);
-            epi::SimdI32x4 E  = epi::LoadI32x4(k0 + x);
-            epi::SimdI32x4 F  = epi::LoadI32x4(k0 + x + 1);
-            epi::SimdI32x4 F4 = epi::LoadI32x4(k0 + x + 2);
-
-            epi::SimdI32x4 G0 = epi::LoadI32x4(kp + x - 2);
-            epi::SimdI32x4 G  = epi::LoadI32x4(kp + x - 1);
-            epi::SimdI32x4 H  = epi::LoadI32x4(kp + x);
-            epi::SimdI32x4 I  = epi::LoadI32x4(kp + x + 1);
-            epi::SimdI32x4 I4 = epi::LoadI32x4(kp + x + 2);
-
-            epi::SimdI32x4 G5 = epi::LoadI32x4(kq + x - 1);
-            epi::SimdI32x4 H5 = epi::LoadI32x4(kq + x);
-            epi::SimdI32x4 I5 = epi::LoadI32x4(kq + x + 1);
-
-            epi::SimdI32x4 color_b = epi::LoadI32x4(cm + x);
-            epi::SimdI32x4 color_d = epi::LoadI32x4(c0 + x - 1);
-            epi::SimdI32x4 color_e = epi::LoadI32x4(c0 + x);
-            epi::SimdI32x4 color_f = epi::LoadI32x4(c0 + x + 1);
-            epi::SimdI32x4 color_h = epi::LoadI32x4(cp + x);
-
-            epi::SimdI32x4 bottom_right = XBRCorner(E, B, C, D, F, G, H, I, I4, I5, H5, F4, color_e, color_f, color_h);
-            epi::SimdI32x4 top_right    = XBRCorner(E, D, A, H, B, I, F, C, C1, C4, F4, B1, color_e, color_b, color_f);
-            epi::SimdI32x4 top_left     = XBRCorner(E, H, G, F, D, C, B, A, A0, A1, B1, D0, color_e, color_d, color_b);
-            epi::SimdI32x4 bottom_left  = XBRCorner(E, F, I, B, H, A, D, G, G5, G0, D0, H5, color_e, color_h, color_d);
-
-            epi::SimdI32x4 top_lo    = epi::InterleaveLoI32x4(top_left, top_right);
-            epi::SimdI32x4 top_hi    = epi::InterleaveHiI32x4(top_left, top_right);
-            epi::SimdI32x4 bottom_lo = epi::InterleaveLoI32x4(bottom_left, bottom_right);
-            epi::SimdI32x4 bottom_hi = epi::InterleaveHiI32x4(bottom_left, bottom_right);
-
-            if (x + 4 <= width)
+            if (epi::kSimdAvailable)
             {
-                epi::StoreI32x4(top + x * 2, top_lo);
-                epi::StoreI32x4(top + x * 2 + 4, top_hi);
-                epi::StoreI32x4(bottom + x * 2, bottom_lo);
-                epi::StoreI32x4(bottom + x * 2 + 4, bottom_hi);
+                epi::SimdU8x16 pattern = HQ2xFlag(planes, center, center + up - 1, 0x01);
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + up, 0x02));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + up + 1, 0x04));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center - 1, 0x08));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + 1, 0x10));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + down - 1, 0x20));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + down, 0x40));
+                pattern                = epi::OrU8x16(pattern, HQ2xFlag(planes, center, center + down + 1, 0x80));
+
+                epi::SimdU8x16 condition = HQ2xFlag(planes, center - 1, center + up, 0x01);
+                condition                = epi::OrU8x16(condition, HQ2xFlag(planes, center + up, center + 1, 0x02));
+                condition                = epi::OrU8x16(condition, HQ2xFlag(planes, center + down, center - 1, 0x04));
+                condition                = epi::OrU8x16(condition, HQ2xFlag(planes, center + 1, center + down, 0x08));
+
+                epi::StoreU8x16(patterns, pattern);
+                epi::StoreU8x16(conditions, condition);
             }
             else
             {
-                size_t bytes = (size_t)(width - x) * 2 * sizeof(int32_t);
+                for (int lane = 0; lane < lanes; lane++)
+                    HQ2xScalarKey(edges, center + lane, planes.stride, &patterns[lane], &conditions[lane]);
+            }
 
-                epi::StoreI32x4(tail, top_lo);
-                epi::StoreI32x4(tail + 4, top_hi);
-                memcpy(top + x * 2, tail, bytes);
+            for (int lane = 0; lane < lanes; lane++)
+            {
+                const uint64_t *colors = planes.colors.data() + center + lane;
+                const uint8_t  *rules  = kHQ2xRuleLookup.rule[patterns[lane] | (conditions[lane] << 8)];
 
-                epi::StoreI32x4(tail + 8, bottom_lo);
-                epi::StoreI32x4(tail + 12, bottom_hi);
-                memcpy(bottom + x * 2, tail + 8, bytes);
+                uint32_t *out_top    = top + (x + lane) * 2;
+                uint32_t *out_bottom = bottom + (x + lane) * 2;
+
+                out_top[0]    = HQ2xBlend(colors, rule_taps[rules[0]]);
+                out_top[1]    = HQ2xBlend(colors, rule_taps[rules[1]]);
+                out_bottom[0] = HQ2xBlend(colors, rule_taps[rules[2]]);
+                out_bottom[1] = HQ2xBlend(colors, rule_taps[rules[3]]);
+            }
+        }
+    }
+
+    if (!opaque)
+    {
+        uint8_t *pixel = result->pixels_;
+
+        for (int index = 0; index < width * height * 4; index++, pixel += 4)
+        {
+            int alpha = pixel[3];
+
+            if (alpha == 0 || alpha == 255)
+                continue;
+
+            for (int channel = 0; channel < 3; channel++)
+            {
+                int value      = (pixel[channel] * 255 + alpha / 2) / alpha;
+                pixel[channel] = (uint8_t)(value > 255 ? 255 : value);
             }
         }
     }
