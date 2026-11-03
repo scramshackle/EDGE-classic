@@ -40,6 +40,7 @@ enum DDFMusicType
     kDDFMusicIMF280,
     kDDFMusicIMF560,
     kDDFMusicIMF700,
+    kDDFMusicORG,
     kTotalDDFMusicTypes
 };
 

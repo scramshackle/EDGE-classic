@@ -363,6 +363,7 @@ void ChangeMusic(int entry_number, bool loop)
         break;
     case kSoundMUS:
     case kSoundMIDI:
+    case kSoundORG:
         delete F;
         music_player = PlayMIDIMusic(data, length, loop);
         break;

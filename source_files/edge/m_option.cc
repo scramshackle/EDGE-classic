@@ -2204,6 +2204,7 @@ static void OptionMenuChangeLanguage(int key_pressed, ConsoleVariable *console_v
 //
 static void OptionMenuChangeSoundbank(int key_pressed, ConsoleVariable *console_variable)
 {
+    EPI_UNUSED(key_pressed);
     console_variable->operator=(console_variable->d_);
     RestartMIDI();
 }

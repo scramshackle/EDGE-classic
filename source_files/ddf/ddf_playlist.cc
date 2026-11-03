@@ -39,6 +39,7 @@ static void InitializeMusicTypes()
     supported_music_types.push_back("IMF280");
     supported_music_types.push_back("IMF560");
     supported_music_types.push_back("IMF700");
+    supported_music_types.push_back("ORG");
 }
 
 //
