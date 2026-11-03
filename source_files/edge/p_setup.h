@@ -35,6 +35,9 @@ extern epi::CRC32 map_things_crc;
 
 extern int total_map_things;
 
+extern uint32_t level_serial;
+extern bool     udmf_level;
+
 // Called by startup code.
 void PlayerStateInit(void);
 

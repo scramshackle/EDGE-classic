@@ -28,6 +28,7 @@
 #include <math.h>
 
 #include <map>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -74,6 +75,7 @@
 #include "w_wad.h"
 
 static bool level_active  = false;
+uint32_t    level_serial  = 0;
 static bool id_arg0_split = false;
 
 EDGE_DEFINE_CONSOLE_VARIABLE(udmf_strict_namespace, "1", kConsoleVariableFlagArchive)
@@ -109,7 +111,7 @@ epi::CRC32 map_things_crc;
 
 int total_map_things;
 
-static bool        udmf_level;
+bool               udmf_level;
 static int         udmf_lump_number;
 static std::string udmf_lump;
 
@@ -2984,6 +2986,8 @@ void LevelSetup(void)
     if (level_active)
         ShutdownLevel();
 
+    level_serial++;
+
     // -ACB- 1998/08/27 nullptr the head pointers for the linked lists....
     respawn_queue_head   = nullptr;
     map_object_list_head = nullptr;
@@ -3018,6 +3022,15 @@ void LevelSetup(void)
     map_sectors_crc.Reset();
     map_lines_crc.Reset();
     map_things_crc.Reset();
+
+    if (udmf_level)
+    {
+        std::span<const uint8_t> textmap((const uint8_t *)udmf_lump.data(), udmf_lump.size());
+
+        map_sectors_crc.AddBlock(textmap);
+        map_lines_crc.AddBlock(textmap);
+        map_things_crc.AddBlock(textmap);
+    }
 
     // note: most of this ordering is important
     // 23-6-98 KM, eg, Sectors must be loaded before sidedefs,

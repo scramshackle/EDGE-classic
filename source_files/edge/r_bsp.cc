@@ -42,6 +42,7 @@
 #include "i_system.h"
 #include "m_bbox.h"
 #include "p_local.h"
+#include "p_setup.h"
 #include "p_spec.h"
 #include "p_tick.h"
 #include "r_backend.h"
@@ -501,16 +502,14 @@ static bool LineSideIsMirrorCandidate(const LineSide *line_side)
 }
 
 static std::vector<int32_t> mirror_candidates;
-static const LineSide      *mirror_candidate_base  = nullptr;
-static int                  mirror_candidate_count = 0;
+static uint32_t             mirror_candidate_serial = 0;
 
 static void RefreshMirrorCandidates(void)
 {
-    if (mirror_candidate_base == level_line_sides && mirror_candidate_count == total_level_lines)
+    if (mirror_candidate_serial == level_serial)
         return;
 
-    mirror_candidate_base  = level_line_sides;
-    mirror_candidate_count = total_level_lines;
+    mirror_candidate_serial = level_serial;
 
     mirror_candidates.clear();
 
@@ -615,7 +614,7 @@ static std::vector<int>              sky_changed_sectors;
 static std::vector<int>              sky_walk_sectors;
 static std::vector<int>              sky_walk_sector_candidates;
 static std::vector<int>              sky_walk_line_side_candidates;
-static const Sector                 *sky_candidate_base       = nullptr;
+static uint32_t                      sky_candidate_serial     = 0;
 static uint32_t                      sky_candidate_generation = 0;
 static uint32_t                      sky_candidate_resident   = 0;
 static int                           sky_candidate_countdown  = 0;
@@ -626,7 +625,7 @@ static constexpr int32_t kSkyTallerNone = -1;
 static constexpr int32_t kSkyTallerMany = -2;
 
 static std::vector<int32_t> sky_taller_neighbour;
-static const Sector        *sky_taller_base = nullptr;
+static uint32_t             sky_taller_serial = 0;
 
 static int32_t SkyFindTallerNeighbour(const Sector *sector)
 {
@@ -673,13 +672,12 @@ static void SkySetTallerNeighbour(size_t index, int32_t value)
 
 static void SkyRefreshTallerNeighbours(const std::vector<int> &changed, bool everything)
 {
-    if (everything || sky_taller_base != level_sectors ||
-        sky_taller_neighbour.size() != (size_t)total_level_sectors)
+    if (everything || sky_taller_serial != level_serial)
     {
-        if (sky_taller_base != level_sectors || sky_taller_neighbour.size() != (size_t)total_level_sectors)
+        if (sky_taller_serial != level_serial)
             sky_taller_neighbour.assign((size_t)total_level_sectors, kSkyTallerNone);
 
-        sky_taller_base = level_sectors;
+        sky_taller_serial = level_serial;
 
         for (int i = 0; i < total_level_sectors; i++)
             SkySetTallerNeighbour((size_t)i, SkyFindTallerNeighbour(level_sectors + i));
@@ -726,7 +724,7 @@ bool SkyEntryClipNeeded(const Sector *entered, const Sector *from)
 
     size_t index = (size_t)(entered - level_sectors);
 
-    if (sky_taller_base != level_sectors || index >= sky_taller_neighbour.size())
+    if (sky_taller_serial != level_serial || index >= sky_taller_neighbour.size())
         return true;
 
     int32_t taller = sky_taller_neighbour[index];
@@ -804,8 +802,7 @@ static void SkyListEverything(void)
 
 static void RefreshSkyCandidates(void)
 {
-    bool changed = (sky_candidate_base != level_sectors || (int)sky_sector_flags.size() != total_level_sectors ||
-                    sky_candidate_resident != SkyResidentGeneration());
+    bool changed = (sky_candidate_serial != level_serial || sky_candidate_resident != SkyResidentGeneration());
 
     if (!changed && sky_candidate_generation == StaticGeometryGeneration() && sky_candidate_countdown > 0)
     {
@@ -818,7 +815,7 @@ static void RefreshSkyCandidates(void)
 
     if (changed)
     {
-        sky_candidate_base     = level_sectors;
+        sky_candidate_serial   = level_serial;
         sky_candidate_resident = SkyResidentGeneration();
         sky_sector_flags.assign((size_t)total_level_sectors, 0);
     }
@@ -1422,8 +1419,7 @@ DrawSector *BakeDrawSector(Sector *sector)
 
 static std::vector<int> view_grid_starts;
 static std::vector<int> view_grid_sectors;
-static const Sector    *view_grid_base   = nullptr;
-static int              view_grid_count  = 0;
+static uint32_t         view_grid_serial   = 0;
 static float            view_grid_origin_x = 0.0f;
 static float            view_grid_origin_y = 0.0f;
 static float            view_grid_cell     = 128.0f;
@@ -1432,8 +1428,7 @@ static int              view_grid_height   = 0;
 
 static void BuildViewGrid(void)
 {
-    view_grid_base  = level_sectors;
-    view_grid_count = total_level_sectors;
+    view_grid_serial = level_serial;
 
     view_grid_starts.clear();
     view_grid_sectors.clear();
@@ -1918,7 +1913,7 @@ bool SectorReachedThisView(const Sector *sector)
 
 void EnumerateViewSectors(void)
 {
-    if (view_grid_base != level_sectors || view_grid_count != total_level_sectors)
+    if (view_grid_serial != level_serial)
         BuildViewGrid();
 
     if (active_mirror_set.TotalActive() == 0 && clip_scope != epi::kBAMAngle180 && total_level_sectors > 0)

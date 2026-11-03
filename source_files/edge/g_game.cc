@@ -839,9 +839,18 @@ static bool GameLoadGameFromFile(const std::string &filename, bool is_hub)
 
     // -- Check LEVEL consistency (crc) --
 
-    if (globs->mapsector.count != total_level_sectors || globs->mapsector.crc != map_sectors_crc.GetCRC() ||
-        globs->mapline.count != total_level_lines || globs->mapline.crc != map_lines_crc.GetCRC() ||
-        globs->mapthing.count != total_map_things || globs->mapthing.crc != map_things_crc.GetCRC())
+    epi::CRC32 unhashed;
+
+    bool unhashed_udmf_save = udmf_level && globs->mapsector.crc == unhashed.GetCRC() &&
+                              globs->mapline.crc == unhashed.GetCRC() && globs->mapthing.crc == unhashed.GetCRC();
+
+    bool counts_match = globs->mapsector.count == total_level_sectors && globs->mapline.count == total_level_lines &&
+                        globs->mapthing.count == total_map_things;
+
+    bool crcs_match = globs->mapsector.crc == map_sectors_crc.GetCRC() &&
+                      globs->mapline.crc == map_lines_crc.GetCRC() && globs->mapthing.crc == map_things_crc.GetCRC();
+
+    if (!counts_match || (!crcs_match && !unhashed_udmf_save))
     {
         SaveFileCloseRead();
 
